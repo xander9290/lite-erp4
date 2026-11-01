@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body className="h-screen flex flex-col overflow-hidden">{children}</body>
     </html>
   );
 }
