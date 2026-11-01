@@ -2,6 +2,6 @@
 @plugin "daisyui" {
   themes:
     corporate --default,
-    dark --prefersdark,
+    dracula --prefersdark,
     corporate;
 }
