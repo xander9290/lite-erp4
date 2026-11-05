@@ -1,17 +1,44 @@
-import { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import Clock from "@/components/Clock";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import UserMenu from "@/components/login/UserMenu";
+import { getCurrentUser } from "@/lib/auth/access";
 
-export default function LayoutErp({ children }: { children: ReactNode }) {
+async function ProtectedErp({ children }: { children: ReactNode }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/auth");
   return (
     <div className="flex-1 flex min-h-0 min-w-0 flex-col overflow-hidden gap-1">
-      <header className="min-h-12 sm:min-h-10 shrink-0 flex flex-wrap items-center gap-2 px-2 py-1 bg-base-100 rounded-md">
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <Clock />
-          <ThemeToggle />
+      <header className="relative z-40 grid min-h-14 shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-md bg-base-100 px-3 py-2 sm:flex">
+        <Link href="/erp" className="btn btn-ghost btn-sm font-semibold">
+          Lite ERP
+        </Link>
+        <div className="contents sm:ml-auto sm:flex sm:items-center sm:gap-3">
+          <div className="col-span-2 row-start-2 flex items-center justify-end gap-2 sm:contents">
+            <Clock />
+            <ThemeToggle />
+          </div>
+          <UserMenu user={{ login: user.login, name: user.name, image: user.image, isAdmin: user.isAdmin }} />
         </div>
       </header>
       <main className="rounded-md flex-1 flex flex-col min-h-0 min-w-0 bg-base-100">{children}</main>
     </div>
+  );
+}
+
+export default function LayoutErp({ children }: { children: ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div role="status" className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-base-100 text-sm text-base-content/60">
+          <span className="loading loading-spinner loading-sm" />
+          Cargando…
+        </div>
+      }
+    >
+      <ProtectedErp>{children}</ProtectedErp>
+    </Suspense>
   );
 }

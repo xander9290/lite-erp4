@@ -1,0 +1,17 @@
+model User {
+    id        String    @id @default(cuid())
+    login     String    @unique
+    password  String
+    lastLogin DateTime? @map("last_login")
+    active Boolean @default(true)
+    isAdmin Boolean @default(false) @map("is_admin")
+    sessionVersion Int @default(0) @map("session_version")
+
+    partnerId String?  @unique @map("partner_id")
+    partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+    @@map("users")
+}

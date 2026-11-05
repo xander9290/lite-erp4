@@ -4,13 +4,14 @@ import { useEffect, useId } from "react";
 import toast from "react-hot-toast";
 import type { FieldErrors, FieldValues, UseFormReturn } from "react-hook-form";
 
-function collectErrors(value: unknown, path = "", errors = new Map<string, string>()) {
+const noSilentErrors: readonly string[] = [];
+function collectErrors(value: unknown, silentTypes: readonly string[], path = "", errors = new Map<string, string>()) {
   if (!value || typeof value !== "object") return errors;
 
   const entry = value as Record<string, unknown>;
   const isFieldError = typeof entry.type === "string" || typeof entry.message === "string";
 
-  if (isFieldError) {
+  if (isFieldError && !silentTypes.includes(String(entry.type))) {
     const message = typeof entry.message === "string" && entry.message.trim()
       ? entry.message
       : path ? `El campo "${path}" no es válido.` : "El formulario contiene un error.";
@@ -19,7 +20,7 @@ function collectErrors(value: unknown, path = "", errors = new Map<string, strin
 
   for (const [key, child] of Object.entries(entry)) {
     if (isFieldError && ["type", "message", "types", "ref"].includes(key)) continue;
-    collectErrors(child, path ? `${path}.${key}` : key, errors);
+    collectErrors(child, silentTypes, path ? `${path}.${key}` : key, errors);
   }
 
   return errors;
@@ -28,7 +29,7 @@ function collectErrors(value: unknown, path = "", errors = new Map<string, strin
 export default function useFormErrorToasts<TFieldValues extends FieldValues>({
   getErrors,
   subscribe,
-}: Pick<UseFormReturn<TFieldValues>, "getErrors" | "subscribe">) {
+}: Pick<UseFormReturn<TFieldValues>, "getErrors" | "subscribe">, silentTypes: readonly string[] = noSilentErrors) {
   const formId = useId();
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export default function useFormErrorToasts<TFieldValues extends FieldValues>({
     const toastId = (name: string) => `form-error-${formId}-${name}`;
 
     function syncErrors(errors: FieldErrors<TFieldValues>, submitCount = previousSubmitCount) {
-      const currentErrors = collectErrors(errors);
+      const currentErrors = collectErrors(errors, silentTypes);
       const submittedAgain = submitCount > previousSubmitCount;
 
       for (const name of previousErrors.keys()) {
@@ -64,5 +65,5 @@ export default function useFormErrorToasts<TFieldValues extends FieldValues>({
       unsubscribe();
       for (const name of previousErrors.keys()) toast.dismiss(toastId(name));
     };
-  }, [formId, getErrors, subscribe]);
+  }, [formId, getErrors, subscribe, silentTypes]);
 }
