@@ -5,6 +5,7 @@ model User {
     lastLogin DateTime? @map("last_login")
     active Boolean @default(true)
     isAdmin Boolean @default(false) @map("is_admin")
+    darkMode Boolean @default(false) @map("dark_mode")
     sessionVersion Int @default(0) @map("session_version")
 
     partnerId String?  @unique @map("partner_id")

@@ -9,7 +9,7 @@ export default {
   trustHost: process.env.NODE_ENV !== "production" || process.env.AUTH_TRUST_HOST === "true" || Boolean(process.env.AUTH_URL),
   callbacks: {
     session({ session, token }) {
-      session.user = { ...session.user, id: token.sub!, login: typeof token.login === "string" ? token.login : "", name: token.name, image: typeof token.picture === "string" ? token.picture : null, isAdmin: token.isAdmin === true, sessionVersion: typeof token.sessionVersion === "number" ? token.sessionVersion : -1 };
+      session.user = { ...session.user, id: token.sub!, login: typeof token.login === "string" ? token.login : "", name: token.name, image: typeof token.picture === "string" ? token.picture : null, isAdmin: token.isAdmin === true, darkMode: token.darkMode === true, sessionVersion: typeof token.sessionVersion === "number" ? token.sessionVersion : -1 };
       return session;
     },
     authorized({ auth, request }) {

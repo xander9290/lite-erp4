@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import Clock from "@/components/Clock";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import UserTheme from "@/components/ui/UserTheme";
 import UserMenu from "@/components/login/UserMenu";
 import { getCurrentUser } from "@/lib/auth/access";
 
@@ -10,7 +11,7 @@ async function ProtectedErp({ children }: { children: ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/auth");
   return (
-    <div className="flex-1 flex min-h-0 min-w-0 flex-col overflow-hidden gap-1">
+    <UserTheme initialDarkMode={user.darkMode}>
       <header className="relative z-40 grid min-h-14 shrink-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 rounded-md bg-base-100 px-3 py-2 sm:flex">
         <Link href="/erp" className="btn btn-ghost btn-sm font-semibold">
           Lite ERP
@@ -24,7 +25,7 @@ async function ProtectedErp({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="rounded-md flex-1 flex flex-col min-h-0 min-w-0 bg-base-100">{children}</main>
-    </div>
+    </UserTheme>
   );
 }
 

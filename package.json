@@ -13,7 +13,8 @@
     "db:seed": "prisma db seed --config prisma7.config.ts",
     "test:auth": "node --import tsx --test src/lib/auth/auth.test.ts",
     "test:form-navigation": "node --import tsx --test src/components/ui/form/unsavedChanges.test.ts",
-    "test:auth:integration": "node --conditions=react-server --import tsx scripts/auth.integration.ts"
+    "test:auth:integration": "node --conditions=react-server --import tsx scripts/auth.integration.ts",
+    "test:theme:integration": "node --conditions=react-server --import tsx scripts/theme.integration.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.1",

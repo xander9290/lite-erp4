@@ -70,6 +70,16 @@ La app es temporal hasta definir el scaffold de aplicaciones.
 
 ## Mi cuenta
 
+La apariencia se guarda por usuario en `User.darkMode` (columna `users.dark_mode`,
+booleano con valor inicial `false`). El botón del header aplica `dark` o `corporate`
+de daisyUI y persiste la selección mediante una acción autenticada. La sesión consulta
+la preferencia actual de la base de datos y el ERP la incluye en su render inicial;
+se conserva al recargar y en próximos inicios de sesión, incluso en otro navegador.
+El login mantiene su tema claro. Si falla el guardado, se restaura el tema anterior
+y se muestra una alerta. Cambiar la apariencia no revoca sesiones ni invalida la
+revisión de formularios abiertos; las credenciales, permisos y otros usuarios no
+son editables desde esta acción.
+
 El menú de cuenta del header reutiliza PartnerAvatar y permite abrir el perfil,
 cambiar la contraseña o salir. Sus enlaces y el cierre de sesión respetan los
 cambios pendientes de FormView. El menú se cierra con Escape, al elegir una opción
@@ -97,6 +107,8 @@ adicionales.
 npm run test:auth
 # Requiere el servidor local y la base de desarrollo con admin / 1234:
 npm run test:auth:integration
+# Usa exclusivamente cuentas temporales, requiere el servidor y la base local:
+npm run test:theme:integration
 ```
 
 La integración usa `TEST_AUTH_URL` si está definido (por defecto `http://localhost:3000`).
