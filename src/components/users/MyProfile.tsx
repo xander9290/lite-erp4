@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { ChevronLeft, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import FormView from "../ui/form/FormView";
 import FormViewLoader from "../ui/form/FormViewLoader";
 import FormGroup from "../ui/form/FormGroup";
@@ -17,7 +17,7 @@ import { profileSchema, type ProfileRecord, type ProfileValues } from "@/schemas
 function ProfileForm({ record }: { record: ProfileRecord }) {
   const router = useRouter();
   const methods = useForm<ProfileValues>({ resolver: zodResolver(profileSchema), defaultValues: record.values });
-  return <FormView title="Mi perfil" description="Tus datos de contacto y tu cuenta de acceso." icon={<UserRound size={22} />} methods={methods} onSubmit={saveMyProfile} onSaved={() => router.refresh()}>
+  return <FormView layout="page" breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: "Mi perfil" }]} title="Mi perfil" description="Tus datos de contacto y tu cuenta de acceso." icon={<UserRound size={22} />} methods={methods} onSubmit={saveMyProfile} onSaved={() => router.refresh()}>
     <FormGroup legend="Contacto">
       <div className="grid min-w-0 gap-4 sm:grid-cols-[7rem_minmax(0,1fr)]">
         <FieldImage<ProfileValues> name="avatarUrl" label="Avatar" widget="avatar" upload={uploadPartnerAvatar} />
@@ -37,8 +37,7 @@ function ProfileForm({ record }: { record: ProfileRecord }) {
 
 export default function MyProfile() {
   const router = useRouter();
-  return <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-6"><div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-4">
-    <Link href="/erp" className="inline-flex w-fit items-center gap-1 text-sm text-base-content/60 hover:text-primary"><ChevronLeft size={16} aria-hidden="true" />Aplicaciones</Link>
+  return (
     <FormViewLoader key={router.bfcacheId} recordKey="my-profile" load={readMyProfile}>{record => <ProfileForm record={record} />}</FormViewLoader>
-  </div></div>;
+  );
 }

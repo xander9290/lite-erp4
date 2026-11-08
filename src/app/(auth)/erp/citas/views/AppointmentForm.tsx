@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, ChevronLeft, ClipboardList, History, RefreshCw, StickyNote } from "lucide-react";
+import { CalendarDays, ClipboardList, History, RefreshCw, StickyNote } from "lucide-react";
 import FormView from "@/components/ui/form/FormView";
 import FormViewLoader from "@/components/ui/form/FormViewLoader";
 import FormGroup from "@/components/ui/form/FormGroup";
@@ -40,6 +40,7 @@ function AppointmentRecordForm({ record, onReload, returnHref }: { record: Appoi
   const revision = useWatch({ control: methods.control, name: "revision" });
   const returnQuery = returnHref === "/erp/citas" ? "" : `?returnTo=${encodeURIComponent(returnHref)}`;
   return <FormView title={savedId ? "Cita odontológica" : "Nueva cita"} description="Agenda, atención y seguimiento del paciente." icon={<CalendarDays size={22} />}
+    layout="page" breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: "Citas odontológicas", href: returnHref }, { label: savedId ? "Cita odontológica" : "Nueva cita" }]}
     methods={methods} mode={savedId ? "edit" : "create"} onSubmit={saveAppointment}
     statebar={<FieldSelect<AppointmentInput, string> name="status" label="Estado" widget="statebar" readOnly={false} options={appointmentStatusOptions} />}
     onNew={savedId ? () => router.push(`/erp/citas/nuevo${returnQuery}`) : undefined} newLabel="Nueva cita"
@@ -81,9 +82,8 @@ export default function AppointmentForm({ id }: { id?: string }) {
   const reload = () => {
     void navigation.run(() => setReloadKey(key => key + 1)).catch(() => { void alerts.error({ title: "No se pudo recargar la cita", message: "Intenta nuevamente. Tus cambios siguen en el formulario." }); });
   };
-  return <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-6"><div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-4">
-    <Link href={returnHref} className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-base-content/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"><ChevronLeft size={16} aria-hidden="true" />Citas odontológicas</Link>
+  return <>
     {id ? <FormViewLoader key={`${router.bfcacheId}:${reloadKey}`} recordKey={id} load={load}>{record => <AppointmentRecordForm record={record} onReload={reload} returnHref={returnHref} />}</FormViewLoader>
       : <AppointmentRecordForm key={router.bfcacheId} record={{ ...newAppointmentDefaults, treatments: [] }} returnHref={returnHref} />}
-  </div></div>;
+  </>;
 }

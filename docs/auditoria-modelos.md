@@ -99,7 +99,12 @@ en `defaultValues`, Zod o el payload de guardado.
 ```
 
 En Editor, mantenerla en estado React independiente y actualizarla con
-`onSaved={(_values, audit) => setAudit(audit)}` de FormView. Para presentar el autor:
+`onSaved={(_values, audit) => setAudit(audit)}` de FormView. Para el panel compacto
+a la derecha, pasar `audit={audit ?? null}` y `layout="page"` a FormView: incluye
+creador, fecha de creación y última actualización. En móvil se coloca debajo de los
+campos y no ocupa una columna lateral. El panel no añade campos a RHF. Flota usa
+esta presentación; los módulos manuales sin proveedor de auditoría no muestran
+metadatos inventados. Para presentar el autor por separado:
 
 ```tsx
 <FieldMany2One

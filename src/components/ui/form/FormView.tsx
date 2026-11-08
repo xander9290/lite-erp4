@@ -10,6 +10,9 @@ import type { FormViewContext, FormViewResult, FormViewSubmit } from "./formView
 import { useAlerts } from "../alerts/AlertProvider";
 import { focusInvalidField, invalidFormFields } from "./notebookErrors";
 import { useFormLeaveGuard, useFormNavigation } from "./FormNavigationProvider";
+import Breadcrumbs, { type Breadcrumb } from "../Breadcrumbs";
+import FormAuditPanel from "./FormAuditPanel";
+import type { RecordAudit } from "@/lib/orm/audit";
 
 export type { FormViewContext, FormViewResult, FormViewSubmit } from "./formView.types";
 export type { FormViewMenuAction } from "./FormViewActionMenu";
@@ -21,6 +24,10 @@ export type FormViewProps<TValues extends FieldValues, TContext = unknown, TOutp
     description?: string;
     icon?: ReactNode;
     width?: "normal" | "wide";
+    layout?: "content" | "page";
+    breadcrumbs?: readonly Breadcrumb[];
+    /** undefined hides the panel; null reserves it for an unsaved record. */
+    audit?: RecordAudit | null;
     mode?: "create" | "edit";
     disabled?: boolean;
     readOnly?: boolean;
@@ -44,7 +51,7 @@ class SaveRejected extends Error {
 const serverErrorTypes = ["server"];
 
 export default function FormView<TValues extends FieldValues, TContext = unknown, TOutput = TValues>({
-  title, description, icon, width = "normal", methods, mode = "edit", disabled = false, readOnly = false, busy: actionBusy = false,
+  title, description, icon, width = "normal", layout = "content", breadcrumbs, audit, methods, mode = "edit", disabled = false, readOnly = false, busy: actionBusy = false,
   headerActions, menuActions, statebar, footer, saveLabel = "Guardar", revertLabel = "Revertir", newLabel = "Nuevo", onNew, onSubmit, onSaved, onRevert,
   children, id, className = "", onSubmitCapture, ...formProps
 }: FormViewProps<TValues, TContext, TOutput>) {
@@ -68,9 +75,10 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
   const secondaryActions = typeof menuActions === "function" ? menuActions(context) : menuActions;
   const footerContent = typeof footer === "function" ? footer(context) : footer;
   const serverError = errors.root?.server?.message;
+  const pageLayout = layout === "page";
 
   return <FormLayout {...formProps} id={id} methods={methods} aria-labelledby={titleId} aria-busy={busy} silentErrorTypes={serverErrorTypes}
-    className={`card mx-auto w-full shrink-0 ${width === "wide" ? "max-w-7xl" : "max-w-5xl"} rounded-2xl border border-base-300 bg-base-100 shadow-sm ${className}`} contentClassName="flex min-w-0 flex-col"
+    className={`card w-full ${pageLayout ? "flex min-h-0 flex-1 flex-col" : `mx-auto shrink-0 ${width === "wide" ? "max-w-7xl" : "max-w-5xl"}`} rounded-2xl border border-base-300 bg-base-100 shadow-sm ${className}`} contentClassName={`flex min-w-0 flex-col ${pageLayout ? "min-h-0 flex-1" : ""}`}
     onSubmitCapture={event => {
       onSubmitCapture?.(event);
       if (event.defaultPrevented || locked || inFlight.current || readOnly || (mode === "edit" && !isDirty)) {
@@ -126,7 +134,8 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
       toast.success(saved.message ?? "Cambios guardados.");
       onSaved?.(saved.values, saved.audit);
     }}>
-    <header data-slot="header" className="space-y-4 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-5 sm:px-6">
+    <header data-slot="header" className="shrink-0 space-y-3 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-3 sm:px-6 sm:py-4">
+      <Breadcrumbs items={breadcrumbs} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3"><span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">{icon ?? <FilePenLine size={22} />}</span><div className="min-w-0 space-y-1"><div className="flex flex-wrap items-center gap-2"><h2 id={titleId} className="text-xl font-semibold tracking-tight wrap-anywhere sm:text-2xl">{title}</h2><span className={`badge badge-sm ${isDirty ? "badge-soft badge-warning" : "badge-ghost"}`}>{readOnly ? "Solo lectura" : isDirty ? "Con cambios" : mode === "create" ? "Nuevo" : "Sin cambios"}</span></div>{description && <p className="max-w-2xl text-sm leading-relaxed text-base-content/60">{description}</p>}</div></div>
         {(!readOnly || onNew || Boolean(secondaryActions?.length)) && <fieldset disabled={locked} className="m-0 flex w-full min-w-0 flex-wrap items-center gap-1 border-0 p-0 sm:w-auto sm:gap-2">
@@ -149,8 +158,15 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
         {statebar && <fieldset disabled={locked || readOnly} className="m-0 ml-auto min-w-0 max-w-full border-0 p-0">{statebar}</fieldset>}
       </div>}
     </header>
-    <div data-slot="body" className="min-w-0 p-4 sm:p-6"><fieldset disabled={locked || readOnly} className="m-0 min-w-0 border-0 p-0"><div className="grid min-w-0 grid-cols-1 items-start gap-4 @2xl/form:grid-cols-2">{children}</div></fieldset></div>
-    <footer data-slot="footer" className="space-y-3 rounded-b-2xl border-t border-base-300 bg-base-200/20 px-4 py-3 sm:px-6">
+    <div data-slot="body" className={`min-w-0 ${pageLayout ? "min-h-0 flex-1 overflow-y-auto" : ""}`}>
+      <div className={`grid min-w-0 grid-cols-1 items-start ${audit !== undefined ? "@4xl/form:grid-cols-[minmax(0,1fr)_18rem]" : ""}`}>
+        <div className="min-w-0 p-4 sm:p-6"><div className={`@container/form mx-auto w-full min-w-0 ${width === "wide" ? "max-w-7xl" : "max-w-5xl"}`}>
+          <fieldset disabled={locked || readOnly} className="m-0 min-w-0 border-0 p-0"><div className="grid min-w-0 grid-cols-1 items-start gap-4 @2xl/form:grid-cols-2">{children}</div></fieldset>
+        </div></div>
+        {audit !== undefined && <FormAuditPanel audit={audit} creating={mode === "create"} />}
+      </div>
+    </div>
+    <footer data-slot="footer" className="shrink-0 space-y-3 rounded-b-2xl border-t border-base-300 bg-base-200/20 px-4 py-3 sm:px-6">
       <p role="status" className="text-xs text-base-content/60">{busy ? saving || isSubmitting ? "Guardando cambios…" : "Procesando acción…" : readOnly ? "Formulario de solo lectura" : isDirty ? "Tienes cambios sin guardar" : "Sin cambios pendientes"}</p>
       {typeof serverError === "string" && <p role="alert" className="text-sm text-error">{serverError}</p>}
       {footerContent && <div className="border-t border-base-300 pt-3">{footerContent}</div>}

@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronLeft, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import FormView from "@/components/ui/form/FormView";
 import FormViewLoader from "@/components/ui/form/FormViewLoader";
 import FormGroup from "@/components/ui/form/FormGroup";
@@ -26,6 +25,8 @@ function ContactRecordForm({ record, canEdit, onReload }: { record: ContactValue
   const Icon = contactsManifest.icon;
 
   return <FormView
+    layout="page"
+    breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: contactsManifest.name, href: "/erp/contactos" }, { label: savedId ? record.name : "Nuevo contacto" }]}
     title={savedId ? canEdit ? "Editar contacto" : "Contacto" : "Nuevo contacto"}
     description="Nombre, imagen y medios de contacto."
     icon={<Icon size={22} />}
@@ -72,9 +73,8 @@ export default function ContactForm({ id, canEdit }: { id?: string; canEdit: boo
       void alerts.error({ title: "No se pudo recargar el contacto", message: "Intenta nuevamente. Tus cambios siguen en el formulario." });
     });
   };
-  return <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-6"><div className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-4">
-    <Link href="/erp/contactos" className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-base-content/60 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"><ChevronLeft size={16} aria-hidden="true" />{contactsManifest.name}</Link>
+  return <>
     {id ? <FormViewLoader key={`${router.bfcacheId}:${reloadKey}`} recordKey={id} load={load}>{record => <ContactRecordForm record={record} canEdit={canEdit} onReload={reload} />}</FormViewLoader>
       : <ContactRecordForm key={router.bfcacheId} record={{ ...newContactDefaults }} canEdit={canEdit} />}
-  </div></div>;
+  </>;
 }

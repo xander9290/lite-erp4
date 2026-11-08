@@ -1,6 +1,9 @@
 # ListView · Card con filtros por columna
 
-En las páginas del ERP, la tarjeta ocupa la altura restante del viewport. El header y
+En las páginas del ERP, ListView se monta directamente en el layout, sin wrappers
+con padding ni enlaces de navegación externos: ocupa todo el ancho y la altura
+disponibles debajo del Top. `breadcrumbs` coloca la ruta dentro del header, también
+durante la carga inicial. El header y
 el footer permanecen visibles y la región de la tabla tiene scroll automático en
 ambos ejes. Para reutilizar ese comportamiento, el contenedor debe ser una columna
 flex con `flex-1 min-h-0` y altura limitada por el layout. Dentro del catálogo
@@ -14,6 +17,7 @@ import ListView from "@/components/ui/list/ListView";
 <ListView
   model="partner"
   title="Contactos"
+  breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: "Contactos" }]}
   headerActions={<a href="/sample#list-view" className="btn btn-ghost btn-sm">Ejemplos</a>}
   footer={<p>Contenido adicional del footer.</p>}
   columns={[
@@ -25,7 +29,7 @@ import ListView from "@/components/ui/list/ListView";
 
 ## Estructura
 
-- **Header**: título, icono, contador, actualizar, limpiar filtros y `headerActions` para botones o menús propios. `createHref`/`createLabel` habilitan «Nuevo» cuando exista la ruta de creación.
+- **Header**: `breadcrumbs` opcional, título, icono, contador, actualizar, limpiar filtros y `headerActions` para botones o menús propios. Cada miga tiene `label` y un `href` opcional; la última representa la página actual. `createHref`/`createLabel` habilitan «Nuevo» cuando exista la ruta de creación.
 - **Body**: tabla con orden y filtro en cada encabezado. Los encabezados siguen disponibles en carga, error y ausencia de resultados.
 - **Footer**: rango, tamaño de página y paginación, más el slot `footer` para contenido adicional.
 

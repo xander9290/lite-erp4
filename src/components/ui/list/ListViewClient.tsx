@@ -10,6 +10,7 @@ import ListRecordPreview from "./ListRecordPreview";
 import ColumnFilter from "./ColumnFilter";
 import ListCellValue from "./ListCellValue";
 import { filterDescription } from "./filterInputs";
+import ListBreadcrumbs, { type ListBreadcrumb } from "./ListBreadcrumbs";
 
 export type ListViewProps = ({ model: ListModel; load?: never } | { model: string; load: (state: ListState) => Promise<ListResult> }) & {
   title: string;
@@ -17,6 +18,7 @@ export type ListViewProps = ({ model: ListModel; load?: never } | { model: strin
   searchFields?: readonly string[];
   description?: string;
   icon?: ReactNode;
+  breadcrumbs?: readonly ListBreadcrumb[];
   pageSize?: number;
   defaultSort?: ListConfig["defaultSort"];
   paramPrefix?: string;
@@ -36,7 +38,7 @@ const alignmentClasses = { left: "text-left", center: "text-center", right: "tex
 export default function ListViewClient({
   model, load, title, columns, searchFields = Object.hasOwn(listModels, model) ? listModels[model as ListModel].searchFields : [], description, icon,
   pageSize = 25, defaultSort, paramPrefix = "",
-  createHref, createLabel = "Nuevo", recordHref, headerActions, footer, className = "", renderCell,
+  createHref, createLabel = "Nuevo", recordHref, breadcrumbs, headerActions, footer, className = "", renderCell,
 }: ListViewProps) {
   const titleId = useId();
   const config = { model, columns, searchFields, defaultSort };
@@ -61,7 +63,8 @@ export default function ListViewClient({
   }
 
   return <section aria-labelledby={titleId} className={`card flex w-full min-h-0 min-w-0 flex-1 flex-col rounded-2xl border border-base-300 bg-base-100 shadow-sm ${className}`}>
-    <header data-slot="header" className="flex shrink-0 flex-wrap items-start justify-between gap-4 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-5 sm:px-6 sm:py-6">
+    <header data-slot="header" className="flex shrink-0 flex-wrap items-start justify-between gap-x-4 gap-y-3 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-3 sm:px-6 sm:py-4">
+      <ListBreadcrumbs items={breadcrumbs} />
       <div className="flex min-w-0 items-start gap-3">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary" aria-hidden="true">{icon ?? <LayoutList size={22} />}</span>
         <div className="min-w-0 space-y-1"><div className="flex flex-wrap items-center gap-2"><h2 id={titleId} className="text-xl font-semibold tracking-tight wrap-anywhere sm:text-2xl">{title}</h2><span className="badge badge-ghost badge-sm tabular-nums">{loading ? "…" : data ? data.total.toLocaleString("es-MX") : "—"}</span></div>{description && <p className="max-w-2xl text-sm leading-relaxed text-base-content/60">{description}</p>}</div>

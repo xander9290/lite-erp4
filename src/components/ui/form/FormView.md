@@ -7,7 +7,23 @@ Por defecto, la tarjeta está centrada, ocupa el ancho disponible hasta `max-w-5
 usa `width="wide"` (máximo 80rem, `max-w-7xl`); ejemplo en `/sample#field-one2many`.
 En pantallas pequeñas ambas variantes se ajustan al ancho del padre. El scroll vertical
 de formularios largos corresponde al contenedor de la página, no a una altura fija
-de FormView.
+de FormView cuando usa `layout="content"` (default).
+
+En las páginas del ERP, usar `layout="page"` y montar la vista directamente bajo
+el layout, sin wrappers con padding ni ancho máximo. Así ocupa el área debajo del
+Top, mantiene header/footer visibles y desplaza el body. `FormViewLoader` transmite
+esa altura al editor. `breadcrumbs={[{label: "Contactos", href: "/erp/contactos"},
+{label: "Nuevo contacto"}]}` integra la navegación en el header y conserva el guard
+de cambios pendientes. `width` limita la hoja de campos, no el marco de la página.
+
+`audit={recordAudit}` presenta creador/avatar, creación y última actualización en
+un panel compacto a la derecha (columna de 18rem desde 56rem de ancho del formulario).
+Su altura depende del contenido; en anchos menores se coloca debajo de los campos.
+La hoja de campos calcula sus columnas con su propio ancho disponible. Sin `audit`
+no se reserva panel; `audit={null}` permite mostrar el aviso previo al primer guardado
+en modo creación. Los datos autorizados permanecen fuera de RHF, defaults y payload;
+el editor mantiene el estado y lo actualiza con `onSaved(values, audit)`.
+Ejemplo RHF/Zod con autor nulo y guardado local en `/sample#record-audit`.
 
 ```tsx
 "use client";

@@ -40,8 +40,8 @@ export default function FormViewLoader<T>({ recordKey, load, children, timeoutMs
     return () => { current = false; clearTimeout(timer); close(); };
   }, [key, load, alerts, timeoutMs]);
   const result = response?.key === key && response.load === load ? response.result : null;
-  if (result?.ok) return <div key={key} className="min-w-0">{children(result.values, result.audit)}</div>;
-  return <div aria-busy={!result} className="card min-w-0 items-center gap-4 border border-base-300 bg-base-100 p-8 text-center shadow-sm">
+  if (result?.ok) return <div key={key} className="flex min-h-0 min-w-0 flex-1 flex-col">{children(result.values, result.audit)}</div>;
+  return <div aria-busy={!result} className="card min-h-0 min-w-0 flex-1 items-center justify-center gap-4 overflow-y-auto border border-base-300 bg-base-100 p-8 text-center shadow-sm">
     {result ? <>
       <CircleAlert size={28} aria-hidden="true" className="text-error" />
       <p role="alert" className="max-w-md text-sm text-base-content/65">{result.error}</p>

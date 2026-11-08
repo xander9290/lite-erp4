@@ -1,17 +1,15 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronLeft, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import FormView from "@/components/ui/form/FormView";
 import FormViewLoader from "@/components/ui/form/FormViewLoader";
 import FormGroup from "@/components/ui/form/FormGroup";
 import FieldText from "@/components/ui/form/FieldText";
 import FieldBoolean from "@/components/ui/form/FieldBoolean";
-import FieldMany2One from "@/components/ui/form/FieldMany2One";
 import type { RecordAudit } from "@/lib/orm/audit";
 import { useFormNavigation } from "@/components/ui/form/FormNavigationProvider";
 import { useAlerts } from "@/components/ui/alerts/AlertProvider";
@@ -26,6 +24,9 @@ function Editor({ record, initialAudit, onReload }: { record: RecordInput; initi
   return (
     <FormView
       title={savedId ? "Editar registro" : "Nuevo registro"}
+      layout="page"
+      breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: "Flota", href: "/erp/flota" }, { label: savedId ? record.name || "Registro" : "Nuevo registro" }]}
+      audit={audit ?? null}
       methods={methods}
       mode={savedId ? "edit" : "create"}
       onSubmit={saveRecord}
@@ -44,9 +45,6 @@ function Editor({ record, initialAudit, onReload }: { record: RecordInput; initi
         <FieldText<RecordInput> name="plate" label="Placas" required maxLength={20} />
         <FieldBoolean<RecordInput> name="active" label="Activo" />
       </FormGroup>
-      {audit && <FormGroup legend="Información del registro" fullWidth>
-        <FieldMany2One mode="display" label="Creado por" value={audit.createBy ? { id: audit.createBy.id, label: `[${audit.createBy.login}] ${audit.createBy.name}`, avatarUrl: audit.createBy.avatarUrl } : null} />
-      </FormGroup>}
     </FormView>
   );
 }
@@ -65,12 +63,7 @@ export default function RecordForm({ id }: { id?: string }) {
       });
   };
   return (
-    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-6">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
-        <Link href="/erp/flota" className="inline-flex w-fit items-center gap-1 text-sm text-base-content/60 hover:text-primary">
-          <ChevronLeft size={16} aria-hidden="true" />
-          {"Flota"}
-        </Link>
+    <>
         {id ? (
           <FormViewLoader key={router.bfcacheId + ":" + attempt} recordKey={id} load={load}>
             {(record, audit) => <Editor record={record} initialAudit={audit} onReload={reload} />}
@@ -78,7 +71,6 @@ export default function RecordForm({ id }: { id?: string }) {
         ) : (
           <Editor key={router.bfcacheId} record={createRecordDefaults()} />
         )}
-      </div>
-    </div>
+    </>
   );
 }
