@@ -40,7 +40,9 @@ No se despachan métodos ni se expone una API remota automáticamente.
 
 `name` identifica el futuro modelo Prisma; `table` declara el nombre físico deseado.
 Ninguno crea una tabla. Los nombres se validan y los campos `id`, `revision`,
-`createdAt` y `updatedAt` están reservados para el contrato de persistencia.
+`createdAt`, `updatedAt`, `createBy` y `createByUser` están reservados para el contrato
+de persistencia. La [auditoría implícita](auditoria-modelos.md) asigna el creador
+desde la sesión del servidor al crear; no se declara como Field editable.
 
 ## Valores iniciales y validación
 

@@ -89,6 +89,8 @@ test("invalid declarations fail early instead of silently producing different va
   assert.throws(() => defineModel(class Empty extends Model {}, { name: "Empty", table: "empty" }), /al menos un Field/);
   assert.throws(() => defineModel(class Bad extends Model { plate = "raw string"; }, { name: "Bad", table: "bad" }), /mediante Fields/);
   assert.throws(() => defineModel(class Bad extends Model { id = Fields.Text(); }, { name: "Bad", table: "bad" }), /reservado/);
+  assert.throws(() => defineModel(class Bad extends Model { createBy = Fields.Text(); }, { name: "Bad", table: "bad" }), /reservado/);
+  assert.throws(() => defineModel(class Bad extends Model { createByUser = Fields.Many2one("User"); }, { name: "Bad", table: "bad" }), /reservado/);
   assert.throws(() => defineModel(class Bad extends Model { plate = Fields.Text(); }, { name: "bad", table: "bad" }), /PascalCase/);
 });
 

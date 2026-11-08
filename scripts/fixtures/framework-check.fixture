@@ -18,7 +18,11 @@ const service = createModelService(recordModel, EnsayoFrameworkRecordRepository,
     { field: "status", label: "Estado", type: "text", sortable: true },
     { field: "notes", label: "Notas", type: "text", sortable: true },
     { field: "partnerId", label: "Contacto", type: "text", sortable: true },
-  ], searchFields: ["name", "notes"], kanban: { field: "status" },
+    { field: "createByUser.login", label: "Creado por", type: "text", widget: "partner", avatarField: "createByUser.partner.avatarUrl", sortable: true },
+    { field: "createByUser.partner.name", label: "Nombre del creador", type: "text", sortable: true },
+    { field: "createdAt", label: "Creado el", type: "datetime", sortable: true },
+    { field: "updatedAt", label: "Actualizado el", type: "datetime", sortable: true },
+  ], searchFields: ["name", "notes", "createByUser.login", "createByUser.partner.name"], kanban: { field: "status" }, audit: true,
 });
 const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 10, filters: [] };
 try {
@@ -36,6 +40,24 @@ try {
   assert.equal(created.values.partnerId, partner.id);
   assert.equal(Object.hasOwn(created.values, "partner"), false);
   assert.equal(Object.hasOwn(created.values, "createdAt"), false);
+  assert.equal(Object.hasOwn(created.values, "createBy"), false);
+  assert.equal(Object.hasOwn(created.values, "audit"), false);
+  assert.equal(created.audit?.createBy?.id, admin.id);
+  assert.equal(created.audit?.createBy?.login, admin.login);
+  assert.deepEqual(Object.keys(created.audit!.createBy!).sort(), ["avatarUrl", "id", "login", "name"]);
+  assert.equal(created.audit?.updatedAt, created.values.revision);
+  const plainRead = await recordService.read(prisma, actor, created.values.id);
+  assert.ok(plainRead.ok); assert.equal(plainRead.audit, undefined);
+  const auditList = await service.list(prisma, actor, { ...state, query: admin.login, sort: "createByUser.login", filters: [{ field: "createdAt", operator: "gte", value: created.audit!.createdAt, precision: "instant" }] });
+  assert.ok(auditList.ok, JSON.stringify(auditList)); assert.equal(auditList.data.total, 1);
+  const author = auditList.data.rows[0].createByUser as { id: string; login: string; partner: unknown };
+  assert.deepEqual(Object.keys(author).sort(), ["id", "login", "partner"]);
+  assert.equal(author.id, admin.id);
+  const plainList = await recordService.list(prisma, actor, state); assert.ok(plainList.ok);
+  assert.ok(plainList.data.rows.every(row => !Object.hasOwn(row, "createByUser") && !Object.hasOwn(row, "createdAt")));
+  const auditFiltered = await service.list(prisma, actor, { ...state, sort: "createByUser.partner.name", filters: [{ field: "createByUser.login", operator: "eq", value: admin.login }] });
+  assert.ok(auditFiltered.ok, JSON.stringify(auditFiltered)); assert.equal(auditFiltered.data.total, 2);
+  assert.equal((await prisma.ensayoFrameworkRecord.findUniqueOrThrow({ where: { id: created.values.id } })).createBy, admin.id);
   assert.ok(created.values.id); assert.ok(created.values.revision);
   const read = await service.read(prisma, actor, created.values.id);
   assert.ok(read.ok); assert.deepEqual(read.values, created.values);
@@ -61,6 +83,10 @@ try {
     { ...defaults, name: "inválido", quantity: 2147483648 }, { ...defaults, name: "inválido", startsAt: "2026-11-07T14:00" },
     { ...defaults, name: "inválido", partnerId: "missing" }, { ...defaults, name: "inválido", id: created.values.id },
     { ...defaults, name: "inválido", isAdmin: true }, { ...defaults, name: "inválido", partner: { connect: { id: partner.id } } },
+    { ...defaults, name: "Autor falsificado", createBy: reader.id },
+    { ...created.values, audit: created.audit },
+    { ...changed.values, createBy: reader.id },
+    { ...defaults, name: "Relación falsificada", createByUser: { connect: { id: reader.id } } },
   ]) { const result = await service.save(prisma, actor, invalid); assert.equal(result.ok, false, JSON.stringify(result)); }
   assert.equal(await prisma.ensayoFrameworkRecord.count(), count);
   const business = await service.save(prisma, actor, { ...defaults, name: "bloqueado" });
@@ -104,6 +130,26 @@ try {
     assert.equal(denied.ok, false); if (!denied.ok) assert.equal(denied.kind, "validation");
     assert.equal((await prisma.ensayoFrameworkRecord.findUniqueOrThrow({ where: { id: row.id } })).status, "draft");
   }
+  // Authenticated creator is implicit, immutable across editors and absent from form payloads.
+  const editor = await prisma.user.create({ data: { login: "fixture-editor", password: await hashPassword("framework-test-only"), isAdmin: true } });
+  const editorActor = { id: editor.id, sessionVersion: editor.sessionVersion };
+  const currentForAudit = await service.read(prisma, editorActor, created.values.id); assert.ok(currentForAudit.ok);
+  const editedByAnother = await service.save(prisma, editorActor, { ...currentForAudit.values, notes: "Edición de otro administrador" });
+  assert.ok(editedByAnother.ok, JSON.stringify(editedByAnother));
+  assert.equal((await prisma.ensayoFrameworkRecord.findUniqueOrThrow({ where: { id: created.values.id } })).createBy, admin.id);
+  const editorCreated = await service.save(prisma, editorActor, { ...defaults, name: "Creado por segundo administrador" });
+  assert.ok(editorCreated.ok, JSON.stringify(editorCreated));
+  assert.equal((await prisma.ensayoFrameworkRecord.findUniqueOrThrow({ where: { id: editorCreated.values.id } })).createBy, editor.id);
+  // Existing records have an unknown author; editing one must not invent its creator.
+  const legacy = await prisma.ensayoFrameworkRecord.create({ data: { name: "Legado sin autor", active: true, createBy: null } });
+  const legacyForm = await service.read(prisma, actor, legacy.id); assert.ok(legacyForm.ok);
+  const legacyEdit = await service.save(prisma, editorActor, { ...legacyForm.values, notes: "Conservar origen desconocido" }); assert.ok(legacyEdit.ok);
+  assert.equal((await prisma.ensayoFrameworkRecord.findUniqueOrThrow({ where: { id: legacy.id } })).createBy, null);
+  const legacyView = await service.read(prisma, actor, legacy.id); assert.ok(legacyView.ok); assert.equal(legacyView.audit?.createBy, null);
+  const unknownAuthors = await service.list(prisma, actor, { ...state, filters: [{ field: "createByUser.login", operator: "empty" }] });
+  assert.ok(unknownAuthors.ok, JSON.stringify(unknownAuthors)); assert.ok(unknownAuthors.data.rows.some(row => row.id === legacy.id));
+  // A foreign-key backed author cannot point to an unknown account.
+  await assert.rejects(prisma.ensayoFrameworkRecord.create({ data: { name: "Autor inexistente", active: true, createBy: "missing-user" } }));
   const unbound = createModelService(recordModel, unboundRepository<ReturnType<typeof recordModel.parse>>(), { columns: [{ field: "name", label: "Nombre" }], searchFields: ["name"] });
   const notReady = await unbound.save(prisma, actor, { ...defaults, name: "Pendiente" }); assert.equal(notReady.ok, false); if (!notReady.ok) assert.match(notReady.error, /orm:bind/);
   await prisma.user.update({ where: { id: admin.id }, data: { active: false } });

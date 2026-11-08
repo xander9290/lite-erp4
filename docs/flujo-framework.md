@@ -134,6 +134,11 @@ hooks de React; las reglas que protegen datos deben verificarse en el servidor.
 
 ## Permisos y concurrencia
 
+Los modelos generados incluyen `createBy`, el ID del usuario autenticado que crea
+el registro. Se conserva durante la edición y queda fuera de los inputs del cliente.
+Los registros anteriores mantienen autor desconocido (`null`). Contrato, relación
+con User y actualización en [Auditoría de modelos](auditoria-modelos.md).
+
 El servicio inicial es **admin para lectura y escritura**. La acción toma la sesión
 del servidor; el servicio vuelve a consultar `active`, `isAdmin` y `sessionVersion`
 dentro de la transacción. Cambiar `manifest.access` no cambia esta política.

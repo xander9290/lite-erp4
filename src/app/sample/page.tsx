@@ -8,6 +8,7 @@ import FormViewSample from "./FormViewSample";
 import AlertsSample from "./AlertsSample";
 import One2manySample from "./One2manySample";
 import CollectionViewsSample from "./CollectionViewsSample";
+import AuditSample from "./AuditSample";
 
 export default function PageSample() {
   return (
@@ -27,6 +28,7 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#card-view">CardView</a>
             <a className="btn btn-sm btn-outline" href="#kanban-view">KanbanView</a>
             <a className="btn btn-sm btn-outline" href="#form-view">FormView</a>
+            <a className="btn btn-sm btn-outline" href="#record-audit">Auditoría</a>
             <a className="btn btn-sm btn-outline" href="#alerts">Alertas</a>
             <a className="btn btn-sm btn-outline" href="#notebook">Notebook</a>
             <a className="btn btn-sm btn-outline" href="#field-select-statebar">Statebar</a>
@@ -47,6 +49,7 @@ export default function PageSample() {
         <CollectionViewsSample />
         <AlertsSample />
         <FormViewSample />
+        <AuditSample />
         <SampleForms />
         <Many2OneSample />
         <RelationTagSample />

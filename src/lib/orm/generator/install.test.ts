@@ -13,7 +13,7 @@ import { createAppTemplate } from "../../scaffold/templates";
 import { createApplication } from "../../scaffold/create";
 import { generateModule } from "./generate";
 
-const fixture = 'datasource db {\n provider = "postgresql"\n}\n\nmodel Partner {\n id String @id\n name String // developer-owned contact field\n}\n\nmodel Company {\n id String @id\n}\n';
+const fixture = "model User {\n id String @id\n}\n" + 'datasource db {\n provider = "postgresql"\n}\n\nmodel Partner {\n id String @id\n name String // developer-owned contact field\n}\n\nmodel Company {\n id String @id\n}\n';
 class Visit extends Model {
   name = Fields.Text({ required: true, maxLength: 100 });
   patientId = Fields.Many2one("Partner");

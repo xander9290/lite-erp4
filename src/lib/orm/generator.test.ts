@@ -9,7 +9,7 @@ import { generateModule, type ModuleGeneration } from "./generator/generate";
 import { prismaBlocks } from "./generator/prisma-source";
 import { artifactPlan, writeArtifacts } from "./generator/write";
 
-const schema = `// 🦷 Preserve Unicode offsets and ignored braces: } model Fake {\ngenerator client {\n provider = "prisma-client"\n output = "./client"\n}\ndatasource db {\n provider = "postgresql"\n}\nmodel Partner {\n id String @id @default(cuid())\n name String\n // A comment with }\n note String? @default("{not a block}")\n @@map("partners")\n}\n`;
+const schema = "model User {\n id String @id\n}\n" + `// 🦷 Preserve Unicode offsets and ignored braces: } model Fake {\ngenerator client {\n provider = "prisma-client"\n output = "./client"\n}\ndatasource db {\n provider = "postgresql"\n}\nmodel Partner {\n id String @id @default(cuid())\n name String\n // A comment with }\n note String? @default("{not a block}")\n @@map("partners")\n}\n`;
 const context = { schema, owners: { Partner: "contactos" } };
 const profile: ModuleGeneration = { id: "flota", depends: ["contactos"], models: [{ model: vehicleModel, clientFields: Object.keys(vehicleModel.fields) }] };
 
@@ -22,12 +22,16 @@ test("generation maps declarations to Prisma, preserves existing models and prop
   assert.match(files["models.prisma"], /driver Partner\? @relation\("FleetVehicle_driverId"/);
   assert.match(files["models.prisma"], /state FleetVehicleStateEnum @default\(available\)/);
   assert.match(files["models.prisma"], /nextServiceAt DateTime\?.*@db.Timestamptz\(3\)/);
+  assert.match(files["models.prisma"], /createBy String\? @map\("create_by"\)/);
+  assert.match(files["models.prisma"], /createByUser User\? @relation\("FleetVehicle_createBy", fields: \[createBy\], references: \[id\], onDelete: Restrict\)/);
+  assert.match(files["models.prisma"], /@@index\(\[createBy\]\)/);
   const preview = prismaBlocks(files["schema.preview.prisma"]);
   assert.equal(preview.some(block => block.kind === "generator"), false);
   assert.equal(preview.some(block => block.name === "Fake"), false);
   const partner = preview.find(block => block.name === "Partner")!;
   assert.match(partner.body, /note String\? @default\("\{not a block\}"\)/);
   assert.match(partner.body, /fleetVehicleDriverIdRecords FleetVehicle\[\]/);
+  assert.match(preview.find(block => block.name === "User")!.body, /fleetVehicleCreatedRecords FleetVehicle\[\] @relation\("FleetVehicle_createBy"\)/);
   const report = JSON.parse(files["review.json"]);
   assert.equal(report.relations[0].owner, "contactos");
   assert.ok(report.validationOnly.some((item: string) => item.includes("mileage")));
@@ -43,6 +47,7 @@ test("client publication is explicit and never serializes model methods or hidde
   const client = files["Private.schema.ts"];
   assert.match(client, /from "@\/lib\/orm\/fields"/);
   for (const forbidden of ["privateNote", "SERVER_ONLY_LABEL", "SERVER_ONLY_METHOD", "defineModel", "server-only"]) assert.equal(client.includes(forbidden), false);
+  assert.equal(client.includes("createBy"), false);
   assert.match(files["models.prisma"], /privateNote String\?/);
 });
 
@@ -56,6 +61,8 @@ test("relation generation supports generated targets, self relations and one-to-
 });
 
 test("generation rejects collisions, unknown relations, missing dependencies and nonportable defaults", () => {
+  assert.throws(() => generateModule(profile, { ...context, schema: schema.replace("model User {\n id String @id\n}\n", "") }), /auditoría createBy/);
+  assert.throws(() => generateModule(profile, { ...context, schema: schema.replace("id String @id\n}", "id String @id\n fleetVehicleCreatedRecords String\n}") }), /auditoría en conflicto/);
   assert.throws(() => generateModule({ ...profile, depends: [] }, context), /dependencia/);
   assert.throws(() => generateModule(profile, { ...context, owners: {} }), /dependencia/);
   assert.throws(() => generateModule({ ...profile, models: [...profile.models, ...profile.models] }, context), /conflicto/);

@@ -3,13 +3,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { CircleAlert, RotateCcw } from "lucide-react";
 import { useAlerts } from "../alerts/AlertProvider";
+import type { RecordAudit } from "@/lib/orm/audit";
 
-export type FormViewLoadResult<T> = { ok: true; values: T } | { ok: false; error: string; kind?: "validation" | "server" };
+export type FormViewLoadResult<T> = { ok: true; values: T; audit?: RecordAudit } | { ok: false; error: string; kind?: "validation" | "server" };
 export type FormViewLoaderProps<T> = {
   recordKey: string | number;
   load: () => Promise<FormViewLoadResult<T>>;
   timeoutMs?: number;
-  children: (record: T) => ReactNode;
+  children: (record: T, audit?: RecordAudit) => ReactNode;
 };
 
 export default function FormViewLoader<T>({ recordKey, load, children, timeoutMs = 30_000 }: FormViewLoaderProps<T>) {
@@ -39,7 +40,7 @@ export default function FormViewLoader<T>({ recordKey, load, children, timeoutMs
     return () => { current = false; clearTimeout(timer); close(); };
   }, [key, load, alerts, timeoutMs]);
   const result = response?.key === key && response.load === load ? response.result : null;
-  if (result?.ok) return <div key={key} className="min-w-0">{children(result.values)}</div>;
+  if (result?.ok) return <div key={key} className="min-w-0">{children(result.values, result.audit)}</div>;
   return <div aria-busy={!result} className="card min-w-0 items-center gap-4 border border-base-300 bg-base-100 p-8 text-center shadow-sm">
     {result ? <>
       <CircleAlert size={28} aria-hidden="true" className="text-error" />

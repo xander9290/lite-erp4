@@ -18,7 +18,7 @@ type Shape<I> = { [K in keyof DeclaredFields<I>]: DeclaredFields<I>[K]["schema"]
 type Values<I> = { [K in keyof DeclaredFields<I>]: z.output<DeclaredFields<I>[K]["schema"]> };
 type Input<I> = { [K in keyof DeclaredFields<I>]: z.input<DeclaredFields<I>[K]["schema"]> };
 export type ModelOptions = { readonly name: string; readonly table: string };
-const reservedFields = new Set(["id", "revision", "createdAt", "updatedAt", "constructor", "prototype"]);
+const reservedFields = new Set(["id", "revision", "createdAt", "updatedAt", "createBy", "createByUser", "constructor", "prototype"]);
 
 export function defineModel<C extends Constructor>(Declaration: C, options: ModelOptions) {
   if (!options || typeof options.name !== "string" || typeof options.table !== "string" || !/^[A-Z][A-Za-z0-9]*$/.test(options.name) || !/^[a-z][a-z0-9_]*$/.test(options.table)) throw new Error("El modelo necesita un nombre PascalCase y una tabla snake_case válidos.");

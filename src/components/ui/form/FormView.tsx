@@ -34,7 +34,7 @@ export type FormViewProps<TValues extends FieldValues, TContext = unknown, TOutp
     newLabel?: string;
     onNew?: () => void | Promise<void>;
     onSubmit: FormViewSubmit<TValues, TOutput>;
-    onSaved?: (values: TValues) => void;
+    onSaved?: (values: TValues, audit?: import("@/lib/orm/audit").RecordAudit) => void;
     onRevert?: () => void;
   };
 
@@ -124,7 +124,7 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
       methods.reset(saved.values);
       markClean();
       toast.success(saved.message ?? "Cambios guardados.");
-      onSaved?.(saved.values);
+      onSaved?.(saved.values, saved.audit);
     }}>
     <header data-slot="header" className="space-y-4 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-5 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-4">

@@ -35,6 +35,23 @@ const methods = useForm({
 - Flechas recorren las sugerencias; Enter selecciona o abre Buscar más; Escape cierra. El modal usa `<dialog>` con foco contenido y devuelve el foco al Field.
 - FormLayout presenta errores Zod en toast. Los errores de conexión tienen reintento local. Una selección inaccesible no se valida silenciosamente.
 
+## Presentación de solo lectura, fuera de RHF
+
+```tsx
+<FieldMany2One mode="display" label="Creado por" direction="inline"
+  value={user ? { id: user.id, label: `[${user.login}] ${user.name}`, avatarUrl: user.avatarUrl } : null} />
+```
+
+`mode="display"` recibe una relación pública ya resuelta por el servidor y la
+muestra con avatar/iniciales. No recibe `name`, `model`, `onChange` ni opciones de
+búsqueda. No registra valores en RHF ni genera inputs, consultas o modal; funciona
+también fuera de FormLayout. Con `null` muestra `emptyText` (por defecto «Sin
+información»). Conserva dirección inline/block y ancho completo sin label.
+El `readOnly` del modo editable anterior conserva su contrato RHF.
+
+Ejemplo: `/sample#record-audit`. Contrato de auditoría:
+[docs/auditoria-modelos.md](../../../../docs/auditoria-modelos.md).
+
 ## Servidor
 
 `src/lib/many2one/actions.ts` contiene una sola acción para búsqueda, paginación y resolución por ID. Valida todas las props con Zod en el servidor. El registro en `registry.ts` define consultas tipadas y selects explícitos: nunca acepta `where`, `include`, selects arbitrarios ni contraseñas desde el cliente.

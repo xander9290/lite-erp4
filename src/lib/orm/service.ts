@@ -14,6 +14,7 @@ import { ModelValidationError, type ModelActor, type ModelContext } from "./cont
 import type { ModelRepository } from "./repository";
 import { INTEGER_MIN, INTEGER_MAX, type FieldMetadata } from "./fields";
 import type { KanbanMoveResult, KanbanRequest } from "../kanban/types";
+import { auditAvatarField, auditColumnType } from "./audit";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = {
@@ -41,11 +42,25 @@ function messageFor(error: unknown) {
 }
 
 /** Admin-only baseline. The repository and list policy are fixed on the server, never selected by a client. */
-export function createModelService<T extends Record<string, unknown>>(model: Contract<T>, repository: ModelRepository<T>, presentation: { columns: readonly ListColumn[]; searchFields: readonly string[]; defaultSort?: ListViewConfig["defaultSort"]; kanban?: { field: string } }) {
+export function createModelService<T extends Record<string, unknown>>(model: Contract<T>, repository: ModelRepository<T>, presentation: { columns: readonly ListColumn[]; searchFields: readonly string[]; defaultSort?: ListViewConfig["defaultSort"]; kanban?: { field: string }; audit?: boolean }) {
   type Values = T & RecordIdentity;
   const config: ListViewConfig = { ...presentation, model: model.name };
   const allowed = new Set(["id", ...Object.keys(model.metadata)]);
-  if (!config.columns.length || config.columns.length > 12 || new Set(config.columns.map(column => column.field)).size !== config.columns.length || config.columns.some(column => !allowed.has(column.field) || column.widget || (column.type && column.type !== (model.metadata[column.field] ? fieldListType(model.metadata[column.field]) : "text"))) || config.searchFields.length > 6 || config.searchFields.some(name => name !== "id" && model.metadata[name]?.kind !== "text" && model.metadata[name]?.kind !== "many2one")) throw new Error("La lista sólo puede publicar campos escalares declarados y búsquedas de texto habilitadas.");
+  if (presentation.audit) for (const field of ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.partner.name"]) allowed.add(field);
+  const columnType = (field: string) => model.metadata[field] ? fieldListType(model.metadata[field]) : presentation.audit ? auditColumnType(field) ?? "text" : "text";
+  if (!config.columns.length || config.columns.length > 12 || new Set(config.columns.map(column => column.field)).size !== config.columns.length || config.columns.some(column => {
+    const avatar = presentation.audit && auditAvatarField(column.field);
+    return !allowed.has(column.field) || (column.widget && !(column.widget === "partner" && avatar && (!column.avatarField || column.avatarField === avatar) && (!column.format || column.format === "text"))) || (column.avatarField !== undefined && (!column.widget || column.avatarField !== avatar)) || (column.type && column.type !== columnType(column.field));
+  }) || config.searchFields.length > 6 || config.searchFields.some(name => name !== "id" && model.metadata[name]?.kind !== "text" && model.metadata[name]?.kind !== "many2one" && !(presentation.audit && ["createByUser.login", "createByUser.partner.name"].includes(name)))) throw new Error("La lista sólo puede publicar campos declarados o auditoría habilitada y búsquedas de texto permitidas.");
+  // Normalize date types for server filters even when the view omitted an explicit type.
+  config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));
+  async function readAudit(tx: Prisma.TransactionClient, id: string) {
+    if (!presentation.audit) return {};
+    if (!repository.audit) throw new Error("MODEL_NOT_BOUND");
+    const audit = await repository.audit(tx, id);
+    if (!audit) throw new ModelValidationError("El registro ya no está disponible.");
+    return { audit };
+  }
   if (config.defaultSort && !config.columns.some(column => column.field === config.defaultSort?.field && column.sortable)) throw new Error("El orden predeterminado debe apuntar a una columna ordenable de la lista.");
   const groupField = presentation.kanban?.field;
   const groupMetadata = groupField && Object.hasOwn(model.metadata, groupField) ? model.metadata[groupField] : null;
@@ -54,13 +69,14 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
 
   async function read(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<FormViewLoadResult<Values>> {
     try {
-      const values = await prisma.$transaction(async tx => {
+      const record = await prisma.$transaction(async tx => {
         await assertActor(tx, actor);
         const id = idSchema.safeParse(input);
         if (!id.success) throw new ModelValidationError("El registro no es válido.");
-        return repository.read(tx, id.data);
+        const values = await repository.read(tx, id.data);
+        return values ? { values, ...await readAudit(tx, id.data) } : null;
       }, { isolationLevel: "RepeatableRead" });
-      return values ? { ok: true, values } : { ok: false, error: "No se encontró este registro." };
+      return record ? { ok: true, ...record } : { ok: false, error: "No se encontró este registro." };
     } catch (error) { return { ok: false, kind: error instanceof ModelValidationError ? "validation" : "server", error: messageFor(error) }; }
   }
 
@@ -82,7 +98,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     }
     const context: ModelContext = { tx, actor, operation: metadata.id ? "update" : "create", id: metadata.id };
     const values = model.schema.parse(model.beforeSave ? await model.beforeSave(parsed.data, context) : parsed.data);
-    const saved = metadata.id ? await repository.update(tx, metadata.id, metadata.revision!, values) : await repository.create(tx, values);
+    const saved = metadata.id ? await repository.update(tx, metadata.id, metadata.revision!, values) : await repository.create(tx, values, actor.id);
     await model.afterSave?.(saved, context);
     const final = await repository.read(tx, saved.id);
     if (!final) throw new ModelValidationError("El registro no está disponible después de guardar.");
@@ -91,8 +107,11 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
 
   async function save(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<FormViewResult<Values>> {
     try {
-      const record = await prisma.$transaction(tx => persist(tx, actor, input), { isolationLevel: "Serializable" });
-      return { ok: true, values: record, message: "Registro guardado." };
+      const record = await prisma.$transaction(async tx => {
+        const values = await persist(tx, actor, input);
+        return { values, ...await readAudit(tx, values.id) };
+      }, { isolationLevel: "Serializable" });
+      return { ok: true, ...record, message: "Registro guardado." };
     } catch (error) {
       const validation = error instanceof ModelValidationError || error instanceof z.ZodError || ["P2002", "P2003", "P2018", "P2025", "P2034"].includes(codeOf(error));
       const fieldErrors = error instanceof ModelValidationError ? error.fieldErrors : error instanceof z.ZodError ? Object.fromEntries(error.issues.filter(issue => issue.path.length).map(issue => [issue.path.join("."), issue.message])) : undefined;
@@ -113,7 +132,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
           const column = config.columns.find(column => column.field === filter.field && column.filterable !== false);
           if (!column || !allowed.has(filter.field)) throw new ModelValidationError("La columna del filtro no está habilitada.");
           const field = model.metadata[filter.field];
-          const type = field ? fieldListType(field) : "text";
+          const type = columnType(filter.field);
           const error = filterValueError(type, filter);
           if (error) throw new ModelValidationError(error);
           if (field?.kind === "integer" && [filter.value, filter.to].filter(value => value !== undefined).some(value => Number(value) < INTEGER_MIN || Number(value) > INTEGER_MAX)) throw new ModelValidationError("El filtro está fuera del rango de un entero de 32 bits.");
@@ -123,16 +142,15 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
             predicates.push({ [filter.field]: { [filter.operator === "eq" ? "equals" : "not"]: filter.value } });
           } else if (field?.kind === "selection") {
             predicates.push(filter.operator === "empty" ? { OR: field.required ? [] : [{ [filter.field]: null }] } : field.required ? {} : { [filter.field]: { not: null } });
-          } else predicates.push(compileColumnFilter(type, filter, field ? !field.required : false));
+          } else predicates.push(compileColumnFilter(type, filter, field ? !field.required : ["createBy", "createByUser.partner.name"].includes(filter.field), presentation.audit ? ["createByUser", "createByUser.partner"] : []));
         }
         if (state.query) {
-          const value = state.query.replace(/[\\%_]/g, "\\$&");
-          predicates.push({ OR: config.searchFields.map(field => ({ [field]: { contains: value, mode: "insensitive" } })) });
+          predicates.push({ OR: config.searchFields.map(field => compileColumnFilter("text", { field, operator: "contains", value: state.query })) });
         }
         const where = { AND: predicates };
         const total = await repository.count(tx, where);
         const page = Math.min(state.page, Math.max(1, Math.ceil(total / state.pageSize)));
-        const rows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize });
+        const rows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize, audit: presentation.audit === true });
         return { rows, total, page, pageSize: state.pageSize };
       }, { isolationLevel: "RepeatableRead" });
       return { ok: true, data };

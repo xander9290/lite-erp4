@@ -1,0 +1,17 @@
+{
+  "module": "flota",
+  "depends": [],
+  "relations": [
+    {
+      "target": "User",
+      "field": "flotaRecordCreatedRecords",
+      "declaration": "  flotaRecordCreatedRecords FlotaRecord[] @relation(\"FlotaRecord_createBy\")",
+      "owner": "@core"
+    }
+  ],
+  "validationOnly": [
+    "FlotaRecord.name: minLength/trim se validan con Zod; no son CHECKs SQL.",
+    "FlotaRecord.plate: minLength/trim se validan con Zod; no son CHECKs SQL."
+  ],
+  "note": "Propuesta; no se han modificado modelos existentes ni aplicado migraciones."
+}

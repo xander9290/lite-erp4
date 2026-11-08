@@ -9,11 +9,13 @@ import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } fro
 import { useFormFieldValidation } from "./formValidation";
 import { useMany2OneSearch } from "./useMany2OneSearch";
 import Many2OneSearchModal, { type Many2OneColumn } from "./Many2OneSearchModal";
+import { PartnerIdentity } from "../PartnerAvatar";
 
 export type { Many2OneModel, Many2OneRecord } from "@/lib/many2one/types";
-export type FieldMany2OneProps<TFieldValues extends FieldValues = FieldValues> =
+type EditableProps<TFieldValues extends FieldValues = FieldValues> =
   Omit<BaseFieldProps<TFieldValues>, "onChange"> &
   Omit<ComponentPropsWithoutRef<"input">, keyof BaseFieldProps<TFieldValues> | "type" | "value" | "defaultValue" | "children" | "onChange" | "onKeyDown" | "size" | "role"> & {
+    mode?: "edit";
     model: Many2OneModel;
     searchFields?: readonly string[];
     displayName?: string;
@@ -23,12 +25,41 @@ export type FieldMany2OneProps<TFieldValues extends FieldValues = FieldValues> =
     onChange?: (id: string | null, record: Many2OneRecord | null) => void;
   };
 
-export default function FieldMany2One<TFieldValues extends FieldValues = FieldValues>({
+export type FieldMany2OneDisplayProps = {
+  mode: "display";
+  value: { id: string; label: string; avatarUrl?: string | null } | null;
+  label?: string;
+  direction?: BaseFieldProps["direction"];
+  emptyText?: string;
+  id?: string;
+  className?: string;
+  "aria-label"?: string;
+};
+export type FieldMany2OneProps<TFieldValues extends FieldValues = FieldValues> = EditableProps<TFieldValues> | FieldMany2OneDisplayProps;
+
+function DisplayRelation({ value, label, direction = "block", emptyText = "Sin información", id, className = "", "aria-label": ariaLabel }: FieldMany2OneDisplayProps) {
+  const generatedId = useId();
+  const labelId = `${id ?? generatedId}-label`;
+  const fieldLabel = label?.trim();
+  return <div role="group" aria-labelledby={fieldLabel ? labelId : undefined} aria-label={fieldLabel ? undefined : ariaLabel} className={fieldDirectionClassName(direction, fieldLabel)}>
+    {fieldLabel && <span id={labelId} className={fieldLabelClassName(direction)}>{fieldLabel}</span>}
+    <div id={id} className={`flex min-h-10 min-w-0 items-center rounded-lg bg-base-200/40 px-3 py-2 text-sm ${className}`}>
+      {value ? <PartnerIdentity name={value.label} avatarUrl={value.avatarUrl} /> : <span className="text-base-content/45">{emptyText}</span>}
+    </div>
+  </div>;
+}
+
+export default function FieldMany2One<TFieldValues extends FieldValues = FieldValues>(props: FieldMany2OneProps<TFieldValues>) {
+  return props.mode === "display" ? <DisplayRelation {...props} /> : <EditableRelation<TFieldValues> {...props} />;
+}
+
+function EditableRelation<TFieldValues extends FieldValues = FieldValues>({
   name, label, direction = "block", model, searchFields = lookupModels[model].searchFields,
   displayName = lookupModels[model].displayName, columns, pageSize = 10, clearable = true,
   onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y seleccionar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps
-}: FieldMany2OneProps<TFieldValues>) {
+}: EditableProps<TFieldValues>) {
+  delete inputProps.mode;
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const listId = `${inputId}-list`, errorId = `${inputId}-error`, statusId = `${inputId}-status`;

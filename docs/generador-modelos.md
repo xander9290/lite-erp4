@@ -100,7 +100,9 @@ y sus tipos coinciden con los de la declaración del servidor.
 | DateTime | DateTime con Timestamptz(3) |
 | Many2one | ID String, relación e inversa; índice o unicidad según el campo |
 
-Se añaden ID cuid, createdAt y updatedAt al modelo propuesto. Los defaults literales
+Se añaden ID cuid, createdAt, updatedAt y createBy al modelo propuesto. createBy
+referencia User como auditoría de infraestructura, con inversa e índice gestionados;
+ver [auditoría de modelos](auditoria-modelos.md). Los defaults literales
 se normalizan con el Field antes de convertirlos a defaults de Prisma. Un default
 opcional que normaliza a null no añade un default SQL.
 

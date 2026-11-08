@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "modules": {
+    "flota": {
+      "file": "orm-flota.prisma",
+      "hash": "23c4e6e73e4ed53410b950d0a61e7d392207a139e8a3f81512cafbacb88f7ae7",
+      "inverses": [
+        {
+          "file": "user.prisma",
+          "target": "User",
+          "text": "\n  // BEGIN lite-erp:flota:User\n  flotaRecordCreatedRecords FlotaRecord[] @relation(\"FlotaRecord_createBy\")\n  // END lite-erp:flota:User\n"
+        }
+      ]
+    }
+  }
+}

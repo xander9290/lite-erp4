@@ -9,7 +9,7 @@ import { createApplication } from "./create";
 import { generateModule } from "../orm/generator/generate";
 import { loadAppGenerationProfile } from "../orm/generator/profile";
 
-const fixtureSchema = 'datasource db {\n provider = "postgresql"\n}\n';
+const fixtureSchema = "model User {\n id String @id\n}\n" + 'datasource db {\n provider = "postgresql"\n}\n';
 async function temporaryRoot() { return mkdtemp(join(await realpath(tmpdir()), "lite-erp-scaffold-")); }
 const artifacts = (template: ReturnType<typeof createAppTemplate>) => generateModule(template.profile, { schema: fixtureSchema, owners: {} });
 

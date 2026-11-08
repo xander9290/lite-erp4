@@ -42,6 +42,8 @@ export function generateModule(module: ModuleGeneration, context: GenerationCont
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(module.id) || !module.models.length || new Set(module.depends).size !== module.depends.length || module.depends.includes(module.id)) throw new Error("La generación necesita un módulo, modelos y dependencias válidos.");
   const blocks = prismaBlocks(context.schema);
   if (!blocks.some(block => block.kind === "datasource" && /provider\s*=\s*"postgresql"/.test(block.body))) throw new Error("Este generador inicial requiere PostgreSQL.");
+  const auditUser = blocks.find(block => block.kind === "model" && block.name === "User");
+  if (!auditUser || !/^\s*id\s+String\b[^\n]*@id\b/m.test(auditUser.maskedBody) || /^\s*id\s+String\b[^\n]*@db\./m.test(auditUser.maskedBody)) throw new Error("La auditoría createBy requiere el modelo de infraestructura User con id String sin tipo nativo especial.");
   const definitions = new Map<string, GenerationModel>();
   const usedNames = new Set(blocks.map(block => block.name));
   const usedTables = new Set<string>();
@@ -69,10 +71,10 @@ export function generateModule(module: ModuleGeneration, context: GenerationCont
   for (const { model } of module.models) {
     const lines = modelLines.get(model.name)!;
     const indexes: string[] = [];
-    const names = new Set(["id", "createdAt", "updatedAt", ...Object.keys(model.fields)]);
-    const columns = new Set(["id", "created_at", "updated_at"]);
+    const names = new Set(["id", "createdAt", "updatedAt", "createBy", "createByUser", ...Object.keys(model.fields)]);
+    const columns = new Set(["id", "created_at", "updated_at", "create_by"]);
     for (const [name, descriptor] of Object.entries(model.fields)) {
-      if (!/^[a-z][A-Za-z0-9]*$/.test(name) || ["id", "revision", "createdAt", "updatedAt"].includes(name)) throw new Error(`Campo inválido: ${model.name}.${name}.`);
+      if (!/^[a-z][A-Za-z0-9]*$/.test(name) || ["id", "revision", "createdAt", "updatedAt", "createBy", "createByUser"].includes(name)) throw new Error(`Campo inválido: ${model.name}.${name}.`);
       const field = descriptor.metadata;
       if (field.defaultKind === "factory") throw new Error(`${model.name}.${name}: un default de función no se puede serializar; esta fase admite defaults literales.`);
       const column = snake(name);
@@ -123,7 +125,15 @@ export function generateModule(module: ModuleGeneration, context: GenerationCont
       inverseLines.push(declaration); additions.set(field.target, inverseLines);
       relations.push({ target: field.target, field: inverse, declaration, owner });
     }
-    lines.push('  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)', '  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)', ...indexes, `  @@map(${quote(model.table)})`);
+    const auditRelation = `${model.name}_createBy`, auditInverse = `${lowerFirst(model.name)}CreatedRecords`;
+    const inverseLines = additions.get("User") ?? [];
+    if (new RegExp(`\\b${auditInverse}\\b`).test(auditUser.maskedBody) || inverseLines.some(line => line.startsWith(`  ${auditInverse} `))) throw new Error(`Relación de auditoría en conflicto: User.${auditInverse}.`);
+    const declaration = `  ${auditInverse} ${model.name}[] @relation(${quote(auditRelation)})`;
+    inverseLines.push(declaration); additions.set("User", inverseLines);
+    // User is core infrastructure, not a business-module dependency (avoids dependency cycles).
+    relations.push({ target: "User", field: auditInverse, declaration, owner: "@core" });
+    lines.push('  createBy String? @map("create_by")', `  createByUser User? @relation(${quote(auditRelation)}, fields: [createBy], references: [id], onDelete: Restrict)`,
+      '  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)', '  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)', ...indexes, '  @@index([createBy])', `  @@map(${quote(model.table)})`);
   }
 
   const generatedModels = module.models.map(({ model }) => `model ${model.name} {\n${[...modelLines.get(model.name)!, ...(additions.get(model.name) ?? [])].join("\n")}\n}`).join("\n\n");
