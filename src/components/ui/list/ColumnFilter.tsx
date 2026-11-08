@@ -7,14 +7,15 @@ import { filterOperators, columnOperatorLabel, filterValueError } from "@/lib/li
 import type { ListDataType, ListFilter, ListFilterOperator } from "@/lib/list/types";
 import { filterInputValue, temporalFilter } from "./filterInputs";
 
-type FilterProps = { field: string; label: string; type: ListDataType; filter?: ListFilter; onApply: (filter: ListFilter | null) => void };
+type FilterProps = { field: string; label: string; type: ListDataType; filter?: ListFilter; onApply: (filter: ListFilter | null) => void; options?: readonly { value: string; label: string }[]; triggerLabel?: string };
 
-function FilterPanel({ field, label, type, filter, onApply, onClose }: FilterProps & { onClose: (restore?: boolean) => void }) {
+function FilterPanel({ field, label, type, filter, onApply, options, onClose }: FilterProps & { onClose: (restore?: boolean) => void }) {
   const titleId = useId();
   const errorId = useId();
   const root = useRef<HTMLFormElement>(null);
   const temporal = type === "date" || type === "datetime";
-  const [operator, setOperator] = useState<ListFilterOperator>(filter && filterOperators[type].includes(filter.operator) ? filter.operator : filterOperators[type][0]);
+  const operators = options ? ["eq", "neq", "empty", "notEmpty"] as const : filterOperators[type];
+  const [operator, setOperator] = useState<ListFilterOperator>(filter && (operators as readonly string[]).includes(filter.operator) ? filter.operator : operators[0]);
   const [precision, setPrecision] = useState<"day" | "instant">(filter?.precision ?? "day");
   const [value, setValue] = useState(temporal ? filterInputValue(filter?.value, filter?.precision ?? "day") : filter?.value ?? "");
   const [to, setTo] = useState(temporal ? filterInputValue(filter?.to, filter?.precision ?? "day", filter?.precision === "day") : filter?.to ?? "");
@@ -37,10 +38,10 @@ function FilterPanel({ field, label, type, filter, onApply, onClose }: FilterPro
   return <form ref={root} role="dialog" aria-modal="false" aria-labelledby={titleId} noValidate className="space-y-3 p-4 text-left text-sm font-normal text-base-content" onSubmit={event => { event.preventDefault(); event.stopPropagation(); apply(); }}>
     <header className="flex items-center justify-between gap-2"><h3 id={titleId} className="min-w-0 font-semibold wrap-anywhere">Filtrar {label}</h3><button type="button" className="btn btn-circle btn-ghost btn-xs shrink-0" aria-label="Cerrar filtro" onClick={() => onClose()}><X size={15} aria-hidden="true" /></button></header>
     <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Condición</span><select className="select select-sm w-full rounded-lg border-base-300" autoComplete="off" aria-label={`Condición de ${label}`} value={operator} onChange={event => { setOperator(event.currentTarget.value as ListFilterOperator); setError(null); }}>
-      {filterOperators[type].map(op => <option key={op} value={op}>{columnOperatorLabel(type, op)}</option>)}
+      {operators.map(op => <option key={op} value={op}>{columnOperatorLabel(type, op)}</option>)}
     </select></label>
     {type === "datetime" && needsValue && <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Precisión</span><select className="select select-sm w-full rounded-lg border-base-300" aria-label={`Precisión de ${label}`} autoComplete="off" value={precision} onChange={event => { setPrecision(event.currentTarget.value as "day" | "instant"); setValue(""); setTo(""); setError(null); }}><option value="day">Día completo</option><option value="instant">Fecha y hora exactas</option></select></label>}
-    {needsValue && (type === "boolean" ? <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Valor</span><select className="select select-sm w-full rounded-lg border-base-300" aria-label={`Valor de ${label}`} autoComplete="off" value={value} onChange={event => { setValue(event.currentTarget.value); setError(null); }}><option value="">Selecciona…</option><option value="true">Sí</option><option value="false">No</option></select></label> : <>
+    {needsValue && (options || type === "boolean" ? <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Valor</span><select className="select select-sm w-full rounded-lg border-base-300" aria-label={`Valor de ${label}`} autoComplete="off" value={value} onChange={event => { setValue(event.currentTarget.value); setError(null); }}><option value="">Selecciona…</option>{(options ?? [{ value: "true", label: "Sí" }, { value: "false", label: "No" }]).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label> : <>
       <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">{operator === "between" ? temporal ? "Desde" : "Mínimo" : "Valor"}</span><input className={controlClass} type={inputType} step={inputType === "datetime-local" ? "0.001" : type === "integer" ? "1" : "any"} autoComplete="off" maxLength={120} aria-label={`Valor de ${label}`} aria-describedby={error ? errorId : undefined} value={value} onInput={event => { setValue(event.currentTarget.value); setError(null); }} onChange={event => { setValue(event.currentTarget.value); setError(null); }} /></label>
       {operator === "between" && <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">{temporal ? "Hasta" : "Máximo"}</span><input className={controlClass} type={inputType} step={inputType === "datetime-local" ? "0.001" : type === "integer" ? "1" : "any"} autoComplete="off" maxLength={120} aria-label={`Hasta de ${label}`} value={to} onInput={event => { setTo(event.currentTarget.value); setError(null); }} onChange={event => { setTo(event.currentTarget.value); setError(null); }} /></label>}
     </>)}
@@ -75,7 +76,7 @@ export default function ColumnFilter(props: FilterProps) {
   }
 
   return <>
-    <button ref={button} type="button" className={`btn btn-circle btn-ghost btn-xs shrink-0 ${props.filter ? "bg-primary/10 text-primary" : "text-base-content/45"}`} aria-label={`Filtrar ${props.label}`} aria-haspopup="dialog" aria-expanded={Boolean(position)} title={`Filtrar ${props.label}`} onClick={toggle}><Filter size={13} aria-hidden="true" />{props.filter && <span className="sr-only">Filtro activo</span>}</button>
+    <button ref={button} type="button" className={`btn btn-ghost shrink-0 ${props.triggerLabel ? "btn-sm border border-base-300" : "btn-circle btn-xs"} ${props.filter ? "bg-primary/10 text-primary" : "text-base-content/65"}`} aria-label={`Filtrar ${props.label}`} aria-haspopup="dialog" aria-expanded={Boolean(position)} title={`Filtrar ${props.label}`} onClick={toggle}><Filter size={13} aria-hidden="true" />{props.triggerLabel}{props.filter && <span className="sr-only">Filtro activo</span>}</button>
     {position && createPortal(<div ref={panel} style={position} className="fixed z-[100] m-0 overflow-y-auto rounded-xl border border-base-300 bg-base-100 shadow-2xl"><FilterPanel key={JSON.stringify(props.filter ?? null)} {...props} onClose={close} /></div>, document.body)}
   </>;
 }

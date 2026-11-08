@@ -5,19 +5,28 @@ import type { Prisma } from "../../generated/prisma/client";
 import { lookupPage, partnerLookupWhere, userLookupWhere } from "../many2one/query";
 import type { ListConfig, ListPage, ListState } from "./types";
 import { compileListFilters } from "./filters";
+import { AccessError } from "../auth/policy";
+import type { ClinicalActor } from "@/app/(auth)/erp/citas/models/access";
+import { listAppointmentRecords } from "@/app/(auth)/erp/citas/models/appointment.list";
 
 // Public DTOs only. The action requires an active session, and an administrator for users.
 export const listRegistry = {
+  dentalAppointment: async (config: ListConfig, state: ListState, actor?: ClinicalActor): Promise<ListPage> => {
+    if (!actor) throw new AccessError("UNAUTHENTICATED");
+    return listAppointmentRecords(prisma, actor, config, state);
+  },
   partner: async (config: ListConfig, state: ListState): Promise<ListPage> => {
     // Dynamic predicates are constrained by the server's field/type registry before compilation.
     const where = { AND: [partnerLookupWhere({ query: state.query, searchFields: [...config.searchFields] }), ...compileListFilters(config, state.filters)] } as Prisma.PartnerWhereInput;
     const order: Prisma.PartnerOrderByWithRelationInput = state.sort === "user.login" ? { user: { login: state.direction } }
+      : state.sort === "email" ? { email: { sort: state.direction, nulls: "last" } }
+      : state.sort === "phone" ? { phone: { sort: state.direction, nulls: "last" } }
       : state.sort === "id" ? { id: state.direction } : { name: state.direction };
     const result = await lookupPage(state, {
       count: () => prisma.partner.count({ where }),
       read: (skip, take) => prisma.partner.findMany({
         where, skip, take, orderBy: [order, ...(state.sort === "id" ? [] : [{ id: "asc" as const }])],
-        select: { id: true, name: true, avatarUrl: true, user: { select: { id: true, login: true } } },
+        select: { id: true, name: true, email: true, phone: true, avatarUrl: true, user: { select: { id: true, login: true } } },
       }),
     });
     return { rows: result.records, total: result.total, page: result.page, pageSize: result.pageSize };

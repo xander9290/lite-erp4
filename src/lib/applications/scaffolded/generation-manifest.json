@@ -1,0 +1,8 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "application-registry",
+  "files": {
+    "catalog.json": "0b3d06f653c1743917ce27f8d1896fa267bfcf4922ceb40537151a2d28a0fb52",
+    "registry.ts": "69ec370ef107a5b6a32639b7d8a6610db73423059c1edb0be5067e3b35003436"
+  }
+}

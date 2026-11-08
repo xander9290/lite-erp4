@@ -48,6 +48,8 @@ export function partnerLookupWhere(request: Pick<LookupQuery, "query" | "searchF
   return { AND: lookupWords(request.query).map(word => ({ OR: request.searchFields.map(path => {
     const text = { contains: word, mode: "insensitive" as const };
     if (path === "user.login") return { user: { is: { login: text } } };
+    if (path === "email") return { email: text };
+    if (path === "phone") return { phone: text };
     if (path === "id") return { id: text };
     return { name: text };
   }) })) };

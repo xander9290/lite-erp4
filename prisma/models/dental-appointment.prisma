@@ -1,0 +1,26 @@
+enum DentalAppointmentStatus {
+    SCHEDULED
+    ATTENDED
+    CANCELLED
+
+    @@map("dental_appointment_status")
+}
+
+model DentalAppointment {
+    id           String                  @id @default(cuid())
+    patientId    String                  @map("patient_id")
+    patient      Partner                 @relation("DentalAppointmentPatient", fields: [patientId], references: [id], onDelete: Restrict)
+    reason       String                  @db.VarChar(1000)
+    scheduledAt  DateTime                @map("scheduled_at") @db.Timestamptz(3)
+    observations String?                 @db.Text
+    status       DentalAppointmentStatus @default(SCHEDULED)
+    treatments   DentalTreatment[]
+
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+    @@index([scheduledAt])
+    @@index([status, scheduledAt])
+    @@index([patientId, scheduledAt])
+    @@map("dental_appointments")
+}

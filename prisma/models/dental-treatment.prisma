@@ -1,0 +1,16 @@
+model DentalTreatment {
+    id            String            @id @default(cuid())
+    appointmentId String            @map("appointment_id")
+    appointment   DentalAppointment @relation(fields: [appointmentId], references: [id], onDelete: Restrict)
+    performedAt   DateTime          @map("performed_at") @db.Timestamptz(3)
+    procedure     String            @db.VarChar(1000)
+    observations  String?           @db.Text
+    position      Int               @default(0)
+
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+    @@index([appointmentId, position])
+    @@index([performedAt])
+    @@map("dental_treatments")
+}

@@ -1,13 +1,10 @@
 import { z } from "zod";
-import { userSchema } from "./user.schema";
+import { partnerContactShape } from "./partner.schema";
 
 export const profileSchema = z.strictObject({
   revision: z.iso.datetime(),
   partnerRevision: z.iso.datetime().nullable(),
-  name: userSchema.shape.name,
-  email: userSchema.shape.email,
-  phone: userSchema.shape.phone,
-  avatarUrl: userSchema.shape.avatarUrl,
+  ...partnerContactShape,
 });
 export type ProfileValues = z.infer<typeof profileSchema>;
 export type ProfileRecord = { values: ProfileValues; account: { login: string; isAdmin: boolean } };

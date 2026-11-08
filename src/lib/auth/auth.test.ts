@@ -35,6 +35,8 @@ test("users require a new password on create and keep it optional on edit", () =
   assert.equal(userSchema.safeParse({ ...valid, id: "existing", revision: "2026-11-05T01:00:00.000Z", password: "" }).success, true);
   assert.equal(userSchema.safeParse({ ...valid, id: "existing", revision: "", password: "" }).success, false);
   assert.equal(userSchema.safeParse({ ...valid, sessionVersion: 99 }).success, false);
+  assert.equal(userSchema.safeParse({ ...valid, partnerRevision: "2026-11-05T01:00:00.000Z" }).success, false);
+  assert.equal(userSchema.safeParse({ ...valid, id: "existing", revision: "2026-11-05T01:00:00.000Z", password: "", partnerRevision: undefined }).success, false);
 });
 
 test("a caller cannot disable themselves or remove the last active administrator", () => {

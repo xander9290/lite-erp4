@@ -9,7 +9,8 @@ import { requireAdmin, requireUser } from "../auth/access";
 import { AccessError } from "../auth/policy";
 
 export async function listRecords(config: ListConfig, state: ListState): Promise<ListResult> {
-  try { await requireUser(); if (config?.model === "user") await requireAdmin(); }
+  let actor: Awaited<ReturnType<typeof requireUser>>;
+  try { actor = await requireUser(); if (config?.model === "user" || config?.model === "dentalAppointment") await requireAdmin(); }
   catch (error) { return { ok: false, error: error instanceof AccessError ? error.message : "No se pudo verificar tu sesión." }; }
   const parsedConfig = listConfigSchema.safeParse(config);
   const parsedState = listStateSchema.safeParse(state);
@@ -19,7 +20,7 @@ export async function listRecords(config: ListConfig, state: ListState): Promise
   if (filterError) return { ok: false, error: filterError };
   try {
     const query = normalizeListState(parsedConfig.data, parsedState.data);
-    return { ok: true, data: await listRegistry[parsedConfig.data.model](parsedConfig.data, query) };
+    return { ok: true, data: await listRegistry[parsedConfig.data.model](parsedConfig.data, query, actor) };
   } catch {
     return { ok: false, error: "No pudimos cargar los registros. Revisa tu conexión e intenta nuevamente." };
   }

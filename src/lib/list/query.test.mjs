@@ -17,6 +17,14 @@ const { formatListValue, columnAlignment, visibleListPages, listRecordHref } = r
 hooks.deregister();
 const config = { model: "partner", searchFields: ["name", "user.login"], columns: [{ field: "name", label: "Nombre", sortable: true }, { field: "user.login", label: "Usuario", sortable: true }] };
 
+test("contact email and phone columns support searching and sorting without exposing account fields", () => {
+  const contacts = { model: "partner", searchFields: ["name", "email", "phone"], columns: [
+    { field: "name", label: "Nombre" }, { field: "email", label: "Correo", sortable: true }, { field: "phone", label: "Teléfono", sortable: true },
+  ], defaultSort: { field: "email", direction: "asc" } };
+  assert.equal(listConfigSchema.safeParse(contacts).success, true);
+  assert.equal(listConfigSchema.safeParse({ ...contacts, searchFields: ["user.password"] }).success, false);
+});
+
 test("list configuration rejects unknown models, private fields and query injection", () => {
   for (const patch of [{ model: "constructor" }, { model: "secret" }, { searchFields: ["password"] }, { columns: [{ field: "user.password", label: "Secret" }] }, { where: { id: "x" } }, { include: { user: true } }]) {
     assert.equal(listConfigSchema.safeParse({ ...config, ...patch }).success, false);

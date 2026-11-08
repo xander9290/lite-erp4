@@ -1,0 +1,11 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "flota",
+  "files": {
+    "models.prisma": "a60b4dc61eef4fc4a297617bb2df5a8a4ccda0390626a15605156f25bae3784f",
+    "schema.preview.prisma": "1075fa383d05fa76276835109b8779de81a4202e070b89dcd1f8a07c2456bef9",
+    "review.json": "0ca6ec383ce3fc62f7dc7909160631dd84b78fc7209de707caaebeecfaf72391",
+    "FleetVehicle.schema.ts": "977bded47a3f58278b0fba9a5a29c615789007b3469b59c33d10e18e91b939f1",
+    "migration.preview.sql": "50b82211dd51a7ea0808fb1625f53810e85de04ebc29564525fec002c0f92544"
+  }
+}

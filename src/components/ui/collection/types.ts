@@ -1,0 +1,13 @@
+import type { ReactNode } from "react";
+import type { ListColumn, ListRecord, ListResult, ListState, ListViewConfig } from "@/lib/list/types";
+
+export type CollectionField = ListColumn & { options?: readonly { value: string; label: string }[] };
+export type CollectionProps = {
+  model: string; title: string; description?: string; icon?: ReactNode;
+  columns: readonly CollectionField[]; searchFields?: readonly string[];
+  defaultSort?: ListViewConfig["defaultSort"]; pageSize?: number; paramPrefix?: string;
+  titleField: string; subtitleField?: string; recordHref?: string; createHref?: string; createLabel?: string;
+  headerActions?: ReactNode; footer?: ReactNode; className?: string;
+  renderCard?: (record: ListRecord) => ReactNode;
+};
+export type CardViewProps = CollectionProps & { load: (state: ListState) => Promise<ListResult> };

@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/.framework-test-*/
 
 # next.js
 /.next/

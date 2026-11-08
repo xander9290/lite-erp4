@@ -82,7 +82,7 @@ export function compileColumnFilter(type: ListDataType, filter: ListFilter, null
     return { AND: [...(nullable ? [nest({ not: null })] : []), ...(type === "text" ? [nest({ not: "" })] : []), ...(parts.length ? [atRelation(parts, {})] : [])] };
   }
   if (type === "text") {
-    const value = filter.value!.replace(/[\\%_]/g, "\\$&");
+    const value = ["eq", "neq"].includes(filter.operator) ? filter.value! : filter.value!.replace(/[\\%_]/g, "\\$&");
     const operator = filter.operator === "eq" ? "equals" : filter.operator === "neq" ? "not" : filter.operator;
     return nest({ [operator]: value, mode: "insensitive" });
   }

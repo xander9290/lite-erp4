@@ -1,4 +1,4 @@
-import { listModels, type ListConfig, type ListFilter, type ListState } from "./types";
+import { listModels, type ListViewConfig, type ListModel, type ListFilter, type ListState } from "./types";
 import { isListFilterShape } from "./filters";
 
 function readFilters(value: unknown): { filters: ListFilter[]; invalidFilters?: boolean } {
@@ -16,9 +16,10 @@ function boundedInteger(value: unknown, fallback: number, maximum: number) {
 }
 
 /** URL parameters are untrusted. Normalize them against the configured visible columns. */
-export function normalizeListState(config: ListConfig, input: Record<string, unknown>, defaultPageSize = 25): ListState {
+export function normalizeListState(config: ListViewConfig, input: Record<string, unknown>, defaultPageSize = 25): ListState {
   const sortable = config.columns.filter(column => column.sortable).map(column => column.field);
-  const fallbackSort = config.defaultSort?.field ?? (sortable.includes(listModels[config.model].defaultSort) ? listModels[config.model].defaultSort : sortable[0]) ?? "id";
+  const modelSort = Object.hasOwn(listModels, config.model) ? listModels[config.model as ListModel].defaultSort : "id";
+  const fallbackSort = config.defaultSort?.field ?? (sortable.includes(modelSort) ? modelSort : sortable[0]) ?? "id";
   return {
     query: typeof input.query === "string" ? input.query.slice(0, 120).trim() : "",
     page: boundedInteger(input.page, 1, Number.MAX_SAFE_INTEGER),
@@ -32,7 +33,7 @@ export function normalizeListState(config: ListConfig, input: Record<string, unk
 const parameterNames = { query: "q", page: "page", pageSize: "size", sort: "sort", direction: "dir", filters: "filters" } as const;
 export function listParameter(key: keyof typeof parameterNames, prefix = "") { return prefix ? `${prefix}_${parameterNames[key]}` : parameterNames[key]; }
 
-export function readListState(config: ListConfig, params: Pick<URLSearchParams, "get">, defaultPageSize = 25, prefix = "") {
+export function readListState(config: ListViewConfig, params: Pick<URLSearchParams, "get">, defaultPageSize = 25, prefix = "") {
   return normalizeListState(config, Object.fromEntries(Object.keys(parameterNames).map(key => [key, params.get(listParameter(key as keyof typeof parameterNames, prefix))])), defaultPageSize);
 }
 

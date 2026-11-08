@@ -1,0 +1,112 @@
+import assert from "node:assert/strict";
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
+const { prisma } = await import("./src/lib/prisma");
+const { recordModel } = await import("./src/app/(auth)/erp/ensayo-framework/models/Record");
+const { recordService } = await import("./src/app/(auth)/erp/ensayo-framework/models/record.service");
+const { EnsayoFrameworkRecordRepository } = await import("./src/generated/orm/bindings/ensayo-framework/EnsayoFrameworkRecord.store");
+const { createModelService } = await import("./src/lib/orm/service");
+const { unboundRepository } = await import("./src/lib/orm/repository");
+const { hashPassword } = await import("./src/lib/auth/password");
+const { createEnsayoFrameworkRecordDefaults, EnsayoFrameworkRecordRecordSchema } = await import("./src/generated/orm/apps/ensayo-framework/EnsayoFrameworkRecord.schema");
+const service = createModelService(recordModel, EnsayoFrameworkRecordRepository, {
+  columns: [
+    { field: "name", label: "Nombre", type: "text", sortable: true },
+    { field: "active", label: "Activo", type: "boolean", sortable: true },
+    { field: "quantity", label: "Cantidad", type: "integer", sortable: true },
+    { field: "startsAt", label: "Fecha", type: "datetime", sortable: true },
+    { field: "status", label: "Estado", type: "text", sortable: true },
+    { field: "notes", label: "Notas", type: "text", sortable: true },
+    { field: "partnerId", label: "Contacto", type: "text", sortable: true },
+  ], searchFields: ["name", "notes"], kanban: { field: "status" },
+});
+const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 10, filters: [] };
+try {
+  const admin = await prisma.user.findUniqueOrThrow({ where: { login: "fixture-admin" } });
+  const reader = await prisma.user.create({ data: { login: "fixture-reader", password: await hashPassword("framework-test-only"), isAdmin: false } });
+  const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
+  const partner = await prisma.partner.create({ data: { name: "Contacto del ensayo" } });
+  const before = await prisma.ensayoFrameworkRecord.findFirstOrThrow({ where: { name: "Registro anterior" } });
+  assert.equal(before.quantity, 0); assert.equal(before.notes, null); assert.equal(before.status, "draft");
+  const defaults = createEnsayoFrameworkRecordDefaults();
+  assert.equal(EnsayoFrameworkRecordRecordSchema.safeParse({ ...defaults, name: "Desde formulario" }).success, true);
+  const created = await service.save(prisma, actor, { ...defaults, name: "Registro de prueba", quantity: 12, startsAt: "2026-11-07T23:59:00.000Z", partnerId: partner.id });
+  assert.ok(created.ok, JSON.stringify(created));
+  assert.equal(created.values.startsAt, "2026-11-07T23:59:00.000Z");
+  assert.equal(created.values.partnerId, partner.id);
+  assert.equal(Object.hasOwn(created.values, "partner"), false);
+  assert.equal(Object.hasOwn(created.values, "createdAt"), false);
+  assert.ok(created.values.id); assert.ok(created.values.revision);
+  const read = await service.read(prisma, actor, created.values.id);
+  assert.ok(read.ok); assert.deepEqual(read.values, created.values);
+  const changed = await service.save(prisma, actor, { ...created.values, quantity: 21 });
+  assert.ok(changed.ok, JSON.stringify(changed));
+  assert.ok(Date.parse(changed.values.revision!) > Date.parse(created.values.revision!));
+  const stale = await service.save(prisma, actor, { ...created.values, name: "Obsoleto" });
+  assert.equal(stale.ok, false); if (!stale.ok) assert.equal(stale.kind, "validation");
+  const race = await Promise.all([service.save(prisma, actor, { ...changed.values, quantity: 30 }), service.save(prisma, actor, { ...changed.values, quantity: 31 })]);
+  assert.equal(race.filter(result => result.ok).length, 1);
+  assert.equal(race.filter(result => !result.ok && result.kind === "validation").length, 1);
+  const forged = { id: reader.id, sessionVersion: reader.sessionVersion, isAdmin: true };
+  for (const user of [forged, { ...actor, sessionVersion: actor.sessionVersion + 1 }]) {
+    assert.equal((await service.read(prisma, user, created.values.id)).ok, false);
+    assert.equal((await service.save(prisma, user, { ...defaults, name: "No autorizado" })).ok, false);
+    assert.equal((await service.list(prisma, user, state)).ok, false);
+  }
+  const count = await prisma.ensayoFrameworkRecord.count();
+  const duplicate = await service.save(prisma, actor, { ...defaults, name: "Registro de prueba" });
+  assert.equal(duplicate.ok, false); if (!duplicate.ok) { assert.equal(duplicate.kind, "validation"); assert.match(duplicate.error, /únicos/); }
+  for (const invalid of [
+    { ...defaults, name: "" }, { ...defaults, name: "inválido", quantity: -1 },
+    { ...defaults, name: "inválido", quantity: 2147483648 }, { ...defaults, name: "inválido", startsAt: "2026-11-07T14:00" },
+    { ...defaults, name: "inválido", partnerId: "missing" }, { ...defaults, name: "inválido", id: created.values.id },
+    { ...defaults, name: "inválido", isAdmin: true }, { ...defaults, name: "inválido", partner: { connect: { id: partner.id } } },
+  ]) { const result = await service.save(prisma, actor, invalid); assert.equal(result.ok, false, JSON.stringify(result)); }
+  assert.equal(await prisma.ensayoFrameworkRecord.count(), count);
+  const business = await service.save(prisma, actor, { ...defaults, name: "bloqueado" });
+  assert.equal(business.ok, false); if (!business.ok) { assert.equal(business.kind, "validation"); assert.equal(business.fieldErrors?.name, "Elige otro nombre."); }
+  const rollback = await service.save(prisma, actor, { ...defaults, name: "rollback" });
+  assert.equal(rollback.ok, false); assert.equal(await prisma.ensayoFrameworkRecord.count(), count);
+  const normalized = await service.save(prisma, actor, { ...defaults, name: "normalizar" });
+  assert.ok(normalized.ok); assert.equal(normalized.values.quantity, 7);
+  const literal = await service.save(prisma, actor, { ...defaults, name: "100%_literal" }); assert.ok(literal.ok);
+  const exact = await service.list(prisma, actor, { ...state, filters: [{ field: "name", operator: "eq", value: "100%_literal" }] });
+  assert.ok(exact.ok); assert.equal(exact.data.total, 1);
+  const search = await service.list(prisma, actor, { ...state, query: "%_" }); assert.ok(search.ok); assert.equal(search.data.total, 1);
+  const numbers = await service.list(prisma, actor, { ...state, filters: [{ field: "quantity", operator: "gte", value: "12" }] });
+  assert.ok(numbers.ok); assert.equal(numbers.data.total, 1);
+  assert.equal((await service.list(prisma, actor, { ...state, filters: [{ field: "quantity", operator: "gt", value: "2147483648" }] })).ok, false);
+  const dates = await service.list(prisma, actor, { ...state, filters: [{ field: "startsAt", operator: "between", value: "2026-11-07T00:00:00.000Z", to: "2026-11-08T00:00:00.000Z", precision: "instant" }] });
+  assert.ok(dates.ok); assert.equal(dates.data.total, 1);
+  const selected = await service.list(prisma, actor, { ...state, filters: [{ field: "status", operator: "eq", value: "draft" }] }); assert.ok(selected.ok);
+  const page = await service.list(prisma, actor, { ...state, page: 999, pageSize: 1 }); assert.ok(page.ok); assert.equal(page.data.page, page.data.total);
+  for (const filter of [{ field: "user.password", operator: "contains", value: "x" }, { field: "__proto__", operator: "eq", value: "x" }, { field: "quantity", operator: "contains", value: "2" }, { field: "status", operator: "contains", value: "dr" }]) assert.equal((await service.list(prisma, actor, { ...state, filters: [filter] })).ok, false);
+  // Column pagination is server-side; moves reuse the form's permissions, validation, hooks and CAS.
+  const draftColumn = await service.kanban(prisma, actor, { group: "draft", state: { ...state, pageSize: 1 } });
+  assert.ok(draftColumn.ok); assert.equal(draftColumn.data.rows.length, 1); assert.equal(draftColumn.data.total, await prisma.ensayoFrameworkRecord.count({ where: { status: "draft" } }));
+  assert.equal((await service.kanban(prisma, forged, { group: "draft", state })).ok, false);
+  assert.equal((await service.kanban(prisma, actor, { group: "__proto__", state })).ok, false);
+  const current = await service.read(prisma, actor, created.values.id); assert.ok(current.ok);
+  const movement = { id: current.values.id!, revision: current.values.revision!, from: "draft", to: "done" };
+  assert.equal((await service.move(prisma, forged, movement)).ok, false);
+  assert.equal((await service.move(prisma, actor, { ...movement, to: "unknown" })).ok, false);
+  assert.equal((await service.move(prisma, actor, { ...movement, isAdmin: true })).ok, false);
+  const moveRace = await Promise.all([service.move(prisma, actor, movement), service.move(prisma, actor, movement)]);
+  assert.equal(moveRace.filter(result => result.ok).length, 1);
+  assert.equal(moveRace.filter(result => !result.ok && result.kind === "validation").length, 1);
+  assert.equal((await prisma.ensayoFrameworkRecord.findUniqueOrThrow({ where: { id: movement.id } })).status, "done");
+  assert.equal((await service.move(prisma, actor, movement)).ok, false);
+  const doneColumn = await service.kanban(prisma, actor, { group: "done", state }); assert.ok(doneColumn.ok); assert.equal(doneColumn.data.total, 1);
+  const excluded = await service.kanban(prisma, actor, { group: "done", state: { ...state, filters: [{ field: "status", operator: "eq", value: "draft" }] } }); assert.ok(excluded.ok); assert.equal(excluded.data.total, 0);
+  for (const name of ["bloqueado", "rollback"]) {
+    const row = await prisma.ensayoFrameworkRecord.create({ data: { name, active: true } });
+    const denied = await service.move(prisma, actor, { id: row.id, revision: row.updatedAt.toISOString(), from: "draft", to: "done" });
+    assert.equal(denied.ok, false); if (!denied.ok) assert.equal(denied.kind, "validation");
+    assert.equal((await prisma.ensayoFrameworkRecord.findUniqueOrThrow({ where: { id: row.id } })).status, "draft");
+  }
+  const unbound = createModelService(recordModel, unboundRepository<ReturnType<typeof recordModel.parse>>(), { columns: [{ field: "name", label: "Nombre" }], searchFields: ["name"] });
+  const notReady = await unbound.save(prisma, actor, { ...defaults, name: "Pendiente" }); assert.equal(notReady.ok, false); if (!notReady.ok) assert.match(notReady.error, /orm:bind/);
+  await prisma.user.update({ where: { id: admin.id }, data: { active: false } });
+  assert.equal((await service.list(prisma, actor, state)).ok, false);
+  await prisma.user.update({ where: { id: admin.id }, data: { active: true } });
+} finally { await prisma.$disconnect(); }

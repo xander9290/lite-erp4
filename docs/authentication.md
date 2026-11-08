@@ -64,8 +64,9 @@ sesiones anteriores en su siguiente solicitud al servidor. Una contraseña vací
 editar conserva el hash actual. El usuario no puede desactivarse ni retirarse sus
 propios permisos administrativos, y debe quedar al menos un administrador activo.
 
-Una revisión de `updatedAt` evita sobrescribir una edición concurrente. El formulario
-recibe la revisión y los valores confirmados al guardar para reiniciar `isDirty`.
+Las revisiones de `User.updatedAt` y `Partner.updatedAt` evitan sobrescribir una
+edición concurrente, incluso cuando el contacto cambia desde Contactos o Perfil.
+El formulario recibe ambas revisiones y los valores confirmados al guardar para reiniciar `isDirty`.
 La app es temporal hasta definir el scaffold de aplicaciones.
 
 ## Mi cuenta

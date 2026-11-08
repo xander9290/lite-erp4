@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useId, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, CircleAlert, Inbox, LayoutList, Plus, RefreshCw, Search, X } from "lucide-react";
-import { listColumnType, listDisplayColumn, listModels, readListValue, type ListColumn, type ListConfig, type ListModel, type ListRecord } from "@/lib/list/types";
+import { listColumnType, listDisplayColumn, listModels, readListValue, type ListColumn, type ListConfig, type ListModel, type ListRecord, type ListResult, type ListState } from "@/lib/list/types";
 import { columnAlignment, formatListValue, listRecordHref, visibleListPages } from "./listFormat";
 import { useListView } from "./useListView";
 import ListRecordPreview from "./ListRecordPreview";
@@ -11,8 +11,7 @@ import ColumnFilter from "./ColumnFilter";
 import ListCellValue from "./ListCellValue";
 import { filterDescription } from "./filterInputs";
 
-export type ListViewProps = {
-  model: ListModel;
+export type ListViewProps = ({ model: ListModel; load?: never } | { model: string; load: (state: ListState) => Promise<ListResult> }) & {
   title: string;
   columns: readonly ListColumn[];
   searchFields?: readonly string[];
@@ -27,21 +26,23 @@ export type ListViewProps = {
   headerActions?: ReactNode;
   footer?: ReactNode;
   className?: string;
+  /** Client-side presentation only; never part of the query configuration sent to the server. */
+  renderCell?: (record: ListRecord, column: ListColumn) => ReactNode;
 };
 
 function internalHref(href?: string) { return Boolean(href && /^\/(?![\/\\])/.test(href)); }
 const alignmentClasses = { left: "text-left", center: "text-center", right: "text-right" };
 
 export default function ListViewClient({
-  model, title, columns, searchFields = listModels[model].searchFields, description, icon,
+  model, load, title, columns, searchFields = Object.hasOwn(listModels, model) ? listModels[model as ListModel].searchFields : [], description, icon,
   pageSize = 25, defaultSort, paramPrefix = "",
-  createHref, createLabel = "Nuevo", recordHref, headerActions, footer, className = "",
+  createHref, createLabel = "Nuevo", recordHref, headerActions, footer, className = "", renderCell,
 }: ListViewProps) {
   const titleId = useId();
   const config = { model, columns, searchFields, defaultSort };
-  const list = useListView(config, pageSize, paramPrefix);
+  const list = useListView(config, pageSize, paramPrefix, load);
   const { state, data, loading, error } = list;
-  const [preview, setPreview] = useState<{ model: ListModel; record: ListRecord } | null>(null);
+  const [preview, setPreview] = useState<{ model: string; record: ListRecord } | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const restoreFocus = useCallback(() => { trigger.current?.focus({ preventScroll: true }); }, []);
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
@@ -101,7 +102,7 @@ export default function ListViewClient({
               const href = canNavigate ? listRecordHref(recordHref!, record.id, list.currentUrl) : "";
               return <tr key={record.id} className="transition-colors hover:bg-primary/5">
                 {displayColumns.map((column, index) => {
-                  const text = <ListCellValue record={record} column={column} />;
+                  const text = renderCell?.(record, column) ?? <ListCellValue record={record} column={column} />;
                   return <td key={column.field} className={`max-w-sm ${column.widget === "partner" ? "min-w-48" : ""} px-4 py-4 whitespace-normal wrap-anywhere ${alignmentClasses[columnAlignment(column)]} ${index === 0 ? "font-medium text-base-content" : "text-base-content/65"}`}>
                     {index === 0 || column.widget === "partner" ? canNavigate ? <Link href={href} className="inline-block max-w-full rounded-sm text-left hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary">{text}</Link> : <button type="button" className="max-w-full cursor-pointer rounded-sm text-left hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={event => openRecord(record, event.currentTarget)}>{text}</button> : text}
                   </td>;

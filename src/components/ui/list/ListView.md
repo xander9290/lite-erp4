@@ -84,6 +84,7 @@ Un día se expresa como `[medianoche local, siguiente medianoche local)`, incluy
 - `format`: `text`, `number`, `currency`, `date`, `datetime` o `boolean`; `currency` y `decimals` ajustan la presentación. El formato no cambia el tipo de dato permitido por el servidor.
 - `pageSize`: valor inicial entre 1 y 50 (25 por defecto). `defaultSort`: columna visible/ordenable y dirección. El ID desempata el orden en el servidor.
 - `description`, `icon`, `className`, `headerActions`, `footer`: presentación opcional.
+- `renderCell(record, column)`: presentación personalizada en un wrapper cliente. Devuelve `undefined` para usar el formato habitual. No se envía como parte de la configuración de consulta; ejemplo en `citas/views/AppointmentList.tsx`.
 - `recordHref`: ruta interna con `{id}` para el futuro FormView. Se agrega `returnTo` con el contexto; el destino debe validarlo antes de redirigir. Sin ruta, abrir una fila muestra una vista rápida de lectura.
 - `paramPrefix`: namespace opcional para varias listas en una misma página.
 
@@ -95,12 +96,28 @@ El buscador general se sustituyó por controles en encabezados; `searchPlacehold
 
 `src/lib/list/registry.ts` define consultas tipadas, selects públicos y órdenes permitidos. `listConfigSchema`, `listStateSchema` y `validateListFilters` validan modelos, campos, operadores, tipos y valores en el servidor; no se aceptan delegates, where, include ni contraseñas arbitrarios. Un enlace con filtros malformados produce un error recuperable, nunca una lectura sin filtros silenciosa.
 
-Al añadir un modelo, registrar sus tipos de campo, nulabilidad, relaciones opcionales, select y ordenamientos reales. No exponer campos privados mediante metadatos. Cuando se implemente autenticación/empresas, aplicar los mismos permisos en listas y buscadores relacionales.
+Al añadir un modelo, registrar sus tipos de campo, nulabilidad, relaciones opcionales, select y ordenamientos reales. No exponer campos privados mediante metadatos. La acción exige sesión activa y administrador para Usuarios/Citas. La consulta clínica de `dentalAppointment` además revalida sesión y permisos en la transacción de su módulo; no heredar el acceso general de Contactos.
 
 ## Ejemplos
 
 - `/erp/contactos`: columnas de texto y relación con consultas reales.
+- `/erp/citas`: paciente con avatar, teléfono, fechas, motivo y seguimiento; formulario operativo en `nuevo` y `[id]`.
 - `/sample#list-view`: header con menú, footer propio, filtros de texto y `User.lastLogin` para fechas reales.
 - La misma sección incluye un ejemplo local de controles numéricos/booleanos con datos de demostración. Los modelos actuales no tienen esos campos; el motor de comparación está probado y requiere registrar campos reales antes de consultarlos en Prisma. No se insertan datos ni se modifica el esquema para la demostración.
 
 Esta fase es de lectura; crear/editar y persistir relaciones corresponde a FormView.
+## Fuentes de una aplicación del scaffold
+
+Además de los modelos del registro central, ListView admite una acción propia:
+
+```tsx
+<ListView model="MiModelo" load={listRecords} title="Mis registros"
+  columns={recordColumns} searchFields={recordSearchFields}
+  recordHref="/erp/mi-app/{id}" createHref="/erp/mi-app/nuevo" />
+```
+
+`load` recibe únicamente `ListState` y devuelve `Promise<ListResult>`. El servidor
+debe fijar su modelo, columnas permitidas y permisos; las props de presentación
+no autorizan consultas. El scaffold usa `createModelService` y un adaptador tipado
+generado por `orm:bind`. El registro central conserva su whitelist de modelos.
+Los tipos de las columnas personalizadas deben indicarse explícitamente.

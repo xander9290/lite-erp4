@@ -7,7 +7,7 @@ import { lookupPage, lookupWindow, userLookupWhere, partnerLookupWhere, type Loo
 // This is the server allowlist, not a dynamic prisma[model] supplied by the browser.
 // The action requires an active session; hashes and security fields never leave this registry.
 const userSelect = { id: true, login: true, partner: { select: { id: true, name: true } } } satisfies Prisma.UserSelect;
-const partnerSelect = { id: true, name: true, user: { select: { id: true, login: true } } } satisfies Prisma.PartnerSelect;
+const partnerSelect = { id: true, name: true, email: true, phone: true, user: { select: { id: true, login: true } } } satisfies Prisma.PartnerSelect;
 
 export const lookupRegistry = {
   user: async (request: LookupQuery) => {

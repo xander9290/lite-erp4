@@ -12,10 +12,10 @@ function Picture({ src }: { src: string }) {
     className="absolute inset-0 size-full object-cover" onError={() => setFailed(true)} />;
 }
 
-export default function PartnerAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
+export default function PartnerAvatar({ name, avatarUrl, size = "sm" }: { name: string; avatarUrl?: string | null; size?: "sm" | "lg" }) {
   const src = partnerAvatarSource(avatarUrl);
   return <span aria-hidden="true" className="avatar avatar-placeholder inline-flex shrink-0">
-    <span className="relative flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-semibold text-primary ring-1 ring-base-content/10">
+    <span className={`relative flex items-center justify-center overflow-hidden rounded-full bg-primary/10 font-semibold text-primary ring-1 ring-base-content/10 ${size === "lg" ? "size-24 text-2xl" : "size-8 text-xs"}`}>
       <span>{partnerInitials(name)}</span>
       {src && <Picture key={src} src={src} />}
     </span>

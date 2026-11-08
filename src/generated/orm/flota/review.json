@@ -1,0 +1,20 @@
+{
+  "module": "flota",
+  "depends": [
+    "contactos"
+  ],
+  "relations": [
+    {
+      "target": "Partner",
+      "field": "fleetVehicleDriverIdRecords",
+      "declaration": "  fleetVehicleDriverIdRecords FleetVehicle[] @relation(\"FleetVehicle_driverId\")",
+      "owner": "contactos"
+    }
+  ],
+  "validationOnly": [
+    "FleetVehicle.plate: minLength/trim se validan con Zod; no son CHECKs SQL.",
+    "FleetVehicle.brand: minLength/trim se validan con Zod; no son CHECKs SQL.",
+    "FleetVehicle.mileage: min/max se validan con Zod; no son CHECKs SQL."
+  ],
+  "note": "Propuesta; no se han modificado modelos existentes ni aplicado migraciones."
+}
