@@ -1,0 +1,247 @@
+import type { AppIdentity } from "./templates";
+
+/** Application-specific command guide, emitted as editable documentation. */
+export function applicationReadme(app: AppIdentity) {
+  const id = app.id;
+  const migration = id.replaceAll("-", "_");
+  const docs = "../../../../../docs";
+  return `# ${app.name}
+
+Guía del módulo \`${id}\`. Ejecuta los comandos desde la raíz del repositorio,
+donde está \`package.json\`, usando la base de desarrollo configurada en Prisma.
+Los comandos \`db:migrate\`, \`db:deploy\` y \`db:generate\` ya incluyen
+\`--config prisma7.config.ts\`.
+
+Los archivos del módulo son editables. Los de \`src/generated\`, el catálogo del
+scaffold y los segmentos de Prisma gestionados se actualizan con sus herramientas.
+Conserva esquemas, migraciones y registros de propiedad juntos en el control de versiones.
+
+## Qué caso necesitas
+
+| Caso | Orden |
+| --- | --- |
+| Crear el cascarón | Simular → crear → personalizar → primera instalación. |
+| Primera instalación de modelos | Generar → plan de instalación → escribir esquema → crear/revisar migración → aplicar → generar cliente → generar/enlazar. |
+| Añadir un campo o modelo | Declarar/publicar → generar → instalar con --update → crear/revisar migración → aplicar → generar cliente → generar/enlazar → completar UI. |
+| Cambiar validación sin cambiar almacenamiento | Generar → revisar → enlazar → comprobar. |
+| Cambiar vistas, menús o dominios | Editar TS/TSX → comprobar tipos/lint; migrar sólo si también cambia el modelo almacenado. |
+| Actualizar únicamente el adaptador | Revisar enlace → escribir enlace. |
+| Revisar estado sin aplicar cambios | Planes de generación/instalación/enlace y migrate status. |
+| Desplegar migraciones existentes | db:deploy → build → start. |
+| Retirar una aplicación | No hay un desinstalador; consulta el último apartado. |
+
+## 1. Crear el cascarón una sola vez
+
+Este README se entrega al crear la aplicación. Los siguientes comandos describen
+ese paso inicial; una aplicación que ya existe continúa en el caso correspondiente.
+Para otra aplicación, sustituye el nombre por el suyo.
+
+\`\`\`bash
+npm run create:app -- "${app.name}" --dry-run
+# Revisa los archivos propuestos antes de crear.
+npm run create:app -- "${app.name}"
+\`\`\`
+
+Antes de instalar, personaliza \`models/Record.ts\`, publica sus campos en
+\`clientFields\` de \`orm.config.ts\` y ajusta \`manifest.ts\` y las vistas.
+El adaptador inicial requiere publicar todos los campos declarados; los contratos
+parciales o privados necesitan un servicio/adaptador propio.
+\`create:app\` no sobrescribe una aplicación existente y no aplica SQL.
+
+## 2. Primera instalación de los modelos
+
+Este caso corresponde a una aplicación cuyos modelos aún no están incorporados
+a \`prisma/models\` por el instalador.
+
+\`\`\`bash
+npm run orm:generate -- ${id} --write
+npm run orm:install -- ${id}
+# Revisa el plan; después incorpora los archivos de esquema.
+npm run orm:install -- ${id} --write
+git status --short prisma
+git diff -- prisma
+\`\`\`
+
+El instalador escribe el esquema y su registro de propiedad; la base se actualiza
+en el siguiente paso. Genera primero la migración para revisar su SQL:
+
+\`\`\`bash
+npm run db:migrate -- --name install_${migration} --create-only
+git status --short prisma/migrations
+\`\`\`
+
+Abre el nuevo \`prisma/migrations/<fecha>_install_${migration}/migration.sql\`
+y revisa todo su contenido. \`git diff\` no muestra el contenido de archivos nuevos
+sin seguimiento. Prisma calcula la migración del esquema completo del proyecto.
+Con el SQL revisado, aplica y completa el enlace, en este orden:
+
+\`\`\`bash
+npm run db:migrate
+npm run db:generate
+npm run orm:generate -- ${id} --write
+npm run orm:bind -- ${id}
+# El plan de enlace compila el acceso tipado; después escríbelo.
+npm run orm:bind -- ${id} --write
+npx tsc --noEmit
+npm run lint -- 'src/app/(auth)/erp/${id}'
+\`\`\`
+
+Inicia desarrollo con \`npm run dev\`. Si estaba ejecutándose al regenerar Prisma
+Client, detenlo con Ctrl+C en su terminal y vuelve a iniciarlo para renovar su
+instancia cacheada. Comprueba crear, editar y reabrir un registro.
+
+## 3. Añadir un campo o modelo después de instalar
+
+1. Declara el campo/modelo en \`models\` y actualiza \`orm.config.ts\`:
+   \`clientFields\`, modelos y dependencias según corresponda.
+2. Para registros existentes, una columna nueva puede ser opcional o tener un
+   default SQL literal admitido. El instalador actual permite evolución aditiva;
+   rechaza retiradas, renombrados y cambios incompatibles de campos existentes.
+3. Genera los contratos y revisa la actualización del esquema:
+
+\`\`\`bash
+npm run orm:generate -- ${id} --write
+npm run orm:install -- ${id} --update
+# Revisa el plan antes de escribir.
+npm run orm:install -- ${id} --update --write
+git status --short prisma
+git diff -- prisma
+npm run db:migrate -- --name add_fields_${migration} --create-only
+git status --short prisma/migrations
+\`\`\`
+
+Usa un nombre descriptivo para la migración, por ejemplo \`add_brand_${migration}\`.
+Revisa el archivo SQL nuevo antes de continuar:
+
+\`\`\`bash
+npm run db:migrate
+npm run db:generate
+npm run orm:generate -- ${id} --write
+npm run orm:bind -- ${id}
+npm run orm:bind -- ${id} --write
+\`\`\`
+
+Añade el Field a \`views/RecordForm.tsx\` y, si lo necesitas en la lista, su columna
+y/o búsqueda a \`views/record.list.ts\`. Completa los ajustes de UI y comprueba:
+
+\`\`\`bash
+npx tsc --noEmit
+npm run lint -- 'src/app/(auth)/erp/${id}'
+\`\`\`
+
+Reinicia dev tras \`db:generate\` y prueba guardar/reabrir el campo, valores vacíos
+si es opcional y su validación. \`orm:install --update\` actualiza archivos de esquema;
+la migración y la generación de Prisma Client siguen siendo pasos explícitos.
+
+## 4. Cambiar validación sin cambiar almacenamiento
+
+Ejemplos: etiqueta, trim, mínimo de longitud o límites de validación de enteros.
+Edita la declaración y sincroniza los contratos:
+
+\`\`\`bash
+npm run orm:generate -- ${id} --write
+git diff -- src/generated/orm/apps/${id}
+npm run orm:bind -- ${id}
+npm run orm:bind -- ${id} --write
+npx tsc --noEmit
+npm run lint -- 'src/app/(auth)/erp/${id}'
+\`\`\`
+
+Este caso requiere que el almacenamiento siga igual. Cambiar \`required\`,
+\`maxLength\` de un Text, unicidad o defaults puede afectar Prisma y requiere
+revisar el caso de evolución de esquema; el instalador puede rechazar esos cambios.
+Revisa la compatibilidad de la validación nueva con los registros existentes.
+
+## 5. Cambiar vistas, menús, acciones o dominios
+
+Edita las vistas TSX, columnas/búsquedas, \`menus\` del manifest o los dominios de
+servidor en \`models/record.lists.ts\`. Luego:
+
+\`\`\`bash
+npx tsc --noEmit
+npm run lint -- 'src/app/(auth)/erp/${id}'
+\`\`\`
+
+Estos cambios de presentación/consulta no requieren instalar, migrar ni generar
+Prisma Client cuando los campos almacenados siguen iguales.
+El scaffold nuevo trae Registros, Mis registros y Activos, reutilizando ListView.
+El dominio se combina con los filtros visibles; los permisos de servidor siguen
+siendo independientes. El acceso inicial del servicio es admin para todas sus
+operaciones, aunque cambies \`manifest.access\`.
+
+ListView incorpora selección de página y \`Acciones → Eliminar\` con confirmación.
+\`create={false}\` y \`delete={false}\` ocultan las acciones correspondientes.
+Eliminar registros de una lista no elimina la aplicación ni sus tablas.
+
+## 6. Regenerar sólo el adaptador
+
+Tras actualizar el generador de enlaces, con esquema, base y Prisma Client ya
+sincronizados:
+
+\`\`\`bash
+npm run orm:bind -- ${id}
+npm run orm:bind -- ${id} --write
+npx tsc --noEmit
+\`\`\`
+
+El enlace incorpora, por ejemplo, el método \`remove\` o cambios de presentación de
+auditoría. No se necesita migración por un cambio exclusivo del adaptador.
+
+## 7. Consultar el estado sin aplicar cambios
+
+\`\`\`bash
+npm run orm:generate -- ${id}
+npm run orm:generate -- ${id} --check
+npm run orm:install -- ${id} --update
+npm run orm:bind -- ${id}
+npx prisma migrate status --config prisma7.config.ts
+\`\`\`
+
+Estos comandos son de revisión; \`orm:install --update\` se usa aquí para un módulo
+ya instalado. \`--check\` devuelve salida 2 si los artefactos necesitan regenerarse.
+Un preview sin SQL compara archivos, no demuestra que la base esté migrada;
+\`migrate status\` consulta el historial de migraciones, no detecta todo el drift.
+
+## 8. Desplegar migraciones versionadas
+
+Con el código, esquemas, registros de propiedad y migraciones revisados/versionados,
+en el entorno de despliegue configurado:
+
+\`\`\`bash
+npm ci
+npm run db:deploy
+npm run build
+npm run start
+\`\`\`
+
+\`build\` ya ejecuta \`db:generate\`. Las migraciones se preparan en desarrollo;
+\`db:deploy\` aplica las pendientes en el entorno elegido. \`db:migrate\` es el flujo
+de desarrollo, no el de producción.
+
+## 9. Retirar o eliminar aplicaciones
+
+**Actualmente no existe un comando de desinstalación de aplicaciones.**
+No hay \`remove:app\`, \`delete:app\` ni \`orm:uninstall\`. La creación,
+instalación y evolución aditiva sí están implementadas.
+
+Ocultar un menú, excluir una aplicación del catálogo visual, eliminar sus registros
+y retirar sus fuentes/tablas son operaciones distintas. El procedimiento y las
+limitaciones actuales están en [Retirar aplicaciones](${docs}/retirar-aplicaciones.md).
+
+El catálogo \`src/lib/applications/scaffolded\` y \`prisma/.orm-installations.json\`
+tienen integridad/propiedad gestionadas: no editar sus hashes ni borrarlos para
+forzar una retirada. Una desinstalación completa necesita resolver dependencias,
+relaciones e inversas y coordinar código, registro y una migración explícita.
+
+## Contratos y guías
+
+- [Flujo del framework](${docs}/flujo-framework.md).
+- [Crear aplicaciones](${docs}/crear-aplicaciones.md).
+- [Dominios de lista](${docs}/dominios-listas.md).
+- [Auditoría de modelos](${docs}/auditoria-modelos.md).
+
+El formulario conserva RHF/isDirty, Revertir, carga y confirmación de salida.
+Los hooks \`beforeSave\`/\`afterSave\` corren en la transacción; sus errores revierten
+el guardado. Los efectos externos necesitan su propio flujo, fuera de esos hooks.
+`;
+}

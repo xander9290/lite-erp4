@@ -11,6 +11,12 @@ import ColumnFilter from "./ColumnFilter";
 import ListCellValue from "./ListCellValue";
 import { filterDescription } from "./filterInputs";
 import ListBreadcrumbs, { type ListBreadcrumb } from "./ListBreadcrumbs";
+import { deleteRecords } from "@/lib/list/actions";
+import { listDeleteSelectionSchema, type ListDeleteResult, type ListDeleteTarget } from "@/lib/list/selection";
+import { emptyListSelection, selectedPageIds, togglePageRecord, toggleWholePage } from "./listSelection";
+import SelectionCheckbox from "./SelectionCheckbox";
+import { useListDeletion } from "./useListDeletion";
+import ListViewActionMenu from "./ListViewActionMenu";
 
 export type ListViewProps = ({ model: ListModel; load?: never } | { model: string; load: (state: ListState) => Promise<ListResult> }) & {
   title: string;
@@ -23,6 +29,9 @@ export type ListViewProps = ({ model: ListModel; load?: never } | { model: strin
   defaultSort?: ListConfig["defaultSort"];
   paramPrefix?: string;
   createHref?: string;
+  create?: boolean;
+  delete?: boolean;
+  onDelete?: (selection: readonly ListDeleteTarget[]) => Promise<ListDeleteResult>;
   createLabel?: string;
   recordHref?: string;
   headerActions?: ReactNode;
@@ -38,12 +47,18 @@ const alignmentClasses = { left: "text-left", center: "text-center", right: "tex
 export default function ListViewClient({
   model, load, title, columns, searchFields = Object.hasOwn(listModels, model) ? listModels[model as ListModel].searchFields : [], description, icon,
   pageSize = 25, defaultSort, paramPrefix = "",
-  createHref, createLabel = "Nuevo", recordHref, breadcrumbs, headerActions, footer, className = "", renderCell,
+  createHref, create = true, delete: deleteEnabled = true, onDelete, createLabel = "Nuevo", recordHref, breadcrumbs, headerActions, footer, className = "", renderCell,
 }: ListViewProps) {
   const titleId = useId();
   const config = { model, columns, searchFields, defaultSort };
   const list = useListView(config, pageSize, paramPrefix, load);
   const { state, data, loading, error } = list;
+  const [selection, setSelection] = useState(emptyListSelection);
+  const selectedIds = selectedPageIds(selection, data);
+  const selectedRows = data?.rows.filter(row => selectedIds.includes(row.id)) ?? [];
+  const parsedSelection = listDeleteSelectionSchema.safeParse(selectedRows.map(row => ({ id: row.id, revision: row.revision })));
+  const deletion = useListDeletion(data);
+  const deleteAction = onDelete ?? (!load && Object.hasOwn(listModels, model) ? (targets: readonly ListDeleteTarget[]) => deleteRecords(model as ListModel, targets) : undefined);
   const [preview, setPreview] = useState<{ model: string; record: ListRecord } | null>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const restoreFocus = useCallback(() => { trigger.current?.focus({ preventScroll: true }); }, []);
@@ -53,7 +68,7 @@ export default function ListViewClient({
   const last = data ? Math.min(page * data.pageSize, data.total) : 0;
   const sizes = [...new Set([10, 25, 50, state.pageSize])].sort((a, b) => a - b);
   const canNavigate = internalHref(recordHref);
-  const canCreate = internalHref(createHref);
+  const canCreate = create && internalHref(createHref);
   const filterCount = state.filters.length + (state.query ? 1 : 0) + (state.invalidFilters ? 1 : 0);
   const displayColumns = columns.map(column => listDisplayColumn(model, column));
 
@@ -70,10 +85,15 @@ export default function ListViewClient({
         <div className="min-w-0 space-y-1"><div className="flex flex-wrap items-center gap-2"><h2 id={titleId} className="text-xl font-semibold tracking-tight wrap-anywhere sm:text-2xl">{title}</h2><span className="badge badge-ghost badge-sm tabular-nums">{loading ? "…" : data ? data.total.toLocaleString("es-MX") : "—"}</span></div>{description && <p className="max-w-2xl text-sm leading-relaxed text-base-content/60">{description}</p>}</div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {selectedIds.length > 0 && <span role="status" className="badge badge-soft badge-primary badge-sm tabular-nums">{selectedIds.length} seleccionado{selectedIds.length === 1 ? "" : "s"} en esta página</span>}
+        {selectedIds.length > 0 && <button type="button" className="btn btn-ghost btn-sm" disabled={deletion.busy} onClick={() => setSelection(emptyListSelection)}>Deseleccionar</button>}
         {state.query && <span className="badge badge-soft badge-sm">Búsqueda: {state.query}</span>}
         {filterCount > 0 && <button type="button" className="btn btn-ghost btn-sm gap-1.5 text-primary" onClick={list.clearFilters} aria-label="Limpiar filtros"><X size={14} aria-hidden="true" />{filterCount} filtro{filterCount === 1 ? "" : "s"}</button>}
         {headerActions}
-        <button type="button" className="btn btn-ghost btn-sm gap-2" disabled={loading} onClick={list.refresh} aria-label={`Actualizar ${title}`}><RefreshCw size={15} className={loading ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" /><span>Actualizar</span></button>
+        {deleteEnabled && selectedIds.length > 0 && <ListViewActionMenu disabled={loading || deletion.busy}
+          deleteDisabled={!deleteAction || !parsedSelection.success} deleteUnavailable={!deleteAction}
+          onDelete={() => { if (deleteAction && parsedSelection.success) void deletion.run(parsedSelection.data, deleteAction, list.refresh); }} />}
+        <button type="button" className="btn btn-ghost btn-sm gap-2" disabled={loading || deletion.busy} onClick={list.refresh} aria-label={`Actualizar ${title}`}><RefreshCw size={15} className={loading ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" /><span>Actualizar</span></button>
         {canCreate && <Link href={createHref!} className="btn btn-primary btn-sm gap-1.5"><Plus size={16} aria-hidden="true" />{createLabel}</Link>}
       </div>
     </header>
@@ -83,6 +103,9 @@ export default function ListViewClient({
         <table className="table table-sm w-full min-w-[30rem]">
           <caption className="sr-only">Listado de {title}</caption>
           <thead className="bg-base-200/70 text-base-content/60"><tr>
+            <th scope="col" className="w-12 px-4 py-3"><SelectionCheckbox label="Seleccionar todos los registros de esta página" checked={Boolean(data?.rows.length && selectedIds.length === data.rows.length)}
+              mixed={selectedIds.length > 0 && selectedIds.length < (data?.rows.length ?? 0)} disabled={loading || deletion.busy || !data?.rows.length}
+              onChange={() => { if (data) setSelection(current => toggleWholePage(current, data)); }} /></th>
             {columns.map(column => {
               const align = columnAlignment(column);
               const current = state.sort === column.field;
@@ -100,10 +123,12 @@ export default function ListViewClient({
             <th scope="col" className="w-12 px-3"><span className="sr-only">Abrir registro</span></th>
           </tr></thead>
           <tbody>
-            {loading ? [1, 2, 3].map(row => <tr key={row} aria-hidden="true">{columns.map(column => <td key={column.field} className="px-4 py-5"><div className="skeleton h-4 w-3/4 motion-reduce:animate-none" /></td>)}<td /></tr>) : error ? <tr><td colSpan={columns.length + 1}><div role="alert" className="sticky left-0 flex min-h-40 w-[calc(100cqw-1rem)] flex-col items-center justify-center gap-3 p-6 text-center"><CircleAlert size={28} className="text-base-content/40" aria-hidden="true" /><p className="max-w-sm text-sm text-base-content/70">{error}</p><button type="button" className="btn btn-soft btn-sm" onClick={list.refresh}>Reintentar</button></div></td></tr> : !data?.rows.length ? <tr><td colSpan={columns.length + 1}><div className="sticky left-0 flex min-h-40 w-[calc(100cqw-1rem)] flex-col items-center justify-center gap-2 p-6 text-center"><span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-base-200 text-base-content/35">{filterCount ? <Search size={24} aria-hidden="true" /> : <Inbox size={24} aria-hidden="true" />}</span><p className="font-semibold">{filterCount ? "Sin coincidencias" : "Aún no hay registros"}</p><p className="max-w-sm text-sm text-base-content/55">{filterCount ? "Prueba con otros filtros o limpia la selección." : "Los registros aparecerán aquí cuando estén disponibles."}</p>{filterCount > 0 && <button type="button" className="btn btn-ghost btn-sm mt-1" onClick={list.clearFilters}>Quitar filtros</button>}</div></td></tr> : data.rows.map(record => {
+            {loading ? [1, 2, 3].map(row => <tr key={row} aria-hidden="true"><td className="px-4"><div className="skeleton size-4 motion-reduce:animate-none" /></td>{columns.map(column => <td key={column.field} className="px-4 py-5"><div className="skeleton h-4 w-3/4 motion-reduce:animate-none" /></td>)}<td /></tr>) : error ? <tr><td colSpan={columns.length + 2}><div role="alert" className="sticky left-0 flex min-h-40 w-[calc(100cqw-1rem)] flex-col items-center justify-center gap-3 p-6 text-center"><CircleAlert size={28} className="text-base-content/40" aria-hidden="true" /><p className="max-w-sm text-sm text-base-content/70">{error}</p><button type="button" className="btn btn-soft btn-sm" onClick={list.refresh}>Reintentar</button></div></td></tr> : !data?.rows.length ? <tr><td colSpan={columns.length + 2}><div className="sticky left-0 flex min-h-40 w-[calc(100cqw-1rem)] flex-col items-center justify-center gap-2 p-6 text-center"><span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-base-200 text-base-content/35">{filterCount ? <Search size={24} aria-hidden="true" /> : <Inbox size={24} aria-hidden="true" />}</span><p className="font-semibold">{filterCount ? "Sin coincidencias" : "Aún no hay registros"}</p><p className="max-w-sm text-sm text-base-content/55">{filterCount ? "Prueba con otros filtros o limpia la selección." : "Los registros aparecerán aquí cuando estén disponibles."}</p>{filterCount > 0 && <button type="button" className="btn btn-ghost btn-sm mt-1" onClick={list.clearFilters}>Quitar filtros</button>}</div></td></tr> : data.rows.map(record => {
               const recordTitle = formatListValue(readListValue(record, displayColumns[0].field), displayColumns[0]);
               const href = canNavigate ? listRecordHref(recordHref!, record.id, list.currentUrl) : "";
-              return <tr key={record.id} className="transition-colors hover:bg-primary/5">
+              return <tr key={record.id} aria-selected={selectedIds.includes(record.id)} className={`transition-colors hover:bg-primary/5 ${selectedIds.includes(record.id) ? "bg-primary/5" : ""}`}>
+                <td className="px-4 py-4"><SelectionCheckbox label={`Seleccionar ${recordTitle}`} checked={selectedIds.includes(record.id)} disabled={deletion.busy}
+                  onChange={() => setSelection(current => togglePageRecord(current, data, record.id))} /></td>
                 {displayColumns.map((column, index) => {
                   const text = renderCell?.(record, column) ?? <ListCellValue record={record} column={column} />;
                   return <td key={column.field} className={`max-w-sm ${column.widget === "partner" ? "min-w-48" : ""} px-4 py-4 whitespace-normal wrap-anywhere ${alignmentClasses[columnAlignment(column)]} ${index === 0 ? "font-medium text-base-content" : "text-base-content/65"}`}>

@@ -20,6 +20,28 @@ permisos granulares y cambios destructivos siguen fuera del alcance inicial.
 
 Agilizar el desarrollo de aplicaciones del ERP mediante un scaffold inspirado en la organización de módulos de Odoo, adaptado a Next.js, TypeScript y Prisma. Mantener la visión **lite**: ligero, profesional y apoyado en los componentes existentes.
 
+## Dirección futura: distribución como paquete npm
+
+Idea acordada: cuando el framework haya madurado, evaluar su distribución como
+`lite-erp`, instalable en un proyecto Next.js, con un comando de configuración que
+prepare las integraciones y permita continuar con el scaffold de aplicaciones.
+El nombre es provisional; no se ha comprobado su disponibilidad en npm.
+
+Conservar Next.js como aliado para rutas, renderizado y comunicación con el servidor,
+y Prisma para persistencia y migraciones. La propuesta es empaquetar nuestra capa de
+ERP, manteniendo React y las librerías conocidas que ya utilizamos.
+
+Una separación posible, todavía por validar, sería núcleo de modelos/domains/reglas,
+integración con Prisma, componentes React, CLI e integración con Next.js. Mantener
+límites claros facilitaría soportar otros entornos en el futuro sin exigir esa
+extracción ahora.
+
+**Prioridad actual: madurar el framework dentro de este proyecto.** Antes de
+extraerlo, consolidar sus contratos mediante aplicaciones reales, comprobar permisos,
+transacciones y evolución de esquemas, mejorar documentación y pruebas, y definir
+compatibilidad, configuración y actualizaciones. El empaquetado, el instalador y la
+publicación en npm quedan pendientes; esta idea no inicia una reestructuración.
+
 ## Dirección acordada: modelos TypeScript y vistas TSX
 
 El usuario eligió explícitamente mantener el ecosistema JavaScript/TypeScript y

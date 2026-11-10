@@ -1,8 +1,9 @@
 # Crear una aplicación con el scaffold
 
 `create:app` ya prepara un módulo, su modelo inicial, contrato cliente y vistas TSX
-editables. Flota todavía no se ha creado: el usuario hará ese ejercicio acompañado
-durante la tutoría, con explicaciones y ejercicios pequeños a su ritmo.
+editables. Flota es el ejercicio de tutoría ya creado en este proyecto; los cambios
+del generador se aplican a aplicaciones nuevas. Los módulos existentes se actualizan
+manualmente, conservando sus personalizaciones.
 
 ## Comandos
 
@@ -10,7 +11,7 @@ durante la tutoría, con explicaciones y ejercicios pequeños a su ritmo.
 # Simulación: valida y muestra el plan sin crear archivos del proyecto.
 npm run create:app -- Flota --dry-run
 
-# Creación real, cuando comencemos la tutoría.
+# Creación real en un proyecto donde todavía no existe Flota.
 npm run create:app -- Flota
 ```
 
@@ -25,7 +26,8 @@ src/app/(auth)/erp/flota/
 ├── orm.config.ts
 ├── models/
 │   ├── Record.ts
-│   └── record.service.ts
+│   ├── record.service.ts
+│   └── record.lists.ts
 ├── schemas/record.schema.ts
 ├── actions/record.actions.ts
 ├── views/
@@ -33,6 +35,8 @@ src/app/(auth)/erp/flota/
 │   └── RecordForm.tsx
 ├── layout.tsx
 ├── page.tsx
+├── mis-registros/page.tsx
+├── activos/page.tsx
 ├── nuevo/page.tsx
 ├── [id]/page.tsx
 └── README.md
@@ -44,6 +48,12 @@ El desarrollador puede editar libremente estos archivos. El comando rechaza una
 carpeta de aplicación existente, aunque esté vacía; no se usa para regenerar vistas.
 
 ## Registro y acceso
+
+El README de cada cascarón incluye los comandos ordenados por caso: creación,
+primera instalación, nuevos campos, validación, vistas/menús/dominios, actualización
+del adaptador, consultas de estado y despliegue. Conserva los puntos de revisión
+entre `--create-only` y la aplicación de las migraciones. Los README existentes
+son editables; el generador no los sobrescribe al actualizar el framework.
 
 La tarjeta se incorpora mediante imports estáticos gestionados en
 `src/lib/applications/scaffolded/registry.ts`. El registro principal combina esa
@@ -58,6 +68,14 @@ El acceso inicial es **admin**. ApplicationLayout protege la ruta y las acciones
 verifican permisos de forma independiente; cambiar el manifest no cambia
 automáticamente la política de escritura de las acciones.
 
+El manifest incluye `menus` con «Registros», «Mis registros» y «Activos». Sus acciones
+fijan el dominio en `models/record.lists.ts` y reutilizan la misma ListView; guía en
+[dominios de lista](dominios-listas.md). La creación se ofrece desde ListView.
+El Topnav muestra las opciones de la aplicación activa, con un desplegable en móvil. Puedes añadir
+enlaces o grupos de un nivel a rutas existentes dentro de la aplicación; el menú
+no crea esas vistas ni ejecuta acciones. Contrato y permisos en
+[navegación de aplicaciones](desarrollo-aplicaciones.md#navegación-de-cada-aplicación-en-el-topnav).
+
 ## Vistas y guardado
 
 La portada usa ListView con una acción propia del módulo para paginación, filtros
@@ -69,6 +87,13 @@ aviso al salir con cambios, FormViewLoader y recarga protegida. Las acciones usa
 el servicio compartido, que revalida permisos admin en la transacción y controla
 las revisiones. Antes de completar `orm:bind`, devuelven un error explícito; no
 simulan un guardado exitoso ni descartan el borrador.
+
+ListView incorpora casillas por fila y selección de la página visible. Su acción
+«Eliminar» usa `deleteRecords` y `recordService.remove`, con confirmación, revisión
+y borrado transaccional admin. `create={false}` y `delete={false}` ocultan los botones
+de la vista. Los adaptadores nuevos incluyen `remove`; los anteriores requieren
+`orm:bind -- id --write`, sin migrar. Contrato en
+[ListView](../src/components/ui/list/ListView.md#selección-y-acciones-predeterminadas).
 
 El comando registra la aplicación en la interfaz, pero no crea tablas ni ejecuta
 migraciones. El paso posterior `orm:install` ya incorpora modelos nuevos al esquema

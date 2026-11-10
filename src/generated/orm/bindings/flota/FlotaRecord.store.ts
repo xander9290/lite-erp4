@@ -5,7 +5,7 @@ import type { ModelRepository } from "@/lib/orm/repository";
 import type { RecordAudit } from "@/lib/orm/audit";
 import type { FlotaRecordValues } from "@/generated/orm/apps/flota/FlotaRecord.schema";
 
-const select = { id: true, updatedAt: true, name: true, plate: true, active: true } satisfies Prisma.FlotaRecordSelect;
+const select = { id: true, updatedAt: true, name: true, plate: true, brand: true, active: true } satisfies Prisma.FlotaRecordSelect;
 type Row = Prisma.FlotaRecordGetPayload<{ select: typeof select }>;
 const auditSelect = { createdAt: true, updatedAt: true, createBy: true, createByUser: { select: { id: true, login: true, partner: { select: { name: true, avatarUrl: true } } } } } satisfies Prisma.FlotaRecordSelect;
 type AuditRow = Prisma.FlotaRecordGetPayload<{ select: typeof auditSelect }>;
@@ -17,6 +17,7 @@ function dto(record: Row) {
   return { id: record.id, revision: record.updatedAt.toISOString(),
     name: record.name,
     plate: record.plate,
+    brand: record.brand,
     active: record.active,
   };
 }
@@ -24,6 +25,7 @@ function data(values: FlotaRecordValues) {
   return {
     name: values.name,
     plate: values.plate,
+    brand: values.brand,
     active: values.active,
   } satisfies Prisma.FlotaRecordUncheckedCreateInput;
 }
@@ -36,6 +38,7 @@ export const FlotaRecordRepository: ModelRepository<FlotaRecordValues> = {
     const updatedAt = new Date(Math.max(Date.now(), Date.parse(revision) + 1));
     return dto(await tx.flotaRecord.update({ where: { id, updatedAt: new Date(revision) }, data: { ...data(values), updatedAt }, select }));
   },
+  async remove(tx, id, revision) { await tx.flotaRecord.delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },
   count(tx, where) { return tx.flotaRecord.count({ where: where as Prisma.FlotaRecordWhereInput }); },
   async list(tx, query) {
     // Only the server service supplies these whitelisted scalar predicates and order.

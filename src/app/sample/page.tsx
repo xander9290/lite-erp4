@@ -25,6 +25,7 @@ export default function PageSample() {
           </div>
           <nav aria-label="Ejemplos de Fields" className="flex flex-wrap gap-2">
             <a className="btn btn-sm btn-outline" href="#list-view">ListView</a>
+            <a className="btn btn-sm btn-outline" href="#list-selection">Selección de listas</a>
             <a className="btn btn-sm btn-outline" href="#card-view">CardView</a>
             <a className="btn btn-sm btn-outline" href="#kanban-view">KanbanView</a>
             <a className="btn btn-sm btn-outline" href="#form-view">FormView</a>

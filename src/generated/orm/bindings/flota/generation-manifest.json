@@ -2,6 +2,6 @@
   "generator": "lite-erp-orm-v1",
   "module": "binding-flota",
   "files": {
-    "FlotaRecord.store.ts": "be1f04778a715a0772960eb0e654daf17327f34febe50347d7d0e8baa25a1ff7"
+    "FlotaRecord.store.ts": "79e6abd40c90063cdd498c872b8a014b9c25f53d7edf7b94bc5fa64ea8ddd4d1"
   }
 }

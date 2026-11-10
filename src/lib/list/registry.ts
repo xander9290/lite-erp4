@@ -26,10 +26,10 @@ export const listRegistry = {
       count: () => prisma.partner.count({ where }),
       read: (skip, take) => prisma.partner.findMany({
         where, skip, take, orderBy: [order, ...(state.sort === "id" ? [] : [{ id: "asc" as const }])],
-        select: { id: true, name: true, email: true, phone: true, avatarUrl: true, user: { select: { id: true, login: true } } },
+        select: { id: true, updatedAt: true, name: true, email: true, phone: true, avatarUrl: true, user: { select: { id: true, login: true } } },
       }),
     });
-    return { rows: result.records, total: result.total, page: result.page, pageSize: result.pageSize };
+    return { rows: result.records.map(({ updatedAt, ...record }) => ({ ...record, revision: updatedAt.toISOString() })), total: result.total, page: result.page, pageSize: result.pageSize };
   },
   user: async (config: ListConfig, state: ListState): Promise<ListPage> => {
     const where = { AND: [userLookupWhere({ query: state.query, searchFields: [...config.searchFields] }), ...compileListFilters(config, state.filters)] } as Prisma.UserWhereInput;
@@ -42,9 +42,9 @@ export const listRegistry = {
       count: () => prisma.user.count({ where }),
       read: (skip, take) => prisma.user.findMany({
         where, skip, take, orderBy: [order, ...(state.sort === "id" ? [] : [{ id: "asc" as const }])],
-        select: { id: true, login: true, lastLogin: true, active: true, isAdmin: true, createdAt: true, partner: { select: { id: true, name: true, avatarUrl: true } } },
+        select: { id: true, updatedAt: true, login: true, lastLogin: true, active: true, isAdmin: true, createdAt: true, partner: { select: { id: true, name: true, avatarUrl: true } } },
       }),
     });
-    return { rows: result.records.map(record => ({ ...record, lastLogin: record.lastLogin?.toISOString() ?? null, createdAt: record.createdAt.toISOString() })), total: result.total, page: result.page, pageSize: result.pageSize };
+    return { rows: result.records.map(({ updatedAt, ...record }) => ({ ...record, revision: updatedAt.toISOString(), lastLogin: record.lastLogin?.toISOString() ?? null, createdAt: record.createdAt.toISOString() })), total: result.total, page: result.page, pageSize: result.pageSize };
   },
 };

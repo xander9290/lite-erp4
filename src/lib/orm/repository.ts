@@ -10,11 +10,12 @@ export interface ModelRepository<T> {
   audit?(tx: Prisma.TransactionClient, id: string): Promise<RecordAudit | null>;
   create(tx: Prisma.TransactionClient, values: T, actorId: string): Promise<SavedRecord<T>>;
   update(tx: Prisma.TransactionClient, id: string, revision: string, values: T): Promise<SavedRecord<T>>;
+  remove?(tx: Prisma.TransactionClient, id: string, revision: string): Promise<void>;
   count(tx: Prisma.TransactionClient, where: Record<string, unknown>): Promise<number>;
   list(tx: Prisma.TransactionClient, query: RepositoryQuery): Promise<ListRecord[]>;
 }
 
 export function unboundRepository<T>(): ModelRepository<T> {
   const unavailable = async (): Promise<never> => { throw new Error("MODEL_NOT_BOUND"); };
-  return { read: unavailable, create: unavailable, update: unavailable, count: unavailable, list: unavailable };
+  return { read: unavailable, create: unavailable, update: unavailable, remove: unavailable, count: unavailable, list: unavailable };
 }

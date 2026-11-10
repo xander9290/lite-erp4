@@ -36,6 +36,7 @@ export const contactsManifest = defineApplication({
 | `depends` | Identificadores de otros módulos que necesita. |
 | `access` | `authenticated`: cuenta activa; `admin`: administradores. Controla entrada y visibilidad del módulo. |
 | `models` | Nombres de los modelos Prisma que **pertenecen** al módulo. No son nombres de tablas ni crean modelos por sí solos. |
+| `menus` | Navegación opcional de la aplicación en el Topnav: enlaces y grupos de un nivel. |
 
 Por ejemplo, Usuarios declara `models: ["User"]` y `depends: ["contactos"]`.
 Usar Partner desde Usuarios no significa volver a declarar su propiedad: Partner
@@ -55,6 +56,49 @@ las búsquedas relacionales autenticadas siguen devolviendo sólo los DTO permit
 Ocultar una tarjeta o proteger un layout no protege una Server Action.
 
 Ventas conserva por ahora su tarjeta de demostración; aún no es un módulo registrado.
+
+## Navegación de cada aplicación en el Topnav
+
+Cada aplicación declara sus propios enlaces en `manifest.ts`. El Topnav compartido
+resuelve la aplicación activa por la ruta, muestra los menús en escritorio y los
+agrupa bajo «Menú» en móvil. El breadcrumb de ListView/FormView se conserva.
+En el cajón, Perfil y rutas fuera de una aplicación no quedan menús de la anterior.
+
+Por ejemplo, en el manifest de Flota:
+
+```ts
+menus: [
+  { id: "vehicles", label: "Vehículos", href: "/erp/flota" },
+],
+```
+
+Los IDs deben ser únicos en todo el menú de la aplicación, incluidos los grupos.
+Cada enlace tiene `id`, `label`, `href` y opcionalmente `match` y `access`. Un grupo
+tiene `id`, `label`, `items` y `access` opcional; no combina `href` con `items` ni
+contiene otros grupos. Las rutas son paths internos de la propia aplicación,
+sin query, fragmento, segmentos dinámicos de plantilla ni destinos externos.
+La declaración no crea las páginas: añade primero la ruta TSX correspondiente.
+
+La coincidencia por defecto es por prefijo de segmento: «Vehículos» permanece activo
+al abrir `/erp/flota/[id]`. Gana el enlace más específico. `match: "exact"` limita
+una opción a su ruta exacta.
+
+`access: "admin"` puede restringir un enlace o un grupo. El acceso de la aplicación
+y el del grupo se heredan; un hijo no amplía esos permisos. El servidor filtra los
+menús antes de enviar los metadatos de presentación al cliente y retira grupos
+vacíos. Las opciones administrativas pueden ocultarse así a cuentas sin escritura.
+Los permisos de las páginas y acciones siguen siendo obligatorios e independientes.
+
+Los enlaces conservan la confirmación de cambios pendientes. Los desplegables usan
+controles nativos, se cierran con Escape, al salir del foco o al hacer clic fuera,
+y admiten etiquetas largas en varias líneas. El manifest contiene navegación;
+las acciones de registro siguen en `headerActions`/`menuActions` de las vistas.
+
+`create:app` incluye «Registros», «Mis registros» y «Activos» en el manifest inicial;
+las dos últimas usan [dominios de servidor](dominios-listas.md). La creación permanece en
+el botón de ListView; no se duplica como opción del Topnav.
+Los manifests anteriores sin `menus` siguen siendo válidos. No se instalan modelos,
+ejecutan migraciones ni regeneran adaptadores al cambiar un menú.
 
 ## Un primer ejercicio sencillo
 

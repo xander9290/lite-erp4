@@ -11,7 +11,8 @@
   ],
   "validationOnly": [
     "FlotaRecord.name: minLength/trim se validan con Zod; no son CHECKs SQL.",
-    "FlotaRecord.plate: minLength/trim se validan con Zod; no son CHECKs SQL."
+    "FlotaRecord.plate: minLength/trim se validan con Zod; no son CHECKs SQL.",
+    "FlotaRecord.brand: minLength/trim se validan con Zod; no son CHECKs SQL."
   ],
   "note": "Propuesta; no se han modificado modelos existentes ni aplicado migraciones."
 }

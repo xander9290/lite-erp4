@@ -28,7 +28,14 @@ aplicación creada, no pueden instalarse con este comando.
 Una vez revisado el esquema, en el entorno de desarrollo correspondiente:
 
 ```sh
-npm run db:migrate -- --name install_mi_app
+npm run db:migrate -- --name install_mi_app --create-only
+```
+
+Revisar el nuevo `prisma/migrations/<fecha>_install_mi_app/migration.sql`.
+Después de revisar el SQL, continuar:
+
+```sh
+npm run db:migrate
 npm run db:generate
 ```
 
@@ -94,5 +101,11 @@ npx tsc --noEmit
 
 Las pruebas usan proyectos temporales y una URL local sin servidor disponible.
 Verifican instalación sin conexión, relaciones entre módulos, regeneración,
-conservación de personalizaciones y rechazos por cambios/conflictos. Flota permanece
-sin aplicación ni tablas hasta comenzar su tutoría.
+conservación de personalizaciones y rechazos por cambios/conflictos. Los proyectos
+temporales de prueba son independientes de Flota y de sus datos existentes.
+
+## Retirada de aplicaciones
+
+El instalador no incluye desinstalación. `--update` admite evolución aditiva y no
+retira tablas, modelos ni aplicaciones. Consulta [Retirar aplicaciones](retirar-aplicaciones.md)
+para distinguir exclusión del catálogo, borrado de registros y retirada completa.

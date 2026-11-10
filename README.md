@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lite ERP 4
 
-## Getting Started
+ERP modular con Next.js, React, TypeScript, Prisma ORM 7 y PostgreSQL.
+Las aplicaciones se componen con modelos declarativos y vistas TSX editables.
 
-First, run the development server:
+## Comandos del scaffold, en orden
+
+Cada aplicación creada con `create:app` incluye un README con comandos concretos
+para su identificador, separados por caso. El módulo de tutoría actual es
+[Flota](src/app/(auth)/erp/flota/README.md).
+
+| Caso | Guía |
+| --- | --- |
+| Crear una aplicación y enlazar su persistencia | [Crear aplicaciones](docs/crear-aplicaciones.md) y [Flujo del framework](docs/flujo-framework.md). |
+| Añadir campos a una aplicación instalada | Caso 3 del [README de Flota](src/app/(auth)/erp/flota/README.md#3-añadir-un-campo-o-modelo-después-de-instalar), con el ID de tu módulo. |
+| Cambiar vistas, menús, dominios o adaptadores | Casos 4–7 del README de cada módulo. |
+| Retirar una aplicación | [Alcance y procedimiento actuales](docs/retirar-aplicaciones.md). No hay comando de desinstalación. |
+
+`orm:generate`, `orm:install` y `orm:bind` revisan sin escribir cuando omites
+`--write`; no aplican SQL. Para cambios físicos, primero se crea la migración con
+`--create-only`, se revisa su `migration.sql` y después se aplica con `db:migrate`.
+Los README detallan dónde intervienen `db:generate`, el enlace y el reinicio de dev.
+
+## Desarrollo
+
+Desde la raíz, con las dependencias y la base local configuradas:
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La aplicación abre en [localhost:3000](http://localhost:3000). La configuración de
+Prisma está en `prisma7.config.ts`; los scripts `db:*` la seleccionan explícitamente.
+El inicio de dev no sustituye las migraciones ni la generación del acceso a datos.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Comprobaciones
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run test:orm
+npm run test:orm:install
+npm run test:scaffold
+npm run test:applications
+npm run test:list-selection
+npx tsc --noEmit
+npm run lint
+```
 
-## Learn More
+`npm run test:framework:integration` comprueba persistencia, evolución, dominios,
+permisos, concurrencia y eliminación con cuentas y un esquema PostgreSQL temporales.
 
-To learn more about Next.js, take a look at the following resources:
+## Otras guías
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Aplicaciones y navegación](docs/desarrollo-aplicaciones.md).
+- [Instalación de modelos y propiedad](docs/instalar-modelos.md).
+- [Dominios de listas](docs/dominios-listas.md).
+- [Auditoría de registros](docs/auditoria-modelos.md).
+- [Vistas de colecciones](docs/vistas-colecciones.md).

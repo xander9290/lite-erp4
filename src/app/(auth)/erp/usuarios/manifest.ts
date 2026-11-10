@@ -10,4 +10,7 @@ export const usersManifest = defineApplication({
   depends: ["contactos"],
   access: "admin",
   models: ["User"],
+  menus: [
+    { id: "users", label: "Usuarios", href: "/erp/usuarios" },
+  ],
 });

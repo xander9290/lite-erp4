@@ -10,7 +10,7 @@ export function useListView(config: ListViewConfig, pageSize: number, prefix: st
   const { state, update } = query;
   const [attempt, setAttempt] = useState(0);
   const key = JSON.stringify({ config, state, attempt });
-  const [response, setResponse] = useState<{ key: string; result: ListResult } | null>(null);
+  const [response, setResponse] = useState<{ key: string; load: typeof load; result: ListResult } | null>(null);
 
 
   useEffect(() => {
@@ -20,12 +20,12 @@ export function useListView(config: ListViewConfig, pageSize: number, prefix: st
       let result: ListResult;
       try { result = load ? await load(input.state) : await listRecords(input.config as ListConfig, input.state); }
       catch { result = { ok: false, error: "No pudimos conectar. Intenta nuevamente." }; }
-      if (current) setResponse({ key, result });
+      if (current) setResponse({ key, load, result });
     }, 0);
     return () => { current = false; clearTimeout(timer); };
   }, [key, load]);
 
-  const result = response?.key === key ? response.result : null;
+  const result = response?.key === key && response.load === load ? response.result : null;
   const data = result?.ok ? result.data : null;
   useEffect(() => {
     if (data && data.page !== state.page) update({ page: data.page }, true);

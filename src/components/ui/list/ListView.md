@@ -35,6 +35,71 @@ import ListView from "@/components/ui/list/ListView";
 
 El wrapper incluye Suspense; las páginas pueden seguir siendo Server Components. La interacción consulta una Server Action validada.
 
+## Selección y acciones predeterminadas
+
+Cada fila tiene una casilla independiente. La casilla del encabezado selecciona o
+deselecciona **sólo la página visible** y muestra el estado intermedio cuando hay una
+selección parcial. Cambiar página, filtros, orden, fuente o actualizar la consulta
+limpia la selección; no hay selección implícita de resultados en otras páginas.
+
+`create` y `delete` son booleanos, ambos `true` por defecto:
+
+```tsx
+<ListView model="partner" title="Contactos"
+  columns={[{ field: "name", label: "Nombre", sortable: true }]}
+  createHref="/erp/contactos/nuevo"
+  create={false}
+  delete={false}
+/>
+```
+
+`create={false}` oculta el botón aunque exista `createHref`; sin una ruta válida
+tampoco se muestra. `delete={false}` oculta «Eliminar» y su menú, manteniendo las casillas.
+Estas props controlan presentación y no conceden ni sustituyen permisos.
+
+«Acciones» es un desplegable del header con icono de engrane que aparece sólo al
+seleccionar registros. Contiene «Eliminar», habilitado para filas con `revision`
+ISO UTC. Se cierra con Escape, al salir del foco, pulsar fuera o elegir una acción.
+Al quitar la selección también se oculta. Eliminar solicita confirmación y bloquea peticiones repetidas.
+Cancelar conserva la selección. Si la consulta cambia durante la confirmación, se
+cancela ese borrado y se pide seleccionar de nuevo. Después de intentar el borrado se vuelve a consultar
+la lista, también ante errores de red cuyo commit sea desconocido; no se simula una
+eliminación optimista. Si se elimina la última fila de una página, el proveedor
+ajusta la paginación al rango disponible.
+
+Las fuentes incorporadas `partner`, `user` y `dentalAppointment` tienen un proveedor
+de borrado explícito. Contactos oculta Crear/Eliminar a cuentas sin escritura. El
+servidor revalida sesión activa, administrador y `sessionVersion` dentro de una
+transacción Serializable. El lote admite de 1 a 50 IDs únicos con sus revisiones;
+un cambio concurrente o una FK restringida revierte todo el lote. No se pueden
+eliminar la cuenta de la sesión ni citas/contactos/usuarios con relaciones que lo
+impidan. Borrar un usuario conserva su contacto Partner.
+
+Las fuentes propias conectan una Server Action mediante `onDelete`:
+
+```ts
+// Contrato de la prop, disponible como tipos en ui/list/ListView:
+onDelete: (selection: readonly { id: string; revision: string }[]) =>
+  Promise<{ ok: true; deleted: number }
+    | { ok: false; error: string; kind?: "validation" | "server" }>;
+```
+
+El callback no recibe modelos, filtros ni dominios arbitrarios. Sin proveedor no
+se ejecuta un borrado; el botón queda desactivado. El scaffold y Flota conectan
+`onDelete={deleteRecords}` con `recordService.remove`. Los adaptadores generados
+incluyen `remove(tx, id, revision)`; para módulos enlazados anteriormente hay que
+regenerarlos con `orm:bind -- id --write`. No hay cambio de esquema ni migración.
+
+El dominio de una lista filtra su consulta; los permisos del borrado son los del
+servicio. La eliminación no ejecuta `beforeSave`/`afterSave`. Las reglas de negocio
+propias de borrado requieren una acción/servicio autorizado específico. No eliminar
+relaciones ni recursos externos desde el cliente para evitar un rechazo de FK.
+
+Ejemplo local: `/sample#list-selection`, con datos ficticios, paginación, eliminación
+en memoria y botón para restablecer. Las listas reales de Contactos/Usuarios del
+catálogo usan `delete={false}`. Pruebas: `npm run test:list-selection` y la integración
+PostgreSQL aislada `npm run test:framework:integration`.
+
 ## Columnas y tipos
 
 ### Widget Partner
@@ -109,7 +174,8 @@ Al añadir un modelo, registrar sus tipos de campo, nulabilidad, relaciones opci
 - `/sample#list-view`: header con menú, footer propio, filtros de texto y `User.lastLogin` para fechas reales.
 - La misma sección incluye un ejemplo local de controles numéricos/booleanos con datos de demostración. Los modelos actuales no tienen esos campos; el motor de comparación está probado y requiere registrar campos reales antes de consultarlos en Prisma. No se insertan datos ni se modifica el esquema para la demostración.
 
-Esta fase es de lectura; crear/editar y persistir relaciones corresponde a FormView.
+Crear/editar campos y persistir relaciones corresponde a FormView. ListView ofrece
+consulta, selección y la acción de eliminación descrita arriba.
 ## Fuentes de una aplicación del scaffold
 
 Además de los modelos del registro central, ListView admite una acción propia:
@@ -125,3 +191,9 @@ debe fijar su modelo, columnas permitidas y permisos; las props de presentación
 no autorizan consultas. El scaffold usa `createModelService` y un adaptador tipado
 generado por `orm:bind`. El registro central conserva su whitelist de modelos.
 Los tipos de las columnas personalizadas deben indicarse explícitamente.
+
+Para reutilizar una lista con un conjunto fijo de registros, el servidor puede
+declarar `recordService.defineListAction({ domain })`. El wrapper remoto sigue
+recibiendo sólo `ListState` y se pasa a `load`; el dominio no se serializa a la UI
+ni se limpia con los filtros. Contrato y ejemplos del scaffold en
+[Dominios de lista](../../../../docs/dominios-listas.md).

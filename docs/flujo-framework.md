@@ -38,8 +38,16 @@ npm run orm:install -- mi-aplicacion --write
 git status --short prisma
 git diff -- prisma
 
-# En la base de desarrollo elegida: crear/aplicar migración y generar cliente.
-npm run db:migrate -- --name install_mi_aplicacion
+# En la base de desarrollo elegida: preparar la migración para revisión.
+npm run db:migrate -- --name install_mi_aplicacion --create-only
+git status --short prisma/migrations
+```
+
+Revisar el nuevo `prisma/migrations/<fecha>_install_mi_aplicacion/migration.sql`.
+Con el SQL revisado, continuar:
+
+```sh
+npm run db:migrate
 npm run db:generate
 
 # Actualizar artefactos de revisión y generar el adaptador tipado.
@@ -63,8 +71,15 @@ Editar la clase, `clientFields` y las vistas, después:
 npm run orm:generate -- mi-aplicacion --write
 npm run orm:install -- mi-aplicacion --update
 npm run orm:install -- mi-aplicacion --update --write
-# Revisar el esquema y crear/aplicar su migración de desarrollo.
-npm run db:migrate -- --name add_notes_mi_aplicacion
+# Revisar el esquema y preparar su migración de desarrollo.
+npm run db:migrate -- --name add_notes_mi_aplicacion --create-only
+git status --short prisma/migrations
+```
+
+Revisar el SQL nuevo antes de aplicar. Después:
+
+```sh
+npm run db:migrate
 npm run db:generate
 npm run orm:generate -- mi-aplicacion --write
 npm run orm:bind -- mi-aplicacion --write
@@ -82,6 +97,12 @@ necesitar revisar datos existentes por separado. No borrar registros de propieda
 ni modificar hashes para forzar una actualización.
 
 ## Dónde vive cada responsabilidad
+
+Cada README generado contiene los comandos concretos de su módulo, separados por
+primera instalación, evolución, validación, vistas/dominios, enlace y despliegue.
+Ejemplo vigente: [README de Flota](../src/app/(auth)/erp/flota/README.md).
+La [retirada de aplicaciones](retirar-aplicaciones.md) todavía no tiene un comando
+automático; su alcance actual se documenta aparte.
 
 | Archivo/capa | Responsabilidad |
 | --- | --- |
@@ -172,6 +193,12 @@ escrituras anidadas se necesita un servicio y adaptador propios. No ampliar la
 publicación sólo para evitar este rechazo.
 
 ## Vistas adicionales
+
+Las [acciones de lista con dominio](dominios-listas.md) fijan condiciones en el
+servidor mediante `recordService.defineListAction`. El scaffold genera «Registros»,
+«Mis registros» y «Activos» con la misma ListView y acciones independientes.
+Los dominios se combinan con los filtros visibles antes de contar/paginar; no
+sustituyen permisos de lectura o escritura por registro.
 
 CardView y KanbanView ya forman parte de la UI. Reutilizan servicios y contratos
 autorizados, con búsqueda, filtros y estado URL. Kanban añade una selección de

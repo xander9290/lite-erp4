@@ -44,7 +44,7 @@ export default function AuditSample() {
       <FormGroup legend="Datos editables"><FieldText<Values> name="name" label="Nombre" required /></FormGroup>
     </FormView>
     </div>
-    <ListView model="AuditDemo" title="Auditoría en ListView" description="Vista previa de dos registros: uno con autor y otro anterior a la auditoría." columns={previewColumns} searchFields={[]} load={loadPreview} paramPrefix="audit" className="h-80" />
+    <ListView delete={false} model="AuditDemo" title="Auditoría en ListView" description="Vista previa de dos registros: uno con autor y otro anterior a la auditoría." columns={previewColumns} searchFields={[]} load={loadPreview} paramPrefix="audit" className="h-80" />
     <div className="rounded-xl bg-base-100 p-4 text-xs"><p className="mb-2 font-medium">Payload validado con Zod · sin auditoría</p><pre className="overflow-x-auto">{submitted ? JSON.stringify(submitted, null, 2) : "Edita el nombre y guarda el ejemplo."}</pre><p role="status" className="mt-2 text-base-content/55">{methods.formState.isDirty ? "Con cambios" : "Sin cambios"}</p></div>
   </section>;
 }

@@ -32,7 +32,7 @@ test("dry run writes nothing; creation emits editable source, owned artifacts an
     const profile = await readFile(join(root, "src/app/(auth)/erp/prueba/orm.config.ts"), "utf8");
     assert.match(profile, /clientFields: \["name", "active"\]/);
     const action = await readFile(join(root, "src/app/(auth)/erp/prueba/actions/record.actions.ts"), "utf8");
-    assert.equal((action.match(/await requireAdmin\(\)/g) ?? []).length, 5);
+    assert.equal((action.match(/await requireAdmin\(\)/g) ?? []).length, 8);
     assert.equal(action.includes("ok: true"), false);
     const form = await readFile(join(root, "src/app/(auth)/erp/prueba/views/RecordForm.tsx"), "utf8");
     for (const feature of ["zodResolver", "FormViewLoader", "navigation.run", "router.bfcacheId", "saveRecord"]) assert.ok(form.includes(feature));

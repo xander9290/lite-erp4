@@ -7,6 +7,7 @@ const { recordService } = await import("./src/app/(auth)/erp/ensayo-framework/mo
 const { EnsayoFrameworkRecordRepository } = await import("./src/generated/orm/bindings/ensayo-framework/EnsayoFrameworkRecord.store");
 const { createModelService } = await import("./src/lib/orm/service");
 const { unboundRepository } = await import("./src/lib/orm/repository");
+const { deleteRegisteredRecords } = await import("./src/lib/list/delete-registry");
 const { hashPassword } = await import("./src/lib/auth/password");
 const { createEnsayoFrameworkRecordDefaults, EnsayoFrameworkRecordRecordSchema } = await import("./src/generated/orm/apps/ensayo-framework/EnsayoFrameworkRecord.schema");
 const service = createModelService(recordModel, EnsayoFrameworkRecordRepository, {
@@ -148,6 +149,48 @@ try {
   const legacyView = await service.read(prisma, actor, legacy.id); assert.ok(legacyView.ok); assert.equal(legacyView.audit?.createBy, null);
   const unknownAuthors = await service.list(prisma, actor, { ...state, filters: [{ field: "createByUser.login", operator: "empty" }] });
   assert.ok(unknownAuthors.ok, JSON.stringify(unknownAuthors)); assert.ok(unknownAuthors.data.rows.some(row => row.id === legacy.id));
+  // List-action domains remain server-side and share count/pagination with visible filters.
+  const mine = service.defineListAction({ domain: ({ actor }) => [{ field: "createBy", operator: "eq", value: actor.id }] });
+  const ownCount = await prisma.ensayoFrameworkRecord.count({ where: { createBy: admin.id } });
+  const ownPage = await mine(prisma, actor, { ...state, page: 999, pageSize: 1 });
+  assert.ok(ownPage.ok, JSON.stringify(ownPage)); assert.equal(ownPage.data.total, ownCount); assert.equal(ownPage.data.page, ownCount);
+  assert.equal(ownPage.data.rows.length, 1); assert.equal(ownPage.data.rows[0].createBy, admin.id);
+  const ownAll = await mine(prisma, actor, { ...state, pageSize: 50 });
+  assert.ok(ownAll.ok); assert.equal(ownAll.data.total, ownCount);
+  assert.ok(ownAll.data.rows.every(row => row.createBy === admin.id));
+  assert.ok(!ownAll.data.rows.some(row => [editorCreated.values.id, legacy.id].includes(row.id)));
+  const contradict = await mine(prisma, actor, { ...state, filters: [{ field: "createByUser.login", operator: "eq", value: editor.login }] });
+  assert.ok(contradict.ok); assert.equal(contradict.data.total, 0);
+  const editorMine = await mine(prisma, editorActor, state); assert.ok(editorMine.ok); assert.equal(editorMine.data.total, 1); assert.equal(editorMine.data.rows[0].id, editorCreated.values.id);
+  const hiddenAuthor = recordService.defineListAction({ domain: ({ actor }) => [{ field: "createBy", operator: "eq", value: actor.id }] });
+  const hiddenPage = await hiddenAuthor(prisma, actor, state); assert.ok(hiddenPage.ok); assert.equal(hiddenPage.data.total, ownCount);
+  assert.ok(hiddenPage.data.rows.every(row => !Object.hasOwn(row, "createBy") && !Object.hasOwn(row, "audit")));
+  const inactive = await service.save(prisma, editorActor, { ...defaults, name: "Inactivo del ensayo", active: false }); assert.ok(inactive.ok);
+  const activeAction = service.defineListAction({ domain: [{ field: "active", operator: "eq", value: true }] });
+  const activePage = await activeAction(prisma, actor, { ...state, pageSize: 50 }); assert.ok(activePage.ok);
+  assert.equal(activePage.data.total, await prisma.ensayoFrameworkRecord.count({ where: { active: true } }));
+  assert.ok(!activePage.data.rows.some(row => row.id === inactive.values.id));
+  const inactiveFilter = await activeAction(prisma, actor, { ...state, filters: [{ field: "active", operator: "eq", value: "false" }] });
+  assert.ok(inactiveFilter.ok); assert.equal(inactiveFilter.data.total, 0);
+  const grouped = service.defineListAction({ domain: [{ any: [
+    { field: "id", operator: "eq", value: legacy.id },
+    { all: [{ field: "createBy", operator: "eq", value: editor.id }, { not: { field: "active", operator: "eq", value: false } }] },
+  ] }] });
+  const groupedPage = await grouped(prisma, actor, state); assert.ok(groupedPage.ok); assert.equal(groupedPage.data.total, 2);
+  const literalDomain = service.defineListAction({ domain: [{ field: "name", operator: "contains", value: "%_" }] });
+  const literalPage = await literalDomain(prisma, actor, state); assert.ok(literalPage.ok); assert.equal(literalPage.data.total, 1);
+  const unknownCreator = service.defineListAction({ domain: [{ field: "createBy", operator: "eq", value: null }] });
+  const unknownPage = await unknownCreator(prisma, actor, state); assert.ok(unknownPage.ok);
+  assert.equal(unknownPage.data.total, await prisma.ensayoFrameworkRecord.count({ where: { createBy: null } }));
+  for (const domain of [[{ any: [] }], [{ not: { all: [] } }], [{ field: "id", operator: "in", value: [] }]]) {
+    const none = service.defineListAction({ domain } as Parameters<typeof service.defineListAction>[0]);
+    const page = await none(prisma, actor, state); assert.ok(page.ok); assert.equal(page.data.total, 0);
+  }
+  assert.equal((await mine(prisma, reader, state)).ok, false);
+  assert.equal((await mine(prisma, { ...actor, sessionVersion: actor.sessionVersion + 1 }, state)).ok, false);
+  assert.equal((await mine(prisma, actor, { ...state, domain: [] })).ok, false);
+  // A list domain does not replace record-access authorization for read/save.
+  assert.equal((await service.read(prisma, actor, editorCreated.values.id)).ok, true);
   // A foreign-key backed author cannot point to an unknown account.
   await assert.rejects(prisma.ensayoFrameworkRecord.create({ data: { name: "Autor inexistente", active: true, createBy: "missing-user" } }));
   const unbound = createModelService(recordModel, unboundRepository<ReturnType<typeof recordModel.parse>>(), { columns: [{ field: "name", label: "Nombre" }], searchFields: ["name"] });
@@ -155,4 +198,44 @@ try {
   await prisma.user.update({ where: { id: admin.id }, data: { active: false } });
   assert.equal((await service.list(prisma, actor, state)).ok, false);
   await prisma.user.update({ where: { id: admin.id }, data: { active: true } });
+  // Deletion is transactional: permissions, complete selection, revisions and FK restrictions.
+  const deleteA = await service.save(prisma, actor, { ...defaults, name: "Eliminar A" }); assert.ok(deleteA.ok);
+  const deleteB = await service.save(prisma, actor, { ...defaults, name: "Eliminar B" }); assert.ok(deleteB.ok);
+  const targets = [deleteA.values, deleteB.values].map(row => ({ id: row.id!, revision: row.revision! }));
+  const newerB = await service.save(prisma, actor, { ...deleteB.values, notes: "Nueva revisión" }); assert.ok(newerB.ok);
+  const staleDelete = await service.remove(prisma, actor, targets); assert.equal(staleDelete.ok, false);
+  assert.equal(await prisma.ensayoFrameworkRecord.count({ where: { id: { in: targets.map(row => row.id) } } }), 2);
+  assert.equal((await service.remove(prisma, reader, targets)).ok, false);
+  assert.equal((await service.remove(prisma, { ...actor, sessionVersion: actor.sessionVersion + 1 }, targets)).ok, false);
+  assert.equal((await service.remove(prisma, actor, [targets[0], targets[0]])).ok, false);
+  const deleted = await service.remove(prisma, actor, [targets[0], { id: newerB.values.id, revision: newerB.values.revision }]);
+  assert.deepEqual(deleted, { ok: true, deleted: 2 });
+  assert.equal(await prisma.ensayoFrameworkRecord.count({ where: { id: { in: targets.map(row => row.id) } } }), 0);
+  const raceRecord = await service.save(prisma, actor, { ...defaults, name: "Eliminar concurrente" }); assert.ok(raceRecord.ok);
+  const raceTarget = [{ id: raceRecord.values.id, revision: raceRecord.values.revision }];
+  const deleteRace = await Promise.all([service.remove(prisma, actor, raceTarget), service.remove(prisma, actor, raceTarget)]);
+  assert.equal(deleteRace.filter(result => result.ok).length, 1);
+  const freePartner = await prisma.partner.create({ data: { name: "Contacto eliminable" } });
+  const linkedPartner = await prisma.partner.findUniqueOrThrow({ where: { id: partner.id } });
+  const contactBatch = [{ id: freePartner.id, revision: freePartner.updatedAt.toISOString() }, { id: linkedPartner.id, revision: linkedPartner.updatedAt.toISOString() }];
+  assert.equal((await deleteRegisteredRecords(prisma, actor, "partner", contactBatch)).ok, false);
+  assert.equal(await prisma.partner.count({ where: { id: freePartner.id } }), 1); // rollback after first deletion
+  assert.deepEqual(await deleteRegisteredRecords(prisma, actor, "partner", [contactBatch[0]]), { ok: true, deleted: 1 });
+  const keptContact = await prisma.partner.create({ data: { name: "Contacto compartido conservado" } });
+  const disposableUser = await prisma.user.create({ data: { login: "fixture-delete", password: await hashPassword("framework-test-only"), partnerId: keptContact.id } });
+  const userTarget = { id: disposableUser.id, revision: disposableUser.updatedAt.toISOString() };
+  const currentAdmin = await prisma.user.findUniqueOrThrow({ where: { id: actor.id } });
+  assert.equal((await deleteRegisteredRecords(prisma, actor, "user", [userTarget, { id: actor.id, revision: currentAdmin.updatedAt.toISOString() }])).ok, false);
+  assert.equal(await prisma.user.count({ where: { id: disposableUser.id } }), 1);
+  assert.equal((await deleteRegisteredRecords(prisma, actor, "user", [userTarget, { id: editor.id, revision: editor.updatedAt.toISOString() }])).ok, false);
+  assert.equal(await prisma.user.count({ where: { id: disposableUser.id } }), 1); // audit FK rejects entire batch
+  assert.deepEqual(await deleteRegisteredRecords(prisma, actor, "user", [userTarget]), { ok: true, deleted: 1 });
+  assert.equal(await prisma.partner.count({ where: { id: keptContact.id } }), 1);
+  const freeAppointment = await prisma.dentalAppointment.create({ data: { patientId: partner.id, reason: "Cita eliminable", scheduledAt: new Date("2026-11-08T18:00:00.000Z") } });
+  const protectedAppointment = await prisma.dentalAppointment.create({ data: { patientId: partner.id, reason: "Cita con tratamiento", scheduledAt: new Date("2026-11-08T18:00:00.000Z"), treatments: { create: { performedAt: new Date("2026-11-08T18:00:00.000Z"), procedure: "Tratamiento conservado", position: 0 } } } });
+  const appointmentBatch = [freeAppointment, protectedAppointment].map(row => ({ id: row.id, revision: row.updatedAt.toISOString() }));
+  assert.equal((await deleteRegisteredRecords(prisma, reader, "dentalAppointment", appointmentBatch)).ok, false);
+  assert.equal((await deleteRegisteredRecords(prisma, actor, "dentalAppointment", appointmentBatch)).ok, false);
+  assert.equal(await prisma.dentalAppointment.count({ where: { id: freeAppointment.id } }), 1);
+  assert.deepEqual(await deleteRegisteredRecords(prisma, actor, "dentalAppointment", [appointmentBatch[0]]), { ok: true, deleted: 1 });
 } finally { await prisma.$disconnect(); }

@@ -10,4 +10,7 @@ export const appointmentsManifest = defineApplication({
   depends: ["contactos"],
   access: "admin",
   models: ["DentalAppointment", "DentalTreatment"],
+  menus: [
+    { id: "appointments", label: "Citas", href: "/erp/citas" },
+  ],
 });

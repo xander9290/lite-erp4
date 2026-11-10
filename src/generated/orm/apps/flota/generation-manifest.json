@@ -2,10 +2,10 @@
   "generator": "lite-erp-orm-v1",
   "module": "flota",
   "files": {
-    "models.prisma": "23c4e6e73e4ed53410b950d0a61e7d392207a139e8a3f81512cafbacb88f7ae7",
-    "schema.preview.prisma": "dfab55d6559c26eff39ad00cacd2a2dc6de58db89794473b7c99d019f11327b7",
-    "review.json": "2606ba4f75f07d7b28aab73ba6f1593a3e73d1e0772f44a3bc9e41133dc27b70",
-    "FlotaRecord.schema.ts": "9301a3a7f3c268e46106b694c01fc061cfaba09e8c61fe46a73305d2309263db",
+    "models.prisma": "f3f43ef47aba6a0a3128eef2586c3aea67d10ca6efb6d0fcca02f951f7267a05",
+    "schema.preview.prisma": "07ed0e7c2390ce3b601bb4b0aa1bf24268d5dfce46d30d4b8dfec446fd033647",
+    "review.json": "65b7fca21a0c325a2bb769c15a07595ea298049226a20044b442ad08b34227ef",
+    "FlotaRecord.schema.ts": "32a49d1e1fdde505506908a80c1d827cfb5d56f5d2032a4107d355abacb64574",
     "migration.preview.sql": "41c2e490f74bf366bcffb9f53a56c958daeada0032ce7402c178e0b5a344ffb8"
   }
 }

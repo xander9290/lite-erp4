@@ -43,6 +43,7 @@ function Editor({ record, initialAudit, onReload }: { record: RecordInput; initi
       <FormGroup legend="Datos generales" fullWidth>
         <FieldText<RecordInput> name="name" label="Nombre" required maxLength={120} autoFocus={!savedId} />
         <FieldText<RecordInput> name="plate" label="Placas" required maxLength={20} />
+        <FieldText<RecordInput> name="brand" label="Marca" maxLength={80} />
         <FieldBoolean<RecordInput> name="active" label="Activo" />
       </FormGroup>
     </FormView>
@@ -64,13 +65,13 @@ export default function RecordForm({ id }: { id?: string }) {
   };
   return (
     <>
-        {id ? (
-          <FormViewLoader key={router.bfcacheId + ":" + attempt} recordKey={id} load={load}>
-            {(record, audit) => <Editor record={record} initialAudit={audit} onReload={reload} />}
-          </FormViewLoader>
-        ) : (
-          <Editor key={router.bfcacheId} record={createRecordDefaults()} />
-        )}
+      {id ? (
+        <FormViewLoader key={router.bfcacheId + ":" + attempt} recordKey={id} load={load}>
+          {(record, audit) => <Editor record={record} initialAudit={audit} onReload={reload} />}
+        </FormViewLoader>
+      ) : (
+        <Editor key={router.bfcacheId} record={createRecordDefaults()} />
+      )}
     </>
   );
 }

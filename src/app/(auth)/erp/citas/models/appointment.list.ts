@@ -35,9 +35,9 @@ export async function listAppointmentRecords(prisma: PrismaClient, actor: Clinic
     const page = Math.min(state.page, Math.max(1, Math.ceil(total / state.pageSize)));
     const records = await tx.dentalAppointment.findMany({
       where, skip: (page - 1) * state.pageSize, take: state.pageSize, orderBy: [order, { id: "asc" }],
-      select: { id: true, reason: true, scheduledAt: true, status: true, patient: { select: { name: true, phone: true, avatarUrl: true } } },
+      select: { id: true, updatedAt: true, reason: true, scheduledAt: true, status: true, patient: { select: { name: true, phone: true, avatarUrl: true } } },
     });
     const now = new Date();
-    return { rows: records.map(record => ({ ...record, scheduledAt: record.scheduledAt.toISOString(), agenda: appointmentAgenda(record.scheduledAt, record.status, now) })), total, page, pageSize: state.pageSize };
+    return { rows: records.map(({ updatedAt, ...record }) => ({ ...record, revision: updatedAt.toISOString(), scheduledAt: record.scheduledAt.toISOString(), agenda: appointmentAgenda(record.scheduledAt, record.status, now) })), total, page, pageSize: state.pageSize };
   }, { isolationLevel: "RepeatableRead" });
 }

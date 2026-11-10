@@ -1,5 +1,20 @@
 import type { LucideIcon } from "lucide-react";
 
+export type ApplicationAccess = "authenticated" | "admin";
+export type ApplicationMenuLink = {
+  readonly id: string;
+  readonly label: string;
+  readonly href: string;
+  readonly match?: "exact" | "prefix";
+  readonly access?: ApplicationAccess;
+};
+export type ApplicationMenu = ApplicationMenuLink | {
+  readonly id: string;
+  readonly label: string;
+  readonly access?: ApplicationAccess;
+  readonly items: readonly ApplicationMenuLink[];
+};
+
 export type ApplicationManifest = {
   readonly id: string;
   readonly name: string;
@@ -7,13 +22,36 @@ export type ApplicationManifest = {
   readonly version: string;
   readonly icon: LucideIcon;
   readonly depends: readonly string[];
-  readonly access: "authenticated" | "admin";
+  readonly access: ApplicationAccess;
+  /** Navigation only: routes and server actions still authorize their operations. */
+  readonly menus?: readonly ApplicationMenu[];
   /** Prisma model names owned by this module; references to other modules are dependencies. */
   readonly models: readonly string[];
 };
 
 const identifier = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 const reserved = new Set(["perfil", "nuevo", "api", "auth", "sample"]);
+
+function validateMenus(application: ApplicationManifest) {
+  if (application.menus === undefined) return;
+  if (!Array.isArray(application.menus)) throw new Error(`Menús inválidos en ${application.id}.`);
+  const ids = new Set<string>();
+  const base = `/erp/${application.id}`;
+  function validateItem(item: ApplicationMenu | ApplicationMenuLink, nested = false) {
+    if (!item || !identifier.test(item.id) || ids.has(item.id) || typeof item.label !== "string" || !item.label.trim()) throw new Error(`Menú inválido o duplicado en ${application.id}.`);
+    ids.add(item.id);
+    if (item.access !== undefined && !["authenticated", "admin"].includes(item.access)) throw new Error(`Acceso de menú inválido en ${application.id}.`);
+    if ("items" in item) {
+      if (nested || "href" in item || !Array.isArray(item.items) || !item.items.length) throw new Error(`Grupo de menú inválido en ${application.id}.`);
+      item.items.forEach(child => validateItem(child, true));
+    } else {
+      // Canonical application paths only; no external URLs, queries or fragments.
+      if (typeof item.href !== "string" || !/^\/erp\/[a-z0-9-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(item.href) || !(item.href === base || item.href.startsWith(`${base}/`))) throw new Error(`Ruta de menú inválida en ${application.id}.`);
+      if (item.match !== undefined && !["exact", "prefix"].includes(item.match)) throw new Error(`Coincidencia de menú inválida en ${application.id}.`);
+    }
+  }
+  application.menus.forEach(item => validateItem(item));
+}
 
 /** Trusted, static TypeScript metadata. This does not create routes or database tables. */
 export function defineApplication<const T extends ApplicationManifest>(manifest: T): T {
@@ -23,6 +61,7 @@ export function defineApplication<const T extends ApplicationManifest>(manifest:
   if (!["authenticated", "admin"].includes(manifest.access)) throw new Error(`Acceso inválido en ${manifest.id}.`);
   if (new Set(manifest.depends).size !== manifest.depends.length || manifest.depends.some(id => !identifier.test(id) || id === manifest.id)) throw new Error(`Dependencias inválidas en ${manifest.id}.`);
   if (new Set(manifest.models).size !== manifest.models.length || manifest.models.some(model => !/^[A-Z][A-Za-z0-9]*$/.test(model))) throw new Error(`Modelos inválidos en ${manifest.id}.`);
+  validateMenus(manifest);
   return manifest;
 }
 

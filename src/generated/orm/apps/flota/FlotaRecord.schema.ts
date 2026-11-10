@@ -6,12 +6,14 @@ import { recordIdentityShape, validateRecordIdentity } from "@/lib/orm/record";
 export const FlotaRecordFields = {
   name: Fields.Text({"label":"Nombre","required":true,"unique":false,"trim":true,"maxLength":120}),
   plate: Fields.Text({"label":"Placas","required":true,"unique":true,"trim":true,"maxLength":20}),
+  brand: Fields.Text({"label":"Marca","required":false,"unique":false,"trim":true,"maxLength":80}),
   active: Fields.Boolean({"label":"Activo","unique":false,"default":true}),
 } as const;
 
 export const FlotaRecordSchema = z.strictObject({
   name: FlotaRecordFields.name.schema,
   plate: FlotaRecordFields.plate.schema,
+  brand: FlotaRecordFields.brand.schema,
   active: FlotaRecordFields.active.schema,
 });
 
@@ -19,6 +21,7 @@ export function createFlotaRecordDefaults() {
   return {
     name: FlotaRecordFields.name.createDefault(),
     plate: FlotaRecordFields.plate.createDefault(),
+    brand: FlotaRecordFields.brand.createDefault(),
     active: FlotaRecordFields.active.createDefault(),
   };
 }

@@ -10,4 +10,33 @@ export const manifest = defineApplication({
   access: "admin",
   depends: [],
   models: ["FlotaRecord"],
+  menus: [
+    {
+      id: "main-menu",
+      label: "Menú",
+      items: [
+        {
+          id: "vehicles",
+          label: "Vehículos",
+          href: "/erp/flota",
+          access: "admin",
+          match: "exact",
+        },
+        {
+          id: "my-vehicles",
+          label: "Mis vehículos",
+          href: "/erp/flota/mis-vehiculos",
+          access: "admin",
+          match: "exact",
+        },
+        {
+          id: "my-active-vehicles",
+          label: "Mis vehículos activos",
+          href: "/erp/flota/mis-vehiculos-activos",
+          access: "admin",
+          match: "exact",
+        },
+      ],
+    },
+  ],
 });

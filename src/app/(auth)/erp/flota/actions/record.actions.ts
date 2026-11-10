@@ -9,6 +9,7 @@ import type { FormViewResult } from "@/components/ui/form/formView.types";
 import type { ListResult, ListState } from "@/lib/list/types";
 import type { RecordInput } from "../schemas/record.schema";
 import { recordService } from "../models/record.service";
+import type { ListDeleteResult, ListDeleteTarget } from "@/lib/list/selection";
 
 export async function readRecord(id: string): Promise<FormViewLoadResult<RecordInput>> {
   try { return await recordService.read(prisma, await requireAdmin(), id); }
@@ -26,6 +27,14 @@ export async function saveRecord(input: unknown): Promise<FormViewResult<RecordI
 export async function listRecords(state: ListState): Promise<ListResult> {
   try { return await recordService.list(prisma, await requireAdmin(), state); }
   catch (error) { return { ok: false, error: error instanceof AccessError ? error.message : "No se pudieron listar los registros." }; }
+}
+
+export async function deleteRecords(selection: readonly ListDeleteTarget[]): Promise<ListDeleteResult> {
+  try {
+    const result = await recordService.remove(prisma, await requireAdmin(), selection);
+    if (result.ok) revalidatePath("/erp/flota", "layout");
+    return result;
+  } catch (error) { return { ok: false, kind: "server", error: error instanceof AccessError ? error.message : "No se pudo eliminar la selección." }; }
 }
 
 // Enable a required Selection field in recordService's kanban configuration before using this view.

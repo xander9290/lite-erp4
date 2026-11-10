@@ -15,6 +15,9 @@ import type { ModelRepository } from "./repository";
 import { INTEGER_MIN, INTEGER_MAX, type FieldMetadata } from "./fields";
 import type { KanbanMoveResult, KanbanRequest } from "../kanban/types";
 import { auditAvatarField, auditColumnType } from "./audit";
+import { compileListDomain, type ListActionOptions, type ListDomainContext } from "./domain";
+import { deleteListSelection } from "../list/delete";
+import type { ListDeleteResult } from "../list/selection";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = {
@@ -119,15 +122,17 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     }
   }
 
-  async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }): Promise<ListResult> {
+  async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>): Promise<ListResult> {
     try {
       const data = await prisma.$transaction(async tx => {
         await assertActor(tx, actor);
+        const fixedDomain = domain ? await domain({ actor: Object.freeze({ id: actor.id, sessionVersion: actor.sessionVersion }), tx }) : undefined;
         const parsed = listStateSchema.safeParse(input);
         if (!parsed.success || parsed.data.invalidFilters) throw new ModelValidationError("Revisa los filtros y parámetros de esta lista.");
         const state = normalizeListState(config, parsed.data);
         if (new Set(state.filters.map(filter => filter.field)).size !== state.filters.length) throw new ModelValidationError("Usa un filtro por columna.");
         const predicates: Record<string, unknown>[] = group ? [{ [group.field]: group.value }] : [];
+        if (fixedDomain) predicates.push(fixedDomain);
         for (const filter of state.filters) {
           const column = config.columns.find(column => column.field === filter.field && column.filterable !== false);
           if (!column || !allowed.has(filter.field)) throw new ModelValidationError("La columna del filtro no está habilitada.");
@@ -177,5 +182,26 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     } catch (error) { return { ok: false, kind: error instanceof ModelValidationError || error instanceof z.ZodError || ["P2002", "P2003", "P2025", "P2034"].includes(codeOf(error)) ? "validation" : "server", error: messageFor(error) }; }
   }
 
-  return { read, save, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), kanban, move };
+  /** Define on the server. The returned loader receives state, never a domain from the browser. */
+  function defineListAction(options: ListActionOptions<T> = {}) {
+    if (!options || typeof options !== "object" || Array.isArray(options) || Object.keys(options).some(key => key !== "domain")) throw new Error("La acción de lista sólo acepta domain del servidor.");
+    const source = options.domain;
+    const dynamic = typeof source === "function" ? source : undefined;
+    // Validate and snapshot static declarations immediately; callbacks run after session revalidation.
+    const fixed = dynamic ? undefined : compileListDomain(model.metadata, source === undefined ? [] : source);
+    const resolve = async (context: ListDomainContext) => dynamic ? compileListDomain(model.metadata, await dynamic(context)) : fixed!;
+    return (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, resolve);
+  }
+
+  function remove(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<ListDeleteResult> {
+    return deleteListSelection(prisma, actor, input, {
+      read: (tx, id) => repository.read(tx, id),
+      remove: async (tx, id, revision) => {
+        if (!repository.remove) throw new Error("MODEL_NOT_BOUND");
+        await repository.remove(tx, id, revision);
+      },
+    });
+  }
+
+  return { read, save, remove, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
 }
