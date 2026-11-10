@@ -85,7 +85,7 @@ function Editor({
       <FormGroup legend="Datos generales">
         <FieldText<RecordInput>
           name="name"
-          label="Nombre"
+          label="Modelo"
           required
           maxLength={120}
           autoFocus={!savedId}
@@ -93,7 +93,7 @@ function Editor({
         />
         <FieldText<RecordInput>
           name="plate"
-          label="Placas"
+          label="Matrícula"
           required
           maxLength={20}
           direction="inline"
