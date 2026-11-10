@@ -3,7 +3,7 @@ import ListViewClient, { type ListViewProps } from "./ListViewClient";
 import ListViewSkeleton from "./ListViewSkeleton";
 
 export type { ListViewProps } from "./ListViewClient";
-export type { ListColumn, ListModel } from "@/lib/list/types";
+export type { ListColumn, ListModel, ListGroup, ListGroupValue, ListPage, ListResult, ListState } from "@/lib/list/types";
 export type { ListBreadcrumb } from "./ListBreadcrumbs";
 export type { ListDeleteTarget, ListDeleteResult } from "@/lib/list/selection";
 

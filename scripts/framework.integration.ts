@@ -19,6 +19,10 @@ const database = new Client({ connectionString: connection });
 let created = false;
 const sanitize = (text: string) => text.replaceAll(url.toString(), "[test database]").replaceAll(connection, "[database]");
 function command(binary: string, args: string[], name: string, expected = 0) {
+  // Invoke package entrypoints with Node: Windows cannot spawn POSIX .bin wrappers.
+  const cli = { prisma: "prisma/build/index.js", tsc: "typescript/bin/tsc", next: "next/dist/bin/next" };
+  const executable = Object.entries(cli).find(([name]) => binary === join(root, "node_modules/.bin", name));
+  if (executable) { args = [join(root, "node_modules", executable[1]), ...args]; binary = process.execPath; }
   const result = spawnSync(binary, args, { cwd: root, encoding: "utf8", timeout: 90000 });
   if (result.error) throw result.error;
   assert.equal(result.status, expected, sanitize(`${name}: ${result.stderr}\n${result.stdout}`));
@@ -44,7 +48,7 @@ try {
     try { await cp(join(project, file), join(root, file)); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
   }
-  await symlink(join(project, "node_modules"), join(root, "node_modules"), "dir");
+  await symlink(join(project, "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
   await writeFile(join(root, ".env.local"), `DATABASE_URL=${JSON.stringify(url.toString())}\nAUTH_SECRET=${randomBytes(32).toString("hex")}\nAUTH_TRUST_HOST=true\nAUTH_URL=http://127.0.0.1:3031\n`, { mode: 0o600 });
   const authPath = join(root, "src/auth.config.ts");
   const fixtureCookies = Object.fromEntries(["sessionToken", "csrfToken", "callbackUrl"].map(name => [name, { name: `${schema}.${name}`, options: { httpOnly: true, sameSite: "lax", path: "/", secure: false } }]));
@@ -72,7 +76,7 @@ try {
 
   const modelPath = join(root, "src/app/(auth)/erp/ensayo-framework/models/Record.ts");
   const model = await readFile(modelPath, "utf8");
-  await writeFile(modelPath, model.replace("Fields, Model, defineModel", "Fields, Model, defineModel, ModelValidationError").replace('// Reglas de negocio: beforeSave(values, context) y afterSave(record, context).', `quantity = Fields.Integer({ required: true, default: 0, min: 0 });\n  notes = Fields.Text({ maxLength: 200 });\n  startsAt = Fields.DateTime();\n  status = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Terminado"}] as const, {required:true,default:"draft"});\n  partnerId = Fields.Many2one("Partner");\n  beforeSave(values: Record<string, unknown>) {\n    if (values.name === "bloqueado") throw new ModelValidationError("Nombre bloqueado por negocio.", {name:"Elige otro nombre."});\n    if (values.name === "normalizar") return {...values,quantity:7};\n    return values;\n  }\n  afterSave(values: Record<string, unknown>) { if(values.name === "rollback") throw new ModelValidationError("Rollback solicitado por la regla de negocio."); }`));
+  await writeFile(modelPath, model.replace("Fields, Model, defineModel", "Fields, Model, defineModel, ModelValidationError").replace('// Reglas de negocio: beforeSave(values, context) y afterSave(record, context).', `quantity = Fields.Integer({ required: true, default: 0, min: 0, tracking: true });\n  notes = Fields.Text({ maxLength: 200, sensitive: true });\n  startsAt = Fields.DateTime();\n  status = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Terminado"}] as const, {required:true,default:"draft",tracking:true});\n  partnerId = Fields.Many2one("Partner");\n  beforeSave(values: Record<string, unknown>) {\n    if (values.name === "bloqueado") throw new ModelValidationError("Nombre bloqueado por negocio.", {name:"Elige otro nombre."});\n    if (values.name === "normalizar") return {...values,quantity:7};\n    return values;\n  }\n  afterSave(values: Record<string, unknown>) { if(values.name === "rollback") throw new ModelValidationError("Rollback solicitado por la regla de negocio."); }`));
   const profilePath = join(root, "src/app/(auth)/erp/ensayo-framework/orm.config.ts");
   const profile = await readFile(profilePath, "utf8");
   await writeFile(profilePath, profile.replace('depends: []', 'depends: ["contactos"]').replace('["name", "active"]', '["name", "active", "quantity", "notes", "startsAt", "status", "partnerId"]').replace('externalOwners: {}', 'externalOwners: {Partner:"contactos"}'));
@@ -91,7 +95,7 @@ try {
   command(process.execPath, ["--conditions=react-server", "--import", "tsx", "framework-check.ts"], "evolved persistence and security");
   command(join(root, "node_modules/.bin/next"), ["typegen"], "Next route types");
   command(join(root, "node_modules/.bin/tsc"), ["--noEmit", "--incremental", "false"], "complete scaffold typecheck");
-  console.log("✓ Evolución migrada sin perder el registro anterior; permisos, concurrencia, validación, relaciones, filtros y hooks verificados.");
+  console.log("✓ Evolución migrada sin perder el registro anterior; permisos, concurrencia, validación, relaciones, filtros, agrupación anidada, hooks, historial y notas verificados.");
 
   if (process.argv.includes("--serve")) {
     const server = spawn(join(root, "node_modules/.bin/next"), ["dev", "-p", "3031"], { cwd: root, stdio: ["ignore", "ignore", "ignore"] });

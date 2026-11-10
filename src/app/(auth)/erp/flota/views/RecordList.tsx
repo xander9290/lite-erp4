@@ -1,7 +1,10 @@
 import ListView from "@/components/ui/list/ListView";
 import { manifest } from "../manifest";
 import { deleteRecords, listRecords } from "../actions/record.actions";
-import { listMyVehicles, listMyActiveVehicles } from "../actions/my-vehicles.actions";
+import {
+  listMyVehicles,
+  listMyActiveVehicles,
+} from "../actions/my-vehicles.actions";
 import { recordColumns, recordSearchFields } from "./record.list";
 
 const views = {
@@ -22,14 +25,22 @@ const views = {
   },
 };
 
-export default function RecordList({ view = "all" }: { view?: keyof typeof views }) {
+export default function RecordList({
+  view = "all",
+}: {
+  view?: keyof typeof views;
+}) {
   const Icon = manifest.icon;
   const selected = views[view];
 
   const breadcrumbs =
     view === "all"
       ? [{ label: "Aplicaciones", href: "/erp" }, { label: manifest.name }]
-      : [{ label: "Aplicaciones", href: "/erp" }, { label: manifest.name, href: "/erp/flota" }, { label: selected.title }];
+      : [
+          { label: "Aplicaciones", href: "/erp" },
+          { label: manifest.name, href: "/erp/flota" },
+          { label: selected.title },
+        ];
 
   return (
     <ListView

@@ -17,6 +17,7 @@ const snake = (value: string) => value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").to
 
 export function fieldExpression(field: FieldMetadata) {
   const common = { label: field.label, ...(field.kind !== "boolean" ? { required: field.required } : {}), unique: field.unique,
+    ...(field.tracking !== undefined ? { tracking: field.tracking } : {}), ...(field.sensitive !== undefined ? { sensitive: field.sensitive } : {}),
     ...(field.defaultKind === "literal" ? { default: field.defaultValue } : {}) };
   if (field.kind === "text") return `Fields.Text(${quote({ ...common, trim: field.trim, minLength: field.minLength, maxLength: field.maxLength })})`;
   if (field.kind === "integer") return `Fields.Integer(${quote({ ...common, min: field.min, max: field.max })})`;

@@ -26,7 +26,7 @@ export async function prepareModuleArtifacts(root: string, profile: ModuleGenera
     const preview = join(temporary, "schema.prisma");
     await writeFile(preview, files["schema.preview.prisma"]);
     const run = (args: string[]) => {
-      const result = spawnSync(join(root, "node_modules/.bin/prisma"), args, { cwd: root, encoding: "utf8" });
+      const result = spawnSync(process.execPath, [join(root, "node_modules/prisma/build/index.js"), ...args], { cwd: root, encoding: "utf8" });
       if (result.error) throw result.error;
       if (result.status !== 0) throw new Error(`Prisma rechazó la propuesta:\n${result.stderr || result.stdout}`);
       return result.stdout;

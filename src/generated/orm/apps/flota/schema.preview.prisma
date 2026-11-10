@@ -64,6 +64,26 @@ model Partner {
 }
 
 
+// Shared infrastructure for declarative model services. Access is always scoped
+// by the service's fixed model name and an authorized, existing record.
+model RecordActivity {
+  id        String   @id @default(cuid())
+  model     String   @db.VarChar(100)
+  recordId  String   @map("record_id") @db.VarChar(100)
+  kind      String   @db.VarChar(10)
+  actorId   String   @map("actor_id")
+  actor     User     @relation("RecordActivity_actor", fields: [actorId], references: [id], onDelete: Restrict)
+  body      String?  @db.VarChar(4000)
+  changes   Json     @default("[]")
+  requestId String?  @map("request_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([actorId, requestId])
+  @@index([model, recordId, createdAt, id])
+  @@map("record_activities")
+}
+
+
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -88,6 +108,7 @@ model User {
 
     partnerId String?  @unique @map("partner_id")
     partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+    recordActivities RecordActivity[] @relation("RecordActivity_actor")
 
     createdAt DateTime @default(now()) @map("created_at")
     updatedAt DateTime @default(now()) @updatedAt @map("updated_at")

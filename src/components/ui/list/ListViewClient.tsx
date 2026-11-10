@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useCallback, useId, useRef, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, CircleAlert, Inbox, LayoutList, Plus, RefreshCw, Search, X } from "lucide-react";
-import { listColumnType, listDisplayColumn, listModels, readListValue, type ListColumn, type ListConfig, type ListModel, type ListRecord, type ListResult, type ListState } from "@/lib/list/types";
-import { columnAlignment, formatListValue, listRecordHref, visibleListPages } from "./listFormat";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, CircleAlert, Inbox, Plus, RefreshCw, Search, X } from "lucide-react";
+import { listColumnType, listDisplayColumn, listModels, type ListColumn, type ListConfig, type ListModel, type ListRecord, type ListResult, type ListState } from "@/lib/list/types";
+import { columnAlignment, visibleListPages } from "./listFormat";
 import { useListView } from "./useListView";
 import ListRecordPreview from "./ListRecordPreview";
 import ColumnFilter from "./ColumnFilter";
-import ListCellValue from "./ListCellValue";
+import ListRecordRows from "./ListRecordRows";
+import ListGroupRows from "./ListGroupRows";
+import ListGroupingControls from "./ListGroupingControls";
 import { filterDescription } from "./filterInputs";
 import ListBreadcrumbs, { type ListBreadcrumb } from "./ListBreadcrumbs";
 import { deleteRecords } from "@/lib/list/actions";
@@ -22,7 +24,9 @@ export type ListViewProps = ({ model: ListModel; load?: never } | { model: strin
   title: string;
   columns: readonly ListColumn[];
   searchFields?: readonly string[];
+  /** Compatibility metadata; the compact header does not render this summary. */
   description?: string;
+  /** Compatibility metadata; the compact header has no application icon. */
   icon?: ReactNode;
   breadcrumbs?: readonly ListBreadcrumb[];
   pageSize?: number;
@@ -45,7 +49,7 @@ function internalHref(href?: string) { return Boolean(href && /^\/(?![\/\\])/.te
 const alignmentClasses = { left: "text-left", center: "text-center", right: "text-right" };
 
 export default function ListViewClient({
-  model, load, title, columns, searchFields = Object.hasOwn(listModels, model) ? listModels[model as ListModel].searchFields : [], description, icon,
+  model, load, title, columns, searchFields = Object.hasOwn(listModels, model) ? listModels[model as ListModel].searchFields : [],
   pageSize = 25, defaultSort, paramPrefix = "",
   createHref, create = true, delete: deleteEnabled = true, onDelete, createLabel = "Nuevo", recordHref, breadcrumbs, headerActions, footer, className = "", renderCell,
 }: ListViewProps) {
@@ -67,7 +71,6 @@ export default function ListViewClient({
   const first = data?.total ? (page - 1) * data.pageSize + 1 : 0;
   const last = data ? Math.min(page * data.pageSize, data.total) : 0;
   const sizes = [...new Set([10, 25, 50, state.pageSize])].sort((a, b) => a - b);
-  const canNavigate = internalHref(recordHref);
   const canCreate = create && internalHref(createHref);
   const filterCount = state.filters.length + (state.query ? 1 : 0) + (state.invalidFilters ? 1 : 0);
   const displayColumns = columns.map(column => listDisplayColumn(model, column));
@@ -78,17 +81,15 @@ export default function ListViewClient({
   }
 
   return <section aria-labelledby={titleId} className={`card flex w-full min-h-0 min-w-0 flex-1 flex-col rounded-2xl border border-base-300 bg-base-100 shadow-sm ${className}`}>
-    <header data-slot="header" className="flex shrink-0 flex-wrap items-start justify-between gap-x-4 gap-y-3 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-3 sm:px-6 sm:py-4">
-      <ListBreadcrumbs items={breadcrumbs} />
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary" aria-hidden="true">{icon ?? <LayoutList size={22} />}</span>
-        <div className="min-w-0 space-y-1"><div className="flex flex-wrap items-center gap-2"><h2 id={titleId} className="text-xl font-semibold tracking-tight wrap-anywhere sm:text-2xl">{title}</h2><span className="badge badge-ghost badge-sm tabular-nums">{loading ? "…" : data ? data.total.toLocaleString("es-MX") : "—"}</span></div>{description && <p className="max-w-2xl text-sm leading-relaxed text-base-content/60">{description}</p>}</div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
+    <h2 id={titleId} className="sr-only">{title}</h2>
+    <header data-slot="header" className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-3 sm:px-6">
+      {!!breadcrumbs?.length && <div className="min-w-0 flex-1 basis-48"><ListBreadcrumbs items={breadcrumbs} /></div>}
+      <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
         {selectedIds.length > 0 && <span role="status" className="badge badge-soft badge-primary badge-sm tabular-nums">{selectedIds.length} seleccionado{selectedIds.length === 1 ? "" : "s"} en esta página</span>}
         {selectedIds.length > 0 && <button type="button" className="btn btn-ghost btn-sm" disabled={deletion.busy} onClick={() => setSelection(emptyListSelection)}>Deseleccionar</button>}
         {state.query && <span className="badge badge-soft badge-sm">Búsqueda: {state.query}</span>}
         {filterCount > 0 && <button type="button" className="btn btn-ghost btn-sm gap-1.5 text-primary" onClick={list.clearFilters} aria-label="Limpiar filtros"><X size={14} aria-hidden="true" />{filterCount} filtro{filterCount === 1 ? "" : "s"}</button>}
+        {(load || !!state.groupBy?.length) && <ListGroupingControls columns={load ? columns : []} fields={state.groupBy ?? []} onChange={groupBy => list.update({ groupBy })} />}
         {headerActions}
         {deleteEnabled && selectedIds.length > 0 && <ListViewActionMenu disabled={loading || deletion.busy}
           deleteDisabled={!deleteAction || !parsedSelection.success} deleteUnavailable={!deleteAction}
@@ -123,21 +124,7 @@ export default function ListViewClient({
             <th scope="col" className="w-12 px-3"><span className="sr-only">Abrir registro</span></th>
           </tr></thead>
           <tbody>
-            {loading ? [1, 2, 3].map(row => <tr key={row} aria-hidden="true"><td className="px-4"><div className="skeleton size-4 motion-reduce:animate-none" /></td>{columns.map(column => <td key={column.field} className="px-4 py-5"><div className="skeleton h-4 w-3/4 motion-reduce:animate-none" /></td>)}<td /></tr>) : error ? <tr><td colSpan={columns.length + 2}><div role="alert" className="sticky left-0 flex min-h-40 w-[calc(100cqw-1rem)] flex-col items-center justify-center gap-3 p-6 text-center"><CircleAlert size={28} className="text-base-content/40" aria-hidden="true" /><p className="max-w-sm text-sm text-base-content/70">{error}</p><button type="button" className="btn btn-soft btn-sm" onClick={list.refresh}>Reintentar</button></div></td></tr> : !data?.rows.length ? <tr><td colSpan={columns.length + 2}><div className="sticky left-0 flex min-h-40 w-[calc(100cqw-1rem)] flex-col items-center justify-center gap-2 p-6 text-center"><span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-base-200 text-base-content/35">{filterCount ? <Search size={24} aria-hidden="true" /> : <Inbox size={24} aria-hidden="true" />}</span><p className="font-semibold">{filterCount ? "Sin coincidencias" : "Aún no hay registros"}</p><p className="max-w-sm text-sm text-base-content/55">{filterCount ? "Prueba con otros filtros o limpia la selección." : "Los registros aparecerán aquí cuando estén disponibles."}</p>{filterCount > 0 && <button type="button" className="btn btn-ghost btn-sm mt-1" onClick={list.clearFilters}>Quitar filtros</button>}</div></td></tr> : data.rows.map(record => {
-              const recordTitle = formatListValue(readListValue(record, displayColumns[0].field), displayColumns[0]);
-              const href = canNavigate ? listRecordHref(recordHref!, record.id, list.currentUrl) : "";
-              return <tr key={record.id} aria-selected={selectedIds.includes(record.id)} className={`transition-colors hover:bg-primary/5 ${selectedIds.includes(record.id) ? "bg-primary/5" : ""}`}>
-                <td className="px-4 py-4"><SelectionCheckbox label={`Seleccionar ${recordTitle}`} checked={selectedIds.includes(record.id)} disabled={deletion.busy}
-                  onChange={() => setSelection(current => togglePageRecord(current, data, record.id))} /></td>
-                {displayColumns.map((column, index) => {
-                  const text = renderCell?.(record, column) ?? <ListCellValue record={record} column={column} />;
-                  return <td key={column.field} className={`max-w-sm ${column.widget === "partner" ? "min-w-48" : ""} px-4 py-4 whitespace-normal wrap-anywhere ${alignmentClasses[columnAlignment(column)]} ${index === 0 ? "font-medium text-base-content" : "text-base-content/65"}`}>
-                    {index === 0 || column.widget === "partner" ? canNavigate ? <Link href={href} className="inline-block max-w-full rounded-sm text-left hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary">{text}</Link> : <button type="button" className="max-w-full cursor-pointer rounded-sm text-left hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={event => openRecord(record, event.currentTarget)}>{text}</button> : text}
-                  </td>;
-                })}
-                <td className="px-3 py-4">{canNavigate ? <Link href={href} className="btn btn-circle btn-ghost btn-xs" aria-label={`Abrir ${recordTitle}`}><ChevronRight size={17} aria-hidden="true" /></Link> : <button type="button" className="btn btn-circle btn-ghost btn-xs" aria-label={`Ver ${recordTitle}`} onClick={event => openRecord(record, event.currentTarget)}><ChevronRight size={17} aria-hidden="true" /></button>}</td>
-              </tr>;
-            })}
+            {loading ? [1, 2, 3].map(row => <tr key={row} aria-hidden="true"><td className="px-4"><div className="skeleton size-4 motion-reduce:animate-none" /></td>{columns.map(column => <td key={column.field} className="px-4 py-3"><div className="skeleton h-4 w-3/4 motion-reduce:animate-none" /></td>)}<td /></tr>) : error ? <tr><td colSpan={columns.length + 2}><div role="alert" className="sticky left-0 flex min-h-40 w-[calc(100cqw-1rem)] flex-col items-center justify-center gap-3 p-6 text-center"><CircleAlert size={28} className="text-base-content/40" aria-hidden="true" /><p className="max-w-sm text-sm text-base-content/70">{error}</p><button type="button" className="btn btn-soft btn-sm" onClick={list.refresh}>Reintentar</button></div></td></tr> : data?.groups ? <ListGroupRows key={JSON.stringify({ state, data })} data={data} state={state} load={load!} columns={displayColumns} recordHref={recordHref} currentUrl={list.currentUrl} renderCell={renderCell} openRecord={openRecord} deleteAction={deleteEnabled ? deleteAction : undefined} refresh={list.refresh} /> : !data?.rows.length ? <tr><td colSpan={columns.length + 2}><div className="sticky left-0 flex min-h-40 w-[calc(100cqw-1rem)] flex-col items-center justify-center gap-2 p-6 text-center"><span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-base-200 text-base-content/35">{filterCount ? <Search size={24} aria-hidden="true" /> : <Inbox size={24} aria-hidden="true" />}</span><p className="font-semibold">{filterCount ? "Sin coincidencias" : "Aún no hay registros"}</p><p className="max-w-sm text-sm text-base-content/55">{filterCount ? "Prueba con otros filtros o limpia la selección." : "Los registros aparecerán aquí cuando estén disponibles."}</p>{filterCount > 0 && <button type="button" className="btn btn-ghost btn-sm mt-1" onClick={list.clearFilters}>Quitar filtros</button>}</div></td></tr> : <ListRecordRows data={data} displayColumns={displayColumns} selectedIds={selectedIds} busy={deletion.busy} recordHref={recordHref} currentUrl={list.currentUrl} renderCell={renderCell} openRecord={openRecord} toggle={id => setSelection(current => togglePageRecord(current, data, id))} />}
           </tbody>
         </table>
       </div>
@@ -146,14 +133,14 @@ export default function ListViewClient({
       <footer data-slot="footer" className="shrink-0 space-y-3 rounded-b-2xl border-t border-base-300 bg-base-200/20 px-4 py-3 text-xs text-base-content/60 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <p role="status" className="tabular-nums">{loading ? "Cargando registros…" : error ? "Consulta no disponible" : `${first.toLocaleString("es-MX")}–${last.toLocaleString("es-MX")} de ${(data?.total ?? 0).toLocaleString("es-MX")} registros`}</p>
+          <p role="status" className="tabular-nums">{loading ? "Cargando registros…" : error ? "Consulta no disponible" : data?.groups ? `${data.total.toLocaleString("es-MX")} registros · Página ${page} de grupos` : `${first.toLocaleString("es-MX")}–${last.toLocaleString("es-MX")} de ${(data?.total ?? 0).toLocaleString("es-MX")} registros`}</p>
           <label className="flex items-center gap-2"><span>Filas</span><select className="select select-sm w-19 rounded-lg border-base-300 bg-base-100" autoComplete="off" aria-label="Filas por página" value={state.pageSize} onChange={event => list.update({ pageSize: Number(event.currentTarget.value) })}>{sizes.map(size => <option key={size} value={size}>{size}</option>)}</select></label>
         </div>
         <nav aria-label={`Paginación de ${title}`} className="flex items-center gap-1">
           <button type="button" className="btn btn-ghost btn-sm btn-square" aria-label="Página anterior de la lista" disabled={loading || !data || page <= 1} onClick={() => list.update({ page: page - 1 })}><ChevronLeft size={17} aria-hidden="true" /></button>
-          <span className="px-2 tabular-nums sm:hidden">{data ? `${page} / ${pages}` : "—"}</span>
-          <div className="hidden items-center gap-1 sm:flex">{visibleListPages(page, pages).map(number => <button key={number} type="button" className={`btn btn-sm min-w-8 px-2 ${number === page ? "btn-soft btn-primary" : "btn-ghost"}`} aria-label={`Ir a página ${number}`} aria-current={number === page ? "page" : undefined} disabled={loading || !data || number === page} onClick={() => list.update({ page: number })}>{number}</button>)}</div>
-          <button type="button" className="btn btn-ghost btn-sm btn-square" aria-label="Página siguiente de la lista" disabled={loading || !data || page >= pages} onClick={() => list.update({ page: page + 1 })}><ChevronRight size={17} aria-hidden="true" /></button>
+          <span className="px-2 tabular-nums sm:hidden">{data ? data.groups ? `${page}` : `${page} / ${pages}` : "—"}</span>
+          <div className="hidden items-center gap-1 sm:flex">{!data?.groups && visibleListPages(page, pages).map(number => <button key={number} type="button" className={`btn btn-sm min-w-8 px-2 ${number === page ? "btn-soft btn-primary" : "btn-ghost"}`} aria-label={`Ir a página ${number}`} aria-current={number === page ? "page" : undefined} disabled={loading || !data || number === page} onClick={() => list.update({ page: number })}>{number}</button>)}</div>
+          <button type="button" className="btn btn-ghost btn-sm btn-square" aria-label="Página siguiente de la lista" disabled={loading || !data || (data?.groups ? !data.hasMoreGroups : page >= pages)} onClick={() => list.update({ page: page + 1 })}><ChevronRight size={17} aria-hidden="true" /></button>
         </nav>
         </div>
         {footer && <div className="border-t border-base-300 pt-3">{footer}</div>}

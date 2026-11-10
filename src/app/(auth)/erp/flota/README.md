@@ -11,6 +11,13 @@ Conserva esquemas, migraciones y registros de propiedad juntos en el control de 
 
 ## Qué caso necesitas
 
+Flota incorpora historial y notas en la columna derecha del formulario. `name`,
+`plate`, `brand` y `active` declaran `tracking: true`; los cambios se registran al
+guardar, después de las reglas de negocio. Las notas se publican por separado y
+no modifican la revisión del vehículo. No se reconstruye historial antiguo.
+Contrato, migración de infraestructura y alcance en
+[Actividad de registros](../../../../../docs/actividad-registros.md).
+
 | Caso | Orden |
 | --- | --- |
 | Crear el cascarón | Simular → crear → personalizar → primera instalación. |

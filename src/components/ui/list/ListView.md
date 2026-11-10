@@ -1,5 +1,13 @@
 # ListView · Card con filtros por columna
 
+Las filas de registros usan padding vertical compacto (`py-2`, 0.5rem por lado),
+también dentro de agrupaciones. Se conservan tamaño de avatares/casillas y ajuste
+multilínea; los encabezados mantienen su separación.
+
+Agrupación anidada opcional: `groupable: true` con proveedor propio `load`.
+Contrato, paginación por rama, selección y límites en
+[Agrupación de listas](../../../../docs/agrupacion-listas.md).
+
 En las páginas del ERP, ListView se monta directamente en el layout, sin wrappers
 con padding ni enlaces de navegación externos: ocupa todo el ancho y la altura
 disponibles debajo del Top. `breadcrumbs` coloca la ruta dentro del header, también
@@ -29,7 +37,7 @@ import ListView from "@/components/ui/list/ListView";
 
 ## Estructura
 
-- **Header**: `breadcrumbs` opcional, título, icono, contador, actualizar, limpiar filtros y `headerActions` para botones o menús propios. Cada miga tiene `label` y un `href` opcional; la última representa la página actual. `createHref`/`createLabel` habilitan «Nuevo» cuando exista la ruta de creación.
+- **Header**: barra compacta de `breadcrumbs`, agrupación, actualizar, limpiar filtros y `headerActions` para botones o menús propios. Cada miga tiene `label` y un `href` opcional; la última representa la página actual. `createHref`/`createLabel` habilitan «Nuevo» cuando exista la ruta de creación. La ruta y los controles comparten fila cuando hay espacio y se adaptan en móvil. No muestra el bloque de icono/título/contador/descripción; el total se consulta en el footer. `title` conserva el nombre accesible de la sección, tabla y acciones.
 - **Body**: tabla con orden y filtro en cada encabezado. Los encabezados siguen disponibles en carga, error y ausencia de resultados.
 - **Footer**: rango, tamaño de página y paginación, más el slot `footer` para contenido adicional.
 
@@ -152,7 +160,7 @@ Un día se expresa como `[medianoche local, siguiente medianoche local)`, incluy
 
 - `format`: `text`, `number`, `currency`, `date`, `datetime` o `boolean`; `currency` y `decimals` ajustan la presentación. El formato no cambia el tipo de dato permitido por el servidor.
 - `pageSize`: valor inicial entre 1 y 50 (25 por defecto). `defaultSort`: columna visible/ordenable y dirección. El ID desempata el orden en el servidor.
-- `description`, `icon`, `className`, `headerActions`, `footer`: presentación opcional.
+- `className`, `headerActions`, `footer`: presentación opcional. `description` e `icon` siguen aceptándose por compatibilidad, pero no se renderizan en el header compacto.
 - `renderCell(record, column)`: presentación personalizada en un wrapper cliente. Devuelve `undefined` para usar el formato habitual. No se envía como parte de la configuración de consulta; ejemplo en `citas/views/AppointmentList.tsx`.
 - `recordHref`: ruta interna con `{id}` para el futuro FormView. Se agrega `returnTo` con el contexto; el destino debe validarlo antes de redirigir. Sin ruta, abrir una fila muestra una vista rápida de lectura.
 - `paramPrefix`: namespace opcional para varias listas en una misma página.

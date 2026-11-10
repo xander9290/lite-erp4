@@ -4,10 +4,11 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { patchListParams, readListState } from "@/lib/list/state";
 import type { ListFilter, ListState, ListViewConfig } from "@/lib/list/types";
 
-export function useCollectionState(config: ListViewConfig, pageSize: number, prefix: string) {
+export function useCollectionState(config: ListViewConfig, pageSize: number, prefix: string, grouping = false) {
   const pathname = usePathname(), params = useSearchParams();
   const serialized = params.toString();
-  const state = readListState(config, params, pageSize, prefix);
+  const parsed = readListState(config, params, pageSize, prefix);
+  const state = grouping ? parsed : { ...parsed, groupBy: undefined, groupPath: undefined };
   const update = useCallback((patch: Partial<ListState>, replace = false) => {
     const query = patchListParams(serialized, patch, prefix);
     const url = `${pathname}${query ? `?${query}` : ""}${window.location.hash}`;

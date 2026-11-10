@@ -2,18 +2,20 @@ import "server-only";
 import { Fields, Model, defineModel, ModelValidationError as Error, ModelContext } from "@/lib/orm";
 
 export class FlotaRecord extends Model {
-  name = Fields.Text({ label: "Nombre", required: true, unique: false, trim: true, maxLength: 120 });
+  name = Fields.Text({ label: "Nombre", required: true, unique: false, trim: true, maxLength: 120, tracking: true });
   plate = Fields.Text({
     label: "Placas",
+    tracking: true,
     required: true,
     unique: true,
     maxLength: 20,
   });
   brand = Fields.Text({
     label: "Marca",
+    tracking: true,
     maxLength: 80,
   });
-  active = Fields.Boolean({ label: "Activo", unique: false, default: true });
+  active = Fields.Boolean({ label: "Activo", unique: false, default: true, tracking: true });
   // Reglas de negocio: beforeSave(values, context) y afterSave(record, context).
 
   async beforeSave(values: Record<string, unknown>, context: ModelContext) {

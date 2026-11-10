@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useFormState, type FieldPath, type FieldValues } from "react-hook-form";
-import { FilePenLine, Plus, RotateCcw, Save } from "lucide-react";
+import { Plus, RotateCcw, Save } from "lucide-react";
 import toast from "react-hot-toast";
 import FormLayout, { type FormLayoutProps } from "./FormLayout";
 import FormViewActionMenu, { type FormViewMenuAction } from "./FormViewActionMenu";
@@ -13,6 +13,7 @@ import { useFormLeaveGuard, useFormNavigation } from "./FormNavigationProvider";
 import Breadcrumbs, { type Breadcrumb } from "../Breadcrumbs";
 import FormAuditPanel from "./FormAuditPanel";
 import type { RecordAudit } from "@/lib/orm/audit";
+import type { FormActivity } from "@/lib/orm/activity";
 
 export type { FormViewContext, FormViewResult, FormViewSubmit } from "./formView.types";
 export type { FormViewMenuAction } from "./FormViewActionMenu";
@@ -21,13 +22,16 @@ type Slot<TValues extends FieldValues, TContext, TOutput> = ReactNode | ((contex
 export type FormViewProps<TValues extends FieldValues, TContext = unknown, TOutput = TValues> =
   Omit<FormLayoutProps<TValues, TContext, TOutput>, "onSubmit" | "onSubmitError" | "onSubmitSettled" | "contentClassName" | "title"> & {
     title: string;
+    /** Compatibility metadata; not rendered by the compact header. */
     description?: string;
+    /** Compatibility metadata; not rendered by the compact header. */
     icon?: ReactNode;
     width?: "normal" | "wide";
     layout?: "content" | "page";
     breadcrumbs?: readonly Breadcrumb[];
     /** undefined hides the panel; null reserves it for an unsaved record. */
     audit?: RecordAudit | null;
+    activity?: FormActivity;
     mode?: "create" | "edit";
     disabled?: boolean;
     readOnly?: boolean;
@@ -51,7 +55,7 @@ class SaveRejected extends Error {
 const serverErrorTypes = ["server"];
 
 export default function FormView<TValues extends FieldValues, TContext = unknown, TOutput = TValues>({
-  title, description, icon, width = "normal", layout = "content", breadcrumbs, audit, methods, mode = "edit", disabled = false, readOnly = false, busy: actionBusy = false,
+  title, width = "normal", layout = "content", breadcrumbs, audit, activity, methods, mode = "edit", disabled = false, readOnly = false, busy: actionBusy = false,
   headerActions, menuActions, statebar, footer, saveLabel = "Guardar", revertLabel = "Revertir", newLabel = "Nuevo", onNew, onSubmit, onSaved, onRevert,
   children, id, className = "", onSubmitCapture, ...formProps
 }: FormViewProps<TValues, TContext, TOutput>) {
@@ -76,6 +80,11 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
   const footerContent = typeof footer === "function" ? footer(context) : footer;
   const serverError = errors.root?.server?.message;
   const pageLayout = layout === "page";
+  const hasAudit = audit !== undefined || activity !== undefined;
+  const [activityVersion, setActivityVersion] = useState(0);
+  // Legacy presentation metadata must not be forwarded to the HTML form.
+  delete formProps.description;
+  delete formProps.icon;
 
   return <FormLayout {...formProps} id={id} methods={methods} aria-labelledby={titleId} aria-busy={busy} silentErrorTypes={serverErrorTypes}
     className={`card w-full ${pageLayout ? "flex min-h-0 flex-1 flex-col" : `mx-auto shrink-0 ${width === "wide" ? "max-w-7xl" : "max-w-5xl"}`} rounded-2xl border border-base-300 bg-base-100 shadow-sm ${className}`} contentClassName={`flex min-w-0 flex-col ${pageLayout ? "min-h-0 flex-1" : ""}`}
@@ -131,14 +140,15 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
       // handleSubmit has finished; reset can now establish a reliable saved baseline.
       methods.reset(saved.values);
       markClean();
+      setActivityVersion(version => version + 1);
       toast.success(saved.message ?? "Cambios guardados.");
       onSaved?.(saved.values, saved.audit);
     }}>
-    <header data-slot="header" className="shrink-0 space-y-3 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-3 sm:px-6 sm:py-4">
-      <Breadcrumbs items={breadcrumbs} />
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3"><span aria-hidden="true" className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">{icon ?? <FilePenLine size={22} />}</span><div className="min-w-0 space-y-1"><div className="flex flex-wrap items-center gap-2"><h2 id={titleId} className="text-xl font-semibold tracking-tight wrap-anywhere sm:text-2xl">{title}</h2><span className={`badge badge-sm ${isDirty ? "badge-soft badge-warning" : "badge-ghost"}`}>{readOnly ? "Solo lectura" : isDirty ? "Con cambios" : mode === "create" ? "Nuevo" : "Sin cambios"}</span></div>{description && <p className="max-w-2xl text-sm leading-relaxed text-base-content/60">{description}</p>}</div></div>
-        {(!readOnly || onNew || Boolean(secondaryActions?.length)) && <fieldset disabled={locked} className="m-0 flex w-full min-w-0 flex-wrap items-center gap-1 border-0 p-0 sm:w-auto sm:gap-2">
+    <h2 id={titleId} className="sr-only">{title}</h2>
+    <header data-slot="header" className="shrink-0 space-y-3 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-3 sm:px-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {!!breadcrumbs?.length && <div className="min-w-0 flex-1 basis-48"><Breadcrumbs items={breadcrumbs} /></div>}
+        {(!readOnly || onNew || Boolean(secondaryActions?.length)) && <fieldset disabled={locked} className="m-0 ml-auto flex min-w-0 flex-wrap items-center gap-1 border-0 p-0 sm:gap-2">
           {onNew && <button type="button" disabled={locked} className="btn btn-soft btn-primary btn-sm gap-1.5" onClick={async () => {
             if (locked) return;
             setStartingNew(true);
@@ -158,12 +168,12 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
         {statebar && <fieldset disabled={locked || readOnly} className="m-0 ml-auto min-w-0 max-w-full border-0 p-0">{statebar}</fieldset>}
       </div>}
     </header>
-    <div data-slot="body" className={`min-w-0 ${pageLayout ? "min-h-0 flex-1 overflow-y-auto" : ""}`}>
-      <div className={`grid min-w-0 grid-cols-1 items-start ${audit !== undefined ? "@4xl/form:grid-cols-[minmax(0,1fr)_18rem]" : ""}`}>
-        <div className="min-w-0 p-4 sm:p-6"><div className={`@container/form mx-auto w-full min-w-0 ${width === "wide" ? "max-w-7xl" : "max-w-5xl"}`}>
-          <fieldset disabled={locked || readOnly} className="m-0 min-w-0 border-0 p-0"><div className="grid min-w-0 grid-cols-1 items-start gap-4 @2xl/form:grid-cols-2">{children}</div></fieldset>
+    <div data-slot="body" className={`min-w-0 ${pageLayout ? `min-h-0 flex-1 overflow-y-auto ${hasAudit ? "@4xl/form:overflow-hidden" : ""}` : ""}`}>
+      <div className={`grid min-w-0 grid-cols-1 items-stretch ${pageLayout ? "min-h-full" : ""} ${hasAudit ? `${activity ? "@4xl/form:grid-cols-[minmax(0,1fr)_24rem]" : "@4xl/form:grid-cols-[minmax(0,1fr)_18rem]"} ${pageLayout ? "@4xl/form:h-full" : ""}` : ""}`}>
+        <div className={`min-w-0 p-2 sm:p-3 ${pageLayout && hasAudit ? "@4xl/form:min-h-0 @4xl/form:overflow-y-auto" : ""}`}><div className={`@container/form w-full min-w-0 ${pageLayout ? "" : width === "wide" ? "max-w-7xl" : "max-w-5xl"}`}>
+          <fieldset disabled={locked || readOnly} className="m-0 min-w-0 border-0 p-0"><div className="grid min-w-0 grid-cols-1 items-start gap-2 @2xl/form:grid-cols-2">{children}</div></fieldset>
         </div></div>
-        {audit !== undefined && <FormAuditPanel audit={audit} creating={mode === "create"} />}
+        {hasAudit && <FormAuditPanel audit={audit} creating={mode === "create"} activity={activity} refreshToken={activityVersion} readOnly={readOnly || locked} />}
       </div>
     </div>
     <footer data-slot="footer" className="shrink-0 space-y-3 rounded-b-2xl border-t border-base-300 bg-base-200/20 px-4 py-3 sm:px-6">

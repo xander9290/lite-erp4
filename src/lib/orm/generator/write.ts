@@ -4,7 +4,7 @@ import { lstat, mkdir, mkdtemp, open, readFile, rename, rm, writeFile } from "no
 import { isAbsolute, join, parse, resolve } from "node:path";
 
 const manifestName = "generation-manifest.json";
-const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+const hash = (value: string) => createHash("sha256").update(value.replace(/\r\n/g, "\n")).digest("hex");
 type Manifest = { generator: "lite-erp-orm-v1"; module: string; files: Record<string, string> };
 const validName = (value: string) => /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(value) && value !== "." && value !== "..";
 async function readOptional(path: string) {
@@ -43,7 +43,7 @@ export async function artifactPlan(directory: string, module: string, files: Rec
   for (const [name, content] of Object.entries(files)) {
     const old = await readOptional(join(directory, name));
     if (old !== null && !Object.hasOwn(previous?.files ?? {}, name)) throw new Error(`No se sobrescribirá el archivo personalizado ${name}.`);
-    changes.push({ name, action: old === content ? "unchanged" : old === null ? "create" : "update" });
+    changes.push({ name, action: old !== null && hash(old) === hash(content) ? "unchanged" : old === null ? "create" : "update" });
   }
   const manifest: Manifest = { generator: "lite-erp-orm-v1", module, files: Object.fromEntries(Object.entries(files).map(([name, content]) => [name, hash(content)])) };
   const manifestText = `${JSON.stringify(manifest, null, 2)}\n`;

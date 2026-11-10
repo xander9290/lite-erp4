@@ -3,9 +3,9 @@
   "module": "flota",
   "files": {
     "models.prisma": "f3f43ef47aba6a0a3128eef2586c3aea67d10ca6efb6d0fcca02f951f7267a05",
-    "schema.preview.prisma": "07ed0e7c2390ce3b601bb4b0aa1bf24268d5dfce46d30d4b8dfec446fd033647",
+    "schema.preview.prisma": "1110df05b990f87d9520dec68c19990ad212b5f1c1aadeb0787171764dd4f0f4",
     "review.json": "65b7fca21a0c325a2bb769c15a07595ea298049226a20044b442ad08b34227ef",
-    "FlotaRecord.schema.ts": "32a49d1e1fdde505506908a80c1d827cfb5d56f5d2032a4107d355abacb64574",
+    "FlotaRecord.schema.ts": "65f57800ebfb7d7dee9be576532ff6a19dde420e89a8a6d1c870a5a0c1e6b527",
     "migration.preview.sql": "41c2e490f74bf366bcffb9f53a56c958daeada0032ce7402c178e0b5a344ffb8"
   }
 }

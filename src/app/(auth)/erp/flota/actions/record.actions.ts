@@ -10,6 +10,17 @@ import type { ListResult, ListState } from "@/lib/list/types";
 import type { RecordInput } from "../schemas/record.schema";
 import { recordService } from "../models/record.service";
 import type { ListDeleteResult, ListDeleteTarget } from "@/lib/list/selection";
+import type { ActivityRequest, ActivityResult, ActivityNote, ActivityNoteResult } from "@/lib/orm/activity";
+
+export async function loadActivity(request: ActivityRequest): Promise<ActivityResult> {
+  try { return await recordService.activity(prisma, await requireAdmin(), request); }
+  catch (error) { return { ok: false, error: error instanceof AccessError ? error.message : "No se pudo cargar la actividad." }; }
+}
+
+export async function addNote(request: ActivityNote): Promise<ActivityNoteResult> {
+  try { return await recordService.addNote(prisma, await requireAdmin(), request); }
+  catch (error) { return { ok: false, error: error instanceof AccessError ? error.message : "No se pudo publicar la nota." }; }
+}
 
 export async function readRecord(id: string): Promise<FormViewLoadResult<RecordInput>> {
   try { return await recordService.read(prisma, await requireAdmin(), id); }

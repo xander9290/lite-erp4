@@ -239,6 +239,7 @@ relaciones e inversas y coordinar código, registro y una migración explícita.
 - [Crear aplicaciones](${docs}/crear-aplicaciones.md).
 - [Dominios de lista](${docs}/dominios-listas.md).
 - [Auditoría de modelos](${docs}/auditoria-modelos.md).
+- [Historial de cambios y notas](${docs}/actividad-registros.md).
 
 El formulario conserva RHF/isDirty, Revertir, carga y confirmación de salida.
 Los hooks \`beforeSave\`/\`afterSave\` corren en la transacción; sus errores revierten

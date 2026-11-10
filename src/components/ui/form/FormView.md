@@ -2,6 +2,12 @@
 
 Card de formulario con un único `FormLayout`/`FormProvider`. El header contiene Guardar, Revertir, `headerActions`, `menuActions` y `statebar`; el body organiza los `FormGroup` en una o dos columnas según el ancho disponible; `footer` permite contenido adicional.
 
+El header es compacto: navegación y acciones comparten fila cuando hay espacio,
+sin bloque visible de icono, título, descripción ni badge de cambios. `title` sigue
+siendo obligatorio como encabezado accesible; `description` e `icon` se aceptan
+por compatibilidad, pero no se renderizan. El estado del formulario permanece en
+el footer. Las acciones adicionales y el `statebar` conservan su fila propia.
+
 Por defecto, la tarjeta está centrada, ocupa el ancho disponible hasta `max-w-5xl`
 (64rem) y su altura depende del contenido. Para formularios con tablas o más columnas,
 usa `width="wide"` (máximo 80rem, `max-w-7xl`); ejemplo en `/sample#field-one2many`.
@@ -14,16 +20,42 @@ el layout, sin wrappers con padding ni ancho máximo. Así ocupa el área debajo
 Top, mantiene header/footer visibles y desplaza el body. `FormViewLoader` transmite
 esa altura al editor. `breadcrumbs={[{label: "Contactos", href: "/erp/contactos"},
 {label: "Nuevo contacto"}]}` integra la navegación en el header y conserva el guard
-de cambios pendientes. `width` limita la hoja de campos, no el marco de la página.
+de cambios pendientes. En `layout="page"`, la hoja de campos aprovecha todo el
+ancho disponible hasta la auditoría, sin límite normal/wide. `width` sólo limita
+el ancho de la tarjeta y su hoja en `layout="content"`.
+La hoja de campos se alinea a la izquierda del body, con separación exterior de
+8px en móvil y 12px desde `sm`; los FormGroup conservan su padding interior.
+La grilla admite un máximo de dos columnas: desde 42rem de ancho de la hoja,
+dos FormGroup normales comparten fila; por debajo se apilan. La separación entre
+grupos es de 8px tanto horizontal como vertical. Un grupo único
+ocupa una columna, dejando libre la segunda en escritorio. `fullWidth` permite ocupar las
+dos columnas incluso si hay otros; omitirlo para colocarlos lado a lado.
+
+Los Fields con `direction="inline"` comparten una columna de label de 7rem
+(112px), separación de 8px y control que ocupa el resto. El label se alinea a la
+izquierda y al centro vertical del control; los textos largos se parten en líneas.
+Así el espacio entre label y control no crece al ensanchar el formulario.
 
 `audit={recordAudit}` presenta creador/avatar, creación y última actualización en
-un panel compacto a la derecha (columna de 18rem desde 56rem de ancho del formulario).
-Su altura depende del contenido; en anchos menores se coloca debajo de los campos.
+una columna lateral derecha de 18rem desde 56rem de ancho del formulario, separada
+por un borde y extendida a todo el alto del body, sin tarjeta interior ni márgenes.
+Con `layout="page"`, campos y auditoría tienen scroll independiente en escritorio;
+header y footer permanecen visibles. En anchos menores la auditoría se coloca
+debajo de los campos, con separador superior y scroll compartido del body.
 La hoja de campos calcula sus columnas con su propio ancho disponible. Sin `audit`
 no se reserva panel; `audit={null}` permite mostrar el aviso previo al primer guardado
 en modo creación. Los datos autorizados permanecen fuera de RHF, defaults y payload;
 el editor mantiene el estado y lo actualiza con `onSaved(values, audit)`.
 Ejemplo RHF/Zod con autor nulo y guardado local en `/sample#record-audit`.
+
+`activity={{ recordId, load, addNote }}` añade historial y notas en esa columna,
+ampliándola a 24rem y sustituyendo el resumen superior de creador/fechas por el
+historial, con avatar junto al autor de cada entrada. Se actualiza tras guardar sin resetear borradores de nota ni
+valores del formulario. Las notas tienen guard de salida independiente de RHF;
+antes del primer guardado no se habilitan. La creación sólo muestra «Registro
+creado» y las diferencias aparecen al guardar ediciones. No hay refresco periódico
+del historial. Las acciones deben autorizar en servidor.
+Contrato y límites en [Actividad de registros](../../../../docs/actividad-registros.md).
 
 ```tsx
 "use client";

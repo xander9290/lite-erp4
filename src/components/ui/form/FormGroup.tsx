@@ -16,7 +16,7 @@ export default function FormGroup({
   return (
     <fieldset
       {...fieldsetProps}
-      className={`m-0 flex min-w-0 flex-col gap-4 rounded-box border border-base-300 bg-base-200/40 p-4 shadow-xs only:col-span-full ${fullWidth ? "col-span-full" : ""} ${className}`}
+      className={`m-0 flex min-w-0 flex-col gap-4 rounded-box border border-base-300 bg-base-200/40 p-4 shadow-xs ${fullWidth ? "col-span-full" : ""} ${className}`}
     >
       {legend != null && <legend className="px-2 text-sm font-semibold text-base-content">{legend}</legend>}
       {children}

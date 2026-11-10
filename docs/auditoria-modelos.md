@@ -1,5 +1,9 @@
 # Autor implícito de los registros: createBy
 
+Para historial de cambios por campo y notas internas, ver
+[Actividad de registros](actividad-registros.md). Esta guía describe el creador
+y las fechas; no deben confundirse con el historial transaccional.
+
 Los modelos declarados con `Model` incorporan `createBy` al generar su esquema,
 junto con ID, `createdAt` y `updatedAt`. No se añade a la clase ni a `clientFields`.
 
@@ -99,10 +103,11 @@ en `defaultValues`, Zod o el payload de guardado.
 ```
 
 En Editor, mantenerla en estado React independiente y actualizarla con
-`onSaved={(_values, audit) => setAudit(audit)}` de FormView. Para el panel compacto
-a la derecha, pasar `audit={audit ?? null}` y `layout="page"` a FormView: incluye
+`onSaved={(_values, audit) => setAudit(audit)}` de FormView. Para la columna lateral
+derecha a todo el alto del body, pasar `audit={audit ?? null}` y `layout="page"` a FormView: incluye
 creador, fecha de creación y última actualización. En móvil se coloca debajo de los
-campos y no ocupa una columna lateral. El panel no añade campos a RHF. Flota usa
+campos y no ocupa una columna lateral. En escritorio, campos y auditoría tienen
+scroll independiente, con header/footer visibles. El panel no añade campos a RHF. Flota usa
 esta presentación; los módulos manuales sin proveedor de auditoría no muestran
 metadatos inventados. Para presentar el autor por separado:
 

@@ -29,8 +29,8 @@ export function scaffoldRegistryFiles(ids: readonly string[]) {
 export function createAppTemplate(name: string) {
   const app = appIdentity(name), modelName = app.modelName;
   const starter = defineModel(class Starter extends Model {
-    name = Fields.Text({ label: "Nombre", required: true, maxLength: 120 });
-    active = Fields.Boolean({ label: "Activo", default: true });
+    name = Fields.Text({ label: "Nombre", required: true, maxLength: 120, tracking: true });
+    active = Fields.Boolean({ label: "Activo", default: true, tracking: true });
   }, { name: modelName, table: app.table });
   const profile: ModuleGeneration = { id: app.id, depends: [], models: [{ model: starter, clientFields: ["name", "active"] }] };
   const files: Record<string, string> = {};

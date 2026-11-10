@@ -9,6 +9,7 @@ import AlertsSample from "./AlertsSample";
 import One2manySample from "./One2manySample";
 import CollectionViewsSample from "./CollectionViewsSample";
 import AuditSample from "./AuditSample";
+import ListGroupingSample from "./ListGroupingSample";
 
 export default function PageSample() {
   return (
@@ -26,6 +27,7 @@ export default function PageSample() {
           <nav aria-label="Ejemplos de Fields" className="flex flex-wrap gap-2">
             <a className="btn btn-sm btn-outline" href="#list-view">ListView</a>
             <a className="btn btn-sm btn-outline" href="#list-selection">Selección de listas</a>
+            <a className="btn btn-sm btn-outline" href="#list-grouping">Agrupación anidada</a>
             <a className="btn btn-sm btn-outline" href="#card-view">CardView</a>
             <a className="btn btn-sm btn-outline" href="#kanban-view">KanbanView</a>
             <a className="btn btn-sm btn-outline" href="#form-view">FormView</a>
@@ -47,6 +49,7 @@ export default function PageSample() {
           </nav>
         </header>
         <ListViewSample />
+        <ListGroupingSample />
         <CollectionViewsSample />
         <AlertsSample />
         <FormViewSample />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import FieldText from "@/components/ui/form/FieldText";
 import ListView from "@/components/ui/list/ListView";
 import { recordAuditColumns, type RecordAudit } from "@/lib/orm/audit";
 import type { ListResult } from "@/lib/list/types";
+import { activityNoteSchema, activityRequestSchema, type ActivityEntry, type ActivityRequest, type ActivityResult, type ActivityNote, type ActivityNoteResult } from "@/lib/orm/activity";
 
 const schema = z.strictObject({ name: z.string().trim().min(1, "Introduce un nombre.").max(120) });
 type Values = z.infer<typeof schema>;
@@ -30,14 +31,37 @@ export default function AuditSample() {
   const [audit, setAudit] = useState(initialAudit);
   const [submitted, setSubmitted] = useState<Values | null>(null);
   const [legacy, setLegacy] = useState(false);
+  const [entries, setEntries] = useState<ActivityEntry[]>([{ id: "sample-created", kind: "create", createdAt: initialAudit.createdAt, author: initialAudit.createBy!, body: null, changes: [] }]);
+  const noteRequests = useRef(new Map<string, string>());
+  const loadActivity = useCallback(async (input: ActivityRequest): Promise<ActivityResult> => {
+    const request = activityRequestSchema.safeParse(input);
+    if (!request.success || request.data.id !== "sample-record") return { ok: false, error: "Registro de ejemplo no disponible." };
+    return { ok: true, data: { entries, nextCursor: null } };
+  }, [entries]);
+  const addNote = useCallback(async (input: ActivityNote): Promise<ActivityNoteResult> => {
+    const request = activityNoteSchema.safeParse(input);
+    if (!request.success || request.data.id !== "sample-record") return { ok: false, error: "Revisa la nota del ejemplo." };
+    const { requestId, body } = request.data;
+    const previous = noteRequests.current.get(requestId);
+    if (previous && previous !== body) return { ok: false, error: "Solicitud ya utilizada." };
+    if (!previous) {
+      noteRequests.current.set(requestId, body);
+      setEntries(current => [{ id: requestId, kind: "note", createdAt: new Date().toISOString(), author: initialAudit.createBy!, body, changes: [] }, ...current]);
+    }
+    return { ok: true };
+  }, []);
   const visible = { ...audit, createBy: legacy ? null : initialAudit.createBy };
   return <section id="record-audit" className="min-w-0 scroll-mt-6 space-y-4">
-    <header className="space-y-1 px-1"><h2 className="text-xl font-semibold">Auditoría · solo lectura</h2><p className="text-sm text-base-content/60">Datos ficticios, sin persistencia. El creador está fuera de RHF: no se valida, no se envía y no altera isDirty.</p></header>
-    <div className="flex h-[34rem] min-w-0 flex-col">
+    <header className="space-y-1 px-1"><h2 className="text-xl font-semibold">Auditoría, historial y notas</h2><p className="text-sm text-base-content/60">Datos ficticios en memoria, sin persistencia. Guarda cambios de nombre o publica notas; recargar reinicia el ejemplo. La actividad y su borrador están fuera de RHF.</p></header>
+    <div className="flex h-[48rem] min-w-0 flex-col">
     <FormView layout="page" breadcrumbs={[{ label: "Ejemplos", href: "/sample" }, { label: "Registro de ejemplo" }]} audit={visible}
+      activity={{ recordId: "sample-record", load: loadActivity, addNote }}
       headerActions={<button type="button" className="btn btn-ghost btn-xs" onClick={() => setLegacy(value => !value)}>{legacy ? "Mostrar creador de ejemplo" : "Simular registro antiguo"}</button>}
       title="Registro de ejemplo" methods={methods} onSubmit={async values => {
       const next = { ...visible, updatedAt: new Date().toISOString() };
+      const before = methods.formState.defaultValues?.name ?? "";
+      if (before !== values.name) setEntries(current => [{ id: crypto.randomUUID(), kind: "update", createdAt: next.updatedAt, author: initialAudit.createBy!, body: null,
+        changes: [{ field: "name", label: "Nombre", type: "text", before, after: values.name }] }, ...current]);
       setSubmitted(values);
       return { ok: true, values, audit: next, message: "Ejemplo validado localmente." };
     }} onSaved={(_values, next) => { if (next) setAudit(next); }} footer={<span className="text-xs text-base-content/55">Solo el nombre pertenece al formulario. Las fechas se muestran en la zona del navegador.</span>}>

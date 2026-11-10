@@ -20,6 +20,7 @@ export async function listRecords(config: ListConfig, state: ListState): Promise
   const parsedConfig = listConfigSchema.safeParse(config);
   const parsedState = listStateSchema.safeParse(state);
   if (!parsedConfig.success || !parsedState.success) return { ok: false, error: "Revisa la configuración y los parámetros de esta lista." };
+  if (parsedState.data.groupBy?.length || parsedState.data.groupPath?.length) return { ok: false, error: "Este proveedor no admite agrupación. Usa una acción propia con createModelService." };
   if (parsedState.data.invalidFilters) return { ok: false, error: "El enlace contiene filtros inválidos. Limpia los filtros para continuar." };
   const filterError = validateListFilters(parsedConfig.data, parsedState.data.filters);
   if (filterError) return { ok: false, error: filterError };

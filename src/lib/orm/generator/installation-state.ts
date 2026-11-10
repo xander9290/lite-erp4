@@ -6,7 +6,8 @@ import { z } from "zod";
 import { prismaBlocks } from "./prisma-source";
 import { assertNoSymlinks } from "./write";
 
-export const sourceHash = (text: string) => createHash("sha256").update(text).digest("hex");
+// Git may check text out as CRLF; formatting alone must not invalidate ownership.
+export const sourceHash = (text: string) => createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
 const idSchema = z.string().regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/);
 const filename = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_.-]*\.prisma$/);
 const installationSchema = z.strictObject({
@@ -30,8 +31,10 @@ export function inverseText(id: string, target: string, declarations: readonly s
 /** Only remove a ledger-owned segment, located inside its expected model. */
 export function removeInverse(source: string, inverse: { target: string; text: string }) {
   const block = prismaBlocks(source).find(item => item.kind === "model" && item.name === inverse.target);
-  if (!block || !block.body.includes(inverse.text) || source.indexOf(inverse.text) !== source.lastIndexOf(inverse.text)) throw new Error(`La inversa gestionada de ${inverse.target} fue modificada o eliminada.`);
-  return source.replace(inverse.text, "");
+  const candidates = [...new Set([inverse.text, inverse.text.replace(/\n/g, "\r\n")])];
+  const found = candidates.filter(text => block?.body.includes(text));
+  if (found.length !== 1 || candidates.reduce((count, text) => count + source.split(text).length - 1, 0) !== 1) throw new Error(`La inversa gestionada de ${inverse.target} fue modificada o eliminada.`);
+  return source.replace(found[0], "");
 }
 
 export async function readInstallationState(root: string) {

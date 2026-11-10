@@ -9,7 +9,7 @@ export const fieldSelectClassName = `select ${fieldControlClassName} pl-1 pr-8 [
 
 export function fieldDirectionClassName(direction: FieldDirection, label?: string) {
   return direction === "inline" && Boolean(label?.trim())
-    ? "grid w-full min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-center gap-3"
+    ? "grid w-full min-w-0 grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-center gap-2"
     : "flex w-full min-w-0 flex-col gap-1.5";
 }
 

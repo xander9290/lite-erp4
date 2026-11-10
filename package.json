@@ -30,7 +30,8 @@
     "test:scaffold": "node --conditions=react-server --import tsx --test src/lib/scaffold/*.test.ts",
     "test:framework:integration": "node --conditions=react-server --import tsx scripts/framework.integration.ts",
     "test:views": "node --conditions=react-server --import tsx --test src/lib/kanban/*.test.ts",
-    "test:list-selection": "node --conditions=react-server --import tsx --test src/components/ui/list/listSelection.test.ts src/lib/list/delete.test.ts"
+    "test:list-selection": "node --conditions=react-server --import tsx --test src/components/ui/list/listSelection.test.ts src/lib/list/delete.test.ts",
+    "test:list-grouping": "node --conditions=react-server --import tsx --test src/lib/list/grouping.test.ts src/lib/orm/service.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

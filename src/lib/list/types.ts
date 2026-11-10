@@ -15,6 +15,8 @@ export type ListColumn = {
   avatarField?: string;
   sortable?: boolean;
   filterable?: boolean;
+  /** Explicit opt-in; the server must also authorize this scalar field. */
+  groupable?: boolean;
   type?: ListDataType;
   align?: "left" | "center" | "right";
   format?: "text" | "number" | "currency" | "date" | "datetime" | "boolean";
@@ -29,10 +31,12 @@ export type ListConfig = {
 };
 /** Custom sources supply their own authorized server action; this is presentation metadata. */
 export type ListViewConfig = Omit<ListConfig, "model"> & { model: string };
-export type ListState = { query: string; page: number; pageSize: number; sort: string; direction: "asc" | "desc"; filters: ListFilter[]; invalidFilters?: boolean };
+export type ListGroupValue = string | number | boolean | null;
+export type ListState = { query: string; page: number; pageSize: number; sort: string; direction: "asc" | "desc"; filters: ListFilter[]; invalidFilters?: boolean; groupBy?: string[]; groupPath?: ListGroupValue[] };
 export type ListValue = string | number | boolean | null | ListValue[] | { [key: string]: ListValue };
 export type ListRecord = { id: string; [key: string]: ListValue };
-export type ListPage = { rows: ListRecord[]; total: number; page: number; pageSize: number };
+export type ListGroup = { value: ListGroupValue; count: number };
+export type ListPage = { rows: ListRecord[]; total: number; page: number; pageSize: number; groups?: ListGroup[]; hasMoreGroups?: boolean };
 export type ListResult = { ok: true; data: ListPage } | { ok: false; error: string };
 
 const partnerWidgets: Record<ListModel, Readonly<Record<string, string>>> = {

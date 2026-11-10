@@ -4,7 +4,7 @@ const fieldTag = Symbol("orm.field");
 export const INTEGER_MIN = -2147483648;
 export const INTEGER_MAX = 2147483647;
 type Default<T> = T | (() => T);
-type CommonOptions = { label?: string; required?: boolean; unique?: boolean };
+type CommonOptions = { label?: string; required?: boolean; unique?: boolean; tracking?: boolean; sensitive?: boolean };
 type NullableOptions<T> = CommonOptions & { default?: Default<T | null> };
 type RequiredValue<T, O> = O extends { required: true } ? T : T | null;
 
@@ -12,6 +12,8 @@ type CommonMetadata = {
   readonly label?: string;
   readonly required: boolean;
   readonly unique: boolean;
+  readonly tracking?: boolean;
+  readonly sensitive?: boolean;
   readonly defaultKind: "empty" | "literal" | "factory";
   readonly defaultValue?: string | number | boolean | null;
 };
@@ -40,10 +42,11 @@ export function isField(value: unknown): value is Field {
 
 function checkOptions(options: CommonOptions, extra: readonly string[]) {
   if (!options || typeof options !== "object" || Array.isArray(options)) throw new Error("Las opciones del Field deben ser un objeto.");
-  const allowed = new Set(["label", "required", "unique", "default", ...extra]);
+  const allowed = new Set(["label", "required", "unique", "default", "tracking", "sensitive", ...extra]);
   for (const key of Object.keys(options)) if (!allowed.has(key)) throw new Error(`Opción de Field desconocida: ${key}.`);
   if (options.label !== undefined && (typeof options.label !== "string" || !options.label.trim())) throw new Error("El label del Field no puede estar vacío.");
-  for (const key of ["required", "unique"] as const) if (options[key] !== undefined && typeof options[key] !== "boolean") throw new Error(`${key} debe ser booleano.`);
+  for (const key of ["required", "unique", "tracking", "sensitive"] as const) if (options[key] !== undefined && typeof options[key] !== "boolean") throw new Error(`${key} debe ser booleano.`);
+  if (options.sensitive && options.tracking) throw new Error("Un campo sensible no puede habilitar tracking.");
 }
 
 function checkBounds(min: number | undefined, max: number | undefined, lengths = false) {
@@ -62,6 +65,8 @@ function makeField<I, O>(schema: z.ZodType<O, I>, options: CommonOptions & { def
   if (hasDefault && typeof configuredDefault !== "function") validateDefault(configuredDefault);
   const metadata = Object.freeze({
     ...details, label: options.label, required: options.required === true, unique: options.unique === true,
+    ...(options.tracking !== undefined ? { tracking: options.tracking } : {}),
+    ...(options.sensitive !== undefined ? { sensitive: options.sensitive } : {}),
     defaultKind: !hasDefault ? "empty" : typeof configuredDefault === "function" ? "factory" : "literal",
     ...(hasDefault && typeof configuredDefault !== "function" ? { defaultValue: configuredDefault } : {}),
   }) as FieldMetadata;

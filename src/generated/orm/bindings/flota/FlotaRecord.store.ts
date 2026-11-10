@@ -40,6 +40,17 @@ export const FlotaRecordRepository: ModelRepository<FlotaRecordValues> = {
   },
   async remove(tx, id, revision) { await tx.flotaRecord.delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },
   count(tx, where) { return tx.flotaRecord.count({ where: where as Prisma.FlotaRecordWhereInput }); },
+  async groups(tx, query) {
+    switch (query.field) {
+      case "id": return (await tx.flotaRecord.groupBy({ by: ["id"], where: query.where as Prisma.FlotaRecordWhereInput, orderBy: { id: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.id, count: row._count._all }));
+      case "name": return (await tx.flotaRecord.groupBy({ by: ["name"], where: query.where as Prisma.FlotaRecordWhereInput, orderBy: { name: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.name, count: row._count._all }));
+      case "plate": return (await tx.flotaRecord.groupBy({ by: ["plate"], where: query.where as Prisma.FlotaRecordWhereInput, orderBy: { plate: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.plate, count: row._count._all }));
+      case "brand": return (await tx.flotaRecord.groupBy({ by: ["brand"], where: query.where as Prisma.FlotaRecordWhereInput, orderBy: { brand: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.brand, count: row._count._all }));
+      case "active": return (await tx.flotaRecord.groupBy({ by: ["active"], where: query.where as Prisma.FlotaRecordWhereInput, orderBy: { active: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.active, count: row._count._all }));
+      case "createBy": return (await tx.flotaRecord.groupBy({ by: ["createBy"], where: query.where as Prisma.FlotaRecordWhereInput, orderBy: { createBy: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.createBy, count: row._count._all }));
+      default: throw new Error("La columna de agrupación no está habilitada.");
+    }
+  },
   async list(tx, query) {
     // Only the server service supplies these whitelisted scalar predicates and order.
     const order = query.sort === "createByUser.login" ? { createByUser: { login: query.direction } } : query.sort === "createByUser.partner.name" ? { createByUser: { partner: { name: query.direction } } } : { [query.sort]: query.direction };

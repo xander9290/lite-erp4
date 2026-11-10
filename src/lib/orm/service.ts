@@ -18,6 +18,9 @@ import { auditAvatarField, auditColumnType } from "./audit";
 import { compileListDomain, type ListActionOptions, type ListDomainContext } from "./domain";
 import { deleteListSelection } from "../list/delete";
 import type { ListDeleteResult } from "../list/selection";
+import { groupingPlan, groupedPage } from "../list/grouping";
+import { activityRequestSchema, activityNoteSchema, type ActivityResult, type ActivityNoteResult } from "./activity";
+import { recordActivity, readActivity } from "./activity.server";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = {
@@ -95,8 +98,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       throw new ModelValidationError("Revisa los datos del registro.", errors);
     }
     const metadata = identity.data;
+    const current = metadata.id ? await repository.read(tx, metadata.id) : null;
     if (metadata.id) {
-      const current = await repository.read(tx, metadata.id);
       if (!current || current.revision !== metadata.revision) throw new ModelValidationError(conflict);
     }
     const context: ModelContext = { tx, actor, operation: metadata.id ? "update" : "create", id: metadata.id };
@@ -105,6 +108,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     await model.afterSave?.(saved, context);
     const final = await repository.read(tx, saved.id);
     if (!final) throw new ModelValidationError("El registro no está disponible después de guardar.");
+    await recordActivity(tx, model.name, actor.id, model.metadata, current, final);
     return final;
   }
 
@@ -130,8 +134,12 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const parsed = listStateSchema.safeParse(input);
         if (!parsed.success || parsed.data.invalidFilters) throw new ModelValidationError("Revisa los filtros y parámetros de esta lista.");
         const state = normalizeListState(config, parsed.data);
+        let grouping: ReturnType<typeof groupingPlan>;
+        try { grouping = groupingPlan(config.columns, state); }
+        catch (error) { throw new ModelValidationError((error as Error).message); }
         if (new Set(state.filters.map(filter => filter.field)).size !== state.filters.length) throw new ModelValidationError("Usa un filtro por columna.");
         const predicates: Record<string, unknown>[] = group ? [{ [group.field]: group.value }] : [];
+        predicates.push(...grouping.predicates);
         if (fixedDomain) predicates.push(fixedDomain);
         for (const filter of state.filters) {
           const column = config.columns.find(column => column.field === filter.field && column.filterable !== false);
@@ -154,6 +162,16 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         }
         const where = { AND: predicates };
         const total = await repository.count(tx, where);
+        if (grouping.field) {
+          if (!repository.groups) throw new ModelValidationError("Este proveedor aún no admite agrupación. Actualiza su adaptador con orm:bind.");
+          // Bound the offset without enumerating every distinct group key.
+          const requestedPage = Math.min(state.page, Math.max(1, Math.ceil(total / state.pageSize)));
+          const query = { where, field: grouping.field, skip: (requestedPage - 1) * state.pageSize, take: state.pageSize + 1 };
+          let groups = await repository.groups(tx, query);
+          const page = !groups.length && requestedPage > 1 ? 1 : requestedPage;
+          if (page !== requestedPage) groups = await repository.groups(tx, { ...query, skip: 0 });
+          return groupedPage({ ...state, page }, total, groups);
+        }
         const page = Math.min(state.page, Math.max(1, Math.ceil(total / state.pageSize)));
         const rows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize, audit: presentation.audit === true });
         return { rows, total, page, pageSize: state.pageSize };
@@ -164,7 +182,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
 
   async function kanban(prisma: PrismaClient, actor: ModelActor, input: KanbanRequest): Promise<ListResult> {
     const request = z.strictObject({ group: z.string().min(1).max(100), state: listStateSchema }).safeParse(input);
-    if (!groupField || !request.success || !groups.some(group => group.value === request.data.group)) return { ok: false, error: "La columna del kanban no está habilitada." };
+    if (!groupField || !request.success || request.data.state.groupBy?.length || request.data.state.groupPath?.length || !groups.some(group => group.value === request.data.group)) return { ok: false, error: "La columna del kanban no está habilitada." };
     return list(prisma, actor, request.data.state, { field: groupField, value: request.data.group });
   }
 
@@ -203,5 +221,41 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     });
   }
 
-  return { read, save, remove, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
+  async function assertActivityRecord(tx: Prisma.TransactionClient, actor: ModelActor, id: string) {
+    await assertActor(tx, actor);
+    if (!await repository.read(tx, id)) throw new ModelValidationError("El registro ya no está disponible.");
+  }
+
+  async function activity(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<ActivityResult> {
+    try {
+      const parsed = activityRequestSchema.safeParse(input);
+      if (!parsed.success) throw new ModelValidationError("La consulta de actividad no es válida.");
+      const data = await prisma.$transaction(async tx => {
+        await assertActivityRecord(tx, actor, parsed.data.id);
+        return readActivity(tx, model.name, model.metadata, parsed.data);
+      }, { isolationLevel: "RepeatableRead" });
+      return { ok: true, data };
+    } catch (error) { return { ok: false, error: messageFor(error) }; }
+  }
+
+  async function addNote(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<ActivityNoteResult> {
+    try {
+      const parsed = activityNoteSchema.safeParse(input);
+      if (!parsed.success) throw new ModelValidationError("Escribe una nota de entre 1 y 4000 caracteres.");
+      const { id, body, requestId } = parsed.data;
+      await prisma.$transaction(async tx => {
+        await assertActivityRecord(tx, actor, id);
+        // Retrying a request after an unknown network outcome must not duplicate its note.
+        const note = await tx.recordActivity.upsert({
+          where: { actorId_requestId: { actorId: actor.id, requestId } }, update: {},
+          create: { model: model.name, recordId: id, actorId: actor.id, kind: "note", body, requestId },
+          select: { model: true, recordId: true, kind: true, body: true },
+        });
+        if (note.model !== model.name || note.recordId !== id || note.kind !== "note" || note.body !== body) throw new ModelValidationError("La solicitud de la nota ya se utilizó con otro contenido.");
+      }, { isolationLevel: "Serializable" });
+      return { ok: true };
+    } catch (error) { return { ok: false, error: messageFor(error) }; }
+  }
+
+  return { read, save, remove, activity, addNote, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
 }

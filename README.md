@@ -55,5 +55,7 @@ permisos, concurrencia y eliminación con cuentas y un esquema PostgreSQL tempor
 - [Aplicaciones y navegación](docs/desarrollo-aplicaciones.md).
 - [Instalación de modelos y propiedad](docs/instalar-modelos.md).
 - [Dominios de listas](docs/dominios-listas.md).
+- [Agrupación anidada de listas](docs/agrupacion-listas.md).
 - [Auditoría de registros](docs/auditoria-modelos.md).
+- [Historial de cambios y notas internas](docs/actividad-registros.md).
 - [Vistas de colecciones](docs/vistas-colecciones.md).

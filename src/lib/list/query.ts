@@ -13,7 +13,7 @@ export const listConfigSchema = z.object({
   columns: z.array(z.object({
     field: z.string().min(1).max(60), label: z.string().trim().min(1).max(80), sortable: z.boolean().optional(),
     widget: z.literal("partner").optional(), avatarField: z.string().min(1).max(60).optional(),
-    filterable: z.boolean().optional(), type: z.enum(["text", "number", "integer", "date", "datetime", "boolean"]).optional(),
+    filterable: z.boolean().optional(), groupable: z.boolean().optional(), type: z.enum(["text", "number", "integer", "date", "datetime", "boolean"]).optional(),
     align: z.enum(["left", "center", "right"]).optional(),
     format: z.enum(["text", "number", "currency", "date", "datetime", "boolean"]).optional(),
     currency: z.string().regex(/^[A-Z]{3}$/).optional(), decimals: z.number().int().min(0).max(6).optional(),
@@ -41,5 +41,7 @@ export const listStateSchema = z.object({
   query: z.string().max(120), page: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER), pageSize: z.number().int().min(1).max(50),
   sort: z.string().min(1).max(60), direction: z.enum(["asc", "desc"]),
   filters: z.array(listFilterSchema).max(12).default([]), invalidFilters: z.boolean().optional(),
+  groupBy: z.array(z.string().min(1).max(60)).max(3).optional(),
+  groupPath: z.array(z.union([z.string().max(1000), z.number().finite(), z.boolean(), z.null()])).max(3).optional(),
 }).strict();
 

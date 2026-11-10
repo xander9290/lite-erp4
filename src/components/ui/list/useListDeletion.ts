@@ -42,7 +42,10 @@ export function useListDeletion(snapshot: object | null) {
       if (mounted.current) await alerts.error({ title: "No se pudo confirmar la eliminación", message: "Revisa tu conexión y comprueba la lista antes de volver a intentarlo." });
     } finally {
       close(); inFlight.current = false;
-      if (mounted.current) { setBusy(false); if (attempted) refresh(); }
+      if (mounted.current) setBusy(false);
+      // An expanded group can close while the request is in flight. Its parent
+      // still needs fresh counts, including when the network outcome is unknown.
+      if (attempted) refresh();
     }
   }
   return { busy, run };

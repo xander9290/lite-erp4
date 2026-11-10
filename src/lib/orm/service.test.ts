@@ -77,3 +77,33 @@ test("client attempts to supply a domain or actor are rejected and malformed cal
   assert.throws(() => service.defineListAction({ domain: null } as unknown as ListActionOptions<{ name: string }>), /Dominio/);
   assert.throws(() => service.defineListAction({ where: {} } as unknown as ListActionOptions<{ name: string }>), /domain/);
 });
+
+test("grouping and leaf pagination retain the authorized domain and filters in the same snapshot", async () => {
+  const { prisma, tx } = listFixture();
+  const calls: Record<string, unknown>[] = [];
+  const service = createModelService(model, { ...repository,
+    count: async (_tx, where) => { assert.equal(_tx, tx); calls.push(where); return 12; },
+    groups: async (_tx, query) => { assert.equal(_tx, tx); calls.push(query); return [{ value: "A", count: 8 }, { value: "B", count: 4 }]; },
+    list: async (_tx, query) => { assert.equal(_tx, tx); calls.push(query); return [{ id: "one", name: "A" }]; },
+  }, { columns: [{ field: "name", label: "Nombre", sortable: true, groupable: true }], searchFields: ["name"] });
+  const mine = service.defineListAction({ domain: ({ actor }) => [{ field: "createBy", operator: "eq", value: actor.id }] });
+  const request = { ...state, pageSize: 1, groupBy: ["name"], query: "A" };
+  const root = await mine(prisma, actor, request);
+  assert.ok(root.ok); assert.equal(root.data.hasMoreGroups, true); assert.deepEqual(root.data.groups, [{ value: "A", count: 8 }]);
+  assert.equal(calls[1].where, calls[0]); assert.equal(calls[1].take, 2);
+  const leaf = await mine(prisma, actor, { ...request, groupPath: ["A"], page: 2 });
+  assert.ok(leaf.ok); assert.equal(leaf.data.groups, undefined); assert.equal(calls[3].skip, 1);
+  assert.deepEqual(calls[2], { AND: [{ name: "A" }, { AND: [{ createBy: { equals: actor.id } }] }, { OR: [{ name: { contains: "A", mode: "insensitive" } }] }] });
+  assert.equal(calls[3].where, calls[2]);
+  calls.length = 0;
+  for (const patch of [{ groupBy: ["password"] }, { groupBy: ["name", "name"] }, { groupPath: ["A", "B"] }]) assert.equal((await mine(prisma, actor, { ...request, ...patch })).ok, false);
+  assert.equal(calls.length, 0);
+});
+
+test("group queries never run for inactive, non-admin or stale sessions", async () => {
+  for (const account of [{ active: false, isAdmin: true, sessionVersion: 3 }, { active: true, isAdmin: false, sessionVersion: 3 }, { active: true, isAdmin: true, sessionVersion: 4 }]) {
+    const { service, prisma, calls } = listFixture(account);
+    assert.equal((await service.list(prisma, actor, { ...state, groupBy: ["name"] })).ok, false);
+    assert.equal(calls.length, 0);
+  }
+});

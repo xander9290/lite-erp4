@@ -6,7 +6,7 @@ import type { ListConfig, ListViewConfig, ListResult, ListState } from "@/lib/li
 import { useCollectionState } from "../collection/useCollectionState";
 
 export function useListView(config: ListViewConfig, pageSize: number, prefix: string, load?: (state: ListState) => Promise<ListResult>) {
-  const query = useCollectionState(config, pageSize, prefix);
+  const query = useCollectionState(config, pageSize, prefix, true);
   const { state, update } = query;
   const [attempt, setAttempt] = useState(0);
   const key = JSON.stringify({ config, state, attempt });
