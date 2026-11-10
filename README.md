@@ -51,6 +51,7 @@ permisos, concurrencia y eliminación con cuentas y un esquema PostgreSQL tempor
 
 ## Otras guías
 
+- [Estado actual y continuidad entre agentes](docs/estado-proyecto.md). Leer junto con [AGENTS.md](AGENTS.md) al retomar el proyecto.
 - [Aplicaciones y navegación](docs/desarrollo-aplicaciones.md).
 - [Instalación de modelos y propiedad](docs/instalar-modelos.md).
 - [Dominios de listas](docs/dominios-listas.md).

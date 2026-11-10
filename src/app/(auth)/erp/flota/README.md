@@ -260,7 +260,10 @@ con otra cuenta administradora para observar cómo cambia el dominio con la sesi
 Este dominio filtra una vista; los permisos actuales de abrir y guardar siguen
 siendo de administrador. Contrato completo en [Dominios de lista](../../../../../docs/dominios-listas.md).
 
-## Ejercicio pendiente: crear otro ejemplo con domain
+## Ejercicio: crear otro ejemplo con domain
+
+Estado: dominio, acción, variante, página y menú ya están implementados en el código.
+Queda pendiente confirmar la prueba funcional del paso 6 durante la tutoría.
 
 **Objetivo:** crear «Mis vehículos activos» en `/erp/flota/mis-vehiculos-activos`,
 combinando dos condiciones de servidor: el creador es el usuario de la sesión y
@@ -283,5 +286,6 @@ Limpiar filtros conserva ambas condiciones. `Activo = No` devuelve cero resultad
 porque se combina con el dominio fijo mediante AND.
 
 El ejercicio conserva la política admin del servicio y no requiere cambiar modelos,
-migrar ni regenerar adaptadores. Su implementación queda pendiente para que la
-realices tú con acompañamiento durante la tutoría.
+migrar ni regenerar adaptadores. Los pasos 1–5 se conservan como recorrido de estudio;
+no es necesario volver a crear los archivos. Avance actual en
+[Estado del proyecto](../../../../../docs/estado-proyecto.md).
