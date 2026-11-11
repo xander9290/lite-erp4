@@ -59,6 +59,15 @@ readRecord, saveRecord, lookupRecords…), separados por archivo. Los componente
 se nombran con el modelo, por ejemplo MantenimientoList y MantenimientoForm.
 El formulario usa los Fields existentes para Text, Integer, Boolean, Selection,
 DateTime y Many2one. DateTime conserva su contrato ISO UTC.
+Image genera FieldImage que importa el uploader gestionado de
+`src/generated/orm/uploads/<app>/<Modelo>.images.ts`, preparado por orm:sync o
+orm:generate. La acción autoriza cada campo y la carpeta procede del contrato
+Image del servidor, nunca del navegador. No necesita
+--lookup ni configuración de callbacks. Las credenciales del servidor se
+comprueban al solicitar la subida, no al generar fuentes. Ver
+[Campos de imagen](ideas/campos-imagen.md).
+Las columnas Image usan miniaturas en las tres colecciones. Sync actualiza
+helpers/contratos, pero no inserta controles o columnas en vistas personalizadas.
 
 ## Elegir vistas y modo de formulario
 

@@ -25,9 +25,10 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
   if (options.group && !views.includes("kanban")) throw new Error("--group sólo se usa con kanban.");
   const title = model.metadata.name?.kind === "text" ? "name" : fields.find(([, field]) => field.kind === "text")?.[0] ?? "id";
   const files: Record<string, string> = {};
-  const columns = fields.slice(0, 12).map(([name, field]) => ({ field: name, label: field.label ?? name, type: field.kind === "integer" ? "integer" : field.kind === "boolean" ? "boolean" : field.kind === "datetime" ? "datetime" : "text", sortable: true, ...(field.kind === "boolean" || field.kind === "selection" ? { groupable: true } : {}) }));
+  const columns = fields.slice(0, 12).map(([name, field]) => ({ field: name, label: field.label ?? name, type: field.kind === "integer" ? "integer" : field.kind === "boolean" ? "boolean" : field.kind === "datetime" ? "datetime" : "text", sortable: field.kind !== "image", ...(field.kind === "image" ? { widget: "image", imageShape: "rounded", imageSize: "sm", filterable: false } : {}), ...(field.kind === "boolean" || field.kind === "selection" ? { groupable: true } : {}) }));
   const searchFields = fields.filter(([, field]) => field.kind === "text").slice(0, 6).map(([name]) => name);
   const selections = fields.filter(([, field]) => field.kind === "selection");
+  const images = fields.filter(([, field]) => field.kind === "image");
   const choices = selections.map(([name]) => `${name}: recordFields.${name}.metadata.kind === "selection" ? recordFields.${name}.metadata.choices : []`).join(",\n  ");
   const columnCode = columns.map(column => model.metadata[column.field].kind === "selection" ? quote(column).slice(0, -1) + `, options: recordChoices.${column.field}}` : quote(column));
   files[`views/${slug}.list.ts`] = `import type { CollectionField } from "@/components/ui/collection/types";\n${selections.length ? `import { recordFields } from "../schemas/${slug}.schema";\nexport const recordChoices = {\n  ${choices}\n} as const;\n` : ""}\nexport const recordColumns = [${columnCode.join(",\n")} ] as const satisfies readonly CollectionField[];\nexport const recordSearchFields = ${quote(searchFields)} as const;\n`;
@@ -56,7 +57,7 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
     const component = kind === "list" ? "ListView" : kind === "card" ? "CardView" : "KanbanView";
     const titleKind = kind === "list" ? "List" : kind === "card" ? "Card" : "Kanban";
     const actions = kind === "kanban" ? "loadKanban, moveRecord" : kind === "list" ? "listRecords, deleteRecords" : "listRecords";
-    const collectionProps = kind === "list" ? `breadcrumbs={${breadcrumbs}} onDelete={deleteRecords}` : `titleField=${quote(title)}`;
+    const collectionProps = kind === "list" ? `breadcrumbs={${breadcrumbs}} onDelete={deleteRecords}` : `breadcrumbs={${breadcrumbs}} titleField=${quote(title)}`;
     const formProps = hasForm ? `createHref=${quote(base + "/nuevo")} createLabel="Nuevo" recordHref=${quote(base + "/{id}")}` : kind === "list" ? "create={false}" : "";
     const groupProps = kind === "kanban" ? `groupField=${quote(group)} groups={recordChoices.${group}} onMove={moveRecord}` : "";
     files[`views/${stem}${titleKind}.tsx`] = `${navigation ? 'import Link from "next/link";\n' : ""}import ${component} from "@/components/ui/${kind === "card" ? "card" : kind === "kanban" ? "kanban" : "list"}/${component}";\nimport { ${actions} } from "../actions/${slug}.actions";\nimport { recordColumns, recordSearchFields${kind === "kanban" ? ", recordChoices" : ""} } from "./${slug}.list";\n\nexport default function ${stem}${titleKind}() {\n  return <${component} model=${quote(n)} title={${quote(label)}} load={${kind === "kanban" ? "loadKanban" : "listRecords"}} columns={recordColumns} searchFields={recordSearchFields} ${collectionProps} ${formProps} ${groupProps}${navigation ? ` headerActions={${navigation}}` : ""} />;\n}\n`;
@@ -66,6 +67,9 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
   if (hasForm) {
     const imports = new Set<string>();
     const relationImports: string[] = [];
+    if (images.length) {
+      relationImports.push(`import { imageUploads } from "@/generated/orm/uploads/${app}/${n}.images";`);
+    }
     const controls = fields.map(([name, field]) => {
       let component = "FieldText", extra = "";
       if (field.kind === "boolean") component = "FieldBoolean";
@@ -73,6 +77,7 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
       if (field.kind === "datetime") { component = "FieldDate"; extra = ' type="datetime"'; }
       if (field.kind === "selection") { component = "FieldSelect"; extra = ` options={recordChoices.${name}}`; }
       if (field.kind === "text" && field.maxLength) extra = ` maxLength={${field.maxLength}}`;
+      if (field.kind === "image") { component = "FieldImage"; extra = ` upload={imageUploads.${name}}`; }
       if (field.kind === "many2one") {
         component = "FieldMany2One";
         const lookup = options.lookups?.[name];

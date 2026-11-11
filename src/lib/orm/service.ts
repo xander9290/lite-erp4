@@ -9,6 +9,7 @@ import { listStateSchema } from "../list/query";
 import { normalizeListState } from "../list/state";
 import { compileColumnFilter, filterValueError } from "../list/filters";
 import type { ListColumn, ListDataType, ListResult, ListViewConfig } from "../list/types";
+import { validImageColumnOptions } from "../list/types";
 import { recordIdentitySchema, type RecordIdentity } from "./record";
 import { ModelValidationError, type ModelActor, type ModelContext } from "./context";
 import type { ModelRepository } from "./repository";
@@ -61,7 +62,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   const columnType = (field: string) => model.metadata[field] ? fieldListType(model.metadata[field]) : presentation.audit ? auditColumnType(field) ?? "text" : "text";
   if (!config.columns.length || config.columns.length > 12 || new Set(config.columns.map(column => column.field)).size !== config.columns.length || config.columns.some(column => {
     const avatar = presentation.audit && auditAvatarField(column.field);
-    return !allowed.has(column.field) || (column.widget && !(column.widget === "partner" && avatar && (!column.avatarField || column.avatarField === avatar) && (!column.format || column.format === "text"))) || (column.avatarField !== undefined && (!column.widget || column.avatarField !== avatar)) || (column.type && column.type !== columnType(column.field));
+    const image = column.widget === "image" && model.metadata[column.field]?.kind === "image" && !model.metadata[column.field].sensitive && (!column.format || column.format === "text");
+    return !allowed.has(column.field) || !validImageColumnOptions(column) || (column.widget && !(image || (column.widget === "partner" && avatar && (!column.avatarField || column.avatarField === avatar) && (!column.format || column.format === "text")))) || (column.avatarField !== undefined && (column.widget !== "partner" || column.avatarField !== avatar)) || (column.type && column.type !== columnType(column.field));
   }) || config.searchFields.length > 6 || config.searchFields.some(name => name !== "id" && model.metadata[name]?.kind !== "text" && model.metadata[name]?.kind !== "many2one" && !(presentation.audit && ["createByUser.login", "createByUser.partner.name"].includes(name)))) throw new Error("La lista sólo puede publicar campos declarados o auditoría habilitada y búsquedas de texto permitidas.");
   // Normalize date types for server filters even when the view omitted an explicit type.
   config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));

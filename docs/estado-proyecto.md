@@ -61,20 +61,36 @@ aplicación por adelantado. Guía: [README de Flota](../src/app/(auth)/erp/flota
 
 ## Siguiente paso concreto
 
+Actualización 2026-11-11 en Windows: el usuario completó el historial de
+Fabricante y añadió avatar Image con folder fabricantes, manteniendo logo Text.
+Prisma migrate status confirmó las 14 migraciones al día en la base local del
+puerto 5433, incluida 20261111162622_sync_flota. Contrato, esquema y binding
+incluyen avatar. El bloqueo por historial anterior descrito más abajo es histórico.
+
+Por petición expresa se aplicaron las mejoras de imágenes a Fabricante: el
+formulario importa imageUploads.avatar del helper gestionado y conserva su
+presentación avatar/squared; la lista añade miniatura squared/sm. signAvatarUpload
+mantiene compatibilidad delegando en la acción generada. No se regeneraron vistas
+personalizadas ni se cambió el modelo durante esta adopción. Helpers se actualizan
+mediante orm:sync/orm:generate; no editarlos a mano.
+
 Estado contrastado con el commit `340be8e` el 2026-11-11: Fabricante ya fue
 recreado. Existen `models/Fabricante.ts`, registro en perfil/manifest, servicio,
 acciones, lista/formulario, rutas, contrato y binding generado. Sus campos son
-`name`, `logo` (Text opcional) y `active`; el formulario usa FieldText para logo.
+`name`, `logo` (Text opcional), `avatar` (Image opcional) y `active` en el checkout
+actual. La referencia al commit indica el punto inicial de la recreación.
 El esquema Prisma incluye FlotaFabricante y está versionada la migración
 `20261111043608_sync_flota`. La presencia de esos archivos no confirma que la
 migración esté aplicada ni que el cliente local esté actualizado en esta máquina.
 
-El siguiente trabajo pendiente del framework es Fields.Image y su integración
-con el scaffold, con proveedor de subida explícito: ver
-[Campos de imagen](ideas/campos-imagen.md). No implementado ni autorizado por la
-sola puesta en contexto. No volver a ejecutar create:model/create:views para
-Fabricante ni reemplazar sus personalizaciones. Conservar la comprobación
-funcional pendiente de «Mis vehículos activos».
+Fields.Image, miniaturas y generación de uploaders ya están implementados:
+ver [Campos de imagen](ideas/campos-imagen.md). Las subidas reales necesitan
+credenciales privadas de Cloudinary y no se probaron subiendo archivos en esta
+verificación; no guardar sus valores aquí. El borrado remoto queda pendiente del
+contrato de [inventario/referencias](ideas/limpieza-imagenes.md).
+No volver a ejecutar create:model/create:views para Fabricante ni reemplazar sus
+personalizaciones. Conservar la comprobación funcional pendiente de «Mis vehículos
+activos».
 
 Antecedente histórico de retirada (superado por la recreación anterior):
 
@@ -111,6 +127,91 @@ el scaffold nuevo. Conservar los pendientes funcionales previos de dominios y
 actividad de vehículos cuando no exista confirmación explícita del usuario.
 
 ## Último trabajo y verificaciones
+
+- 2026-11-11: aplicada la presentación compacta a CardView y al header compartido
+  con KanbanView. Retirado bloque visible de icono/título/descripción/contador;
+  title sigue accesible y los totales quedan en footer/columnas. Breadcrumbs
+  opcionales y controles/acciones comparten barra; Fabricante los configura y
+  scaffold nuevo los incluye en card/kanban. CardView usa padding exterior 8/12px
+  y gap 8px; tarjeta predeterminada con padding 12px, sin detalles vacíos ni fila
+  de apertura duplicada bajo el título enlazado. renderCard personalizado conserva
+  su acceso adicional. Skeleton adaptado; filtros y búsqueda permanecen explícitos.
+  Verificados TypeScript, ESLint de archivos afectados, build, dos pruebas existentes
+  de vistas y prueba focalizada de plantillas. Navegador en /sample#image-collections:
+  header de unos 49px, padding 12px y gap 8px en escritorio; búsqueda devuelve una
+  tarjeta y limpiar restaura tres, filtros abren/cierran. A 375px, CardView mide
+  318px sin overflow, usa una columna y Actualizar comparte fila con Filtros.
+  Viewport restaurado y servidor temporal detenido. Revisión con datos ficticios
+  del componente compartido; no se abrió Fabricante autenticado ni se escribieron
+  registros, modelos o migraciones. Guía docs/vistas-colecciones.md actualizada.
+
+- 2026-11-11: completadas miniaturas compartidas para ListView/vista rápida,
+  CardView y KanbanView (tarjeta por defecto). widget image con sm/md/lg y
+  rounded/squared, validación HTTPS, carga directa lazy sin referrer y fallback
+  accesible al faltar/fallar. El servicio sólo lo admite para Image no sensible
+  en columnas autorizadas; legacy no amplía whitelist. Scaffold genera esas
+  columnas sin filtro/orden de URL por defecto y controles FieldImage.
+  orm:generate/orm:sync generan uploaders y acciones admin bajo
+  src/generated/orm/uploads con hashes y preflight; --check/--plan los incluyen.
+  create:app los prepara inicialmente. Agregar Image a un modelo existente
+  actualiza el helper sin tocar vistas; mapas vacíos revocan campos retirados.
+  Configuración privada y defaults públicos centralizados; preset firmado
+  opcional se incluye en la firma. Aplicado a Fabricante conservando avatar
+  squared y personalizaciones: formulario usa imageUploads.avatar, lista añade
+  miniatura squared/sm, acción anterior delega por compatibilidad. No se cambió
+  su modelo ni se aplicó SQL sobre la base real; migrate status confirmó 14
+  migraciones al día. La generación local de Flota pasó --check sin diferencias.
+  Verificados TypeScript, ESLint de archivos afectados/generados, build producción,
+  test:images (11), uploaders gestionados (2), sync (3), agrupación/servicio (12),
+  vistas (2), selección (8) y scaffold completo (10). La primera ejecución de
+  scaffold tuvo EBUSY al limpiar un fixture Windows; se corrigieron tiempo de
+  espera del compilador y reintentos de limpieza. También se hicieron portables
+  sus junctions/rutas/entrypoint TS, sin desactivar pruebas de enlaces.
+  Integración PostgreSQL temporal aprobada: sync añade Image a modelo existente,
+  conserva registro/formulario, genera helper y compila recurso/vistas; cubre
+  persistencia, permisos, revisiones e historial. Recursos temporales eliminados.
+  Navegador de producción en /sample#image-collections: nueve miniaturas, tres
+  imágenes cargadas y seis fallbacks (ausencia/error), forma squared de radio 0,
+  apertura/cierre de vista rápida y tarjetas; no se subieron archivos reales ni
+  se probaron escrituras sobre Fabricante. Servidor temporal detenido al terminar.
+  La limpieza remota no se implementa sin inventario/referencias; su contrato y
+  aceptación están en [Limpieza de imágenes](ideas/limpieza-imagenes.md).
+
+- 2026-11-11: diagnóstico de orm:sync detenido ante la retirada histórica de
+  Fabricante. Se revisaron las tres migraciones y el historial/ausencia de tabla
+  en transacción RepeatableRead de sólo lectura. Mejorado el error para mostrar
+  SQL y nombre de la migración bloqueada sin relajar assertSyncSQL. Tres pruebas
+  de sync y ESLint aprobados; TypeScript global falla por avatar ya generado en
+  contrato y todavía ausente del binding, tras la sincronización incompleta del
+  usuario. No se ejecutaron deploy, migraciones nuevas ni regeneración de bindings.
+
+- 2026-11-11: implementado Fields.Image con folder explícito y metadata escalar,
+  validación HTTPS compartida, defaults/null/inferencia, límite 2048 y Prisma
+  String/VarChar. Generador de contratos y create:views reconocen Image: formulario
+  FieldImage, uploader firmado y acción admin con modelo/publicación fijados en
+  servidor. Helper de firma SHA-256 por solicitud, ID aleatorio sin sobrescritura,
+  formatos jpg/png/webp y modo dynamic/asset_folder o fixed/folder. Se conservan
+  uploaders unsigned/manuales de Partner; no se convirtió Fabricante ni avatarUrl.
+  FieldImage añade shape rounded/squared conservando style CSS; las demos de
+  imagen/avatar usan Fields.Image, RHF/Zod, firma autorizada y selector de forma.
+  Contrato/configuración/límites en [Campos de imagen](ideas/campos-imagen.md).
+  Verificados test:images (11), TypeScript, ESLint de archivos afectados, build
+  de producción e integración PostgreSQL temporal. La integración cubre rechazo
+  de URL inválida, guardar/reabrir URL, cambios auditados de imagen, modelo/vistas
+  generados compilables y permisos existentes. Proyecto/esquema temporal eliminados;
+  no se migró ni modificó el ERP. Transporte Cloudinary simulado: firma, carpeta
+  fija/autorización por llamada, secretos fuera del resultado, progreso, fallos,
+  compatibilidad unsigned y cancelación repetida/antes/durante la petición.
+  Navegador de producción en /sample: image rounded (radio 4px) / squared (0),
+  avatar circular / squared (0) y validación de imagen obligatoria vacía.
+  Sin subida real: faltan las credenciales privadas de firma; el cloud name público
+  ya existe. El servidor temporal de revisión se detuvo.
+  Suites completas fuera del sandbox: test:orm 38/39 (symlink de archivo EPERM),
+  test:scaffold 7/10 (dos fixtures con symlink EPERM y aserción de ruta con / en
+  Windows), test:orm:install 7/12 (fixtures con symlink EPERM). No se presentan
+  como suites aprobadas. La prueba CLI de recurso con Image sí compiló y pasó.
+  El primer build en sandbox quedó sin progreso y se interrumpió; el build
+  posterior fuera del sandbox pasó. No se desactivaron protecciones de enlaces.
 
 - 2026-11-11: FieldText unifica variantes bajo `widget`: text por defecto,
   password, long, phone y email. Se retiran type y widget=input de la API pública;
@@ -406,10 +507,10 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
 
 ## Oportunidades de mejora pendientes
 
-- **Pendiente solicitado para el otro agente: Fields.Image.** Declarar logo como
-  URL de imagen, centralizar validación HTTPS y generar FieldImage desde create:views
-  con proveedor upload explícito. No implementado. Contexto, decisiones por resolver
-  y criterios de aceptación en [Campos de imagen](ideas/campos-imagen.md).
+- **Retirada segura de archivos remotos:** falta inventario de assets y referencias
+  de todos los consumidores. Motivo: no se puede deducir propiedad/ausencia de uso
+  de una URL al quitarla de un formulario. Alcance y aceptación en
+  [Limpieza de imágenes](ideas/limpieza-imagenes.md); sin borrado automático hoy.
 - Evaluar si declarar nuevas listas con dominio requiere demasiados cambios entre
   servicio, acción, variante, página y menú. Motivo: el ejercicio muestra pasos
   repetitivos. Criterio de aceptación: reducir código o pasos conservando TSX

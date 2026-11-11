@@ -110,6 +110,25 @@ PostgreSQL aislada `npm run test:framework:integration`.
 
 ## Columnas y tipos
 
+### Widget Image
+
+Para servicios declarativos autorizados:
+
+```ts
+{ field: "avatar", label: "Imagen", type: "text", widget: "image",
+  imageSize: "sm", imageShape: "squared", sortable: false, filterable: false }
+```
+
+Sólo se admite sobre un Fields.Image no sensible en la configuración del servicio
+del servidor. imageSize permite sm/md/lg (32/48/96 px), imageShape rounded/squared.
+Se muestra fallback accesible para valores ausentes, inválidos o fallos de carga.
+Pulsar la miniatura sigue recordHref o abre la vista rápida. La URL se carga
+directamente en el navegador, sin proxy del servidor ni enlace externo implícito.
+CardView/KanbanView comparten el render y usan la primera Image como cabecera de
+la tarjeta por defecto. renderCard personalizado mantiene su presentación.
+Los proveedores legacy conservan sus campos/widget partner; no se admiten rutas
+arbitrarias de imagen enviadas desde el cliente. Demo `/sample#image-collections`.
+
 ### Widget Partner
 
 `widget="partner"` muestra un avatar circular de 32px junto al nombre. Sin imagen,

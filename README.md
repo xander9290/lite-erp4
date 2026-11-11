@@ -16,6 +16,10 @@ npm run orm:sync -- flota
 
 [Metodología, vistas opcionales y protecciones](docs/modelos-y-vistas.md).
 
+`Fields.Image({folder:"..."})` genera uploaders/acciones autorizadas con orm:sync
+y miniaturas en las vistas nuevas. Las vistas existentes importan el helper de
+`src/generated/orm/uploads` sin regenerarse. [Imágenes y configuración](docs/ideas/campos-imagen.md).
+
 Para instalar o actualizar modelos en desarrollo, el flujo guiado reúne los pasos:
 
 ```bash

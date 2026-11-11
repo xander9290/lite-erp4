@@ -2,11 +2,11 @@
   "generator": "lite-erp-orm-v1",
   "module": "flota",
   "files": {
-    "models.prisma": "056348d782b7976ccad7f1ad35bf3fd55d7c31db0d365f7a6bb2220d5331b035",
-    "schema.preview.prisma": "9fca7e8c94ac3cf504a83ea4ffc525ab9ecfb5ff596c93f48411673345b00025",
-    "review.json": "8e4b076cfe0a1027e5b7ca5f7bac974abe5720b63de3e09806f29a95530c1637",
+    "models.prisma": "c264891f4640dd05a4a7ddfb1f6544e42447bd7a2db6cd020b4276d4d64ce1b7",
+    "schema.preview.prisma": "c77398a243f3eb94989092b9ed689ec9aec7fa6b37299ef26e5888a4cbcce805",
+    "review.json": "b497da1137777566cef2d7fc839a8ed47c26e55a69c60c6834b23ce9f45f6e9c",
     "FlotaRecord.schema.ts": "65f57800ebfb7d7dee9be576532ff6a19dde420e89a8a6d1c870a5a0c1e6b527",
-    "FlotaFabricante.schema.ts": "ccc6d8ca21d09cef77a5bbb5701f3fc21f735facf09a2b84edddf63328246aa3",
+    "FlotaFabricante.schema.ts": "ad9488642e89e8287470bf51c4f57b33899e4f2408500768d222e6af989205be",
     "migration.preview.sql": "41c2e490f74bf366bcffb9f53a56c958daeada0032ce7402c178e0b5a344ffb8"
   }
 }

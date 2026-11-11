@@ -24,7 +24,7 @@ test("dry run writes nothing; creation emits editable source, owned artifacts an
   try {
     const template = createAppTemplate("Prueba"), generated = artifacts(template);
     const plan = await createApplication(root, template, generated, true);
-    assert.ok(plan.paths.some(path => path.endsWith("models/Record.ts")));
+    assert.ok(plan.paths.some(path => path.endsWith(join("models", "Record.ts"))));
     assert.deepEqual(await readdir(root), []);
     await createApplication(root, template, generated);
     const model = await readFile(join(root, "src/app/(auth)/erp/prueba/models/Record.ts"), "utf8");
@@ -74,7 +74,7 @@ test("created model profiles load without React and infer schemas identical to t
   const root = await temporaryRoot();
   try {
     await writeFile(join(root, "package.json"), '{"type":"module"}');
-    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), "dir");
+    await symlink(join(process.cwd(), "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
     const template = createAppTemplate("Perfil de Prueba");
     await createApplication(root, template, artifacts(template));
     const profile = await loadAppGenerationProfile(root, template.app.id);
@@ -88,10 +88,10 @@ test("created model profiles load without React and infer schemas identical to t
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("CLI creates a compilable app in an isolated project and its ORM profile regenerates unchanged", { timeout: 60000 }, async () => {
+test("CLI creates a compilable app in an isolated project and its ORM profile regenerates unchanged", { timeout: 120000 }, async () => {
   const root = await temporaryRoot(), project = process.cwd();
   try {
-    await symlink(join(project, "node_modules"), join(root, "node_modules"), "dir");
+    await symlink(join(project, "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
     await writeFile(join(root, "package.json"), '{"type":"module"}');
     await mkdir(join(root, "prisma/models"), { recursive: true });
     await writeFile(join(root, "prisma/models/schema.prisma"), fixtureSchema);
@@ -100,16 +100,16 @@ test("CLI creates a compilable app in an isolated project and its ORM profile re
     // The generated registry's relative type import has the same neighboring contract in a real project.
     await mkdir(join(root, "src/lib/applications"), { recursive: true });
     await writeFile(join(root, "src/lib/applications/manifest.ts"), await readFile(join(project, "src/lib/applications/manifest.ts"), "utf8"));
-    const run = (script: string, args: string[]) => spawnSync(process.execPath, ["--conditions=react-server", "--import", "tsx", join(project, "scripts", script), ...args], { cwd: root, encoding: "utf8", timeout: 25000 });
+    const run = (script: string, args: string[]) => spawnSync(process.execPath, ["--conditions=react-server", "--import", "tsx", join(project, "scripts", script), ...args], { cwd: root, encoding: "utf8", timeout: 45000 });
     const create = run("create-app.ts", ["Tutoría"]);
     assert.equal(create.status, 0, create.stderr + create.stdout);
     assert.ok(create.stdout.includes("tutoria"));
     const check = run("orm-generate.ts", ["tutoria", "--check"]);
     assert.equal(check.status, 0, check.stderr + check.stdout);
-    const compile = spawnSync(join(project, "node_modules/.bin/tsc"), ["--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 25000 });
+    const compile = spawnSync(process.execPath, [join(project, "node_modules/typescript/bin/tsc"), "--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 60000 });
     assert.equal(compile.status, 0, compile.stderr + compile.stdout);
     const again = run("create-app.ts", ["Tutoría"]);
     assert.equal(again.status, 1);
     assert.match(again.stderr, /Ya existe/);
-  } finally { await rm(root, { recursive: true, force: true }); }
+  } finally { await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
 });

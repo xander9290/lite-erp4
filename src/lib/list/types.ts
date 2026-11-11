@@ -11,7 +11,9 @@ export type ListFilter = { field: string; operator: ListFilterOperator; value?: 
 export type ListColumn = {
   field: string;
   label: string;
-  widget?: "partner";
+  widget?: "partner" | "image";
+  imageSize?: "sm" | "md" | "lg";
+  imageShape?: "rounded" | "squared";
   avatarField?: string;
   sortable?: boolean;
   filterable?: boolean;
@@ -23,6 +25,12 @@ export type ListColumn = {
   currency?: string;
   decimals?: number;
 };
+
+/** Presentation options are bounded, and never choose another field or remote resource. */
+export function validImageColumnOptions(column: ListColumn): boolean {
+  return (column.imageSize === undefined || (column.widget === "image" && ["sm", "md", "lg"].includes(column.imageSize))) &&
+    (column.imageShape === undefined || (column.widget === "image" && ["rounded", "squared"].includes(column.imageShape)));
+}
 export type ListConfig = {
   model: ListModel;
   columns: readonly ListColumn[];

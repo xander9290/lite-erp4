@@ -105,12 +105,16 @@ try {
   command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "apply"], "sync resume approved SQL");
   await database.query(`INSERT INTO "${schema}".facil_records (id, name, active) VALUES ('sync-preserved', 'Conservado', true)`);
   const syncModelPath = join(root, "src/app/(auth)/erp/facil/models/Record.ts");
-  await writeFile(syncModelPath, (await readFile(syncModelPath, "utf8")).replace("// Reglas de negocio:", 'notes = Fields.Text({ maxLength: 80 });\n  // Reglas de negocio:'));
+  const syncFormPath = join(root, "src/app/(auth)/erp/facil/views/RecordForm.tsx");
+  const syncFormBefore = await readFile(syncFormPath, "utf8");
+  await writeFile(syncModelPath, (await readFile(syncModelPath, "utf8")).replace("// Reglas de negocio:", 'notes = Fields.Text({ maxLength: 80 });\n  photo = Fields.Image({folder:"tests/sync/photos"});\n  // Reglas de negocio:'));
   const syncProfilePath = join(root, "src/app/(auth)/erp/facil/orm.config.ts");
-  await writeFile(syncProfilePath, (await readFile(syncProfilePath, "utf8")).replace('["name", "active"]', '["name", "active", "notes"]'));
+  await writeFile(syncProfilePath, (await readFile(syncProfilePath, "utf8")).replace('["name", "active"]', '["name", "active", "notes", "photo"]'));
   command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "evolve"], "sync additive evolution");
-  const preserved = await database.query(`SELECT name, notes FROM "${schema}".facil_records WHERE id='sync-preserved'`);
-  assert.deepEqual(preserved.rows, [{ name: "Conservado", notes: null }]);
+  const preserved = await database.query(`SELECT name, notes, photo FROM "${schema}".facil_records WHERE id='sync-preserved'`);
+  assert.deepEqual(preserved.rows, [{ name: "Conservado", notes: null, photo: null }]);
+  assert.match(await readFile(join(root, "src/generated/orm/uploads/facil/FacilRecord.images.ts"), "utf8"), /photo: createSigned/);
+  assert.equal(await readFile(syncFormPath, "utf8"), syncFormBefore);
   await writeFile(join(root, "src/sync-type-error.ts"), 'export const invalid: number = "error";\n');
   command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "type-error"], "sync stops on type failure");
   await rm(join(root, "src/sync-type-error.ts"));
@@ -119,8 +123,8 @@ try {
 
   script("create-model.ts", ["facil", "Trabajo"]);
   const resourceModelPath = join(root, "src/app/(auth)/erp/facil/models/Trabajo.ts");
-  await writeFile(resourceModelPath, (await readFile(resourceModelPath, "utf8")).replace("  // Define aquí", '  state = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Hecho"}] as const, {required:true,default:"draft",tracking:true});\n  quantity = Fields.Integer({required:true,default:0,tracking:true});\n  at = Fields.DateTime();\n  // Define aquí'));
-  await writeFile(syncProfilePath, (await readFile(syncProfilePath, "utf8")).replace('model: facilTrabajoModel, clientFields: ["name", "active"]', 'model: facilTrabajoModel, clientFields: ["name", "active", "state", "quantity", "at"]'));
+  await writeFile(resourceModelPath, (await readFile(resourceModelPath, "utf8")).replace("  // Define aquí", '  state = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Hecho"}] as const, {required:true,default:"draft",tracking:true});\n  quantity = Fields.Integer({required:true,default:0,tracking:true});\n  at = Fields.DateTime();\n  logo = Fields.Image({folder:"tests/work",tracking:true});\n  // Define aquí'));
+  await writeFile(syncProfilePath, (await readFile(syncProfilePath, "utf8")).replace('model: facilTrabajoModel, clientFields: ["name", "active"]', 'model: facilTrabajoModel, clientFields: ["name", "active", "state", "quantity", "at", "logo"]'));
   script("create-views.ts", ["facil", "Trabajo", "--views", "list,card,kanban,form", "--form", "modal", "--group", "state", "--label", "Trabajos"]);
   command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "evolve"], "model + views + sync");
   await cp(join(project, "scripts/fixtures/resource-check.fixture"), join(root, "resource-check.ts"));

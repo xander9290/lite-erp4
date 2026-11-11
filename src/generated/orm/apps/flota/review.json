@@ -20,7 +20,8 @@
     "FlotaRecord.plate: minLength/trim se validan con Zod; no son CHECKs SQL.",
     "FlotaRecord.brand: minLength/trim se validan con Zod; no son CHECKs SQL.",
     "FlotaFabricante.name: minLength/trim se validan con Zod; no son CHECKs SQL.",
-    "FlotaFabricante.logo: minLength/trim se validan con Zod; no son CHECKs SQL."
+    "FlotaFabricante.logo: minLength/trim se validan con Zod; no son CHECKs SQL.",
+    "FlotaFabricante.avatar: URL HTTPS sin credenciales validada con Zod; el contenido remoto y la propiedad del archivo no se verifican en SQL."
   ],
   "note": "Propuesta; no se han modificado modelos existentes ni aplicado migraciones."
 }

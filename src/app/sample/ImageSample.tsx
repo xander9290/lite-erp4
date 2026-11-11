@@ -6,12 +6,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import FieldImage from "@/components/ui/form/FieldImage";
 import FormLayout from "@/components/ui/form/FormLayout";
 import FormGroup from "@/components/ui/form/FormGroup";
-import { createCloudinaryImageUploader } from "@/lib/uploads/cloudinary";
+import { createSignedCloudinaryImageUploader } from "@/lib/uploads/cloudinary";
+import { signSampleImage } from "./image.actions";
 import { imageSampleSchema, type ImageSampleInput, type ImageSampleValues } from "./sample.schema";
 
-const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? "";
-const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? "";
-const upload = createCloudinaryImageUploader({ cloudName, uploadPreset, folder: "lite-erp/samples" });
+const upload = createSignedCloudinaryImageUploader(signSampleImage);
 
 export default function ImageSample({ widget = "image" }: { widget?: "image" | "avatar" }) {
   const isAvatar = widget === "avatar";
@@ -19,6 +18,7 @@ export default function ImageSample({ widget = "image" }: { widget?: "image" | "
   const methods = useForm<ImageSampleInput, unknown, ImageSampleValues>({ resolver: zodResolver(imageSampleSchema), defaultValues: { image: null } });
   const [submitted, setSubmitted] = useState<ImageSampleValues | null>(null);
   const [url, setUrl] = useState<string | null>();
+  const [shape, setShape] = useState<"rounded" | "squared">("rounded");
   return (
     <section id={sampleId} aria-labelledby={`${sampleId}-title`} className="card min-w-0 scroll-mt-6 border border-base-300 bg-base-100 shadow-sm">
       <div className="card-body min-w-0 gap-5 p-4 sm:p-6">
@@ -26,12 +26,15 @@ export default function ImageSample({ widget = "image" }: { widget?: "image" | "
           <h2 id={`${sampleId}-title`} className="text-xl font-semibold">{isAvatar ? "FieldImage · Avatar" : "FieldImage"}</h2>
           <p className="text-sm text-base-content/65">{isAvatar ? "widget=\"avatar\": haz clic en el avatar para seleccionar o cambiar la imagen; usa la papelera para quitarlo. El editor se abre en un modal con recorte cuadrado por defecto. Cancelar o pulsar Escape conserva el avatar anterior." : "widget=\"image\" (por defecto): selecciona o arrastra una imagen, recórtala y ajusta sus dimensiones dentro del Field."} Al confirmar, se sube a Cloudinary y onChange recibe la URL pública HTTPS.</p>
         </header>
-        {!cloudName || !uploadPreset ? (
-          <div role="note" className="rounded-box border border-info/30 bg-info/10 p-3 text-sm">Para subir imágenes, configura NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME y NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET (unsigned) en .env.local y reinicia el servidor. Puedes probar el editor sin subir.</div>
-        ) : <p className="text-xs text-base-content/60">Cloudinary configurado. La imagen se sube únicamente al pulsar «Aplicar y subir imagen».</p>}
+        <p role="note" className="text-xs text-base-content/60">Fields.Image declara la carpeta lite-erp/samples y valida la URL con Zod. Para subir, inicia sesión como administrador y configura CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY y CLOUDINARY_API_SECRET en el servidor. Puedes probar el editor sin subir; no se persisten registros de esta demo.</p>
+        <label className="flex items-center gap-2 text-sm">Forma de presentación
+          <select className="select select-sm w-auto" autoComplete="off" value={shape} onChange={event => setShape(event.target.value as "rounded" | "squared")}>
+            <option value="rounded">rounded</option><option value="squared">squared</option>
+          </select>
+        </label>
         <FormLayout methods={methods} onSubmit={data => setSubmitted(data)} onInvalid={() => setSubmitted(null)} aria-labelledby={`${sampleId}-title`}>
           <FormGroup legend={isAvatar ? "Avatar" : "Imagen"}>
-            <FieldImage<ImageSampleInput> name="image" label={isAvatar ? "Avatar de ejemplo" : "Imagen de ejemplo"} widget={widget} upload={upload} maxSizeMB={10} onChange={setUrl} required />
+            <FieldImage<ImageSampleInput> name="image" label={isAvatar ? "Avatar de ejemplo" : "Imagen de ejemplo"} widget={widget} shape={shape} upload={upload} maxSizeMB={10} onChange={setUrl} required />
           </FormGroup>
           <FormGroup legend="Validación y resultado">
             <p className="text-sm text-base-content/70">Zod exige una URL HTTPS. Un recorte pendiente o una subida en curso impiden validar el formulario. Si la subida falla, puedes reintentar y se conserva la URL anterior.</p>

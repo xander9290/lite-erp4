@@ -6,12 +6,14 @@ import { recordIdentityShape, validateRecordIdentity } from "@/lib/orm/record";
 export const FlotaFabricanteFields = {
   name: Fields.Text({"label":"Nombre","required":true,"unique":false,"tracking":true,"trim":true,"maxLength":120}),
   active: Fields.Boolean({"label":"Activo","unique":false,"tracking":true,"default":true}),
+  avatar: Fields.Image({"required":false,"unique":false,"folder":"fabricantes","maxLength":2048}),
   logo: Fields.Text({"label":"Logotipo","required":false,"unique":false,"trim":true}),
 } as const;
 
 export const FlotaFabricanteSchema = z.strictObject({
   name: FlotaFabricanteFields.name.schema,
   active: FlotaFabricanteFields.active.schema,
+  avatar: FlotaFabricanteFields.avatar.schema,
   logo: FlotaFabricanteFields.logo.schema,
 });
 
@@ -19,6 +21,7 @@ export function createFlotaFabricanteDefaults() {
   return {
     name: FlotaFabricanteFields.name.createDefault(),
     active: FlotaFabricanteFields.active.createDefault(),
+    avatar: FlotaFabricanteFields.avatar.createDefault(),
     logo: FlotaFabricanteFields.logo.createDefault(),
   };
 }

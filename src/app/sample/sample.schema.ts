@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { formatPhone } from "@/components/ui/form/phone";
+import { Fields } from "@/lib/orm/fields";
 
 export const emailSampleSchema = z.object({
   email: z.email({ error: "Correo: escribe una dirección válida." }).max(254),
@@ -42,10 +43,8 @@ export const booleanSampleExample: BooleanSampleValues = {
   notifications: false, confirmation: true, quietMode: true, locked: true, unavailable: true,
 };
 
-export const imageSampleSchema = z.object({
-  image: z.url({ error: "Imagen: la URL no es válida.", protocol: /^https$/ })
-    .nullable().refine(value => value !== null, "Imagen: selecciona, edita y sube una imagen."),
-});
+export const imageSampleField = Fields.Image({ label: "Imagen", folder: "lite-erp/samples", required: true });
+export const imageSampleSchema = z.object({ image: imageSampleField.schema });
 export type ImageSampleInput = z.input<typeof imageSampleSchema>;
 export type ImageSampleValues = z.output<typeof imageSampleSchema>;
 

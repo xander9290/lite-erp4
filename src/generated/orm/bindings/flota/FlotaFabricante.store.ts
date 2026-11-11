@@ -5,7 +5,7 @@ import type { ModelRepository } from "@/lib/orm/repository";
 import type { RecordAudit } from "@/lib/orm/audit";
 import type { FlotaFabricanteValues } from "@/generated/orm/apps/flota/FlotaFabricante.schema";
 
-const select = { id: true, updatedAt: true, name: true, logo: true, active: true } satisfies Prisma.FlotaFabricanteSelect;
+const select = { id: true, updatedAt: true, name: true, logo: true, avatar: true, active: true } satisfies Prisma.FlotaFabricanteSelect;
 type Row = Prisma.FlotaFabricanteGetPayload<{ select: typeof select }>;
 const auditSelect = { createdAt: true, updatedAt: true, createBy: true, createByUser: { select: { id: true, login: true, partner: { select: { name: true, avatarUrl: true } } } } } satisfies Prisma.FlotaFabricanteSelect;
 type AuditRow = Prisma.FlotaFabricanteGetPayload<{ select: typeof auditSelect }>;
@@ -17,6 +17,7 @@ function dto(record: Row) {
   return { id: record.id, revision: record.updatedAt.toISOString(),
     name: record.name,
     logo: record.logo,
+    avatar: record.avatar,
     active: record.active,
   };
 }
@@ -24,6 +25,7 @@ function data(values: FlotaFabricanteValues) {
   return {
     name: values.name,
     logo: values.logo,
+    avatar: values.avatar,
     active: values.active,
   } satisfies Prisma.FlotaFabricanteUncheckedCreateInput;
 }
@@ -39,7 +41,7 @@ export const FlotaFabricanteRepository: ModelRepository<FlotaFabricanteValues> =
   async remove(tx, id, revision) { await tx.flotaFabricante.delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },
   count(tx, where) { return tx.flotaFabricante.count({ where: where as Prisma.FlotaFabricanteWhereInput }); },
   async lookup(tx, query) {
-    const allowed = new Set(["id", "name", "logo", "active"]);
+    const allowed = new Set(["id", "name", "logo", "avatar", "active"]);
     if (query.fields.some(field => !allowed.has(field))) throw new Error("Campo de presentación no permitido.");
     const projection = Object.fromEntries(query.fields.map(field => [field, true])) as Prisma.FlotaFabricanteSelect;
     return tx.flotaFabricante.findMany({ where: query.where as Prisma.FlotaFabricanteWhereInput, select: projection, orderBy: { id: "asc" }, skip: query.skip, take: query.take });
@@ -49,6 +51,7 @@ export const FlotaFabricanteRepository: ModelRepository<FlotaFabricanteValues> =
       case "id": return (await tx.flotaFabricante.groupBy({ by: ["id"], where: query.where as Prisma.FlotaFabricanteWhereInput, orderBy: { id: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.id, count: row._count._all }));
       case "name": return (await tx.flotaFabricante.groupBy({ by: ["name"], where: query.where as Prisma.FlotaFabricanteWhereInput, orderBy: { name: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.name, count: row._count._all }));
       case "logo": return (await tx.flotaFabricante.groupBy({ by: ["logo"], where: query.where as Prisma.FlotaFabricanteWhereInput, orderBy: { logo: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.logo, count: row._count._all }));
+      case "avatar": return (await tx.flotaFabricante.groupBy({ by: ["avatar"], where: query.where as Prisma.FlotaFabricanteWhereInput, orderBy: { avatar: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.avatar, count: row._count._all }));
       case "active": return (await tx.flotaFabricante.groupBy({ by: ["active"], where: query.where as Prisma.FlotaFabricanteWhereInput, orderBy: { active: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.active, count: row._count._all }));
       case "createBy": return (await tx.flotaFabricante.groupBy({ by: ["createBy"], where: query.where as Prisma.FlotaFabricanteWhereInput, orderBy: { createBy: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.createBy, count: row._count._all }));
       default: throw new Error("La columna de agrupación no está habilitada.");

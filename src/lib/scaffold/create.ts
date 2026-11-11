@@ -4,6 +4,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { artifactPlan, assertNoSymlinks, writeArtifacts } from "../orm/generator/write";
 import { appIdentity, scaffoldRegistryFiles, type createAppTemplate } from "./templates";
 import { unboundFiles } from "../orm/generator/bind";
+import { imageUploadFiles } from "../orm/generator/image-uploads";
 
 type Template = ReturnType<typeof createAppTemplate>;
 async function absent(path: string) {
@@ -19,10 +20,11 @@ export async function planApplication(root: string, template: Template, artifact
   const appPath = join(root, "src/app/(auth)/erp", template.app.id);
   const artifactsPath = join(root, "src/generated/orm/apps", template.app.id);
   const bindingsPath = join(root, "src/generated/orm/bindings", template.app.id);
+  const uploadsPath = join(root, "src/generated/orm/uploads", template.app.id);
   const registryPath = join(root, "src/lib/applications/scaffolded");
-  for (const path of [appPath, artifactsPath, bindingsPath, registryPath]) await assertNoSymlinks(path);
+  for (const path of [appPath, artifactsPath, bindingsPath, uploadsPath, registryPath]) await assertNoSymlinks(path);
   await assertNoSymlinks(join(registryPath, "catalog.json"));
-  await absent(appPath); await absent(artifactsPath); await absent(bindingsPath);
+  await absent(appPath); await absent(artifactsPath); await absent(bindingsPath); await absent(uploadsPath);
   let ids: string[] = [];
   try {
     const catalog = JSON.parse(await readFile(join(registryPath, "catalog.json"), "utf8"));
@@ -37,7 +39,9 @@ export async function planApplication(root: string, template: Template, artifact
   const paths = [...Object.keys(template.files).map(name => relative(root, join(appPath, name))), ...Object.keys(artifacts).map(name => relative(root, join(artifactsPath, name))), ...Object.keys(registry).map(name => relative(root, join(registryPath, name)))];
   const bindings = unboundFiles(template.profile);
   paths.push(...Object.keys(bindings).map(name => relative(root, join(bindingsPath, name))));
-  return { root, appPath, artifactsPath, bindingsPath, bindings, registryPath, registry, paths };
+  const uploads = imageUploadFiles(template.profile);
+  paths.push(...Object.keys(uploads).map(name => relative(root, join(uploadsPath, name))));
+  return { root, appPath, artifactsPath, bindingsPath, bindings, uploadsPath, uploads, registryPath, registry, paths };
 }
 
 export async function createApplication(root: string, template: Template, artifacts: Record<string, string>, dryRun = false) {
@@ -52,7 +56,7 @@ export async function createApplication(root: string, template: Template, artifa
   try {
     const plan = await planApplication(root, template, artifacts);
     stage = await mkdtemp(join(plan.root, ".create-app-"));
-    const stagedApp = join(stage, "application"), stagedArtifacts = join(stage, "artifacts"), stagedBindings = join(stage, "bindings");
+    const stagedApp = join(stage, "application"), stagedArtifacts = join(stage, "artifacts"), stagedBindings = join(stage, "bindings"), stagedUploads = join(stage, "uploads");
     for (const [name, content] of Object.entries(template.files)) {
       const path = join(stagedApp, name);
       await mkdir(dirname(path), { recursive: true });
@@ -60,7 +64,8 @@ export async function createApplication(root: string, template: Template, artifa
     }
     await writeArtifacts(stagedArtifacts, template.app.id, artifacts);
     await writeArtifacts(stagedBindings, `binding-${template.app.id}`, plan.bindings);
-    for (const [from, to] of [[stagedApp, plan.appPath], [stagedArtifacts, plan.artifactsPath], [stagedBindings, plan.bindingsPath]]) {
+    await writeArtifacts(stagedUploads, `uploads-${template.app.id}`, plan.uploads);
+    for (const [from, to] of [[stagedApp, plan.appPath], [stagedArtifacts, plan.artifactsPath], [stagedBindings, plan.bindingsPath], [stagedUploads, plan.uploadsPath]]) {
       await mkdir(dirname(to), { recursive: true });
       await absent(to);
       await rename(from, to);

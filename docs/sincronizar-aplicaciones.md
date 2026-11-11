@@ -14,6 +14,8 @@ vistas ni acciones nuevas en aplicaciones existentes.
 ## Qué hace
 
 1. Genera contratos y valida la propuesta Prisma.
+   También genera uploaders/acciones en src/generated/orm/uploads, con hashes y
+   publicación explícita, sin reescribir vistas personalizadas.
 2. Incorpora el esquema y su propiedad, detectando instalación o actualización.
 3. Lee el historial y muestra el SQL completo de las migraciones pendientes del
    proyecto, incluidas las de otras aplicaciones. Indica la base y el schema.
@@ -64,6 +66,13 @@ No ejecuta reset, push, seed ni acepta pérdidas automáticamente. Un drift que
 requiera reset, una migración fallida, un historial ausente/modificado o SQL con
 retiradas/borrados detectados exige revisión manual. La comprobación SQL de este
 flujo es conservadora, no un analizador de SQL ni una garantía sobre scripts custom.
+
+El bloqueo identifica el nombre y muestra el SQL de la migración que requiere
+revisión; no implica que el cambio recién declarado sea destructivo. Al cambiar
+de máquina puede haber migraciones históricas de retirada aún pendientes. Revisar
+la cadena completa y el estado real de la tabla antes de aplicar ese historial
+por el flujo manual (`npm run db:deploy`); después repetir orm:sync. No usar deploy
+como bypass general ni marcar migraciones como aplicadas sin comprobar el esquema.
 
 Prisma puede aplicar migraciones anteriores incluso con --create-only; por eso
 orm:sync revisa y aplica las pendientes primero mediante deploy, sólo con aprobación.

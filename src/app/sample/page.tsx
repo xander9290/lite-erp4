@@ -11,6 +11,7 @@ import CollectionViewsSample from "./CollectionViewsSample";
 import AuditSample from "./AuditSample";
 import ListGroupingSample from "./ListGroupingSample";
 import ModelDisplayNameSample from "./ModelDisplayNameSample";
+import ImageCollectionsSample from "./ImageCollectionsSample";
 
 export default function PageSample() {
   return (
@@ -49,12 +50,14 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#field-date">FieldDate</a>
             <a className="btn btn-sm btn-outline" href="#field-boolean">FieldBoolean</a>
             <a className="btn btn-sm btn-outline" href="#field-image">FieldImage</a>
+            <a className="btn btn-sm btn-outline" href="#image-collections">Imágenes en colecciones</a>
             <a className="btn btn-sm btn-outline" href="#field-image-avatar">Avatar</a>
           </nav>
         </header>
         <ListViewSample />
         <ListGroupingSample />
         <CollectionViewsSample />
+        <ImageCollectionsSample />
         <AlertsSample />
         <FormViewSample />
         <AuditSample />

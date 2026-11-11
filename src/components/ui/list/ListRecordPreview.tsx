@@ -13,7 +13,8 @@ export default function ListRecordPreview({ record, columns, onClose, onAfterClo
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const title = formatListValue(readListValue(record, columns[0].field), columns[0]);
+  const titleColumn = columns.find(column => column.widget !== "image");
+  const title = titleColumn ? formatListValue(readListValue(record, titleColumn.field), titleColumn) : record.id;
   useEffect(() => {
     const dialog = dialogRef.current;
     dialog?.showModal(); titleRef.current?.focus();

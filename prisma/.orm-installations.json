@@ -3,7 +3,7 @@
   "modules": {
     "flota": {
       "file": "orm-flota.prisma",
-      "hash": "056348d782b7976ccad7f1ad35bf3fd55d7c31db0d365f7a6bb2220d5331b035",
+      "hash": "c264891f4640dd05a4a7ddfb1f6544e42447bd7a2db6cd020b4276d4d64ce1b7",
       "inverses": [
         {
           "file": "user.prisma",

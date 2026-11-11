@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { ArrowDownWideNarrow, Filter, Search, X } from "lucide-react";
 import type { ListFilter, ListState } from "@/lib/list/types";
 import ColumnFilter from "../list/ColumnFilter";
@@ -8,21 +8,23 @@ import type { CollectionField } from "./types";
 
 function SearchBox({ query, search, disabled }: { query: string; search: (query: string) => void; disabled: boolean }) {
   const [draft, setDraft] = useState(query);
-  return <form role="search" aria-label="Buscar registros" autoComplete="off" className="flex min-w-0 flex-1 basis-full items-center gap-2 sm:max-w-md sm:basis-0" onSubmit={event => { event.preventDefault(); search(draft.trim()); }}>
+  return <form role="search" aria-label="Buscar registros" autoComplete="off" className="order-1 flex min-w-0 flex-1 basis-full items-center gap-2 sm:max-w-md sm:basis-0" onSubmit={event => { event.preventDefault(); search(draft.trim()); }}>
     <label className="input input-sm flex min-w-0 flex-1 items-center gap-2 rounded-xl border-base-300 bg-base-100"><Search size={16} className="shrink-0 text-base-content/45" aria-hidden="true" /><input type="search" className="min-w-0 grow" autoComplete="off" aria-label="Buscar registros" placeholder="Buscar registros…" maxLength={120} value={draft} disabled={disabled} onChange={event => setDraft(event.currentTarget.value)} /></label>
     <button type="submit" className="btn btn-sm btn-primary" disabled={disabled}>Buscar</button>
   </form>;
 }
 
-export default function CollectionToolbar({ columns, state, update, setFilter, clear, disabled = false }: { columns: readonly CollectionField[]; state: ListState; update: (patch: Partial<ListState>) => void; setFilter: (field: string, filter: ListFilter | null) => void; clear: () => void; disabled?: boolean }) {
+export default function CollectionToolbar({ columns, state, update, setFilter, clear, disabled = false, leading, actions }: { columns: readonly CollectionField[]; state: ListState; update: (patch: Partial<ListState>) => void; setFilter: (field: string, filter: ListFilter | null) => void; clear: () => void; disabled?: boolean; leading?: ReactNode; actions?: ReactNode }) {
   const [open, setOpen] = useState(false), panelId = useId();
   const sortable = columns.filter(column => column.sortable);
   const count = state.filters.length + (state.query ? 1 : 0) + (state.invalidFilters ? 1 : 0);
-  return <div className="shrink-0 space-y-3 border-b border-base-300 bg-base-100 p-4 sm:px-6">
+  return <div className="min-w-0 space-y-2">
     <div className="flex min-w-0 flex-wrap items-center gap-2">
+      {leading}
       <SearchBox key={state.query} query={state.query} search={query => update({ query })} disabled={disabled} />
-      <button type="button" className={`btn btn-sm ${open || state.filters.length ? "btn-soft btn-primary" : "btn-ghost"}`} disabled={disabled} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(value => !value)}><Filter size={15} aria-hidden="true" />Filtros{state.filters.length > 0 && <span className="badge badge-xs">{state.filters.length}</span>}</button>
-      {sortable.length > 0 && <div className="ml-auto flex w-full min-w-0 items-center gap-1 sm:w-auto"><ArrowDownWideNarrow size={15} className="shrink-0 text-base-content/50" aria-hidden="true" /><select aria-label="Ordenar por" autoComplete="off" className="select select-sm min-w-0 flex-1 rounded-lg border-base-300 sm:w-40 sm:flex-none" value={state.sort} disabled={disabled} onChange={event => update({ sort: event.currentTarget.value })}>{sortable.map(column => <option key={column.field} value={column.field}>{column.label}</option>)}</select><select aria-label="Dirección del orden" autoComplete="off" className="select select-sm w-24 shrink-0 rounded-lg border-base-300" value={state.direction} disabled={disabled} onChange={event => update({ direction: event.currentTarget.value as "asc" | "desc" })}><option value="asc" aria-label="Ascendente">↑ Asc.</option><option value="desc" aria-label="Descendente">↓ Desc.</option></select></div>}
+      <button type="button" className={`btn btn-sm order-2 ${open || state.filters.length ? "btn-soft btn-primary" : "btn-ghost"}`} disabled={disabled} aria-expanded={open} aria-controls={panelId} onClick={() => setOpen(value => !value)}><Filter size={15} aria-hidden="true" />Filtros{state.filters.length > 0 && <span className="badge badge-xs">{state.filters.length}</span>}</button>
+      {sortable.length > 0 && <div className="order-4 ml-auto flex w-full min-w-0 items-center gap-1 sm:order-3 sm:w-auto"><ArrowDownWideNarrow size={15} className="shrink-0 text-base-content/50" aria-hidden="true" /><select aria-label="Ordenar por" autoComplete="off" className="select select-sm min-w-0 flex-1 rounded-lg border-base-300 sm:w-40 sm:flex-none" value={state.sort} disabled={disabled} onChange={event => update({ sort: event.currentTarget.value })}>{sortable.map(column => <option key={column.field} value={column.field}>{column.label}</option>)}</select><select aria-label="Dirección del orden" autoComplete="off" className="select select-sm w-24 shrink-0 rounded-lg border-base-300" value={state.direction} disabled={disabled} onChange={event => update({ direction: event.currentTarget.value as "asc" | "desc" })}><option value="asc" aria-label="Ascendente">↑ Asc.</option><option value="desc" aria-label="Descendente">↓ Desc.</option></select></div>}
+      {actions}
     </div>
     {open && <fieldset id={panelId} disabled={disabled} className="rounded-xl bg-base-200/65 p-3"><legend className="sr-only">Filtros disponibles</legend><p className="mb-2 text-xs text-base-content/60">Elige el campo que quieres filtrar.</p><div className="flex flex-wrap gap-2">{columns.filter(column => column.filterable !== false).map(column => <ColumnFilter key={column.field} field={column.field} label={column.label} triggerLabel={column.label} type={column.type ?? "text"} options={column.options} filter={state.filters.find(filter => filter.field === column.field)} onApply={filter => setFilter(column.field, filter)} />)}</div></fieldset>}
     {count > 0 && <div aria-label="Filtros activos" className="flex flex-wrap items-center gap-2">

@@ -22,6 +22,7 @@
     "test:appointments:integration": "node --conditions=react-server --import tsx scripts/appointments.integration.ts",
     "test:appointments:service": "node --conditions=react-server --import tsx scripts/appointments-service.integration.ts",
     "test:orm": "node --conditions=react-server --import tsx --test src/lib/orm/*.test.ts",
+    "test:images": "node --conditions=react-server --import tsx --test src/lib/orm/image.test.ts src/lib/uploads/model-image.test.ts src/components/ui/form/imageProcessing.test.mjs",
     "orm:generate": "node --conditions=react-server --import tsx scripts/orm-generate.ts",
     "orm:install": "node --conditions=react-server --import tsx scripts/orm-install.ts",
     "orm:bind": "node --conditions=react-server --import tsx scripts/orm-bind.ts",

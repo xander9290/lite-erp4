@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { IMAGE_URL_MAX_LENGTH, imageUrlSchema, validateImageFolder } from "../uploads/image-policy";
 
 const fieldTag = Symbol("orm.field");
 export const INTEGER_MIN = -2147483648;
@@ -20,6 +21,7 @@ type CommonMetadata = {
 export type SelectionOption = { readonly value: string; readonly label: string };
 export type FieldMetadata = CommonMetadata & (
   | { readonly kind: "text"; readonly trim: boolean; readonly minLength?: number; readonly maxLength?: number }
+  | { readonly kind: "image"; readonly folder: string; readonly maxLength: number }
   | { readonly kind: "integer"; readonly min?: number; readonly max?: number }
   | { readonly kind: "boolean" }
   | { readonly kind: "selection"; readonly choices: readonly SelectionOption[] }
@@ -84,11 +86,24 @@ function makeField<I, O>(schema: z.ZodType<O, I>, options: CommonOptions & { def
 
 function nullableString(value: string | null) { return value === "" ? null : value; }
 type TextOptions = NullableOptions<string> & { minLength?: number; maxLength?: number; trim?: boolean };
+type ImageOptions = NullableOptions<string> & { folder: string; maxLength?: number };
 type IntegerOptions = NullableOptions<number> & { min?: number; max?: number };
 type BooleanOptions = Omit<CommonOptions, "required"> & { default?: Default<boolean> };
 type Many2oneOptions = NullableOptions<string> & { onDelete?: "Restrict" | "SetNull" };
 
 export const Fields = Object.freeze({
+  Image<const O extends ImageOptions>(options: O): Field<string | null, RequiredValue<string, O>> {
+    checkOptions(options, ["folder", "maxLength"]);
+    const folder = validateImageFolder(options.folder);
+    const maxLength = options.maxLength ?? IMAGE_URL_MAX_LENGTH;
+    checkBounds(1, maxLength, true);
+    if (maxLength > IMAGE_URL_MAX_LENGTH) throw new Error(`Image admite URLs de hasta ${IMAGE_URL_MAX_LENGTH} caracteres.`);
+    const value = imageUrlSchema(options.label, maxLength);
+    const schema = z.string().nullable().transform(text => nullableString(text?.trim() ?? null))
+      .pipe(options.required ? value : value.nullable());
+    return makeField(schema as z.ZodType<RequiredValue<string, O>, string | null>, options, null, { kind: "image", folder, maxLength });
+  },
+
   Text<const O extends TextOptions = Record<never, never>>(options: O = {} as O): Field<string | null, RequiredValue<string, O>> {
     checkOptions(options, ["minLength", "maxLength", "trim"]);
     checkBounds(options.minLength, options.maxLength, true);

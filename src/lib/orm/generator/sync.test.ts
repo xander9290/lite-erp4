@@ -22,6 +22,7 @@ test("pending migrations include the whole project and reject edited/missing/fai
 test("sync keeps destructive SQL on the manual path", () => {
   assert.doesNotThrow(() => assertSyncSQL(sql));
   for (const sql of ["DROP TABLE test", "ALTER TABLE test DROP COLUMN name", "DROP INDEX foo", "TRUNCATE test", "DELETE FROM test"]) assert.throws(() => assertSyncSQL(sql), /manual/);
+  assert.throws(() => assertSyncSQL('DROP TABLE "flota_fabricante";', "20261111042330_revert_fabricante_tutorial"), /20261111042330_revert_fabricante_tutorial.*manual/);
 });
 
 test("CLI rejects noninteractive writes, unsafe IDs and approval bypasses before starting", () => {

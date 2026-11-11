@@ -3,6 +3,6 @@
   "module": "binding-flota",
   "files": {
     "FlotaRecord.store.ts": "967d2c3c0b4aed3a3af5dd6633c14e4fc4f879935b0c53e00c2b158642d69ea0",
-    "FlotaFabricante.store.ts": "7e059372c7370841445fd3dc49f8749dad41bae99cf10d5204257075d029f929"
+    "FlotaFabricante.store.ts": "073de6288dca7ece0671470a5fc72a7590152e4005f2bece23ee7515d4624b72"
   }
 }

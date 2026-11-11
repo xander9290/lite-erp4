@@ -1,4 +1,5 @@
 import type { ImageOutputType, ImageSelection, ImageSize } from "./image.types";
+import { imageUrlSchema } from "@/lib/uploads/image-policy";
 
 export const IMAGE_ACCEPT = "image/jpeg,image/png,image/webp";
 export const MAX_IMAGE_DIMENSION = 4096;
@@ -40,10 +41,9 @@ export function fitImageSize(size: ImageSize): ImageSize {
 }
 
 export function publicImageUrl(value: unknown): string {
-  if (typeof value !== "string" || !value.trim()) throw new Error("El servidor no devolvió una URL de imagen.");
-  const url = new URL(value);
-  if (url.protocol !== "https:" || url.username || url.password) throw new Error("El servidor debe devolver una URL pública HTTPS.");
-  return url.href;
+  const result = imageUrlSchema().safeParse(typeof value === "string" ? value.trim() : value);
+  if (!result.success) throw new Error("El servidor debe devolver una URL HTTPS válida, sin credenciales y de hasta 2048 caracteres.");
+  return new URL(result.data).href;
 }
 
 export function loadImage(source: string, signal: AbortSignal): Promise<HTMLImageElement> {

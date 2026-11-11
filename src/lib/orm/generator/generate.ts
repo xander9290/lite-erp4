@@ -20,6 +20,7 @@ export function fieldExpression(field: FieldMetadata) {
     ...(field.tracking !== undefined ? { tracking: field.tracking } : {}), ...(field.sensitive !== undefined ? { sensitive: field.sensitive } : {}),
     ...(field.defaultKind === "literal" ? { default: field.defaultValue } : {}) };
   if (field.kind === "text") return `Fields.Text(${quote({ ...common, trim: field.trim, minLength: field.minLength, maxLength: field.maxLength })})`;
+  if (field.kind === "image") return `Fields.Image(${quote({ ...common, folder: field.folder, maxLength: field.maxLength })})`;
   if (field.kind === "integer") return `Fields.Integer(${quote({ ...common, min: field.min, max: field.max })})`;
   if (field.kind === "boolean") return `Fields.Boolean(${quote(common)})`;
   if (field.kind === "selection") return `Fields.Selection(${quote(field.choices)}, ${quote(common)})`;
@@ -95,13 +96,14 @@ export function generateModule(module: ModuleGeneration, context: GenerationCont
         if (value !== null) attributes.push(`@default(${field.kind === "selection" ? value : quote(value)})`);
       }
       if (column !== name) attributes.push(`@map(${quote(column)})`);
-      if (field.kind === "text" && field.maxLength !== undefined) {
+      if ((field.kind === "text" || field.kind === "image") && field.maxLength !== undefined) {
         if (field.maxLength < 1) throw new Error(`${model.name}.${name}: VarChar necesita al menos un carácter.`);
         attributes.push(`@db.VarChar(${field.maxLength})`);
       }
       if (field.kind === "datetime") attributes.push("@db.Timestamptz(3)");
       lines.push(`  ${name} ${type}${field.required ? "" : "?"}${attributes.length ? ` ${attributes.join(" ")}` : ""}`);
       if (field.kind === "text" && (field.minLength !== undefined || field.trim)) constraints.push(`${model.name}.${name}: minLength/trim se validan con Zod; no son CHECKs SQL.`);
+      if (field.kind === "image") constraints.push(`${model.name}.${name}: URL HTTPS sin credenciales validada con Zod; el contenido remoto y la propiedad del archivo no se verifican en SQL.`);
       if (field.kind === "integer" && (field.min !== undefined || field.max !== undefined)) constraints.push(`${model.name}.${name}: min/max se validan con Zod; no son CHECKs SQL.`);
       if (field.kind !== "many2one") continue;
       const target = definitions.get(field.target);

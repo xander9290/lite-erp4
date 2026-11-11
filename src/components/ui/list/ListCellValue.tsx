@@ -1,9 +1,11 @@
 import { readListValue, type ListColumn, type ListRecord } from "@/lib/list/types";
 import { PartnerIdentity } from "../PartnerAvatar";
 import { formatListValue } from "./listFormat";
+import CollectionImage from "../collection/CollectionImage";
 
 export default function ListCellValue({ record, column }: { record: ListRecord; column: ListColumn }) {
   const value = readListValue(record, column.field);
+  if (column.widget === "image") return <CollectionImage value={value} label={column.label} size={column.imageSize} shape={column.imageShape} />;
   const formatted = formatListValue(value, column);
   if (column.widget === "partner") {
     const avatar = column.avatarField ? readListValue(record, column.avatarField) : null;

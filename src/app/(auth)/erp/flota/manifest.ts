@@ -9,38 +9,29 @@ export const manifest = defineApplication({
   icon: Car,
   access: "admin",
   depends: [],
-  models: ["FlotaRecord",
-    "FlotaFabricante",
-  ],
+  models: ["FlotaRecord", "FlotaFabricante"],
   menus: [
     {
-      id: "main-menu",
-      label: "Menú",
+      id: "flota",
+      label: "Flota",
+      href: "/erp/flota",
+      access: "authenticated",
+      match: "exact",
+    },
+    {
+      id: "flota-settings",
+      label: "Configuración",
+      access: "authenticated",
+      match: "exact",
       items: [
         {
-          id: "vehicles",
-          label: "Vehículos",
-          href: "/erp/flota",
-          access: "admin",
-          match: "exact",
-        },
-        {
-          id: "my-vehicles",
-          label: "Mis vehículos",
-          href: "/erp/flota/mis-vehiculos",
-          access: "admin",
-          match: "exact",
-        },
-        {
-          id: "my-active-vehicles",
-          label: "Mis vehículos activos",
-          href: "/erp/flota/mis-vehiculos-activos",
+          id: "fabricantes",
+          label: "Fabricantes",
+          href: "/erp/flota/fabricante",
           access: "admin",
           match: "exact",
         },
       ],
     },
-  
-    {"id":"fabricante-list","label":"Fabricante","href":"/erp/flota/fabricante","access":"admin","match":"exact"},
   ],
 });

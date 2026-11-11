@@ -15,7 +15,8 @@ export default function ListRecordRows({ data, displayColumns, selectedIds, busy
 }) {
   const canNavigate = Boolean(recordHref && /^\/(?![\/\\])/.test(recordHref));
   return <>{data.rows.map(record => {
-              const recordTitle = formatListValue(readListValue(record, displayColumns[0].field), displayColumns[0]);
+              const titleColumn = displayColumns.find(column => column.widget !== "image");
+              const recordTitle = titleColumn ? formatListValue(readListValue(record, titleColumn.field), titleColumn) : record.id;
               const href = canNavigate ? listRecordHref(recordHref!, record.id, currentUrl) : "";
               return <tr key={record.id} aria-selected={selectedIds.includes(record.id)} className={`transition-colors hover:bg-primary/5 ${selectedIds.includes(record.id) ? "bg-primary/5" : ""}`}>
                 <td className="px-4 py-2"><SelectionCheckbox label={`Seleccionar ${recordTitle}`} checked={selectedIds.includes(record.id)} disabled={busy}
@@ -23,7 +24,7 @@ export default function ListRecordRows({ data, displayColumns, selectedIds, busy
                 {displayColumns.map((column, index) => {
                   const text = renderCell?.(record, column) ?? <ListCellValue record={record} column={column} />;
                   return <td key={column.field} className={`max-w-sm ${column.widget === "partner" ? "min-w-48" : ""} px-4 py-2 whitespace-normal wrap-anywhere ${alignmentClasses[columnAlignment(column)]} ${index === 0 ? "font-medium text-base-content" : "text-base-content/65"}`}>
-                    {index === 0 || column.widget === "partner" ? canNavigate ? <Link href={href} className="inline-block max-w-full rounded-sm text-left hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary">{text}</Link> : <button type="button" className="max-w-full cursor-pointer rounded-sm text-left hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={event => openRecord(record, event.currentTarget)}>{text}</button> : text}
+                    {index === 0 || column.widget === "partner" || column.widget === "image" ? canNavigate ? <Link href={href} className="inline-block max-w-full rounded-sm text-left hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary">{text}</Link> : <button type="button" className="max-w-full cursor-pointer rounded-sm text-left hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={event => openRecord(record, event.currentTarget)}>{text}</button> : text}
                   </td>;
                 })}
                 <td className="px-3 py-2">{canNavigate ? <Link href={href} className="btn btn-circle btn-ghost btn-xs" aria-label={`Abrir ${recordTitle}`}><ChevronRight size={17} aria-hidden="true" /></Link> : <button type="button" className="btn btn-circle btn-ghost btn-xs" aria-label={`Ver ${recordTitle}`} onClick={event => openRecord(record, event.currentTarget)}><ChevronRight size={17} aria-hidden="true" /></button>}</td>

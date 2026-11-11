@@ -4,6 +4,7 @@ import type { ModuleGeneration } from "../src/lib/orm/generator/generate";
 import { artifactPlan, writeArtifacts } from "../src/lib/orm/generator/write";
 import { prepareModuleArtifacts } from "../src/lib/orm/generator/prepare";
 import { loadAppGenerationProfile } from "../src/lib/orm/generator/profile";
+import { imageUploadFiles } from "../src/lib/orm/generator/image-uploads";
 
 const profiles: Record<string, ModuleGeneration> = {
   flota: { id: "flota", depends: ["contactos"], models: [{ model: vehicleModel, clientFields: ["plate", "brand", "mileage", "driverId", "active", "state", "nextServiceAt"] }] },
@@ -21,11 +22,19 @@ async function main() {
   if (!application && !Object.hasOwn(profiles, id)) throw new Error("No existe un orm.config.ts para esta aplicación ni un ejemplo con ese nombre.");
   const files = await prepareModuleArtifacts(root, application?.module ?? profiles[id], application?.externalOwners ?? externalOwners[id]);
   const directory = application ? resolve(root, "src/generated/orm/apps", id) : resolve(root, "src/generated/orm", id);
-  const plan = mode === "--write" ? await writeArtifacts(directory, id, files) : await artifactPlan(directory, id, files);
+  const uploadDirectory = resolve(root, "src/generated/orm/uploads", id);
+  const uploads = application ? imageUploadFiles(application.module) : null;
+  const plan = await artifactPlan(directory, id, files);
+  const uploadPlan = uploads ? await artifactPlan(uploadDirectory, `uploads-${id}`, uploads) : null;
+  if (mode === "--write") {
+    await writeArtifacts(directory, id, files);
+    if (uploads) await writeArtifacts(uploadDirectory, `uploads-${id}`, uploads);
+  }
   console.log(`Prisma validó la propuesta de ${id}. ${mode === "--write" ? "Artefactos escritos" : "Plan de generación"}:`);
   for (const change of plan.changes) console.log(`  ${change.action.padEnd(9)} ${change.name}`);
+  for (const change of uploadPlan?.changes ?? []) console.log(`  ${change.action.padEnd(9)} uploads/${change.name}`);
   console.log("No se modificó prisma/models, no se aplicaron migraciones y no se instaló ninguna aplicación.");
-  if (mode === "--check" && (plan.manifestChanged || plan.changes.some(change => change.action !== "unchanged"))) process.exitCode = 2;
+  if (mode === "--check" && [plan, uploadPlan].some(item => item && (item.manifestChanged || item.changes.some(change => change.action !== "unchanged")))) process.exitCode = 2;
 }
 
 main().catch(error => { console.error(error instanceof Error ? error.message : "No se pudo generar el módulo."); process.exitCode = 1; });

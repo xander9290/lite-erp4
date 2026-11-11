@@ -1,0 +1,10 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "uploads-flota",
+  "files": {
+    "FlotaRecord.images.actions.ts": "69a9808978b76f1318977c72faf16200f4f21282b5aa1649ef46bd5f56c08118",
+    "FlotaRecord.images.ts": "2275c008a38e887fa43333ef3cb20eae4691cb9a10ea8300b530b3f2858962d8",
+    "FlotaFabricante.images.actions.ts": "456cf21d1bfe40fc20e73cc0b3f262980f443fd452544545ea35b09debd4c8f9",
+    "FlotaFabricante.images.ts": "44c22fee9d4f3f1eb4d5626f6920d6a0ebb706f306e1ace62b1d966a62c90788"
+  }
+}

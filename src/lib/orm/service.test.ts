@@ -12,6 +12,19 @@ import type { ListActionOptions } from "./domain";
 const model = defineModel(class Example extends Model { name = Fields.Text({ required: true }); }, { name: "AuditExample", table: "audit_examples" });
 const repository = unboundRepository<{ name: string }>();
 
+test("collection images require a declared public Image scalar and bounded presentation options", () => {
+  const images = defineModel(class extends Model {
+    name = Fields.Text();
+    photo = Fields.Image({ folder: "tests/photos" });
+    hidden = Fields.Image({ folder: "tests/hidden", sensitive: true });
+  }, { name: "ImageListTest", table: "image_list_tests" });
+  const imageRepository = unboundRepository<ReturnType<typeof images.parse>>();
+  const column = { field: "photo", label: "Imagen", widget: "image" as const, type: "text" as const, imageSize: "sm" as const, imageShape: "squared" as const };
+  const create = (patch: Record<string, unknown>) => createModelService(images, imageRepository, { columns: [{ ...column, ...patch }], searchFields: [] });
+  assert.doesNotThrow(() => create({}));
+  for (const patch of [{ field: "name" }, { field: "hidden" }, { field: "createByUser.password" }, { field: "unknown" }, { avatarField: "hidden" }, { imageSize: "huge" }, { imageShape: "other" }, { format: "boolean" }, { type: "integer" }, { widget: undefined }]) assert.throws(() => create(patch), /auditoría habilitada/);
+});
+
 test("audit presentation is opt-in and only accepts public paths and approved avatars", () => {
   assert.doesNotThrow(() => createModelService(model, repository, { audit: true, columns: recordAuditColumns, searchFields: ["createByUser.login", "createByUser.partner.name"] }));
   assert.throws(() => createModelService(model, repository, { columns: recordAuditColumns, searchFields: [] }), /auditoría habilitada/);

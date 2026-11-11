@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import CardViewClient from "./CardViewClient";
 import type { CardViewProps } from "../collection/types";
+import { CollectionSkeleton } from "../collection/CollectionShell";
 export type { CardViewProps, CollectionField } from "../collection/types";
 
 export default function CardView(props: CardViewProps) {
-  return <Suspense fallback={<div role="status" className="skeleton min-h-64 rounded-2xl motion-reduce:animate-none"><span className="sr-only">Cargando tarjetas…</span></div>}><CardViewClient {...props} /></Suspense>;
+  return <Suspense fallback={<CollectionSkeleton title={props.title} breadcrumbs={props.breadcrumbs} className={props.className} />}><CardViewClient {...props} /></Suspense>;
 }

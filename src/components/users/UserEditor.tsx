@@ -50,8 +50,8 @@ function UserForm({ record }: { record: UserValues }) {
       footer={
         <p className="text-xs leading-relaxed text-base-content/55">
           {savedId
-            ? "Deja la contraseña vacía para conservar la actual o escribe una nueva de 4 a 8 caracteres, sin exigir símbolos ni mayúsculas. Cambiar la contraseña, el usuario o los permisos cerrará sus sesiones anteriores."
-            : "La contraseña debe tener de 4 a 8 caracteres, sin exigir símbolos ni mayúsculas."}
+            ? "Deja la contraseña vacía para conservar la actual. Cambiar la contraseña, el usuario o los permisos cerrará sus sesiones anteriores."
+            : "La contraseña debe tener al menos 8 caracteres."}
         </p>
       }
     >

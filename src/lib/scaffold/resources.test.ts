@@ -33,6 +33,7 @@ test("view templates support typed fields, modal guards and explicit kanban stat
     at = Fields.DateTime();
     state = Fields.Selection([{ value: "draft", label: "Borrador" }, { value: "done", label: "Hecho" }] as const, { required: true });
     ownerId = Fields.Many2one("Partner");
+    logo = Fields.Image({ folder: "tests/work", tracking: true });
   }, { name: "TestWork", table: "test_work" });
   const entry = { model, clientFields: Object.keys(model.fields) };
   const template = resourceTemplates(modelIdentity("test", "Work"), entry, { source: "./models/Work", exported: "customExport" }, { views: ["list", "card", "kanban", "form"], form: "modal", group: "state", label: 'Trabajo "especial"' });
@@ -43,6 +44,11 @@ test("view templates support typed fields, modal guards and explicit kanban stat
   assert.match(template.files["views/WorkForm.tsx"], /FieldNumber<RecordInput>/);
   assert.match(template.files["views/WorkForm.tsx"], /FieldDate<RecordInput>/);
   assert.match(template.files["views/WorkForm.tsx"], /FieldMany2One<RecordInput>/);
+  assert.match(template.files["views/WorkForm.tsx"], /FieldImage<RecordInput>.*upload=\{imageUploads.logo\}/);
+  assert.match(template.files["views/WorkForm.tsx"], /generated\/orm\/uploads\/test\/TestWork.images/);
+  assert.doesNotMatch(template.files["actions/work.actions.ts"], /createModelImageSigner/);
+  assert.match(template.files["views/work.list.ts"], /"field":"logo".*"widget":"image"/);
+  assert.doesNotMatch(template.files["views/WorkForm.tsx"], /tests\/work|API_SECRET/);
   assert.match(template.files["views/WorkModal.tsx"], /navigation.run/);
   assert.match(template.files["views/WorkForm.tsx"], /FormViewLoader/);
   assert.match(template.files["views/WorkForm.tsx"], /navigation.run/);
@@ -101,9 +107,9 @@ test("CLI model first then views preserves sources and produces a compilable edi
     await assert.rejects(readFile(join(base, "models/Work.ts")), /ENOENT/);
     run("create-model.ts", ["prueba", "Work"]);
     const modelPath = join(base, "models/Work.ts");
-    await writeFile(modelPath, (await readFile(modelPath, "utf8")).replace("  // Define aquí", '  state = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Hecho"}] as const, {required:true,default:"draft"});\n  // Define aquí'));
+    await writeFile(modelPath, (await readFile(modelPath, "utf8")).replace("  // Define aquí", '  state = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Hecho"}] as const, {required:true,default:"draft"});\n  logo = Fields.Image({folder:"tests/work",tracking:true});\n  // Define aquí'));
     const profilePath = join(base, "orm.config.ts");
-    await writeFile(profilePath, (await readFile(profilePath, "utf8")).replace('model: pruebaWorkModel, clientFields: ["name", "active"]', 'model: pruebaWorkModel, clientFields: ["name", "active", "state"]'));
+    await writeFile(profilePath, (await readFile(profilePath, "utf8")).replace('model: pruebaWorkModel, clientFields: ["name", "active"]', 'model: pruebaWorkModel, clientFields: ["name", "active", "state", "logo"]'));
     run("create-model.ts", ["prueba", "Work"], 1);
     run("create-views.ts", ["prueba", "Work", "--views", "list,card,kanban,form", "--form", "modal", "--group", "state", "--dry-run"]);
     await assert.rejects(readFile(join(base, "views/WorkList.tsx")), /ENOENT/);
@@ -122,5 +128,14 @@ test("CLI model first then views preserves sources and produces a compilable edi
     for (const [name, source] of Object.entries(unboundFiles(profile.module))) await writeFile(join(root, "src/generated/orm/bindings/prueba", name), source);
     const compiled = spawnSync(process.execPath, [join(project, "node_modules/typescript/bin/tsc"), "--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 30000 });
     assert.equal(compiled.status, 0, compiled.stdout + compiled.stderr);
+    const formPath = join(base, "views/WorkForm.tsx");
+    const customizedForm = await readFile(formPath, "utf8");
+    await writeFile(modelPath, (await readFile(modelPath, "utf8")).replace("  // Define aquí", '  detail = Fields.Image({folder:"tests/details"});\n  // Define aquí'));
+    await writeFile(profilePath, (await readFile(profilePath, "utf8")).replace('["name", "active", "state", "logo"]', '["name", "active", "state", "logo", "detail"]'));
+    run("orm-generate.ts", ["prueba", "--write"]);
+    assert.match(await readFile(join(root, "src/generated/orm/uploads/prueba/PruebaWork.images.ts"), "utf8"), /detail: createSigned/);
+    assert.equal(await readFile(formPath, "utf8"), customizedForm);
+    const compiledAgain = spawnSync(process.execPath, [join(project, "node_modules/typescript/bin/tsc"), "--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 30000 });
+    assert.equal(compiledAgain.status, 0, compiledAgain.stdout + compiledAgain.stderr);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

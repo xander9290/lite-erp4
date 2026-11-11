@@ -85,6 +85,7 @@ utilizarse explícitamente; no modifica el método `parse` del contrato original
 | Field | Entrada de controles | Salida validada y reglas |
 | --- | --- | --- |
 | `Text` | `string \| null`; inicia en `""` | Recorta espacios salvo `trim: false`; vacío pasa a null si es opcional. `minLength` / `maxLength`. |
+| `Image` | `string \| null`; inicia en `null` | URL HTTPS sin credenciales, hasta 2048 caracteres. folder obligatorio; [contrato y Cloudinary](ideas/campos-imagen.md). |
 | `Integer` | `number \| null`; inicia en null | Entero de 32 bits, compatible con Int de Prisma; `min` / `max`. No convierte strings a números. |
 | `Boolean` | `boolean`; inicia en false | true y false son válidos. No acepta `required`; no significa «debe estar activado». |
 | `Selection` | Unión literal de opciones o null | Acepta sólo los valores declarados; etiquetas separadas del valor persistido. |

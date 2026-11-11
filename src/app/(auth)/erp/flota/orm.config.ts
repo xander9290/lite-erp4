@@ -13,7 +13,10 @@ export const generationProfile = {
         clientFields: ["name", "plate", "brand", "active"],
       },
 
-      { model: flotaFabricanteModel, clientFields: ["name", "active", "logo"] },
+      {
+        model: flotaFabricanteModel,
+        clientFields: ["name", "active", "avatar", "logo"],
+      },
     ],
   },
   externalOwners: {},

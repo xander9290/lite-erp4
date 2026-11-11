@@ -5,7 +5,21 @@ Ejemplos interactivos: `/sample#card-view` y `/sample#kanban-view`.
 La demo es local y pública: sus proyectos son ficticios, no se guardan en la base
 y se reinician al recargar. La integración del servicio real se prueba por separado.
 
+Las columnas `widget: "image"` muestran miniaturas en las tres colecciones. La
+primera sustituye el icono de la tarjeta por defecto; renderCard personalizado
+controla su presentación. imageSize admite sm/md/lg e imageShape rounded/squared,
+con fallback accesible si falta o falla la URL. El servidor sólo lo permite para
+Fields.Image no sensibles; legacy conserva su whitelist. Demo
+`/sample#image-collections` y [contrato de imágenes](ideas/campos-imagen.md).
+
 ## Búsqueda y filtros comunes
+
+CardView y KanbanView usan header compacto compartido: breadcrumbs opcionales,
+búsqueda, filtros, orden y acciones. title permanece como encabezado accesible;
+icon/description se aceptan por compatibilidad sin el bloque visible de resumen.
+CardView muestra el total sólo en el footer; Kanban conserva conteos por columna.
+El skeleton usa el mismo header compacto. En móvil los controles se distribuyen
+en filas, con Actualizar junto a Filtros; se mantiene autocomplete off.
 
 Ambas vistas comparten una barra con:
 
@@ -31,6 +45,7 @@ import { recordColumns, recordSearchFields } from "./record.list";
   model="MiModelo"
   title="Mis registros"
   titleField="name"
+  breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: "Mis registros" }]}
   columns={recordColumns}
   searchFields={recordSearchFields}
   load={listRecords}
@@ -52,6 +67,13 @@ defecto muestra hasta cuatro campos adicionales de `columns`; estas columnas
 también definen filtros/orden y su formato. `recordHref` añade enlaces de apertura
 que incluyen `returnTo` con la URL actual. La vista de destino debe validar y usar
 ese parámetro al construir su enlace de vuelta.
+
+CardView usa padding exterior de 8px en móvil y 12px desde sm, con separación de
+8px entre tarjetas. Las tarjetas predeterminadas tienen padding interior de 12px
+y no reservan un bloque de detalles si no hay campos adicionales. Cuando hay
+recordHref, su título es el acceso al registro; no se repite una fila «Abrir
+registro» abajo. renderCard personalizado conserva el acceso adicional porque
+el framework no controla su contenido.
 
 En columnas se admite `options: [{value,label}]` para una selección; así el filtro
 presenta sus etiquetas y no operadores de texto incompatibles con un enum.

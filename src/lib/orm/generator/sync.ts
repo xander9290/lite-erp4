@@ -7,7 +7,8 @@ import { spawnSync } from "node:child_process";
 import { Client } from "pg";
 import { loadAppGenerationProfile } from "./profile";
 import { installModels } from "./install";
-import { assertNoSymlinks, writeArtifacts } from "./write";
+import { artifactPlan, assertNoSymlinks, writeArtifacts } from "./write";
+import { imageUploadFiles } from "./image-uploads";
 import { prepareModuleArtifacts } from "./prepare";
 import { bindRepositories } from "./bind";
 
@@ -27,8 +28,8 @@ export function pendingMigrations(files: readonly MigrationFile[], applied: read
   return files.filter(file => !applied.some(row => row.migration_name === file.name && row.finished_at && !row.rolled_back_at));
 }
 
-export function assertSyncSQL(sql: string) {
-  if (/\bDROP\s+(TABLE|COLUMN|TYPE|INDEX|CONSTRAINT)\b|\bTRUNCATE\b|\bDELETE\s+FROM\b/i.test(sql)) throw new Error("La migración contiene retiradas o borrados: requiere el flujo manual de revisión.");
+export function assertSyncSQL(sql: string, migrationName?: string) {
+  if (/\bDROP\s+(TABLE|COLUMN|TYPE|INDEX|CONSTRAINT)\b|\bTRUNCATE\b|\bDELETE\s+FROM\b/i.test(sql)) throw new Error(`La migración${migrationName ? ` ${migrationName}` : ""} contiene retiradas o borrados: requiere el flujo manual de revisión.`);
 }
 
 async function migrationFiles(root: string): Promise<MigrationFile[]> {
@@ -77,8 +78,11 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   if (!profile) throw new Error("No existe un orm.config.ts para esta aplicación.");
   if (options.plan) {
     const plan = await installModels(root, profile, false, true);
+    const uploadDirectory = join(root, "src/generated/orm/uploads", id);
+    const uploads = await artifactPlan(uploadDirectory, `uploads-${id}`, imageUploadFiles(profile.module));
     options.log(`Plan de fuentes de ${id} (sin consultar la base):`);
     for (const change of plan.changes) options.log(relative(root, change.path));
+    for (const change of uploads.changes.filter(change => change.action !== "unchanged")) options.log(`${change.action}: ${relative(root, join(uploadDirectory, change.name))}`);
     options.log(plan.sql);
     options.log("Sin escrituras ni SQL aplicado. El enlace se comprueba en la sincronización completa.");
     return;
@@ -100,14 +104,20 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   const prisma = (args: string[], codes?: number[]) => run([...args, "--config", join(root, "prisma7.config.ts")], codes);
   const generate = async () => {
     const files = await prepareModuleArtifacts(root, profile.module, profile.externalOwners);
-    await writeArtifacts(join(root, "src/generated/orm/apps", id), id, files);
+    const directory = join(root, "src/generated/orm/apps", id);
+    const uploadDirectory = join(root, "src/generated/orm/uploads", id);
+    const uploads = imageUploadFiles(profile.module);
+    await artifactPlan(directory, id, files);
+    await artifactPlan(uploadDirectory, `uploads-${id}`, uploads);
+    await writeArtifacts(directory, id, files);
+    await writeArtifacts(uploadDirectory, `uploads-${id}`, uploads);
   };
   const pending = async () => pendingMigrations(await migrationFiles(root), await readApplied(databaseUrl));
   const applyPending = async () => {
     const files = await pending();
     if (!files.length) return;
     stage("Revisar migraciones pendientes del proyecto");
-    for (const file of files) { assertSyncSQL(file.sql); options.log(`\n${file.name}/migration.sql\n${file.sql}`); }
+    for (const file of files) { options.log(`\n${file.name}/migration.sql\n${file.sql}`); assertSyncSQL(file.sql, file.name); }
     if (!await options.confirm(`¿Aplicar estas ${files.length} migraciones a la base de desarrollo indicada? Escribe aplicar`)) throw new Error("Cancelado: las migraciones mostradas no se aplicaron. Los archivos preparados se conservan.");
     if (JSON.stringify(await pending()) !== JSON.stringify(files)) throw new Error("Las migraciones cambiaron durante la revisión. Vuelve a ejecutar orm:sync.");
     stage("Aplicar SQL aprobado");

@@ -13,6 +13,7 @@ const upload = createCloudinaryImageUploader({
   label="Imagen"
   upload={upload}
   widget="image" // Predeterminado: editor dentro del Field.
+  shape="rounded" // Alternativa: "squared". No modifica el archivo exportado.
   maxSizeMB={10}
   // aspectRatio={1} // Opcional: recorte cuadrado fijo.
   onChange={(url) => console.log(url)}
@@ -20,6 +21,12 @@ const upload = createCloudinaryImageUploader({
 ```
 
 Importa el Field desde `@/components/ui/form/FieldImage` y el adaptador desde `@/lib/uploads/cloudinary`. Dentro de FormLayout/FormGroup se usa como cualquier otro Field. `direction="inline"`, label opcional, `disabled`, `readOnly` y `required` están soportados.
+
+`shape` es independiente de `widget`: rounded conserva esquinas redondeadas en
+image y círculo en avatar; squared usa esquinas rectas y guía de recorte
+rectangular. Sin shape se conserva la presentación anterior. `style` continúa
+aceptando estilos CSS del contenedor. Las demos permiten alternar ambas formas
+con RHF/Zod sin subir archivos ni modificar el valor del campo.
 
 ## Avatar
 
@@ -33,7 +40,7 @@ Importa el Field desde `@/components/ui/form/FieldImage` y el adaptador desde `@
 />
 ```
 
-`widget` admite `image` (por defecto) y `avatar`. Avatar usa una vista circular de DaisyUI y lleva la lectura, recorte, dimensiones, formato, calidad, progreso y errores de subida a un modal nativo con estilos `modal`/`modal-box`. El recorte es cuadrado por defecto; puedes especificar otro `aspectRatio`. La guía circular y el avatar son visuales: el archivo exportado conserva el rectángulo del recorte, sin descartar sus esquinas.
+`widget` admite `image` (por defecto) y `avatar`. Avatar usa una vista circular de DaisyUI (o rectangular con shape="squared") y lleva la lectura, recorte, dimensiones, formato, calidad, progreso y errores de subida a un modal nativo con estilos `modal`/`modal-box`. El recorte es cuadrado por defecto; puedes especificar otro `aspectRatio`. La guía circular y el avatar son visuales: el archivo exportado conserva el rectángulo del recorte, sin descartar sus esquinas.
 
 El avatar es el botón para seleccionar o cambiar la imagen; funciona con clic, Enter o Espacio. Una cámara aparece al pasar el cursor o enfocarlo con teclado. Cuando hay una imagen, la papelera permite quitarla sin abrir el selector y devuelve `null`. Los botones de texto y la caja de selección se reservan para `widget="image"`; el avatar ocupa aproximadamente 104 × 104 px, más su label opcional.
 
@@ -45,7 +52,18 @@ El ejemplo completo y el esquema Zod están en `/sample`. Separa `z.input` (perm
 
 ## Cloudinary
 
-Configura en `.env.local` y reinicia el servidor:
+Para modelos con `Fields.Image({folder:"..."})`, create:views conecta la subida
+firmada predeterminada. Carpeta, autorización y credenciales se resuelven en el
+servidor; el navegador usa createSignedCloudinaryImageUploader con la acción
+generada. Configuración y contrato en [Campos de imagen](../../../../docs/ideas/campos-imagen.md).
+orm:sync actualiza los uploaders aunque el Image se añada después de crear las
+vistas. En una vista personalizada basta importar imageUploads del archivo
+`@/generated/orm/uploads/<app>/<Modelo>.images` y pasar `upload={imageUploads.campo}`.
+Las demos de /sample usan esta ruta: subir requiere administrador; los modelos
+de muestra no se instalan ni guardan registros en la base.
+
+El adaptador unsigned anterior sigue disponible para consumidores como Partner.
+Para usarlo, configura en `.env.local` y reinicia el servidor:
 
 ```env
 NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=tu_cloud_name

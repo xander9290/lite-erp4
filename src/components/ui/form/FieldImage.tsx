@@ -12,12 +12,14 @@ import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } fro
 import { useFormFieldValidation } from "./formValidation";
 import ImageEditorModal from "./ImageEditorModal";
 import "react-image-crop/dist/ReactCrop.css";
+import { imageUploadDefaults } from "@/lib/uploads/config";
 
 export type { ImageUploader, ImageUploadOptions } from "./image.types";
 export type FieldImageProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string | null> &
   Omit<HTMLAttributes<HTMLDivElement>, keyof BaseFieldProps<TFieldValues, string | null> | "children" | "defaultValue"> & {
     upload: ImageUploader;
     widget?: "image" | "avatar";
+    shape?: "rounded" | "squared";
     maxSizeMB?: number;
     aspectRatio?: number;
     outputType?: ImageOutputType;
@@ -38,8 +40,8 @@ const cropLabels = {
 };
 
 export default function FieldImage<TFieldValues extends FieldValues = FieldValues>({
-  name, label, direction = "block", widget = "image", upload, onChange, onBlur, onFocus,
-  maxSizeMB = 10, aspectRatio, outputType = "image/webp", quality = 0.85,
+  name, label, direction = "block", widget = "image", shape, upload, onChange, onBlur, onFocus,
+  maxSizeMB = imageUploadDefaults.maxSizeMB, aspectRatio, outputType = imageUploadDefaults.outputType, quality = imageUploadDefaults.quality,
   disabled, readOnly, required, id, className = "", "aria-label": ariaLabel,
   "aria-describedby": describedBy, ...containerProps
 }: FieldImageProps<TFieldValues>) {
@@ -47,6 +49,9 @@ export default function FieldImage<TFieldValues extends FieldValues = FieldValue
   const inputId = id ?? generatedId;
   const modalId = `${inputId}-editor-modal`;
   const isAvatar = widget === "avatar";
+  const rounded = shape === "rounded" || (shape === undefined && isAvatar);
+  const avatarShape = rounded ? "rounded-full" : "rounded-none";
+  const imageShape = shape === "squared" ? "rounded-none" : "rounded-box";
   const cropAspectRatio = aspectRatio ?? (isAvatar ? 1 : undefined);
   const labelId = `${inputId}-label`, hintId = `${inputId}-hint`, errorId = `${inputId}-error`;
   const { control, getFieldState, setError, clearErrors, trigger, watch } = useFormContext<TFieldValues>();
@@ -167,7 +172,7 @@ export default function FieldImage<TFieldValues extends FieldValues = FieldValue
               <button type="button" disabled={locked} onClick={() => cancel()} className="btn btn-ghost btn-sm">{busy ? "Cancelar subida" : "Cancelar edición"}</button>
             </div>
             <div className="flex min-w-0 items-center justify-center overflow-hidden rounded-lg bg-base-200 p-2">
-              <ReactCrop crop={crop} aspect={aspect} circularCrop={isAvatar} keepSelection disabled={locked || busy} ruleOfThirds ariaLabels={cropLabels} onChange={(_pixels, percent) => setCrop(percent)} onComplete={(_pixels, percent) => finishCrop(percent)}>
+              <ReactCrop crop={crop} aspect={aspect} circularCrop={isAvatar && rounded} keepSelection disabled={locked || busy} ruleOfThirds ariaLabels={cropLabels} onChange={(_pixels, percent) => setCrop(percent)} onComplete={(_pixels, percent) => finishCrop(percent)}>
                 <Image unoptimized loading="eager" src={draft.url} width={draft.width} height={draft.height} alt="Imagen para recortar" draggable={false} className="block h-auto w-auto max-w-full" style={{ maxHeight: isAvatar ? "min(30dvh, 16rem)" : "20rem" }} />
               </ReactCrop>
             </div>
@@ -201,7 +206,7 @@ export default function FieldImage<TFieldValues extends FieldValues = FieldValue
       <div
         {...containerProps}
         role="group" aria-label={ariaLabel || (!fieldLabel ? name : undefined)} aria-labelledby={!ariaLabel && fieldLabel ? labelId : undefined}
-        aria-describedby={description} data-invalid={fieldState.invalid} aria-busy={busy} aria-disabled={fieldDisabled}
+        aria-describedby={description} data-invalid={fieldState.invalid} data-image-shape={shape ?? "rounded"} aria-busy={busy} aria-disabled={fieldDisabled}
         className={`min-w-0 ${isAvatar ? "" : "space-y-3"} ${className}`}
         onFocus={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) onFocus?.(event); }}
         onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget) && !document.getElementById(modalId)?.contains(event.relatedTarget)) { blurField(); onBlur?.(event); } }}
@@ -212,17 +217,17 @@ export default function FieldImage<TFieldValues extends FieldValues = FieldValue
         {isAvatar ? (
           <div className="relative w-fit max-w-full p-1">
             <div className={`avatar ${currentUrl ? "" : "avatar-placeholder"}`}>
-              <div className="size-24 rounded-full bg-base-200 text-base-content/50 ring-2 ring-base-content/15 ring-offset-2 ring-offset-base-100 transition-shadow hover:ring-primary/50 focus-within:ring-primary focus-within:ring-offset-4">
+              <div className={`size-24 ${avatarShape} bg-base-200 text-base-content/50 ring-2 ring-base-content/15 ring-offset-2 ring-offset-base-100 transition-shadow hover:ring-primary/50 focus-within:ring-primary focus-within:ring-offset-4`}>
                 <button
                   ref={node => { fieldRef(node); selectButton.current = node; }}
                   id={inputId} type="button" disabled={locked || busy}
                   aria-label={`${currentUrl ? "Cambiar" : "Seleccionar"} ${accessibleLabel}`}
                   aria-describedby={description} title={currentUrl ? "Cambiar avatar" : "Seleccionar avatar"}
-                  className="group/avatar relative flex size-full cursor-pointer items-center justify-center rounded-full outline-none disabled:cursor-not-allowed disabled:opacity-45"
+                  className={`group/avatar relative flex size-full cursor-pointer items-center justify-center overflow-hidden ${avatarShape} outline-none disabled:cursor-not-allowed disabled:opacity-45`}
                   onClick={() => fileInput.current?.click()}
                 >
                   {currentUrl ? <Image unoptimized loading="eager" src={currentUrl} width={256} height={256} alt="" /> : <UserRound aria-hidden="true" className="size-10" />}
-                  <span aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-base-content/50 text-base-100 opacity-0 transition-opacity group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100 group-disabled/avatar:hidden motion-reduce:transition-none"><Camera size={24} /></span>
+                  <span aria-hidden="true" className={`pointer-events-none absolute inset-0 flex items-center justify-center ${avatarShape} bg-base-content/50 text-base-100 opacity-0 transition-opacity group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100 group-disabled/avatar:hidden motion-reduce:transition-none`}><Camera size={24} /></span>
                 </button>
               </div>
             </div>
@@ -235,8 +240,8 @@ export default function FieldImage<TFieldValues extends FieldValues = FieldValue
             <p id={hintId} className="sr-only">Haz clic en el avatar para seleccionar o cambiar la imagen. JPEG, PNG o WebP, hasta {maxSizeMB} MB. Usa la papelera para quitarlo.</p>
           </div>
         ) : (
-        <div className="flex min-w-0 flex-col items-center gap-3 rounded-box border border-dashed border-base-content/25 bg-base-200/50 p-4 text-center">
-          {currentUrl ? <Image unoptimized loading="eager" src={currentUrl} width={640} height={480} alt={accessibleLabel} className="h-36 w-full object-contain" /> : <ImagePlus aria-hidden="true" className="size-9 text-base-content/40" />}
+        <div className={`flex min-w-0 flex-col items-center gap-3 ${imageShape} border border-dashed border-base-content/25 bg-base-200/50 p-4 text-center`}>
+          {currentUrl ? <Image unoptimized loading="eager" src={currentUrl} width={640} height={480} alt={accessibleLabel} className={`h-36 w-full ${imageShape} object-contain`} /> : <ImagePlus aria-hidden="true" className="size-9 text-base-content/40" />}
           <div className="flex flex-wrap justify-center gap-2">
             <button ref={node => { fieldRef(node); selectButton.current = node; }} id={inputId} type="button" disabled={locked || busy} className="btn btn-soft btn-sm" aria-describedby={description} onClick={() => fileInput.current?.click()}><Upload aria-hidden="true" size={16} />{currentUrl ? "Cambiar imagen" : "Seleccionar imagen"}</button>
             {currentUrl && <button type="button" disabled={locked || busy} className="btn btn-ghost btn-sm" onClick={remove}><X aria-hidden="true" size={16} />Quitar imagen</button>}
