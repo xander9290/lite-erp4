@@ -37,6 +37,7 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#notebook">Notebook</a>
             <a className="btn btn-sm btn-outline" href="#field-select-statebar">Statebar</a>
             <a className="btn btn-sm btn-outline" href="#field-text">FieldText</a>
+            <a className="btn btn-sm btn-outline" href="#field-text-phone">Teléfono</a>
             <a className="btn btn-sm btn-outline" href="#field-text-long">Texto largo</a>
             <a className="btn btn-sm btn-outline" href="#field-number">FieldNumber</a>
             <a className="btn btn-sm btn-outline" href="#field-select">FieldSelect</a>

@@ -1,4 +1,10 @@
 import { z } from "zod";
+import { formatPhone } from "@/components/ui/form/phone";
+
+export const phoneSampleSchema = z.object({
+  phone: z.string().transform(formatPhone).pipe(z.string().regex(/^\+52 \d{2} \d{4} \d{4}$/, "Teléfono: escribe diez dígitos mexicanos, con prefijo +52 opcional.")),
+});
+export type PhoneSampleValues = z.infer<typeof phoneSampleSchema>;
 
 const uniqueIds = (maximum: number) => z.array(z.string().min(1)).max(maximum, `Selecciona como máximo ${maximum} registros.`)
   .refine(ids => new Set(ids).size === ids.length, "La selección contiene registros duplicados.");

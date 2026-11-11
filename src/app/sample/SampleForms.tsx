@@ -11,6 +11,7 @@ import FieldBoolean from "@/components/ui/form/FieldBoolean";
 import FormLayout from "@/components/ui/form/FormLayout";
 import FormGroup from "@/components/ui/form/FormGroup";
 import {
+  phoneSampleSchema, type PhoneSampleValues,
   textSampleSchema, textSampleDefaults, textSampleExample, type TextSampleValues,
   longTextSampleSchema, longTextSampleDefaults, longTextSampleExample, type LongTextSampleValues,
   numberSampleSchema, numberSampleDefaults, numberSampleExample, type NumberSampleInput, type NumberSampleValues,
@@ -82,6 +83,26 @@ function TextSample() {
           <p className="text-xs text-base-content/60">Sin label, el input ocupa todo el ancho disponible. La contraseña se oculta en el resultado.</p>
         </FormGroup>
         <SampleActions onReset={() => reset(textSampleDefaults)} onExample={() => reset(textSampleExample)} />
+      </FormLayout>
+      <SampleResult value={submitted} change={change} />
+    </SampleCard>
+  );
+}
+
+function PhoneSample() {
+  const methods = useForm<PhoneSampleValues>({ resolver: zodResolver(phoneSampleSchema), defaultValues: { phone: "" } });
+  const [submitted, setSubmitted] = useState<PhoneSampleValues | null>(null);
+  const [change, setChange] = useState<string>();
+  function reset(phone: string) {
+    methods.reset({ phone }); setSubmitted(null); setChange(undefined);
+  }
+  return (
+    <SampleCard id="field-text-phone" title="FieldText · Teléfono" description={'widget="phone": escribe 3321659874 y sal del campo para obtener +52 33 2165 9874. Acepta espacios, paréntesis y guiones. La validación exige diez dígitos mexicanos.'}>
+      <FormLayout methods={methods} onSubmit={data => setSubmitted(data)} onInvalid={() => setSubmitted(null)} aria-labelledby="field-text-phone-title">
+        <FormGroup legend="Teléfono mexicano">
+          <FieldText<PhoneSampleValues> name="phone" label="Teléfono" widget="phone" direction="inline" placeholder="+52 33 2165 9874" required onChange={setChange} />
+        </FormGroup>
+        <SampleActions onReset={() => reset("")} onExample={() => reset("3321659874")} />
       </FormLayout>
       <SampleResult value={submitted} change={change} />
     </SampleCard>
@@ -223,5 +244,5 @@ function BooleanSample() {
 }
 
 export default function SampleForms() {
-  return <><TextSample /><LongTextSample /><NumberSample /><SelectSample /><DateSample /><BooleanSample /></>;
+  return <><TextSample /><PhoneSample /><LongTextSample /><NumberSample /><SelectSample /><DateSample /><BooleanSample /></>;
 }

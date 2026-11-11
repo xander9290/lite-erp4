@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-10.
+Última actualización: 2026-11-11.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
@@ -61,6 +61,23 @@ aplicación por adelantado. Guía: [README de Flota](../src/app/(auth)/erp/flota
 
 ## Siguiente paso concreto
 
+Estado contrastado con el commit `340be8e` el 2026-11-11: Fabricante ya fue
+recreado. Existen `models/Fabricante.ts`, registro en perfil/manifest, servicio,
+acciones, lista/formulario, rutas, contrato y binding generado. Sus campos son
+`name`, `logo` (Text opcional) y `active`; el formulario usa FieldText para logo.
+El esquema Prisma incluye FlotaFabricante y está versionada la migración
+`20261111043608_sync_flota`. La presencia de esos archivos no confirma que la
+migración esté aplicada ni que el cliente local esté actualizado en esta máquina.
+
+El siguiente trabajo pendiente del framework es Fields.Image y su integración
+con el scaffold, con proveedor de subida explícito: ver
+[Campos de imagen](ideas/campos-imagen.md). No implementado ni autorizado por la
+sola puesta en contexto. No volver a ejecutar create:model/create:views para
+Fabricante ni reemplazar sus personalizaciones. Conservar la comprobación
+funcional pendiente de «Mis vehículos activos».
+
+Antecedente histórico de retirada (superado por la recreación anterior):
+
 El usuario pidió revertir Fabricante para probar el nuevo scaffold. La práctica se
 retiró de forma específica: ya no hay clase, registro en orm.config/manifest,
 servicio, acciones, contrato ni vistas/rutas de Fabricante. La tabla estaba vacía
@@ -76,15 +93,15 @@ Después se regeneraron contratos, cliente Prisma y binding de vehículos con la
 herramientas actuales. FlotaRecord.store.ts quedó idéntico al respaldo previo,
 conservando las mejoras del framework. Los vehículos mantienen brand como texto.
 
-Siguiente ejercicio, a cargo del usuario:
+Ejercicio propuesto entonces y ya reflejado en el código actual:
 
 ```bash
 npm run create:model -- flota Fabricante
 ```
 
 Personalizar campos/reglas y clientFields; después create:views y orm:sync.
-El agente ya comprobó --dry-run sin escribir: permite crear FlotaFabricante y
-registrarlo nuevamente. No ejecutar la recreación por adelantado.
+El agente comprobó entonces --dry-run sin escribir. Esa comprobación es histórica;
+el modelo y las vistas ya existen en el checkout actual.
 
 Respaldo local de la práctica anterior: /private/tmp/lite-erp-fabricante-cj8494k2
 (con files.json y rollback.json). Es una copia temporal en esta máquina, no un
@@ -94,6 +111,27 @@ el scaffold nuevo. Conservar los pendientes funcionales previos de dominios y
 actividad de vehículos cuando no exista confirmación explícita del usuario.
 
 ## Último trabajo y verificaciones
+
+- 2026-11-11: FieldText añade `widget="phone"` para teléfonos mexicanos. Usa
+  type/inputMode tel y formatea al perder foco: diez dígitos, con prefijo 52/+52
+  opcional y separadores habituales, se convierten a `+52 33 2165 9874`.
+  Actualiza RHF/onChange antes de onBlur; conserva texto incompleto/inválido para
+  validación y respeta readOnly. Helper puro reutilizable y contrato en
+  [FieldText](../src/components/ui/form/FieldText.md). Demo RHF/Zod obligatoria
+  en `/sample#field-text-phone`, con normalización también al enviar.
+  No se cambiaron formularios de las aplicaciones ni validaciones de Partner.
+  Verificados dos tests de formato/validación (prefijos, separadores, idempotencia,
+  vacíos, extensiones y entradas inválidas), ESLint de archivos afectados y
+  TypeScript. El primer tsc detectó Prisma Client local sin Fabricante: se
+  regeneró con db:generate y la segunda comprobación pasó. No se aplicaron
+  migraciones ni se comprobó persistencia; sin nueva revisión visual o build.
+
+- 2026-11-11: puesta en contexto en Windows leyendo AGENTS.md, README, estado,
+  guías de modelos/vistas e imágenes, Git y fuentes/artefactos de Flota. Árbol
+  limpio al inicio en `340be8e`. Detectado y corregido el resumen obsoleto de
+  Fabricante retirado. Inspección de archivos únicamente; no se ejecutaron suites,
+  generación, migraciones ni comprobaciones de servidor/base local. Las pruebas
+  anteriores siguen siendo evidencia histórica de sus respectivos alcances.
 
 - 2026-11-10: retirada de Fabricante solicitada para probar el scaffold desde cero.
   Copia de 11 archivos de la práctica y snapshots compartidos/gestionados en el

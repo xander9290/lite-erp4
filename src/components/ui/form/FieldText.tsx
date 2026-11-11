@@ -4,12 +4,14 @@ import { useId, useState, type InputHTMLAttributes, type TextareaHTMLAttributes 
 import { Eye, EyeOff } from "lucide-react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import type { BaseFieldProps } from "./field.types";
+import { formatPhone } from "./phone";
 import { fieldDirectionClassName, fieldInputClassName, fieldTextareaClassName, fieldLabelClassName } from "./field.styles";
 
 type TextControl = HTMLInputElement | HTMLTextAreaElement;
 type ControlledProps<TFieldValues extends FieldValues> = keyof BaseFieldProps<TFieldValues, string> | "type" | "value" | "defaultValue" | "children";
 export type FieldTextProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string> & (
   | (Omit<InputHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget?: "input"; type?: "text" | "password" })
+  | (Omit<InputHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget: "phone"; type?: "tel" })
   | (Omit<TextareaHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget: "long"; type?: "text" })
 );
 
@@ -73,7 +75,8 @@ export default function FieldText<TFieldValues extends FieldValues = FieldValues
           disabled={fieldDisabled}
           id={inputId}
           autoComplete="off"
-          type={type === "password" && passwordVisible ? "text" : type}
+          type={widget === "phone" ? "tel" : type === "password" && passwordVisible ? "text" : type}
+          inputMode={widget === "phone" ? "tel" : inputProps.inputMode}
           value={fieldValue ?? ""}
           className={`${fieldInputClassName} ${type === "password" ? "px-10 [&::-ms-reveal]:hidden" : "px-1"} ${className}`}
           style={type === "password" ? { ...style, textAlign: "center" } : style}
@@ -86,6 +89,13 @@ export default function FieldText<TFieldValues extends FieldValues = FieldValues
             onChange?.(value);
           }}
           onBlur={(event) => {
+            if (widget === "phone" && !inputProps.readOnly) {
+              const value = formatPhone(event.currentTarget.value);
+              if (value !== event.currentTarget.value) {
+                updateField(value);
+                onChange?.(value);
+              }
+            }
             blurField();
             onBlur?.(event);
           }}
