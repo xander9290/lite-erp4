@@ -11,7 +11,8 @@ export type ListFilter = { field: string; operator: ListFilterOperator; value?: 
 export type ListColumn = {
   field: string;
   label: string;
-  widget?: "partner" | "image";
+  widget?: "partner" | "image" | "many2one";
+  options?: readonly { value: string; label: string }[];
   imageSize?: "sm" | "md" | "lg";
   imageShape?: "rounded" | "squared";
   avatarField?: string;
@@ -43,8 +44,8 @@ export type ListGroupValue = string | number | boolean | null;
 export type ListState = { query: string; page: number; pageSize: number; sort: string; direction: "asc" | "desc"; filters: ListFilter[]; invalidFilters?: boolean; groupBy?: string[]; groupPath?: ListGroupValue[] };
 export type ListValue = string | number | boolean | null | ListValue[] | { [key: string]: ListValue };
 export type ListRecord = { id: string; [key: string]: ListValue };
-export type ListGroup = { value: ListGroupValue; count: number };
-export type ListPage = { rows: ListRecord[]; total: number; page: number; pageSize: number; groups?: ListGroup[]; hasMoreGroups?: boolean };
+export type ListGroup = { value: ListGroupValue; count: number; label?: string };
+export type ListPage = { rows: ListRecord[]; total: number; page: number; pageSize: number; groups?: ListGroup[]; groupField?: string; hasMoreGroups?: boolean };
 export type ListResult = { ok: true; data: ListPage } | { ok: false; error: string };
 
 const partnerWidgets: Record<ListModel, Readonly<Record<string, string>>> = {
@@ -79,4 +80,13 @@ export function readListValue(record: ListRecord, path: string): ListValue {
     value = value[part];
   }
   return value;
+}
+
+/** Presentation only: the stored scalar remains available through readListValue. */
+export function readListDisplayValue(record: ListRecord, column: ListColumn): ListValue {
+  const value = readListValue(record, column.field);
+  if (column.widget !== "many2one" || value === null || value === "") return value;
+  const labels = Object.hasOwn(record, "$labels") ? record.$labels : null;
+  const label = labels && typeof labels === "object" && !Array.isArray(labels) && Object.hasOwn(labels, column.field) ? labels[column.field] : null;
+  return label && typeof label === "object" && !Array.isArray(label) && label.value === value && typeof label.label === "string" ? label.label : "No disponible";
 }

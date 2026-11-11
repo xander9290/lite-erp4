@@ -79,8 +79,12 @@ todavía no se contrasta automáticamente con el catálogo general de aplicacion
 Esta versión permite **modelos nuevos**, repeticiones sin cambios y actualizaciones
 aditivas explícitas mediante `--update`. Sin ese flag se detiene si cambia un modelo
 instalado. Se admiten campos opcionales, obligatorios con default SQL literal,
-modelos nuevos y valores adicionales de enum. Se conservan las definiciones previas;
-renombrados, cambios de tipo, retiradas de campos y desinstalación requieren otro
+modelos nuevos y valores adicionales de enum. También se admite ampliar el límite
+de un `String @db.VarChar(n)` a un valor mayor, manteniendo idénticos nombre,
+nulabilidad, default, índices y mapeos. Esto permite aumentar `Fields.Text.maxLength`
+sin editar archivos gestionados ni hashes a mano; revisar el ALTER TABLE antes de
+aplicarlo, pues sigue siendo una migración de base de datos.
+Reducciones de longitud, renombrados, otros cambios de tipo, retiradas de campos y desinstalación requieren otro
 flujo. Cada actualización necesita revisar y aplicar su migración. Nunca se fuerza
 una actualización borrando el registro de propiedad.
 

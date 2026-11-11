@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import { isField, type Field, type FieldMetadata } from "./fields";
 import type { ModelContext } from "./context";
+import { displayFieldPaths, projectDisplayRecord } from "./display";
 
 const modelTag = Symbol("orm.model");
 
@@ -40,9 +41,7 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     shape[name] = value.schema;
   }
   if (!Object.keys(fields).length) throw new Error("El modelo debe declarar al menos un Field.");
-  const displayFields = instance.displayFields ?? (metadata.name?.kind === "text" && !metadata.name.sensitive ? ["name"] : []);
-  if (!Array.isArray(displayFields) || displayFields.length > 12 || new Set(displayFields).size !== displayFields.length || displayFields.some(name => name !== "id" && (!Object.hasOwn(metadata, name) || metadata[name].sensitive))) throw new Error("displayFields sólo admite campos escalares declarados no sensibles o id.");
-  const displayKeys = Object.freeze([...new Set(["id", ...displayFields])]);
+  const displayKeys = displayFieldPaths(metadata, instance.displayFields);
   // Runtime collection filters precisely the descriptor keys represented by Shape.
   const schema = z.strictObject(shape as Shape<InstanceType<C>>);
   return Object.freeze({
@@ -52,11 +51,10 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     schema,
     displayFields: displayKeys,
     displayName(record: Readonly<Record<string, unknown>>): string {
-      if (typeof record.id !== "string" || !record.id) throw new Error("displayName necesita el ID del registro.");
-      const projected = Object.freeze(Object.fromEntries(displayKeys.map(key => [key, record[key]])));
+      const projected = projectDisplayRecord(record, displayKeys);
       const label = instance.displayName ? instance.displayName(projected) : projected.name ?? record.id;
       if (typeof label !== "string") throw new Error("displayName debe devolver texto de forma síncrona.");
-      return label.trim() || record.id;
+      return label.trim() || projected.id;
     },
     createDefaults(): Input<InstanceType<C>> {
       return Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, field.createDefault()])) as Input<InstanceType<C>>;

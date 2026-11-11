@@ -1,3 +1,4 @@
+import { flotaModeloModel } from "./models/Modelo";
 import { flotaFabricanteModel } from "./models/Fabricante";
 import "server-only";
 import type { GenerationProfile } from "@/lib/orm/generator/profile";
@@ -16,6 +17,11 @@ export const generationProfile = {
       {
         model: flotaFabricanteModel,
         clientFields: ["name", "active", "avatar", "logo"],
+      },
+
+      {
+        model: flotaModeloModel,
+        clientFields: ["name", "active", "fabricanteId", "vehicleType"],
       },
     ],
   },

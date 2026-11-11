@@ -8,7 +8,8 @@ npm run orm:sync -- flota
 
 Sustituye flota por el ID de tu aplicación. Antes, declara los modelos, publica sus
 campos en orm.config.ts y registra los modelos en el manifest. El comando sirve
-tanto para la primera instalación como para cambios aditivos posteriores; no crea
+tanto para la primera instalación como para cambios aditivos posteriores y ampliaciones
+de VARCHAR que conservan el resto de atributos del campo; no crea
 vistas ni acciones nuevas en aplicaciones existentes.
 
 ## Qué hace

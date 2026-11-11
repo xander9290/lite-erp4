@@ -175,7 +175,35 @@ el espacio disponible. En catálogos o paneles se puede definir altura explícit
 como `className="h-[42rem]"`. CardView adapta las columnas al ancho; KanbanView
 conserva columnas legibles con scroll horizontal y scroll vertical por columna.
 
-## Verificación
+## Etiquetas Many2one y Selection
+
+Una columna `widget: "many2one"` presenta el nombre del registro relacionado sin
+reemplazar el ID guardado. El scaffold conecta el mismo `--lookup` autorizado del
+formulario a las acciones de lista/kanban. Las vistas existentes pueden hacerlo
+explícitamente en servidor:
+
+```ts
+return resolveListLabels(await queries.listRecords(state), {
+  fabricanteId: lookupFabricantes,
+});
+```
+
+Importar `resolveListLabels` de `@/lib/list/relation-labels`. Los proveedores son
+fijos del servidor, nunca elegidos por el navegador. Cada uno autoriza su consulta;
+lista y etiquetas se consultan en transacciones separadas. La respuesta incluye
+sólo etiquetas auxiliares en `$labels`, sin objetos completos del lookup. Se
+deduplican IDs por página y se dividen en lotes de hasta cien, sin caché compartida
+entre usuarios. Un fallo del proveedor rechaza la página; una referencia ausente
+se muestra como «No disponible» y una vacía conserva el estado vacío.
+
+ListView (incluidos vista rápida y grupos), CardView y KanbanView comparten esa
+presentación. Selection usa `options` en celdas y encabezados de grupo. Orden y
+filtros siguen actuando sobre los escalares originales; esta mejora no agrega
+búsqueda/orden por etiquetas ni agrupación por rutas. Para grupos propios, publicar
+`groupField` del nivel actual, preferiblemente mediante `groupedPage`.
+Ejemplo ficticio junto al formulario RHF/Zod en `/sample#model-display-name`.
+
+## Comprobaciones
 
 ```sh
 npm run test:views

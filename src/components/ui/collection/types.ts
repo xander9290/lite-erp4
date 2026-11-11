@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { ListColumn, ListRecord, ListResult, ListState, ListViewConfig } from "@/lib/list/types";
 import type { ListBreadcrumb } from "../list/ListBreadcrumbs";
 
-export type CollectionField = ListColumn & { options?: readonly { value: string; label: string }[] };
+export type CollectionField = ListColumn;
 export type CollectionProps = {
   model: string; title: string; description?: string; icon?: ReactNode;
   columns: readonly CollectionField[]; searchFields?: readonly string[];

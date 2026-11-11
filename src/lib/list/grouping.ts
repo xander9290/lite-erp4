@@ -24,9 +24,15 @@ export function groupingPlan(columns: readonly ListColumn[], state: ListState) {
 
 export type GroupQuery = { where: Record<string, unknown>; field: string; skip: number; take: number };
 export function groupedPage(state: ListState, total: number, groups: ListGroup[]): ListPage {
-  return { rows: [], total, page: state.page, pageSize: state.pageSize, groups: groups.slice(0, state.pageSize), hasMoreGroups: groups.length > state.pageSize };
+  return { rows: [], total, page: state.page, pageSize: state.pageSize, groups: groups.slice(0, state.pageSize), groupField: state.groupBy?.[state.groupPath?.length ?? 0], hasMoreGroups: groups.length > state.pageSize };
 }
 
 export function groupValueLabel(value: ListGroupValue) {
   return value === null ? "Sin valor" : value === "" ? "Texto vacío" : typeof value === "boolean" ? value ? "Sí" : "No" : String(value);
+}
+
+export function groupDisplayLabel(group: ListGroup, column?: ListColumn) {
+  if (group.value === null || group.value === "") return groupValueLabel(group.value);
+  if (column?.widget === "many2one") return group.label?.trim() || "No disponible";
+  return column?.options?.find(option => option.value === group.value)?.label ?? groupValueLabel(group.value);
 }

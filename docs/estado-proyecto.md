@@ -128,6 +128,61 @@ actividad de vehículos cuando no exista confirmación explícita del usuario.
 
 ## Último trabajo y verificaciones
 
+- 2026-11-11: el instalador permite ampliar String VARCHAR(n) a un límite mayor
+  conservando todos los demás atributos; las reducciones y otros cambios siguen
+  bloqueados. Caso real: el usuario cambió FlotaModelo.name de 5 a 120 y orm:sync
+  se detenía en la comprobación aditiva. Se corrigió el framework, sin editar el
+  esquema instalado ni hashes manualmente. Plan `orm:install -- flota --update`
+  comprobado sin --write: propone sólo ALTER TABLE flota_modelo ALTER COLUMN name
+  SET DATA TYPE VARCHAR(120). No se ejecutó SQL, migración ni generación de cliente.
+  Tres pruebas de evolución, TypeScript y ESLint aprobados; cubren ampliación
+  requerida/opcional y rechazos de reducciones, cambios de nulabilidad, defaults,
+  mapeos y textos que sólo contienen una apariencia de atributo Prisma.
+  Próximo paso del usuario: repetir orm:sync -- flota y revisar/aprobar el SQL.
+
+- 2026-11-11: presentación de Many2one en colecciones y encabezados agrupados.
+  `resolveListLabels` reutiliza proveedores autorizados por lotes, conserva IDs
+  y publica sólo nombres auxiliares. El scaffold conecta el `--lookup` también
+  a listRecords/loadKanban; Modelo quedó conectado al lookup de Fabricante.
+  `groupedPage` incluye groupField y los grupos admiten label independiente de
+  value: no se fusionan IDs con nombres iguales. Selection muestra sus opciones
+  también en tabla y grupos. ListView/vista rápida/CardView/Kanban comparten la
+  presentación; no se amplió búsqueda/orden por etiquetas ni rutas agrupables.
+  Contratos en [Colecciones](vistas-colecciones.md) y [Agrupación](agrupacion-listas.md).
+- Verificaciones de esta corrección: 18/18 pruebas de etiquetas, agrupación y
+  servicio, TypeScript, ESLint y diff-check aprobados. Comprueban grupos anidados, página de grupos,
+  nombres iguales, null, referencia ausente, permisos/errores y claves intactas.
+  En el trabajo inmediatamente anterior pasaron también 10/10 del scaffold,
+  incluida compilación de vistas Many2one con lookup explícito en proyecto temporal;
+  esta corrección sólo amplía el resolvedor compartido y el DTO/render de grupos.
+  La comprobación visual anterior se detuvo porque Computer Use no pudo determinar
+  la URL del navegador; no afirmar validación visual nueva. No se ejecutó SQL ni
+  se modificaron datos del ERP. Siguiente paso: recargar la lista agrupada de Modelo
+  y confirmar «Fabricante: Volkswagen» en el encabezado.
+
+- 2026-11-11: `displayFields` admite rutas Many2one de hasta tres saltos, como
+  `fabricante.name`, con método `displayName` síncrono. El generador verifica
+  destinos del mismo perfil, publicación explícita y ausencia de sensibles en
+  cada salto. Los bindings cargan proyecciones anidadas por página/lote; sólo
+  ID/label sale del servicio. Relaciones vacías y copias anidadas congeladas
+  soportadas. Agregar rutas exige `orm:bind` o `orm:sync`; no cambia SQL por sí
+  solo. Contrato y límites en [Nombres de presentación](nombres-presentacion.md).
+  La demo RHF/Zod ficticia `/sample#model-display-name` muestra fabricante y
+  relación vacía; no se editó ni sincronizó la aplicación Flota durante esta mejora.
+- Verificación de esta mejora: 10/10 pruebas específicas de displayName aprobadas,
+  incluyendo privacidad, permisos/sesión, adaptadores anteriores, tres saltos y
+  compilación de bindings con un Prisma Client real generado en un proyecto
+  temporal sin conexión a BD. `test:scaffold` 10/10, `tsc --noEmit`, ESLint de los
+  archivos afectados y `git diff --check` aprobados. No se comprobó esta demo
+  nueva en navegador ni se ejecutaron migraciones o consultas contra el ERP.
+- Suites amplias de esta sesión: `test:orm` 44/45 aprobadas antes de añadir las
+  dos últimas pruebas (después aprobadas en la suite específica); queda el fallo
+  histórico EPERM al crear un symlink de archivo en Windows, incluso fuera del
+  sandbox. `test:orm:install` dentro del sandbox: 9/14; sus cinco fixtures fallan
+  al crear symlinks de directorio. No presentar estas suites completas como aprobadas.
+  Próximo paso de tutoría: declarar las dependencias en el modelo que el usuario
+  elija y regenerar el binding cuando sus modelos/esquema estén sincronizados.
+
 - 2026-11-11: aplicada la presentación compacta a CardView y al header compartido
   con KanbanView. Retirado bloque visible de icono/título/descripción/contador;
   title sigue accesible y los totales quedan en footer/columnas. Breadcrumbs
@@ -506,6 +561,23 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
   Las pruebas de código anteriores son históricas y no se repitieron para esta nota.
 
 ## Oportunidades de mejora pendientes
+
+- **Simplificar relaciones y vistas**, registrado el 2026-11-11, sin implementación:
+  incluye también Fields de formulario enlazados al contrato cliente del modelo
+  para heredar etiqueta, required, maxLength, opciones y lookup configurado,
+  manteniendo componentes y props explícitos. Control automático FormView.Field
+  sólo como alternativa posterior por evaluar.
+  ampliado con columnas JSX `ListView.Field` dentro de la vista, `foo.list.ts`
+  opcional y política de consultas independiente fijada en el servidor.
+  Conservar `columns` y personalizaciones; los hijos JSX no conceden permisos.
+  priorizar proveedores lookup por convención y etiquetas centralizadas en el
+  servicio. Después evaluar presentación derivada de Fields, tipado de
+  displayName y propuestas de actualización de vistas que preserven
+  personalizaciones. Motivo, orden y criterios de aceptación en
+  [el pendiente específico](ideas/simplificar-relaciones-y-vistas.md).
+  Esta anotación sólo modifica documentación; verificada con `git diff --check`.
+  Próximo paso al retomarlo: diseñar los dos primeros puntos con ejemplos de
+  código antes/después; no se inicia su implementación con esta anotación.
 
 - **Retirada segura de archivos remotos:** falta inventario de assets y referencias
   de todos los consumidores. Motivo: no se puede deducir propiedad/ausencia de uso

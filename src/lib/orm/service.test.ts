@@ -12,6 +12,17 @@ import type { ListActionOptions } from "./domain";
 const model = defineModel(class Example extends Model { name = Fields.Text({ required: true }); }, { name: "AuditExample", table: "audit_examples" });
 const repository = unboundRepository<{ name: string }>();
 
+test("relation presentation requires a non-sensitive Many2one scalar", () => {
+  const related = defineModel(class extends Model {
+    name = Fields.Text();
+    brandId = Fields.Many2one("Brand");
+    hiddenId = Fields.Many2one("Brand", { sensitive: true });
+  }, { name: "RelatedExample", table: "related_example" });
+  const create = (field: string) => createModelService(related, unboundRepository<ReturnType<typeof related.parse>>(), { columns: [{ field, label: field, widget: "many2one" }], searchFields: [] });
+  assert.doesNotThrow(() => create("brandId"));
+  for (const field of ["name", "hiddenId", "brand.name", "$labels", "unknown"]) assert.throws(() => create(field));
+});
+
 test("collection images require a declared public Image scalar and bounded presentation options", () => {
   const images = defineModel(class extends Model {
     name = Fields.Text();

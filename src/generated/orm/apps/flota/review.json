@@ -13,6 +13,18 @@
       "field": "flotaFabricanteCreatedRecords",
       "declaration": "  flotaFabricanteCreatedRecords FlotaFabricante[] @relation(\"FlotaFabricante_createBy\")",
       "owner": "@core"
+    },
+    {
+      "target": "FlotaFabricante",
+      "field": "flotaModeloFabricanteIdRecords",
+      "declaration": "  flotaModeloFabricanteIdRecords FlotaModelo[] @relation(\"FlotaModelo_fabricanteId\")",
+      "owner": "flota"
+    },
+    {
+      "target": "User",
+      "field": "flotaModeloCreatedRecords",
+      "declaration": "  flotaModeloCreatedRecords FlotaModelo[] @relation(\"FlotaModelo_createBy\")",
+      "owner": "@core"
     }
   ],
   "validationOnly": [
@@ -21,7 +33,8 @@
     "FlotaRecord.brand: minLength/trim se validan con Zod; no son CHECKs SQL.",
     "FlotaFabricante.name: minLength/trim se validan con Zod; no son CHECKs SQL.",
     "FlotaFabricante.logo: minLength/trim se validan con Zod; no son CHECKs SQL.",
-    "FlotaFabricante.avatar: URL HTTPS sin credenciales validada con Zod; el contenido remoto y la propiedad del archivo no se verifican en SQL."
+    "FlotaFabricante.avatar: URL HTTPS sin credenciales validada con Zod; el contenido remoto y la propiedad del archivo no se verifican en SQL.",
+    "FlotaModelo.name: minLength/trim se validan con Zod; no son CHECKs SQL."
   ],
   "note": "Propuesta; no se han modificado modelos existentes ni aplicado migraciones."
 }

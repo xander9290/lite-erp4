@@ -49,7 +49,7 @@ export default function KanbanViewClient(props: KanbanViewProps) {
       onDragStart={event => setDragging(event.active.data.current?.record ?? null)} onDragCancel={() => setDragging(null)}
       onDragEnd={event => { setDragging(null); if (event.over) { const record = event.active.data.current?.record as ListRecord | undefined, from = event.active.data.current?.group as string | undefined; if (record && from) void move(record, from, String(event.over.id)); } }}>
       <div className="flex min-h-0 min-w-0 flex-1 gap-4 overflow-x-auto p-4 sm:p-6" aria-label={`Tablero de ${props.title}`}>{props.groups.map(group => <KanbanColumn key={`${group.value}:${version}`} {...props} group={group} state={query.state} currentUrl={query.currentUrl} pending={pending} move={(record, from, to) => { void move(record, from, to); }} registerHandle={registerHandle} onSettled={onSettled} />)}</div>
-      <DragOverlay dropAnimation={null}>{dragging && <article style={{ width: "min(20rem, calc(100vw - 5rem))" }} className="pointer-events-none rotate-2 rounded-xl border border-primary/40 bg-base-100 shadow-2xl" aria-label={`Moviendo ${recordCardTitle(dragging, props.titleField)}`}><RecordCard {...props} recordHref={undefined} record={dragging} currentUrl={query.currentUrl} /></article>}</DragOverlay>
+      <DragOverlay dropAnimation={null}>{dragging && <article style={{ width: "min(20rem, calc(100vw - 5rem))" }} className="pointer-events-none rotate-2 rounded-xl border border-primary/40 bg-base-100 shadow-2xl" aria-label={`Moviendo ${recordCardTitle(dragging, props.titleField, props.columns)}`}><RecordCard {...props} recordHref={undefined} record={dragging} currentUrl={query.currentUrl} /></article>}</DragOverlay>
     </DndContext>
   </CollectionShell>;
 }

@@ -2,6 +2,8 @@ import type { ListColumn, ListValue } from "../../../lib/list/types";
 
 export function formatListValue(value: ListValue, column: ListColumn): string {
   if (value === null || value === "" || typeof value === "object") return "—";
+  const option = column.options?.find(option => option.value === value);
+  if (option) return option.label;
   try {
     if (column.format === "boolean") return value === true ? "Sí" : value === false ? "No" : "—";
     if (column.format === "number" || column.format === "currency") {

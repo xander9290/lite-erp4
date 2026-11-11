@@ -24,6 +24,7 @@ import { activityRequestSchema, activityNoteSchema, type ActivityResult, type Ac
 import { recordActivity, readActivity } from "./activity.server";
 import { modelLookupSchema } from "../many2one/model-lookup";
 import type { Many2OneResult } from "../many2one/types";
+import { displayFieldPaths, projectDisplayRecord } from "./display";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = {
@@ -63,7 +64,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   if (!config.columns.length || config.columns.length > 12 || new Set(config.columns.map(column => column.field)).size !== config.columns.length || config.columns.some(column => {
     const avatar = presentation.audit && auditAvatarField(column.field);
     const image = column.widget === "image" && model.metadata[column.field]?.kind === "image" && !model.metadata[column.field].sensitive && (!column.format || column.format === "text");
-    return !allowed.has(column.field) || !validImageColumnOptions(column) || (column.widget && !(image || (column.widget === "partner" && avatar && (!column.avatarField || column.avatarField === avatar) && (!column.format || column.format === "text")))) || (column.avatarField !== undefined && (column.widget !== "partner" || column.avatarField !== avatar)) || (column.type && column.type !== columnType(column.field));
+    const relation = column.widget === "many2one" && model.metadata[column.field]?.kind === "many2one" && !model.metadata[column.field].sensitive && (!column.format || column.format === "text");
+    return !allowed.has(column.field) || !validImageColumnOptions(column) || (column.widget && !(image || relation || (column.widget === "partner" && avatar && (!column.avatarField || column.avatarField === avatar) && (!column.format || column.format === "text")))) || (column.avatarField !== undefined && (column.widget !== "partner" || column.avatarField !== avatar)) || (column.type && column.type !== columnType(column.field));
   }) || config.searchFields.length > 6 || config.searchFields.some(name => name !== "id" && model.metadata[name]?.kind !== "text" && model.metadata[name]?.kind !== "many2one" && !(presentation.audit && ["createByUser.login", "createByUser.partner.name"].includes(name)))) throw new Error("La lista sólo puede publicar campos declarados o auditoría habilitada y búsquedas de texto permitidas.");
   // Normalize date types for server filters even when the view omitted an explicit type.
   config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));
@@ -272,8 +274,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       return await prisma.$transaction(async tx => {
         await assertActor(tx, actor);
         if (!repository.lookup) throw new Error("MODEL_NOT_BOUND");
-        const fields = [...new Set(["id", ...(model.displayFields ?? (model.metadata.name?.kind === "text" && !model.metadata.name.sensitive ? ["name"] : []))])];
-        if (fields.some(field => field !== "id" && (!model.metadata[field] || model.metadata[field].sensitive))) throw new Error("Invalid display fields");
+        const fields = displayFieldPaths(model.metadata, model.displayFields);
+        if (fields.some(field => field.includes(".") && !repository.lookupPaths?.includes(field))) throw new Error("MODEL_NOT_BOUND");
         const search = config.searchFields.filter(field => model.metadata[field]?.kind === "text" && !model.metadata[field].sensitive);
         const predicates: Record<string, unknown>[] = [];
         if (request.id) predicates.push({ id: request.id });
@@ -288,7 +290,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const records = total ? await repository.lookup(tx, { fields, where, skip: (page - 1) * pageSize, take: pageSize }) : [];
         return { ok: true as const, total, page, pageSize, items: records.map(row => {
           if (typeof row.id !== "string") throw new Error("Invalid lookup record");
-          const record = Object.freeze(Object.fromEntries(fields.map(field => [field, row[field] instanceof Date ? row[field].toISOString() : row[field]])));
+          const record = projectDisplayRecord(row, fields);
           // Only the label and ID leave this service, never the inputs used to construct it.
           const label = model.displayName ? model.displayName(record) : typeof record.name === "string" ? record.name.trim() || row.id : row.id;
           return { value: row.id, label, record: { id: row.id } };

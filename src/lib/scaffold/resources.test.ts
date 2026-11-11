@@ -44,6 +44,10 @@ test("view templates support typed fields, modal guards and explicit kanban stat
   assert.match(template.files["views/WorkForm.tsx"], /FieldNumber<RecordInput>/);
   assert.match(template.files["views/WorkForm.tsx"], /FieldDate<RecordInput>/);
   assert.match(template.files["views/WorkForm.tsx"], /FieldMany2One<RecordInput>/);
+  assert.match(template.files["views/work.list.ts"], /"field":"ownerId".*"widget":"many2one"/);
+  assert.match(template.files["actions/work.actions.ts"], /resolveListLabels\(await queries.listRecords\(state\), relationLookups\)/);
+  assert.match(template.files["actions/work.actions.ts"], /resolveListLabels\(await queries.loadKanban\(request\), relationLookups\)/);
+  assert.match(template.files["actions/work.actions.ts"], /model: "partner"/);
   assert.match(template.files["views/WorkForm.tsx"], /FieldImage<RecordInput>.*upload=\{imageUploads.logo\}/);
   assert.match(template.files["views/WorkForm.tsx"], /generated\/orm\/uploads\/test\/TestWork.images/);
   assert.doesNotMatch(template.files["actions/work.actions.ts"], /createModelImageSigner/);
@@ -107,13 +111,13 @@ test("CLI model first then views preserves sources and produces a compilable edi
     await assert.rejects(readFile(join(base, "models/Work.ts")), /ENOENT/);
     run("create-model.ts", ["prueba", "Work"]);
     const modelPath = join(base, "models/Work.ts");
-    await writeFile(modelPath, (await readFile(modelPath, "utf8")).replace("  // Define aquí", '  state = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Hecho"}] as const, {required:true,default:"draft"});\n  logo = Fields.Image({folder:"tests/work",tracking:true});\n  // Define aquí'));
+    await writeFile(modelPath, (await readFile(modelPath, "utf8")).replace("  // Define aquí", '  state = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Hecho"}] as const, {required:true,default:"draft"});\n  logo = Fields.Image({folder:"tests/work",tracking:true});\n  parentId = Fields.Many2one("PruebaRecord");\n  // Define aquí'));
     const profilePath = join(base, "orm.config.ts");
-    await writeFile(profilePath, (await readFile(profilePath, "utf8")).replace('model: pruebaWorkModel, clientFields: ["name", "active"]', 'model: pruebaWorkModel, clientFields: ["name", "active", "state", "logo"]'));
+    await writeFile(profilePath, (await readFile(profilePath, "utf8")).replace('model: pruebaWorkModel, clientFields: ["name", "active"]', 'model: pruebaWorkModel, clientFields: ["name", "active", "state", "logo", "parentId"]'));
     run("create-model.ts", ["prueba", "Work"], 1);
-    run("create-views.ts", ["prueba", "Work", "--views", "list,card,kanban,form", "--form", "modal", "--group", "state", "--dry-run"]);
+    run("create-views.ts", ["prueba", "Work", "--views", "list,card,kanban,form", "--form", "modal", "--group", "state", "--lookup", "parentId=@/app/(auth)/erp/prueba/actions/record.actions#lookupRecords", "--dry-run"]);
     await assert.rejects(readFile(join(base, "views/WorkList.tsx")), /ENOENT/);
-    run("create-views.ts", ["prueba", "Work", "--views", "list,card,kanban,form", "--form", "modal", "--group", "state"]);
+    run("create-views.ts", ["prueba", "Work", "--views", "list,card,kanban,form", "--form", "modal", "--group", "state", "--lookup", "parentId=@/app/(auth)/erp/prueba/actions/record.actions#lookupRecords"]);
     const manifest = await readFile(join(base, "manifest.ts"), "utf8");
     assert.match(manifest, /mis-registros/); assert.match(manifest, /work\/tablero/);
     assert.match(manifest, /Mi comentario y mi nombre/);
@@ -131,7 +135,7 @@ test("CLI model first then views preserves sources and produces a compilable edi
     const formPath = join(base, "views/WorkForm.tsx");
     const customizedForm = await readFile(formPath, "utf8");
     await writeFile(modelPath, (await readFile(modelPath, "utf8")).replace("  // Define aquí", '  detail = Fields.Image({folder:"tests/details"});\n  // Define aquí'));
-    await writeFile(profilePath, (await readFile(profilePath, "utf8")).replace('["name", "active", "state", "logo"]', '["name", "active", "state", "logo", "detail"]'));
+    await writeFile(profilePath, (await readFile(profilePath, "utf8")).replace('["name", "active", "state", "logo", "parentId"]', '["name", "active", "state", "logo", "parentId", "detail"]'));
     run("orm-generate.ts", ["prueba", "--write"]);
     assert.match(await readFile(join(root, "src/generated/orm/uploads/prueba/PruebaWork.images.ts"), "utf8"), /detail: createSigned/);
     assert.equal(await readFile(formPath, "utf8"), customizedForm);

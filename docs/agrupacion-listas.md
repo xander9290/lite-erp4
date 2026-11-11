@@ -51,7 +51,13 @@ implícito de páginas ocultas. Eliminar conserva la confirmación y la recarga 
 contrato existente; no evita autorización ni control de revisión del servidor.
 
 Este primer contrato admite escalares de texto, selección, booleanos y enteros;
-los Many2one escalares se agrupan por ID, sin resolver etiquetas. No agrupa rutas
+los Many2one escalares se agrupan por ID y pueden mostrar su displayName mediante
+`resolveListLabels` y columnas `widget: "many2one"`. `groupedPage` publica el
+`groupField` del nivel actual; el resolvedor consulta sólo los IDs de esa página
+con el lookup autorizado y añade `label`, conservando `value` y conteos. Dos IDs
+con el mismo nombre siguen siendo grupos distintos. Referencias ausentes muestran
+«No disponible»; errores del lookup rechazan la consulta completa. Selection usa
+sus `options` también en encabezados. Esto no habilita agrupación por rutas
 de relaciones (`createByUser.login`), ni fechas/periodos. `null` y cadena vacía son
 grupos distintos; el texto usa igualdad exacta, incluso mayúsculas/minúsculas.
 Los proveedores legacy sin `load` (`partner`, `user`, `dentalAppointment`) no

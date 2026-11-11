@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import type { ListColumn, ListPage, ListRecord } from "@/lib/list/types";
-import { readListValue } from "@/lib/list/types";
+import { readListDisplayValue } from "@/lib/list/types";
 import { formatListValue, listRecordHref, columnAlignment } from "./listFormat";
 import ListCellValue from "./ListCellValue";
 import SelectionCheckbox from "./SelectionCheckbox";
@@ -16,7 +16,7 @@ export default function ListRecordRows({ data, displayColumns, selectedIds, busy
   const canNavigate = Boolean(recordHref && /^\/(?![\/\\])/.test(recordHref));
   return <>{data.rows.map(record => {
               const titleColumn = displayColumns.find(column => column.widget !== "image");
-              const recordTitle = titleColumn ? formatListValue(readListValue(record, titleColumn.field), titleColumn) : record.id;
+              const recordTitle = titleColumn ? formatListValue(readListDisplayValue(record, titleColumn), titleColumn) : record.id;
               const href = canNavigate ? listRecordHref(recordHref!, record.id, currentUrl) : "";
               return <tr key={record.id} aria-selected={selectedIds.includes(record.id)} className={`transition-colors hover:bg-primary/5 ${selectedIds.includes(record.id) ? "bg-primary/5" : ""}`}>
                 <td className="px-4 py-2"><SelectionCheckbox label={`Seleccionar ${recordTitle}`} checked={selectedIds.includes(record.id)} disabled={busy}

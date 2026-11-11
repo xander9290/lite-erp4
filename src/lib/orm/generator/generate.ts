@@ -1,9 +1,11 @@
 import "server-only";
 import type { Field, FieldMetadata } from "../fields";
 import { prismaBlocks, maskPrisma } from "./prisma-source";
+import { lookupProjectionPlan } from "./display";
+import { relationFieldName } from "../display";
 
 export type GenerationModel = {
-  model: { readonly name: string; readonly table: string; readonly fields: Readonly<Record<string, Field>>; readonly metadata: Readonly<Record<string, FieldMetadata>> };
+  model: { readonly name: string; readonly table: string; readonly fields: Readonly<Record<string, Field>>; readonly metadata: Readonly<Record<string, FieldMetadata>>; readonly displayFields?: readonly string[] };
   /** Explicit publication boundary. Adding a private field must not publish it to the browser. */
   clientFields: readonly string[];
 };
@@ -70,7 +72,9 @@ export function generateModule(module: ModuleGeneration, context: GenerationCont
     modelLines.set(model.name, ['  id String @id @default(cuid())']);
   }
 
-  for (const { model } of module.models) {
+  for (const entry of module.models) {
+    const { model } = entry;
+    lookupProjectionPlan(module, entry);
     const lines = modelLines.get(model.name)!;
     const indexes: string[] = [];
     const names = new Set(["id", "createdAt", "updatedAt", "createBy", "createByUser", ...Object.keys(model.fields)]);
@@ -113,7 +117,7 @@ export function generateModule(module: ModuleGeneration, context: GenerationCont
       if (!owner || (!target && !module.depends.includes(owner))) throw new Error(`Declara la dependencia del módulo propietario de ${field.target}.`);
       if (external && !/^\s*id\s+String\b[^\n]*@id\b/m.test(external.maskedBody)) throw new Error(`${field.target} necesita una clave primaria id de tipo String para este Many2one.`);
       if (external && /^\s*id\s+String\b[^\n]*@db\./m.test(external.maskedBody)) throw new Error(`${field.target}.id usa un tipo nativo; su mapeo requiere soporte adicional antes de generar esta relación.`);
-      const relationField = name.endsWith("Id") ? name.slice(0, -2) : `${name}Record`;
+      const relationField = relationFieldName(name);
       if (!relationField || names.has(relationField)) throw new Error(`Campo de relación en conflicto: ${model.name}.${relationField}.`);
       names.add(relationField);
       const relation = `${model.name}_${name}`;

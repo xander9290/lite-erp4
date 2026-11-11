@@ -25,6 +25,7 @@ import {
   type RecordInput,
   type RecordValues,
 } from "../schemas/record.schema";
+import FieldMany2One from "@/components/ui/form/FieldMany2One";
 
 function Editor({
   record,

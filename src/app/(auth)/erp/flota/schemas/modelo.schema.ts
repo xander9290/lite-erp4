@@ -1,0 +1,1 @@
+export { FlotaModeloFields as recordFields, FlotaModeloRecordSchema as recordSchema, createFlotaModeloDefaults as createRecordDefaults, type FlotaModeloRecordInput as RecordInput, type FlotaModeloRecordValues as RecordValues } from "@/generated/orm/apps/flota/FlotaModelo.schema";

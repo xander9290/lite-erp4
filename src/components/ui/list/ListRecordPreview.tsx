@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { FileText, X } from "lucide-react";
-import { readListValue, type ListColumn, type ListRecord } from "@/lib/list/types";
+import { readListDisplayValue, type ListColumn, type ListRecord } from "@/lib/list/types";
 import { formatListValue } from "./listFormat";
 import ListCellValue from "./ListCellValue";
 
@@ -14,7 +14,7 @@ export default function ListRecordPreview({ record, columns, onClose, onAfterClo
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const titleColumn = columns.find(column => column.widget !== "image");
-  const title = titleColumn ? formatListValue(readListValue(record, titleColumn.field), titleColumn) : record.id;
+  const title = titleColumn ? formatListValue(readListDisplayValue(record, titleColumn), titleColumn) : record.id;
   useEffect(() => {
     const dialog = dialogRef.current;
     dialog?.showModal(); titleRef.current?.focus();

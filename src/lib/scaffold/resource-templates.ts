@@ -25,7 +25,22 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
   if (options.group && !views.includes("kanban")) throw new Error("--group sólo se usa con kanban.");
   const title = model.metadata.name?.kind === "text" ? "name" : fields.find(([, field]) => field.kind === "text")?.[0] ?? "id";
   const files: Record<string, string> = {};
-  const columns = fields.slice(0, 12).map(([name, field]) => ({ field: name, label: field.label ?? name, type: field.kind === "integer" ? "integer" : field.kind === "boolean" ? "boolean" : field.kind === "datetime" ? "datetime" : "text", sortable: field.kind !== "image", ...(field.kind === "image" ? { widget: "image", imageShape: "rounded", imageSize: "sm", filterable: false } : {}), ...(field.kind === "boolean" || field.kind === "selection" ? { groupable: true } : {}) }));
+  const relations = fields.filter(([, field]) => field.kind === "many2one");
+  const lookupImports: string[] = [], lookupEntries: string[] = [];
+  const manualLookups = relations.some(([name, field]) => !options.lookups?.[name] && field.kind === "many2one" && ["Partner", "User"].includes(field.target));
+  if (manualLookups) lookupImports.push('import { searchMany2One } from "@/lib/many2one/actions";', 'import { lookupModels } from "@/lib/many2one/types";');
+  for (const [name, field] of relations) {
+    const lookup = options.lookups?.[name];
+    if (lookup) {
+      const [path, exported] = lookup.split("#"), alias = `lookup${name[0].toUpperCase() + name.slice(1)}`;
+      lookupImports.push(`import { ${exported} as ${alias} } from ${quote(path)};`);
+      lookupEntries.push(`${name}: ${alias}`);
+    } else if (field.kind === "many2one" && ["Partner", "User"].includes(field.target)) {
+      const target = field.target === "Partner" ? "partner" : "user";
+      lookupEntries.push(`${name}: (request: ModelLookupRequest) => searchMany2One({ ...request, model: "${target}", searchFields: lookupModels.${target}.searchFields, displayName: lookupModels.${target}.displayName })`);
+    } else throw new Error(`${name}: declara --lookup campo=modulo#exportAsync para resolver el Many2one con un proveedor autorizado.`);
+  }
+  const columns = fields.slice(0, 12).map(([name, field]) => ({ field: name, label: field.label ?? name, type: field.kind === "integer" ? "integer" : field.kind === "boolean" ? "boolean" : field.kind === "datetime" ? "datetime" : "text", sortable: field.kind !== "image", ...(field.kind === "many2one" ? { widget: "many2one" } : {}), ...(field.kind === "image" ? { widget: "image", imageShape: "rounded", imageSize: "sm", filterable: false } : {}), ...(field.kind === "boolean" || field.kind === "selection" ? { groupable: true } : {}) }));
   const searchFields = fields.filter(([, field]) => field.kind === "text").slice(0, 6).map(([name]) => name);
   const selections = fields.filter(([, field]) => field.kind === "selection");
   const images = fields.filter(([, field]) => field.kind === "image");
@@ -48,6 +63,12 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
     .replace(/  listMyRecords:.*\n/, "").replace(/  listActiveRecords:.*\n/, "")
     .replace(/export async function listMyRecords\([\s\S]*?\n}\n/, "")
     .replace(/export async function listActiveRecords\([\s\S]*?\n}\n/, "");
+  if (relations.length && collections.length) {
+    files[`actions/${slug}.actions.ts`] = files[`actions/${slug}.actions.ts`]
+      .replace('"use server";', `"use server";\nimport { resolveListLabels } from "@/lib/list/relation-labels";\n${lookupImports.join("\n")}\nconst relationLookups = { ${lookupEntries.join(", ")} };`)
+      .replace("return queries.listRecords(state);", "return resolveListLabels(await queries.listRecords(state), relationLookups);")
+      .replace("return queries.loadKanban(request);", "return resolveListLabels(await queries.loadKanban(request), relationLookups);");
+  }
 
   const kinds = { list: "Lista", card: "Tarjetas", kanban: "Tablero" };
   const routes = collections.map((kind, index) => ({ kind, route: index ? `${base}/${kind === "card" ? "tarjetas" : kind === "kanban" ? "tablero" : "lista"}` : base }));

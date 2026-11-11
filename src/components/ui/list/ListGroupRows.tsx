@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useEffect, useState, type ComponentProps } from "react";
 import type { ListGroupValue, ListPage, ListResult, ListState } from "@/lib/list/types";
-import { groupValueLabel } from "@/lib/list/grouping";
+import { groupDisplayLabel } from "@/lib/list/grouping";
 import { listDeleteSelectionSchema, type ListDeleteResult, type ListDeleteTarget } from "@/lib/list/selection";
 import ListRecordRows from "./ListRecordRows";
 import { emptyListSelection, selectedPageIds, togglePageRecord, toggleWholePage } from "./listSelection";
@@ -66,7 +66,8 @@ export default function ListGroupRows(props: Props) {
   const [open, setOpen] = useState<string[]>([]);
   const path = props.state.groupPath ?? [];
   const field = props.state.groupBy?.[path.length];
-  const label = props.columns.find(column => column.field === field)?.label ?? field;
+  const column = props.columns.find(column => column.field === field);
+  const label = column?.label ?? field;
   if (!props.data.groups?.length) return <tr><td colSpan={props.columns.length + 2}>Sin grupos para esta consulta.</td></tr>;
   return <>{props.data.groups.map(group => {
     const id = JSON.stringify(group.value), expanded = open.includes(id);
@@ -75,7 +76,7 @@ export default function ListGroupRows(props: Props) {
     return <Fragment key={id}>
       <tr className="bg-base-200/60"><td colSpan={props.columns.length + 2}>
         <button type="button" className="flex w-full items-center gap-2 rounded py-2 text-left font-medium focus-visible:outline-2 focus-visible:outline-primary" style={{ paddingLeft: `${path.length}rem` }} aria-expanded={expanded} onClick={() => setOpen(value => expanded ? value.filter(key => key !== id) : [...value, id])}>
-          <span aria-hidden="true">{expanded ? "▾" : "▸"}</span><span>{label}: {groupValueLabel(group.value)}</span><span className="badge badge-sm badge-ghost">{group.count}</span>
+          <span aria-hidden="true">{expanded ? "▾" : "▸"}</span><span>{label}: {groupDisplayLabel(group, column)}</span><span className="badge badge-sm badge-ghost">{group.count}</span>
         </button>
       </td></tr>
       {expanded && <Branch {...branchProps} path={[...path, group.value]} />}

@@ -13,4 +13,4 @@ export const recordColumns = [
     filterable: false,
   },
 ] as const satisfies readonly CollectionField[];
-export const recordSearchFields = ["name", "logo"] as const;
+export const recordSearchFields = ["name"] as const;

@@ -20,5 +20,6 @@ model User {
   // BEGIN lite-erp:flota:User
   flotaRecordCreatedRecords FlotaRecord[] @relation("FlotaRecord_createBy")
   flotaFabricanteCreatedRecords FlotaFabricante[] @relation("FlotaFabricante_createBy")
+  flotaModeloCreatedRecords FlotaModelo[] @relation("FlotaModelo_createBy")
   // END lite-erp:flota:User
 }

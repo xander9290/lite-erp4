@@ -15,6 +15,8 @@ export interface ModelRepository<T> {
   remove?(tx: Prisma.TransactionClient, id: string, revision: string): Promise<void>;
   count(tx: Prisma.TransactionClient, where: Record<string, unknown>): Promise<number>;
   lookup?(tx: Prisma.TransactionClient, query: { fields: readonly string[]; where: Record<string, unknown>; skip: number; take: number }): Promise<Record<string, unknown>[]>;
+  /** Generated, authorized relation paths. Legacy adapters fail closed until rebound. */
+  readonly lookupPaths?: readonly string[];
   list(tx: Prisma.TransactionClient, query: RepositoryQuery): Promise<ListRecord[]>;
   groups?(tx: Prisma.TransactionClient, query: GroupQuery): Promise<ListGroup[]>;
 }
