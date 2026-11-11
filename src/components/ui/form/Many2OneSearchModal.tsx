@@ -7,11 +7,14 @@ import { readLookupPath, type Many2OneOption, type Many2OneRequest } from "@/lib
 import { useMany2OneSearch } from "./useMany2OneSearch";
 import { toggleRelationTag } from "./relationTagValues";
 
+import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
+
 export type Many2OneColumn = { field: string; label: string };
 
 type SearchModalProps = {
   title: string;
   request: Many2OneRequest;
+  load?: Many2OneLoader;
   initialQuery: string;
   columns?: readonly Many2OneColumn[];
   onClose: () => void;
@@ -29,7 +32,7 @@ export default function Many2OneSearchModal(props: SearchModalProps) {
   const [query, setQuery] = useState(initialQuery);
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<Many2OneOption[]>(() => props.multiple ? [...props.selectedOptions] : []);
-  const { data, error, loading, retry } = useMany2OneSearch({ ...request, query, page }, true);
+  const { data, error, loading, retry } = useMany2OneSearch({ ...request, query, page }, true, 250, props.load);
   const currentPage = data?.page ?? page;
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : currentPage;
   const atLimit = Boolean(props.multiple && draft.length >= props.maxSelected);

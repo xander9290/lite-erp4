@@ -16,6 +16,34 @@ Los archivos del módulo son editables. Los de \`src/generated\`, el catálogo d
 scaffold y los segmentos de Prisma gestionados se actualizan con sus herramientas.
 Conserva esquemas, migraciones y registros de propiedad juntos en el control de versiones.
 
+## Añadir otro modelo a esta aplicación
+
+\`\`\`bash
+npm run create:model -- ${id} OtroModelo
+# Personaliza campos/reglas y clientFields antes de generar las vistas.
+npm run create:views -- ${id} OtroModelo
+npm run orm:sync -- ${id}
+\`\`\`
+
+Por defecto genera lista y formulario; puedes elegir tarjetas, kanban y modo modal.
+Ambos create admiten --dry-run y rechazan archivos existentes.
+Metodología: [Modelo y vistas](${docs}/modelos-y-vistas.md).
+
+## Flujo guiado recomendado
+
+Después de declarar/publicar los modelos y actualizar el manifest:
+
+\`\`\`bash
+npm run orm:sync -- ${id}
+\`\`\`
+
+Reúne generación, instalación/actualización, revisión y aplicación de migraciones,
+Prisma Client y adaptadores. La terminal pide escribir aplicar antes de ejecutar SQL
+y se detiene si un paso falla. \`--plan\` revisa fuentes sin escribir ni consultar
+la base. Sólo para desarrollo; no ejecuta reset ni reemplaza el diseño de vistas.
+Guía y continuación ante fallos: [Sincronizar aplicaciones](${docs}/sincronizar-aplicaciones.md).
+Las secuencias manuales siguientes sirven como referencia y diagnóstico.
+
 ## Qué caso necesitas
 
 | Caso | Orden |

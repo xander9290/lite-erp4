@@ -13,6 +13,6 @@ async function main() {
   for (const change of plan.changes) console.log(`  ${relative(root, change.path)}`);
   if (plan.changes.length) console.log(plan.sql);
   console.log("No se ejecutó SQL ni se regeneró Prisma Client. La instalación del esquema no activa la persistencia de las vistas.");
-  if (flags.includes("--write")) console.log(`Siguiente paso: revisar git diff y ejecutar npm run db:migrate -- --name install_${id.replaceAll("-", "_")}; después npm run db:generate.`);
+  if (flags.includes("--write")) console.log(`Siguiente paso: npm run orm:sync -- ${id} para el flujo guiado con revisión de SQL; o continúa con la migración manual usando --create-only.`);
 }
 main().catch(error => { console.error(error instanceof Error ? error.message : "No se pudo instalar el esquema."); process.exitCode = 1; });

@@ -40,6 +40,12 @@ export const FlotaRecordRepository: ModelRepository<FlotaRecordValues> = {
   },
   async remove(tx, id, revision) { await tx.flotaRecord.delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },
   count(tx, where) { return tx.flotaRecord.count({ where: where as Prisma.FlotaRecordWhereInput }); },
+  async lookup(tx, query) {
+    const allowed = new Set(["id", "name", "plate", "brand", "active"]);
+    if (query.fields.some(field => !allowed.has(field))) throw new Error("Campo de presentación no permitido.");
+    const projection = Object.fromEntries(query.fields.map(field => [field, true])) as Prisma.FlotaRecordSelect;
+    return tx.flotaRecord.findMany({ where: query.where as Prisma.FlotaRecordWhereInput, select: projection, orderBy: { id: "asc" }, skip: query.skip, take: query.take });
+  },
   async groups(tx, query) {
     switch (query.field) {
       case "id": return (await tx.flotaRecord.groupBy({ by: ["id"], where: query.where as Prisma.FlotaRecordWhereInput, orderBy: { id: "asc" }, skip: query.skip, take: query.take, _count: { _all: true } })).map(row => ({ value: row.id, count: row._count._all }));

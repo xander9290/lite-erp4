@@ -23,7 +23,7 @@ function command(binary: string, args: string[], name: string, expected = 0) {
   const cli = { prisma: "prisma/build/index.js", tsc: "typescript/bin/tsc", next: "next/dist/bin/next" };
   const executable = Object.entries(cli).find(([name]) => binary === join(root, "node_modules/.bin", name));
   if (executable) { args = [join(root, "node_modules", executable[1]), ...args]; binary = process.execPath; }
-  const result = spawnSync(binary, args, { cwd: root, encoding: "utf8", timeout: 90000 });
+  const result = spawnSync(binary, args, { cwd: root, env: { ...process.env, DATABASE_URL: url.toString() }, encoding: "utf8", timeout: 90000 });
   if (result.error) throw result.error;
   assert.equal(result.status, expected, sanitize(`${name}: ${result.stderr}\n${result.stdout}`));
   return result.stdout;
@@ -76,7 +76,7 @@ try {
 
   const modelPath = join(root, "src/app/(auth)/erp/ensayo-framework/models/Record.ts");
   const model = await readFile(modelPath, "utf8");
-  await writeFile(modelPath, model.replace("Fields, Model, defineModel", "Fields, Model, defineModel, ModelValidationError").replace('// Reglas de negocio: beforeSave(values, context) y afterSave(record, context).', `quantity = Fields.Integer({ required: true, default: 0, min: 0, tracking: true });\n  notes = Fields.Text({ maxLength: 200, sensitive: true });\n  startsAt = Fields.DateTime();\n  status = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Terminado"}] as const, {required:true,default:"draft",tracking:true});\n  partnerId = Fields.Many2one("Partner");\n  beforeSave(values: Record<string, unknown>) {\n    if (values.name === "bloqueado") throw new ModelValidationError("Nombre bloqueado por negocio.", {name:"Elige otro nombre."});\n    if (values.name === "normalizar") return {...values,quantity:7};\n    return values;\n  }\n  afterSave(values: Record<string, unknown>) { if(values.name === "rollback") throw new ModelValidationError("Rollback solicitado por la regla de negocio."); }`));
+  await writeFile(modelPath, model.replace("Fields, Model, defineModel", "Fields, Model, defineModel, ModelValidationError, type ModelContext").replace('// Reglas de negocio: beforeSave(values, context) y afterSave(record, context).', `quantity = Fields.Integer({ required: true, default: 0, min: 0, tracking: true });\n  notes = Fields.Text({ maxLength: 200, sensitive: true });\n  startsAt = Fields.DateTime();\n  status = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Terminado"}] as const, {required:true,default:"draft",tracking:true});\n  partnerId = Fields.Many2one("Partner");\n  normalize(values: Readonly<Record<string, unknown>>) {\n    return {...values, quantity: typeof values.quantity === "string" && /^\\d+$/.test(values.quantity) ? Number(values.quantity) : values.quantity};\n  }\n  beforeSave(values: Record<string, unknown>, context: ModelContext) {\n    if (context.operation === "update" && context.previous?.id !== context.id) throw new Error("Falta el estado anterior verificado.");\n    if (values.name === "bloqueado") throw new ModelValidationError("Nombre bloqueado por negocio.", {name:"Elige otro nombre."});\n    if (values.name === "normalizar") return {...values,quantity:7};\n    return values;\n  }\n  afterSave(values: Record<string, unknown>) { if(values.name === "rollback") throw new ModelValidationError("Rollback solicitado por la regla de negocio."); }`));
   const profilePath = join(root, "src/app/(auth)/erp/ensayo-framework/orm.config.ts");
   const profile = await readFile(profilePath, "utf8");
   await writeFile(profilePath, profile.replace('depends: []', 'depends: ["contactos"]').replace('["name", "active"]', '["name", "active", "quantity", "notes", "startsAt", "status", "partnerId"]').replace('externalOwners: {}', 'externalOwners: {Partner:"contactos"}'));
@@ -96,6 +96,38 @@ try {
   command(join(root, "node_modules/.bin/next"), ["typegen"], "Next route types");
   command(join(root, "node_modules/.bin/tsc"), ["--noEmit", "--incremental", "false"], "complete scaffold typecheck");
   console.log("✓ Evolución migrada sin perder el registro anterior; permisos, concurrencia, validación, relaciones, filtros, agrupación anidada, hooks, historial y notas verificados.");
+
+  script("create-app.ts", ["Facil"]);
+  await cp(join(project, "scripts/fixtures/sync-check.fixture"), join(root, "sync-check.ts"));
+  command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "cancel"], "sync SQL cancellation");
+  const cancelled = await database.query("SELECT to_regclass($1) AS name", [`${schema}.facil_records`]);
+  assert.equal(cancelled.rows[0].name, null);
+  command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "apply"], "sync resume approved SQL");
+  await database.query(`INSERT INTO "${schema}".facil_records (id, name, active) VALUES ('sync-preserved', 'Conservado', true)`);
+  const syncModelPath = join(root, "src/app/(auth)/erp/facil/models/Record.ts");
+  await writeFile(syncModelPath, (await readFile(syncModelPath, "utf8")).replace("// Reglas de negocio:", 'notes = Fields.Text({ maxLength: 80 });\n  // Reglas de negocio:'));
+  const syncProfilePath = join(root, "src/app/(auth)/erp/facil/orm.config.ts");
+  await writeFile(syncProfilePath, (await readFile(syncProfilePath, "utf8")).replace('["name", "active"]', '["name", "active", "notes"]'));
+  command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "evolve"], "sync additive evolution");
+  const preserved = await database.query(`SELECT name, notes FROM "${schema}".facil_records WHERE id='sync-preserved'`);
+  assert.deepEqual(preserved.rows, [{ name: "Conservado", notes: null }]);
+  await writeFile(join(root, "src/sync-type-error.ts"), 'export const invalid: number = "error";\n');
+  command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "type-error"], "sync stops on type failure");
+  await rm(join(root, "src/sync-type-error.ts"));
+  command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "repeat"], "sync idempotent repeat");
+  console.log("✓ orm:sync: cancelación, continuación, evolución conservando datos, fallo de TypeScript y repetición verificados.");
+
+  script("create-model.ts", ["facil", "Trabajo"]);
+  const resourceModelPath = join(root, "src/app/(auth)/erp/facil/models/Trabajo.ts");
+  await writeFile(resourceModelPath, (await readFile(resourceModelPath, "utf8")).replace("  // Define aquí", '  state = Fields.Selection([{value:"draft",label:"Borrador"},{value:"done",label:"Hecho"}] as const, {required:true,default:"draft",tracking:true});\n  quantity = Fields.Integer({required:true,default:0,tracking:true});\n  at = Fields.DateTime();\n  // Define aquí'));
+  await writeFile(syncProfilePath, (await readFile(syncProfilePath, "utf8")).replace('model: facilTrabajoModel, clientFields: ["name", "active"]', 'model: facilTrabajoModel, clientFields: ["name", "active", "state", "quantity", "at"]'));
+  script("create-views.ts", ["facil", "Trabajo", "--views", "list,card,kanban,form", "--form", "modal", "--group", "state", "--label", "Trabajos"]);
+  command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "evolve"], "model + views + sync");
+  await cp(join(project, "scripts/fixtures/resource-check.fixture"), join(root, "resource-check.ts"));
+  command(process.execPath, ["--conditions=react-server", "--import", "tsx", "resource-check.ts"], "generated resource persistence");
+  command(join(root, "node_modules/.bin/next"), ["typegen"], "new resource route types");
+  command(join(root, "node_modules/.bin/tsc"), ["--noEmit", "--incremental", "false"], "generated resource route typecheck");
+  console.log("✓ create:model/create:views: rutas, formulario modal, listas/tarjetas/kanban y persistencia con permisos verificados.");
 
   if (process.argv.includes("--serve")) {
     const server = spawn(join(root, "node_modules/.bin/next"), ["dev", "-p", "3031"], { cwd: root, stdio: ["ignore", "ignore", "ignore"] });

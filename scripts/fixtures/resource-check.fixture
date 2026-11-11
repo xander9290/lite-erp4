@@ -1,0 +1,25 @@
+import assert from "node:assert/strict";
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
+const { prisma } = await import("./src/lib/prisma");
+const { recordService } = await import("./src/app/(auth)/erp/facil/models/trabajo.service");
+const { createRecordDefaults } = await import("./src/app/(auth)/erp/facil/schemas/trabajo.schema");
+try {
+  const admin = await prisma.user.findUniqueOrThrow({ where: { login: "fixture-admin" } });
+  const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
+  const defaults = createRecordDefaults();
+  const saved = await recordService.save(prisma, actor, { ...defaults, name: "Trabajo real de prueba", at: "2026-11-10T12:00:00.000Z", quantity: 4 });
+  assert.ok(saved.ok, JSON.stringify(saved));
+  const read = await recordService.read(prisma, actor, saved.values.id); assert.ok(read.ok);
+  assert.equal(read.values.name, saved.values.name); assert.equal(read.audit?.createBy?.id, actor.id);
+  const state = { query: "Trabajo", filters: [], page: 1, pageSize: 10, sort: "name", direction: "asc" as const };
+  const list = await recordService.list(prisma, actor, state); assert.ok(list.ok); assert.equal(list.data.total, 1);
+  const kanban = await recordService.kanban(prisma, actor, { group: "draft", state }); assert.ok(kanban.ok); assert.equal(kanban.data.total, 1);
+  const moved = await recordService.move(prisma, actor, { id: saved.values.id, revision: saved.values.revision!, from: "draft", to: "done" }); assert.ok(moved.ok, JSON.stringify(moved));
+  const reader = await prisma.user.findUniqueOrThrow({ where: { login: "fixture-reader" } });
+  assert.equal((await recordService.list(prisma, { id: reader.id, sessionVersion: reader.sessionVersion }, state)).ok, false);
+  const current = await recordService.read(prisma, actor, saved.values.id); assert.ok(current.ok);
+  const activity = await recordService.activity(prisma, actor, { id: saved.values.id }); assert.ok(activity.ok);
+  assert.ok(activity.data.entries.some(entry => entry.kind === "update"));
+  assert.equal((await recordService.remove(prisma, actor, [{ id: saved.values.id, revision: current.values.revision! }])).ok, true);
+} finally { await prisma.$disconnect(); }

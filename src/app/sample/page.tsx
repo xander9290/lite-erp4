@@ -10,6 +10,7 @@ import One2manySample from "./One2manySample";
 import CollectionViewsSample from "./CollectionViewsSample";
 import AuditSample from "./AuditSample";
 import ListGroupingSample from "./ListGroupingSample";
+import ModelDisplayNameSample from "./ModelDisplayNameSample";
 
 export default function PageSample() {
   return (
@@ -40,6 +41,7 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#field-number">FieldNumber</a>
             <a className="btn btn-sm btn-outline" href="#field-select">FieldSelect</a>
             <a className="btn btn-sm btn-outline" href="#field-many2one">FieldMany2One</a>
+            <a className="btn btn-sm btn-outline" href="#model-display-name">Nombre desde el modelo</a>
             <a className="btn btn-sm btn-outline" href="#field-relation-tag">FieldRelationTag</a>
             <a className="btn btn-sm btn-outline" href="#field-one2many">FieldOne2many</a>
             <a className="btn btn-sm btn-outline" href="#field-date">FieldDate</a>
@@ -56,6 +58,7 @@ export default function PageSample() {
         <AuditSample />
         <SampleForms />
         <Many2OneSample />
+        <ModelDisplayNameSample />
         <RelationTagSample />
         <One2manySample />
         <ImageSample />

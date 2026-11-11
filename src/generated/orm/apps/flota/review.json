@@ -7,12 +7,20 @@
       "field": "flotaRecordCreatedRecords",
       "declaration": "  flotaRecordCreatedRecords FlotaRecord[] @relation(\"FlotaRecord_createBy\")",
       "owner": "@core"
+    },
+    {
+      "target": "User",
+      "field": "flotaFabricanteCreatedRecords",
+      "declaration": "  flotaFabricanteCreatedRecords FlotaFabricante[] @relation(\"FlotaFabricante_createBy\")",
+      "owner": "@core"
     }
   ],
   "validationOnly": [
     "FlotaRecord.name: minLength/trim se validan con Zod; no son CHECKs SQL.",
     "FlotaRecord.plate: minLength/trim se validan con Zod; no son CHECKs SQL.",
-    "FlotaRecord.brand: minLength/trim se validan con Zod; no son CHECKs SQL."
+    "FlotaRecord.brand: minLength/trim se validan con Zod; no son CHECKs SQL.",
+    "FlotaFabricante.name: minLength/trim se validan con Zod; no son CHECKs SQL.",
+    "FlotaFabricante.logo: minLength/trim se validan con Zod; no son CHECKs SQL."
   ],
   "note": "Propuesta; no se han modificado modelos existentes ni aplicado migraciones."
 }

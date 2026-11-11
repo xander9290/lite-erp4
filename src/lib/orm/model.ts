@@ -8,6 +8,9 @@ const modelTag = Symbol("orm.model");
 /** Declaration base only: no implicit persistence, requests or database connections. */
 export abstract class Model {
   declare protected readonly [modelTag]: true;
+  readonly displayFields?: readonly string[];
+  displayName?(record: Readonly<Record<string, unknown>>): string;
+  normalize?(values: Readonly<Record<string, unknown>>): Record<string, unknown>;
   beforeSave?(values: Record<string, unknown>, context: ModelContext): Record<string, unknown> | Promise<Record<string, unknown>>;
   afterSave?(record: Record<string, unknown>, context: ModelContext): void | Promise<void>;
 }
@@ -28,6 +31,7 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
   const metadata: Record<string, FieldMetadata> = {};
   const shape: Record<string, z.ZodType> = {};
   for (const [name, value] of Object.entries(instance)) {
+    if (name === "displayFields") continue;
     if (typeof value === "function") continue;
     if (!isField(value)) throw new Error(`${options.name}.${name}: declara el dato mediante Fields.`);
     if (!/^[a-z][A-Za-z0-9]*$/.test(name) || reservedFields.has(name)) throw new Error(`Nombre de campo inválido o reservado: ${name}.`);
@@ -36,6 +40,9 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     shape[name] = value.schema;
   }
   if (!Object.keys(fields).length) throw new Error("El modelo debe declarar al menos un Field.");
+  const displayFields = instance.displayFields ?? (metadata.name?.kind === "text" && !metadata.name.sensitive ? ["name"] : []);
+  if (!Array.isArray(displayFields) || displayFields.length > 12 || new Set(displayFields).size !== displayFields.length || displayFields.some(name => name !== "id" && (!Object.hasOwn(metadata, name) || metadata[name].sensitive))) throw new Error("displayFields sólo admite campos escalares declarados no sensibles o id.");
+  const displayKeys = Object.freeze([...new Set(["id", ...displayFields])]);
   // Runtime collection filters precisely the descriptor keys represented by Shape.
   const schema = z.strictObject(shape as Shape<InstanceType<C>>);
   return Object.freeze({
@@ -43,16 +50,30 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     fields: Object.freeze(fields) as Readonly<DeclaredFields<InstanceType<C>>>,
     metadata: Object.freeze(metadata) as Readonly<{ [K in keyof DeclaredFields<InstanceType<C>>]: FieldMetadata }>,
     schema,
+    displayFields: displayKeys,
+    displayName(record: Readonly<Record<string, unknown>>): string {
+      if (typeof record.id !== "string" || !record.id) throw new Error("displayName necesita el ID del registro.");
+      const projected = Object.freeze(Object.fromEntries(displayKeys.map(key => [key, record[key]])));
+      const label = instance.displayName ? instance.displayName(projected) : projected.name ?? record.id;
+      if (typeof label !== "string") throw new Error("displayName debe devolver texto de forma síncrona.");
+      return label.trim() || record.id;
+    },
     createDefaults(): Input<InstanceType<C>> {
       return Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, field.createDefault()])) as Input<InstanceType<C>>;
     },
     parse(input: unknown): Values<InstanceType<C>> {
       return schema.parse(input) as Values<InstanceType<C>>;
     },
-    async beforeSave(values: Values<InstanceType<C>>, context: ModelContext): Promise<Values<InstanceType<C>>> {
+    normalize(input: Record<string, unknown>): Values<InstanceType<C>> {
+      // Unknown input keys must fail even if the normalizer would drop them.
+      if (Object.keys(input).some(key => !Object.hasOwn(fields, key))) throw new Error("La normalización sólo acepta campos declarados.");
+      const values = Object.freeze({ ...input });
+      return schema.parse(instance.normalize ? instance.normalize(values) : values) as Values<InstanceType<C>>;
+    },
+    async beforeSave(values: Values<InstanceType<C>>, context: ModelContext<Values<InstanceType<C>>>): Promise<Values<InstanceType<C>>> {
       return schema.parse(instance.beforeSave ? await instance.beforeSave(values, context) : values) as Values<InstanceType<C>>;
     },
-    async afterSave(record: Record<string, unknown>, context: ModelContext) { await instance.afterSave?.(record, context); },
+    async afterSave(record: Record<string, unknown>, context: ModelContext<Values<InstanceType<C>>>) { await instance.afterSave?.(record, context); },
   });
 }
 

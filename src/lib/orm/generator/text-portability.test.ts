@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inverseText, removeInverse, sourceHash } from "./installation-state";
@@ -18,7 +18,7 @@ test("managed inverse and schema ownership survive CRLF checkout but reject sema
 });
 
 test("artifact integrity accepts checkout line endings without updating hashes and still rejects edits", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "orm-line-endings-"));
+  const directory = await mkdtemp(join(await realpath(tmpdir()), "orm-line-endings-"));
   try {
     const content = "export const answer = 42;\n";
     await writeFile(join(directory, "example.ts"), content.replace(/\n/g, "\r\n"));

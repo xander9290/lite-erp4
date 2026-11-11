@@ -8,6 +8,10 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Dirección y funcionalidades
 
+- Metodología para modelos nuevos: create:model → personalizar campos/negocio y
+  clientFields → create:views → orm:sync. Se generan conexiones y vistas TSX
+  editables sin XML/renderizado automático. Lista/formulario por defecto, tarjetas,
+  kanban y modo modal opcionales. Guía en [Modelo y vistas](modelos-y-vistas.md).
 - Framework ERP en TypeScript, Next.js, React, Prisma 7 y PostgreSQL.
   Modelos/Fields declarativos, contratos Zod, vistas TSX editables y herramientas
   para crear aplicaciones, generar contratos, instalar esquemas y enlazar Prisma.
@@ -57,17 +61,134 @@ aplicación por adelantado. Guía: [README de Flota](../src/app/(auth)/erp/flota
 
 ## Siguiente paso concreto
 
-Probar con el usuario historial y notas en Flota: editar un campo con tracking,
-guardar/reabrir y publicar una nota. La integración SQL usa registros temporales;
-la revisión de navegador se hizo con el ejemplo ficticio `/sample#record-audit`.
-Adjuntos, correos y actividades quedan para una etapa futura.
+El usuario pidió revertir Fabricante para probar el nuevo scaffold. La práctica se
+retiró de forma específica: ya no hay clase, registro en orm.config/manifest,
+servicio, acciones, contrato ni vistas/rutas de Fabricante. La tabla estaba vacía
+(cero filas) y sin claves foráneas entrantes; se retiró mediante la migración
+20261111042330_revert_fabricante_tutorial, aplicada a liteerp4/public. Conserva la
+migración original 20261111020207_add_fabricante_flota y todo el historial.
+La migración inversa bloquea la tabla, aborta si hay filas y no usa CASCADE.
 
-Retomar con la prueba de la nueva vista: comparar las tres listas, filtrar por
-placas y limpiar filtros; el dominio debe mantenerse. `Activo = No` debe devolver
-cero registros en «Mis vehículos activos». Registros ajenos o con creador nulo
-deben quedar fuera. Conservar permisos admin y personalizaciones del usuario.
+Se restauraron snapshots versionados coherentes del esquema/propiedad/artefactos
+anteriores a la instalación de Fabricante, tras verificar su alcance e integridad;
+no se inventaron hashes ni se forzó orm:install --update para aceptar retiradas.
+Después se regeneraron contratos, cliente Prisma y binding de vehículos con las
+herramientas actuales. FlotaRecord.store.ts quedó idéntico al respaldo previo,
+conservando las mejoras del framework. Los vehículos mantienen brand como texto.
+
+Siguiente ejercicio, a cargo del usuario:
+
+```bash
+npm run create:model -- flota Fabricante
+```
+
+Personalizar campos/reglas y clientFields; después create:views y orm:sync.
+El agente ya comprobó --dry-run sin escribir: permite crear FlotaFabricante y
+registrarlo nuevamente. No ejecutar la recreación por adelantado.
+
+Respaldo local de la práctica anterior: /private/tmp/lite-erp-fabricante-cj8494k2
+(con files.json y rollback.json). Es una copia temporal en esta máquina, no un
+recurso versionado ni disponible automáticamente en otra máquina. Las pruebas de
+nombres duplicados/guard de aquella UI quedaron pendientes y podrán retomarse con
+el scaffold nuevo. Conservar los pendientes funcionales previos de dominios y
+actividad de vehículos cuando no exista confirmación explícita del usuario.
 
 ## Último trabajo y verificaciones
+
+- 2026-11-10: retirada de Fabricante solicitada para probar el scaffold desde cero.
+  Copia de 11 archivos de la práctica y snapshots compartidos/gestionados en el
+  respaldo local indicado arriba. Retirados clase, registro, UI y conectores;
+  restauración coordinada de snapshots versionados y regeneración con herramientas.
+  Verificada tabla con cero filas y ninguna FK entrante antes de preparar la
+  migración inversa; sólo esa migración estaba pendiente y db:deploy la aplicó.
+  No se borraron migraciones anteriores ni datos de vehículos. El SQL aborta si
+  aparecen filas antes del DROP. Comprobaciones: Prisma Client regenerado,
+  orm:generate --write sin diferencias, orm:bind --write compilado, adaptador de
+  vehículos idéntico al previo, next typegen, TypeScript, ESLint de configuración,
+  migrate diff sin diferencias y create:model -- flota Fabricante --dry-run aprobado.
+  No se recreó Fabricante ni se repitió build/revisión visual en esta retirada.
+
+- 2026-11-10: implementados create:model y create:views. Registro de modelos y menús
+  con edición de AST sobre literales, sin reescribir personalizaciones; preflight,
+  colisiones, nombres globales, symlinks, staging y lock compartido con create:app.
+  Las vistas usan servicios/acciones existentes, RHF/Zod, loader, guards, historial,
+  notas y mutaciones autorizadas. Selection comparte opciones desde el contrato
+  cliente. Kanban necesita Selection requerido; Many2one custom requiere proveedor
+  async explícito. Los comandos rechazan partial/sensitive y archivos existentes.
+  No se ejecutaron create:model/create:views con escritura ni SQL sobre Flota;
+  --dry-run de Fabricante confirmó rechazo de su ruta existente. Sus fuentes de
+  aplicación se conservaron; sólo se añadió documentación a su README.
+  Verificaciones: TypeScript, ESLint, scaffold (10 pruebas) y SQL aislado con el modelo Trabajo
+  en la aplicación temporal Facil. Cubrió lista/card/kanban/modal compilables,
+  creación/lectura/auditoría/borrado/movimiento autorizado, recarga de rutas, rechazo
+  de no-admin, dry-run, conservación de fuentes y recuperación de sync. Recursos
+  temporales eliminados. Build del proyecto actual aprobado.
+  Límite: el intento de build del proyecto temporal agotó 90s después de completar
+  sus comprobaciones SQL/TS; no se presenta como build aprobado de las vistas de
+  prueba. La integración normal final pasó y el build del checkout actual pasó.
+  No se realizó revisión visual nueva del modal en navegador.
+
+- 2026-11-10: añadido `npm run orm:sync -- id` para reunir el flujo de desarrollo
+  en una sola invocación interactiva. Detecta instalación/actualización aditiva,
+  genera fuentes, revisa historial y SQL pendiente global, solicita escribir aplicar,
+  prepara migraciones nuevas sólo si hay diferencias, genera cliente/bindings y
+  comprueba TypeScript. --plan sólo revisa fuentes, sin escrituras ni consulta BD.
+  Sin --yes/reset/push/seed; detiene pasos posteriores al error y no promete rollback
+  global. Guía en [Sincronizar aplicaciones](sincronizar-aplicaciones.md), README
+  raíz, README de Flota y plantilla de README actualizados sin reemplazar tutoría.
+  No se ejecutó sync con escritura en Flota: allí sólo se verificó --plan.
+  Verificados TypeScript, ESLint, instalación/generador (12), scaffold (5) e
+  integración PostgreSQL desechable: cancelación sin aplicar SQL, continuación,
+  evolución aditiva conservando registros, error de TS y repetición sin cambios.
+  Recursos temporales eliminados. Reforzada la configuración explícita del schema
+  temporal en los subprocesos de integración para no heredar una URL ajena.
+  No se repitió build ni revisión visual para esta CLI de desarrollo.
+  La siguiente tarea de Fabricante sigue siendo su configuración de lista/servicio;
+  sus pasos de esquema, migración, cliente y binding ya se completaron.
+
+- 2026-11-10: aplicadas las tres simplificaciones propuestas: normalize síncrono
+  antes de Zod, ModelContext<T>.previous readonly (null al crear) y createQueryActions
+  para compartir autorización por llamada y manejo de errores de consultas.
+  Scaffold mantiene exports async explícitos y mutaciones/invalidation propios.
+  Las clases/acciones actuales de Flota se conservaron para tutoría; ya pueden
+  adoptar los contratos cuando se explique el ejercicio. No requiere migración,
+  regeneración de bindings ni generar/instalar Fabricante.
+  Guía y ejemplos en [Ciclo de modelos](ciclo-modelos.md).
+  Verificados TypeScript, ESLint, test:orm (36), test:scaffold (5), build e integración
+  PostgreSQL temporal. Cubre normalización antes de validar, snapshot en hooks,
+  kanban, campos falsificados, revisión obsoleta, autorización por consulta,
+  tracking/rollback y compilación del scaffold. Proyecto/esquema temporales eliminados;
+  no hubo escrituras ni migraciones sobre datos del ERP ni revisión visual nueva.
+
+- 2026-11-10: implementación de displayFields/displayName en modelos y lookup
+  autorizado en el servicio, con proyección escalar y publicación sólo de ID/label.
+  FieldMany2One admite load sin plantilla en la vista; sugerencias, modal e ID
+  inicial usan el mismo proveedor. Scaffold añade lookupRecords; ejemplo ficticio
+  RHF/Zod en `/sample#model-display-name`. Contrato, compatibilidad y propuestas de
+  simplificación en [Nombres de presentación](nombres-presentacion.md).
+  No se generó/instaló Fabricante ni se alteraron archivos de aplicación por esta
+  mejora. El usuario ya completó clientFields y manifest antes de solicitarla.
+  Se regeneró Prisma Client local porque aún no reflejaba RecordActivity; no se
+  aplicaron migraciones locales.
+  Verificaciones: TypeScript, ESLint, test:orm (33), test:orm:install (9),
+  test:scaffold (5), integración PostgreSQL aislada y build aprobados.
+  Integración ampliada con búsqueda por palabras, resolución por ID/lote, etiqueta
+  compuesta y rechazo de configuración falsa/no-admin; recursos temporales eliminados.
+  No se realizó revisión visual nueva en navegador. El primer build se interrumpió
+  tras quedar sin progreso en sandbox; la ejecución fuera de sandbox pasó.
+  Corregidos dos problemas de pruebas: conteo fijo obsoleto de acciones del scaffold
+  (ahora comprueba autorización por acción) y ruta temporal no canónica en macOS
+  (sin relajar protección de symlinks). Las limitaciones Windows anotadas abajo son
+  históricas; esta ejecución en macOS no demuestra su resolución en Windows.
+
+- 2026-11-10: puesta en contexto mediante AGENTS.md, README, este documento,
+  guías de flujo/actividad/agrupación, historial Git y archivos de Flota.
+  Árbol limpio al comenzar. Contrastados historial/notas y agrupación con código;
+  detectada y documentada la fase inicial de Fabricante, ausente de este resumen.
+  RecordForm contiene actualmente un solo FormGroup; las menciones de dos o tres
+  grupos más abajo describen verificaciones históricas. Esta revisión sólo modifica
+  documentación y verifica `git diff --check`; no ejecuta pruebas, migraciones,
+  generación ni comprueba el servidor o la base de datos local.
 
 - 2026-11-10: Fields inline usan columna de label de 7rem (112px) y gap de
   8px en field.styles.ts, sustituyendo proporción 1:2 y gap de 12px. Alineación
@@ -223,6 +344,10 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
 
 ## Oportunidades de mejora pendientes
 
+- **Pendiente solicitado para el otro agente: Fields.Image.** Declarar logo como
+  URL de imagen, centralizar validación HTTPS y generar FieldImage desde create:views
+  con proveedor upload explícito. No implementado. Contexto, decisiones por resolver
+  y criterios de aceptación en [Campos de imagen](ideas/campos-imagen.md).
 - Evaluar si declarar nuevas listas con dominio requiere demasiados cambios entre
   servicio, acción, variante, página y menú. Motivo: el ejercicio muestra pasos
   repetitivos. Criterio de aceptación: reducir código o pasos conservando TSX

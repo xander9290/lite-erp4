@@ -9,7 +9,9 @@ export const manifest = defineApplication({
   icon: Car,
   access: "admin",
   depends: [],
-  models: ["FlotaRecord"],
+  models: ["FlotaRecord",
+    "FlotaFabricante",
+  ],
   menus: [
     {
       id: "main-menu",
@@ -38,5 +40,7 @@ export const manifest = defineApplication({
         },
       ],
     },
+  
+    {"id":"fabricante-list","label":"Fabricante","href":"/erp/flota/fabricante","access":"admin","match":"exact"},
   ],
 });

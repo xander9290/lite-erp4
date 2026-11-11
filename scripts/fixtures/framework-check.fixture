@@ -36,10 +36,32 @@ try {
   assert.equal(before.quantity, 0); assert.equal(before.notes, null); assert.equal(before.status, "draft");
   const defaults = createEnsayoFrameworkRecordDefaults();
   assert.equal(EnsayoFrameworkRecordRecordSchema.safeParse({ ...defaults, name: "Desde formulario" }).success, true);
-  const created = await service.save(prisma, actor, { ...defaults, name: "Registro de prueba", quantity: 12, startsAt: "2026-11-07T23:59:00.000Z", partnerId: partner.id });
+  const created = await service.save(prisma, actor, { ...defaults, name: "Registro de prueba", quantity: "12", startsAt: "2026-11-07T23:59:00.000Z", partnerId: partner.id });
   assert.ok(created.ok, JSON.stringify(created));
+  const lookup = await service.lookup(prisma, actor, { id: created.values.id });
+  assert.ok(lookup.ok, JSON.stringify(lookup));
+  assert.deepEqual(lookup.items, [{ value: created.values.id, label: created.values.name, record: { id: created.values.id } }]);
+  const searchedLookup = await service.lookup(prisma, actor, { query: "Registro prueba", pageSize: 1, page: 999 });
+  assert.ok(searchedLookup.ok); assert.equal(searchedLookup.total, 1); assert.equal(searchedLookup.page, 1);
+  const batchLookup = await service.lookup(prisma, actor, { ids: [created.values.id, before.id], pageSize: 1 });
+  assert.ok(batchLookup.ok); assert.equal(batchLookup.items.length, 2);
+  assert.equal((await service.lookup(prisma, { id: reader.id, sessionVersion: reader.sessionVersion }, {})).ok, false);
+  assert.equal((await service.lookup(prisma, actor, { displayName: "{notes}" })).ok, false);
+  const namedService = createModelService({ ...recordModel, displayFields: ["name", "quantity"], displayName: row => `${row.name} · ${row.quantity}` }, EnsayoFrameworkRecordRepository, {
+    columns: [{ field: "name", label: "Nombre" }], searchFields: ["name"],
+  });
+  const namedLookup = await namedService.lookup(prisma, actor, { id: created.values.id });
+  assert.ok(namedLookup.ok, JSON.stringify(namedLookup));
+  assert.deepEqual(namedLookup.items, [{ value: created.values.id, label: `${created.values.name} · 12`, record: { id: created.values.id } }]);
   assert.equal(created.values.startsAt, "2026-11-07T23:59:00.000Z");
   assert.equal(created.values.partnerId, partner.id);
+  const { createQueryActions } = await import("./src/lib/orm/query-actions");
+  let authorizations = 0;
+  const queries = createQueryActions({ prisma, authorize: async () => { authorizations++; return actor; } }, { read: service.read, list: service.list });
+  const queryRead = await queries.read(created.values.id); assert.ok(queryRead.ok);
+  const queryList = await queries.list(state); assert.ok(queryList.ok);
+  assert.equal(authorizations, 2);
+
   assert.equal(Object.hasOwn(created.values, "partner"), false);
   assert.equal(Object.hasOwn(created.values, "createdAt"), false);
   assert.equal(Object.hasOwn(created.values, "createBy"), false);

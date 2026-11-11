@@ -8,7 +8,18 @@ ejecutando consultas y migraciones; las herramientas generan sus definiciones.
 Flota está reservada para la tutoría del usuario. Los ejemplos siguientes describen
 el procedimiento; las pruebas del framework usan otra aplicación temporal.
 
+Para añadir un modelo dentro de una aplicación, create:model prepara su declaración
+y registro; después de personalizarlo, create:views genera las conexiones y vistas
+elegidas, y orm:sync completa la persistencia. Ver [Modelo primero, vistas después](modelos-y-vistas.md).
+Los pasos manuales de esta guía siguen siendo válidos.
+
 ## Primera instalación
+
+Para reunir la secuencia de generación, instalación, migración revisada y enlace
+en una sola invocación, usar `npm run orm:sync -- mi-aplicacion` después de declarar
+los modelos. La terminal muestra el SQL, pide confirmación y se detiene si falla un
+paso. [Flujo guiado y límites](sincronizar-aplicaciones.md). Los pasos manuales
+siguientes se conservan como referencia y para diagnosticar casos especiales.
 
 ```sh
 npm run create:app -- "Mi aplicación"
@@ -120,6 +131,12 @@ Los tipos del contrato de campos siguen disponibles como `<Modelo>Input` y
 La revisión es el `updatedAt` del servidor en ISO UTC con milisegundos.
 
 ## Reglas de negocio en la clase
+
+Las conversiones puras pueden declararse en `normalize(values)` antes de validar
+con Zod. Los hooks reciben `context.previous` con la instantánea anterior ya leída
+y verificada, o null al crear. Las consultas pueden compartir autorización y manejo
+de errores con `createQueryActions`; el scaffold nuevo ya lo usa. Contratos y
+ejemplos en [Ciclo de modelos](ciclo-modelos.md).
 
 La clase puede implementar estos hooks opcionales:
 

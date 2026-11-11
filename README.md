@@ -5,6 +5,26 @@ Las aplicaciones se componen con modelos declarativos y vistas TSX editables.
 
 ## Comandos del scaffold, en orden
 
+Para añadir otro modelo a una aplicación, el flujo es **modelo → negocio → vistas → sincronizar**:
+
+```bash
+npm run create:model -- flota Mantenimiento
+# Personaliza campos/reglas y clientFields.
+npm run create:views -- flota Mantenimiento --label Mantenimientos
+npm run orm:sync -- flota
+```
+
+[Metodología, vistas opcionales y protecciones](docs/modelos-y-vistas.md).
+
+Para instalar o actualizar modelos en desarrollo, el flujo guiado reúne los pasos:
+
+```bash
+npm run orm:sync -- flota
+```
+
+Muestra el SQL y pide aprobación antes de aplicarlo; se detiene ante errores.
+`--plan` revisa las fuentes sin escribir. [Guía del comando](docs/sincronizar-aplicaciones.md).
+
 Cada aplicación creada con `create:app` incluye un README con comandos concretos
 para su identificador, separados por caso. El módulo de tutoría actual es
 [Flota](src/app/(auth)/erp/flota/README.md).
@@ -55,6 +75,8 @@ permisos, concurrencia y eliminación con cuentas y un esquema PostgreSQL tempor
 - [Aplicaciones y navegación](docs/desarrollo-aplicaciones.md).
 - [Instalación de modelos y propiedad](docs/instalar-modelos.md).
 - [Dominios de listas](docs/dominios-listas.md).
+- [Nombres de presentación y Many2one declarativos](docs/nombres-presentacion.md).
+- [Normalización, estado anterior y acciones de consulta](docs/ciclo-modelos.md).
 - [Agrupación anidada de listas](docs/agrupacion-listas.md).
 - [Auditoría de registros](docs/auditoria-modelos.md).
 - [Historial de cambios y notas internas](docs/actividad-registros.md).

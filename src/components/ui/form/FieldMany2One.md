@@ -1,5 +1,12 @@
 # FieldMany2One
 
+Para modelos declarativos, usar `load={lookupRecords}` del servicio del modelo
+relacionado, sin plantilla de presentación ni campos de búsqueda en la vista.
+Contrato, permisos, compatibilidad y ejemplo RHF/Zod en
+[Nombres de presentación](../../../../docs/nombres-presentacion.md) y
+`/sample#model-display-name`. El modo `model` descrito abajo conserva los
+catálogos manuales existentes.
+
 Buscador de registros existentes integrado con FormLayout/RHF. No crea ni edita registros. No requiere librerías adicionales.
 
 ```tsx

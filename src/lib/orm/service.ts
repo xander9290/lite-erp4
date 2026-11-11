@@ -21,12 +21,17 @@ import type { ListDeleteResult } from "../list/selection";
 import { groupingPlan, groupedPage } from "../list/grouping";
 import { activityRequestSchema, activityNoteSchema, type ActivityResult, type ActivityNoteResult } from "./activity";
 import { recordActivity, readActivity } from "./activity.server";
+import { modelLookupSchema } from "../many2one/model-lookup";
+import type { Many2OneResult } from "../many2one/types";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = {
   name: string; schema: z.ZodType<T>; metadata: Readonly<Record<string, FieldMetadata>>;
-  beforeSave?(values: T, context: ModelContext): Promise<T>;
-  afterSave?(record: Record<string, unknown>, context: ModelContext): Promise<void>;
+  normalize?(values: Record<string, unknown>): T;
+  beforeSave?(values: T, context: ModelContext<T>): Promise<T>;
+  afterSave?(record: Record<string, unknown>, context: ModelContext<T>): Promise<void>;
+  readonly displayFields?: readonly string[];
+  displayName?(record: Readonly<Record<string, unknown>>): string;
 };
 const idSchema = z.string().trim().min(1).max(100);
 const codeOf = (error: unknown) => error && typeof error === "object" && "code" in error ? String(error.code) : "";
@@ -91,10 +96,11 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (!input || typeof input !== "object" || Array.isArray(input)) throw new ModelValidationError("Revisa los datos del registro.");
     const { id, revision, ...fields } = input as Record<string, unknown>;
     const identity = recordIdentitySchema.safeParse({ id, revision });
-    const parsed = model.schema.safeParse(fields);
-    if (!identity.success || !parsed.success) {
+    // Reject forged/unknown fields before any model code can discard them.
+    if (Object.keys(fields).some(key => !Object.hasOwn(model.metadata, key))) throw new ModelValidationError("El registro contiene campos no declarados.");
+    if (!identity.success) {
       const errors: Record<string, string> = {};
-      for (const issue of [...(!identity.success ? identity.error.issues : []), ...(!parsed.success ? parsed.error.issues : [])]) if (issue.path.length) errors[issue.path.join(".")] ??= issue.message;
+      for (const issue of identity.error.issues) if (issue.path.length) errors[issue.path.join(".")] ??= issue.message;
       throw new ModelValidationError("Revisa los datos del registro.", errors);
     }
     const metadata = identity.data;
@@ -102,8 +108,9 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (metadata.id) {
       if (!current || current.revision !== metadata.revision) throw new ModelValidationError(conflict);
     }
-    const context: ModelContext = { tx, actor, operation: metadata.id ? "update" : "create", id: metadata.id };
-    const values = model.schema.parse(model.beforeSave ? await model.beforeSave(parsed.data, context) : parsed.data);
+    const context: ModelContext<T> = Object.freeze({ tx, actor: Object.freeze({ ...actor }), operation: metadata.id ? "update" : "create", id: metadata.id, previous: current ? Object.freeze({ ...current }) : null });
+    const normalized = model.schema.parse(model.normalize ? model.normalize(fields) : fields);
+    const values = model.schema.parse(model.beforeSave ? await model.beforeSave(normalized, context) : normalized);
     const saved = metadata.id ? await repository.update(tx, metadata.id, metadata.revision!, values) : await repository.create(tx, values, actor.id);
     await model.afterSave?.(saved, context);
     const final = await repository.read(tx, saved.id);
@@ -257,5 +264,36 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     } catch (error) { return { ok: false, error: messageFor(error) }; }
   }
 
-  return { read, save, remove, activity, addNote, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
+  async function lookup(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<Many2OneResult> {
+    try {
+      const request = modelLookupSchema.parse(input);
+      return await prisma.$transaction(async tx => {
+        await assertActor(tx, actor);
+        if (!repository.lookup) throw new Error("MODEL_NOT_BOUND");
+        const fields = [...new Set(["id", ...(model.displayFields ?? (model.metadata.name?.kind === "text" && !model.metadata.name.sensitive ? ["name"] : []))])];
+        if (fields.some(field => field !== "id" && (!model.metadata[field] || model.metadata[field].sensitive))) throw new Error("Invalid display fields");
+        const search = config.searchFields.filter(field => model.metadata[field]?.kind === "text" && !model.metadata[field].sensitive);
+        const predicates: Record<string, unknown>[] = [];
+        if (request.id) predicates.push({ id: request.id });
+        if (request.ids) predicates.push({ id: { in: request.ids } });
+        for (const word of request.query.trim().split(/\s+/).filter(Boolean)) {
+          predicates.push(search.length ? { OR: search.map(field => ({ [field]: { contains: word.replace(/[\\%_]/g, "\\$&"), mode: "insensitive" } })) } : { id: { in: [] } });
+        }
+        const where = { AND: predicates };
+        const total = await repository.count(tx, where);
+        const pageSize = request.ids?.length ?? request.pageSize;
+        const page = request.ids ? 1 : Math.min(request.page, Math.max(1, Math.ceil(total / pageSize)));
+        const records = total ? await repository.lookup(tx, { fields, where, skip: (page - 1) * pageSize, take: pageSize }) : [];
+        return { ok: true as const, total, page, pageSize, items: records.map(row => {
+          if (typeof row.id !== "string") throw new Error("Invalid lookup record");
+          const record = Object.freeze(Object.fromEntries(fields.map(field => [field, row[field] instanceof Date ? row[field].toISOString() : row[field]])));
+          // Only the label and ID leave this service, never the inputs used to construct it.
+          const label = model.displayName ? model.displayName(record) : typeof record.name === "string" ? record.name.trim() || row.id : row.id;
+          return { value: row.id, label, record: { id: row.id } };
+        }) };
+      }, { isolationLevel: "RepeatableRead" });
+    } catch (error) { return { ok: false, error: messageFor(error) }; }
+  }
+
+  return { read, save, remove, activity, addNote, lookup, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
 }

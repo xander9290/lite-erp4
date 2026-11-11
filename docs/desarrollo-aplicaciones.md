@@ -6,6 +6,12 @@ Usuarios usa el mismo contrato y depende de Contactos porque User se relaciona c
 Partner. La estructura toma la organización por módulos como referencia y usa las
 rutas de Next.js, los modelos de Prisma y nuestros componentes existentes.
 
+Para desarrollo nuevo, el flujo recomendado es **crear modelo → escribir negocio →
+generar vistas → sincronizar**. `create:model` registra una declaración dentro de
+una app y `create:views` prepara sus servicios, acciones, vistas, rutas y menús.
+Guía con comandos y opciones en [Modelo primero, vistas después](modelos-y-vistas.md).
+Este documento conserva la explicación de los pilotos y sus contratos de acceso.
+
 ## El archivo que debes conocer primero
 
 Abre `src/app/(auth)/erp/contactos/manifest.ts`:

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ComponentPropsWit
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { lookupModels, type Many2OneModel, type Many2OneOption, type Many2OneRecord } from "@/lib/many2one/types";
+import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { useFormFieldValidation } from "./formValidation";
@@ -16,14 +17,14 @@ type EditableProps<TFieldValues extends FieldValues = FieldValues> =
   Omit<BaseFieldProps<TFieldValues>, "onChange"> &
   Omit<ComponentPropsWithoutRef<"input">, keyof BaseFieldProps<TFieldValues> | "type" | "value" | "defaultValue" | "children" | "onChange" | "onKeyDown" | "size" | "role"> & {
     mode?: "edit";
-    model: Many2OneModel;
-    searchFields?: readonly string[];
-    displayName?: string;
     columns?: readonly Many2OneColumn[];
     pageSize?: 5 | 10 | 20 | 25;
     clearable?: boolean;
     onChange?: (id: string | null, record: Many2OneRecord | null) => void;
-  };
+  } & (
+    | { model: Many2OneModel; load?: never; searchFields?: readonly string[]; displayName?: string }
+    | { load: Many2OneLoader; model?: never; searchFields?: never; displayName?: never }
+  );
 
 export type FieldMany2OneDisplayProps = {
   mode: "display";
@@ -54,7 +55,7 @@ export default function FieldMany2One<TFieldValues extends FieldValues = FieldVa
 }
 
 function EditableRelation<TFieldValues extends FieldValues = FieldValues>({
-  name, label, direction = "block", model, searchFields = lookupModels[model].searchFields,
+  name, label, direction = "block", model = "partner", load, searchFields = lookupModels[model].searchFields,
   displayName = lookupModels[model].displayName, columns, pageSize = 10, clearable = true,
   onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y seleccionar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps
@@ -73,15 +74,15 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>({
   const [modalOpen, setModalOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const [cached, setCached] = useState<{ context: string; option: Many2OneOption } | null>(null);
+  const [cached, setCached] = useState<{ context: string; load?: Many2OneLoader; option: Many2OneOption } | null>(null);
   const request = { model, searchFields, displayName };
   const context = JSON.stringify(request);
-  const savedOption = cached?.context === context && cached.option.value === value ? cached.option : null;
-  const resolution = useMany2OneSearch({ ...request, id: value ?? "", pageSize: 1 }, Boolean(value && !savedOption), 0);
+  const savedOption = cached?.load === load && cached?.context === context && cached.option.value === value ? cached.option : null;
+  const resolution = useMany2OneSearch({ ...request, id: value ?? "", pageSize: 1 }, Boolean(value && !savedOption), 0, load);
   const selected = savedOption ?? resolution.data?.items[0] ?? null;
   const locked = field.disabled || readOnly;
   const expanded = open && !locked && !modalOpen;
-  const suggestions = useMany2OneSearch({ ...request, query, pageSize: 5 }, expanded);
+  const suggestions = useMany2OneSearch({ ...request, query, pageSize: 5 }, expanded, 250, load);
   const options = suggestions.data?.items ?? [];
   const activeIndex = Math.min(active, options.length);
   const fieldLabel = label?.trim();
@@ -120,7 +121,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>({
 
   function choose(option: Many2OneOption | null) {
     if (locked) return;
-    setCached(option ? { context, option } : null);
+    setCached(option ? { context, load, option } : null);
     field.onChange(option?.value ?? null);
     field.onBlur();
     setQuery(""); setOpen(false); setModalOpen(false); setActive(0);
@@ -195,7 +196,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>({
 
         {value && !selected && !resolution.loading && <p id={statusId} role="status" className="mt-1 text-xs text-base-content/60">{resolution.error || "El registro ya no está disponible."}{resolution.error && <button type="button" className="ml-2 cursor-pointer underline" onClick={resolution.retry}>Reintentar</button>}</p>}
         {fieldState.invalid && <span id={errorId} className="sr-only">{errorMessage}</span>}
-        {modalOpen && !locked && <Many2OneSearchModal title={fieldLabel || "Registros"} request={{ ...request, pageSize }} initialQuery={query} selectedId={value} columns={columns}
+        {modalOpen && !locked && <Many2OneSearchModal load={load} title={fieldLabel || "Registros"} request={{ ...request, pageSize }} initialQuery={query} selectedId={value} columns={columns}
           onSelect={choose} onClose={() => setModalOpen(false)} onAfterClose={restoreFocus} />}
       </div>
     </div>

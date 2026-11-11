@@ -1,21 +1,11 @@
 import "server-only";
-import { defineModel, Fields, Model } from "@/lib/orm";
+import { Fields, Model, defineModel } from "@/lib/orm";
 
 export class FlotaFabricante extends Model {
-  name = Fields.Text({
-    label: "Nombre",
-    required: true,
-    unique: true,
-    maxLength: 50,
-  });
-
-  logo = Fields.Text({
-    label: "Logotipo",
-    maxLength: 30,
-  });
+  name = Fields.Text({ label: "Nombre", required: true, maxLength: 120, tracking: true });
+  logo = Fields.Text({ label: "Logotipo" });
+  active = Fields.Boolean({ label: "Activo", default: true, tracking: true });
+  // Define aquí normalize, beforeSave y afterSave cuando tu negocio lo necesite.
 }
 
-export const fabricanteFlotaModel = defineModel(FlotaFabricante, {
-  name: "FlotaFabricante",
-  table: "flota_fabricante",
-});
+export const flotaFabricanteModel = defineModel(FlotaFabricante, { name: "FlotaFabricante", table: "flota_fabricante" });
