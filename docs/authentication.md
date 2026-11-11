@@ -25,8 +25,13 @@ las migraciones revisadas con `npx prisma migrate deploy --config prisma7.config
 El seed crea el usuario inicial **admin / 1234**, activo y administrador, con su Partner.
 Guarda la contraseña con bcrypt (coste 12). Repetir el seed conserva las credenciales
 y permisos de un admin existente. La contraseña inicial es para arrancar el entorno;
-puedes cambiarla desde Usuarios. Las contraseñas nuevas requieren al menos 8 caracteres
-y un máximo de 72 bytes UTF-8.
+puedes cambiarla desde Usuarios. Las contraseñas nuevas requieren de 4 a 8 caracteres,
+sin requisitos de símbolos, mayúsculas o combinación de tipos; no se recortan espacios
+ni se transforma su contenido. La política compartida se aplica en cliente y servidor
+al crear usuarios y cambiar contraseñas desde Usuarios o Perfil. Al editar un usuario,
+vacío conserva su contraseña. Login y contraseña actual mantienen el límite de bcrypt
+de 72 bytes UTF-8 para permitir acceso con credenciales anteriores; no se modifican
+hashes ni contraseñas existentes.
 
 ## Rutas y permisos
 

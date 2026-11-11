@@ -12,41 +12,111 @@ import FieldText from "@/components/ui/form/FieldText";
 import FieldBoolean from "@/components/ui/form/FieldBoolean";
 import FieldImage from "@/components/ui/form/FieldImage";
 import { uploadPartnerAvatar } from "@/lib/uploads/partner-avatar";
-import { newUserDefaults, userSchema, type UserValues } from "@/schemas/user.schema";
+import {
+  newUserDefaults,
+  userSchema,
+  type UserValues,
+} from "@/schemas/user.schema";
 import { readUser, saveUser } from "@/lib/users/actions";
 
 function UserForm({ record }: { record: UserValues }) {
   const router = useRouter();
-  const methods = useForm<UserValues>({ resolver: zodResolver(userSchema), defaultValues: record });
+  const methods = useForm<UserValues>({
+    resolver: zodResolver(userSchema),
+    defaultValues: record,
+  });
   const [savedId, setSavedId] = useState(record.id);
-  return <FormView title={savedId ? "Editar usuario" : "Nuevo usuario"} description="Datos de contacto y acceso al ERP." icon={<ShieldCheck size={22} />} methods={methods} mode={savedId ? "edit" : "create"} onSubmit={saveUser}
-    layout="page" breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: "Usuarios", href: "/erp/usuarios" }, { label: savedId ? record.login : "Nuevo usuario" }]}
-    onNew={savedId ? () => router.push("/erp/usuarios/nuevo") : undefined}
-    onSaved={values => { setSavedId(values.id); if (!record.id && values.id) router.replace(`/erp/usuarios/${values.id}`); router.refresh(); }}
-    footer={<p className="text-xs leading-relaxed text-base-content/55">{savedId ? "Deja la contraseña vacía para conservar la actual. Cambiar la contraseña, el usuario o los permisos cerrará sus sesiones anteriores." : "La contraseña debe tener al menos 8 caracteres."}</p>}>
-    <FormGroup legend="Contacto">
-      <div className="grid min-w-0 gap-4 sm:grid-cols-[7rem_minmax(0,1fr)]">
-        <FieldImage<UserValues> name="avatarUrl" label="Avatar" widget="avatar" upload={uploadPartnerAvatar} />
-        <div className="flex min-w-0 flex-col gap-4">
-          <FieldText<UserValues> name="name" label="Nombre completo" maxLength={120} />
-          <FieldText<UserValues> name="email" label="Correo electrónico" maxLength={254} />
-          <FieldText<UserValues> name="phone" label="Teléfono" maxLength={40} />
+  return (
+    <FormView
+      title={savedId ? "Editar usuario" : "Nuevo usuario"}
+      description="Datos de contacto y acceso al ERP."
+      icon={<ShieldCheck size={22} />}
+      methods={methods}
+      mode={savedId ? "edit" : "create"}
+      onSubmit={saveUser}
+      layout="page"
+      breadcrumbs={[
+        { label: "Aplicaciones", href: "/erp" },
+        { label: "Usuarios", href: "/erp/usuarios" },
+        { label: savedId ? record.login : "Nuevo usuario" },
+      ]}
+      onNew={savedId ? () => router.push("/erp/usuarios/nuevo") : undefined}
+      onSaved={(values) => {
+        setSavedId(values.id);
+        if (!record.id && values.id)
+          router.replace(`/erp/usuarios/${values.id}`);
+        router.refresh();
+      }}
+      footer={
+        <p className="text-xs leading-relaxed text-base-content/55">
+          {savedId
+            ? "Deja la contraseña vacía para conservar la actual o escribe una nueva de 4 a 8 caracteres, sin exigir símbolos ni mayúsculas. Cambiar la contraseña, el usuario o los permisos cerrará sus sesiones anteriores."
+            : "La contraseña debe tener de 4 a 8 caracteres, sin exigir símbolos ni mayúsculas."}
+        </p>
+      }
+    >
+      <FormGroup legend="Contacto">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-[7rem_minmax(0,1fr)]">
+          <FieldImage<UserValues>
+            name="avatarUrl"
+            label="Avatar"
+            widget="avatar"
+            upload={uploadPartnerAvatar}
+          />
+          <div className="flex min-w-0 flex-col gap-4">
+            <FieldText<UserValues>
+              name="name"
+              label="Nombre completo"
+              maxLength={120}
+            />
+            <FieldText<UserValues>
+              name="email"
+              label="Correo electrónico"
+              maxLength={254}
+            />
+            <FieldText<UserValues>
+              name="phone"
+              widget="phone"
+              label="Teléfono"
+              maxLength={40}
+            />
+          </div>
         </div>
-      </div>
-    </FormGroup>
-    <FormGroup legend="Acceso">
-      <FieldText<UserValues> name="login" label="Usuario" maxLength={64} />
-      <FieldText<UserValues> name="password" label={savedId ? "Nueva contraseña" : "Contraseña"} type="password" />
-      <FieldBoolean<UserValues> name="active" label="Cuenta activa" direction="inline" />
-      <FieldBoolean<UserValues> name="isAdmin" label="Administrador" direction="inline" />
-    </FormGroup>
-  </FormView>;
+      </FormGroup>
+      <FormGroup legend="Acceso">
+        <FieldText<UserValues> name="login" label="Usuario" maxLength={64} />
+        <FieldText<UserValues>
+          name="password"
+          label={savedId ? "Nueva contraseña" : "Contraseña"}
+          widget="password"
+        />
+        <FieldBoolean<UserValues>
+          name="active"
+          label="Cuenta activa"
+          direction="inline"
+        />
+        <FieldBoolean<UserValues>
+          name="isAdmin"
+          label="Administrador"
+          direction="inline"
+        />
+      </FormGroup>
+    </FormView>
+  );
 }
 
 export default function UserEditor({ id }: { id?: string }) {
   const router = useRouter();
   const load = useCallback(() => readUser(id!), [id]);
-  return <>
-    {id ? <FormViewLoader key={router.bfcacheId} recordKey={id} load={load}>{record => <UserForm record={record} />}</FormViewLoader> : <UserForm key={router.bfcacheId} record={newUserDefaults} />}
-  </>;
+  return (
+    <>
+      {id ? (
+        <FormViewLoader key={router.bfcacheId} recordKey={id} load={load}>
+          {(record) => <UserForm record={record} />}
+        </FormViewLoader>
+      ) : (
+        <UserForm key={router.bfcacheId} record={newUserDefaults} />
+      )}
+    </>
+  );
 }

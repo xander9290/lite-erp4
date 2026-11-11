@@ -10,17 +10,15 @@ import { fieldDirectionClassName, fieldInputClassName, fieldTextareaClassName, f
 type TextControl = HTMLInputElement | HTMLTextAreaElement;
 type ControlledProps<TFieldValues extends FieldValues> = keyof BaseFieldProps<TFieldValues, string> | "type" | "value" | "defaultValue" | "children";
 export type FieldTextProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string> & (
-  | (Omit<InputHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget?: "input"; type?: "text" | "password" })
-  | (Omit<InputHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget: "phone"; type?: "tel" })
-  | (Omit<TextareaHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget: "long"; type?: "text" })
+  | (Omit<InputHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget?: "text" | "password" | "phone" | "email"; type?: never })
+  | (Omit<TextareaHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget: "long"; type?: never })
 );
 
 export default function FieldText<TFieldValues extends FieldValues = FieldValues>(props: FieldTextProps<TFieldValues>) {
   const {
     name,
     label,
-    widget = "input",
-    type = "text",
+    widget = "text",
     direction = "block",
     onChange,
     onBlur,
@@ -41,6 +39,8 @@ export default function FieldText<TFieldValues extends FieldValues = FieldValues
   const fieldLabel = label?.trim();
   const errorMessage = fieldState.error?.message || `${fieldLabel || name}: valor inválido.`;
   const visibilityLabel = passwordVisible ? "Ocultar contraseña" : "Mostrar contraseña";
+  const isPassword = widget === "password";
+  const inputType = widget === "phone" ? "tel" : isPassword && !passwordVisible ? "password" : widget === "email" ? "email" : "text";
 
   return (
     <div data-form-field={name} className={fieldDirectionClassName(direction, fieldLabel)}>
@@ -75,11 +75,11 @@ export default function FieldText<TFieldValues extends FieldValues = FieldValues
           disabled={fieldDisabled}
           id={inputId}
           autoComplete="off"
-          type={widget === "phone" ? "tel" : type === "password" && passwordVisible ? "text" : type}
-          inputMode={widget === "phone" ? "tel" : inputProps.inputMode}
+          type={inputType}
+          inputMode={widget === "phone" ? "tel" : widget === "email" ? "email" : inputProps.inputMode}
           value={fieldValue ?? ""}
-          className={`${fieldInputClassName} ${type === "password" ? "px-10 [&::-ms-reveal]:hidden" : "px-1"} ${className}`}
-          style={type === "password" ? { ...style, textAlign: "center" } : style}
+          className={`${fieldInputClassName} ${isPassword ? "px-10 [&::-ms-reveal]:hidden" : "px-1"} ${className}`}
+          style={isPassword ? { ...style, textAlign: "center" } : style}
           aria-label={inputProps["aria-label"] || (!fieldLabel && !inputProps["aria-labelledby"] ? name : undefined)}
           aria-invalid={fieldState.invalid || inputProps["aria-invalid"]}
           aria-describedby={[describedBy, fieldState.invalid ? errorId : undefined].filter(Boolean).join(" ") || undefined}
@@ -100,7 +100,7 @@ export default function FieldText<TFieldValues extends FieldValues = FieldValues
             onBlur?.(event);
           }}
         />}
-        {widget === "input" && type === "password" && (
+        {isPassword && (
           <button
             type="button"
             disabled={fieldDisabled}

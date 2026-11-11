@@ -1,10 +1,25 @@
 # FieldText
 
-Campo de texto integrado con RHF. Variantes: `widget="input"` (por defecto),
-`widget="long"` (textarea) y `widget="phone"` (teléfono mexicano).
+Campo de texto integrado con RHF. `widget` es la única opción para elegir su uso;
+se retiran la prop `type` y el antiguo nombre `widget="input"`.
+
+| widget | Control y comportamiento |
+| --- | --- |
+| `text` (por defecto) | Input de texto. |
+| `password` | Contraseña oculta con botón accesible para mostrar/ocultar. |
+| `long` | Textarea; admite rows. |
+| `phone` | Teléfono mexicano, con formato al salir del campo. |
+| `email` | Input email con teclado de correo; no transforma el texto. |
+
+Todos mantienen `autoComplete="off"`, RHF, errores y `data-form-field`.
+Para migrar, sustituye `type="password"` por `widget="password"` y
+`widget="input"` por `widget="text"` o elimina widget. `type` queda reservado
+al control HTML interno y no se acepta en la API del componente.
 
 ```tsx
 <FieldText name="phone" label="Teléfono" widget="phone" direction="inline" />
+<FieldText name="password" label="Contraseña" widget="password" />
+<FieldText name="email" label="Correo" widget="email" />
 ```
 
 Phone usa `type="tel"`, teclado telefónico y `autoComplete="off"`. Al salir del
@@ -23,3 +38,8 @@ El widget formatea; la validación corresponde al esquema del formulario y del
 servidor. `formatPhone` en `phone.ts` es puro y se puede reutilizar en ambos.
 Ejemplo RHF/Zod con normalización también al enviar en `/sample#field-text-phone`.
 No cambia automáticamente los campos de Contactos, Usuarios o Perfil.
+
+Cada variante conserva la validación del esquema que la consume: password no
+impone una longitud propia ni email sustituye la validación del servidor.
+Ejemplos RHF/Zod: `/sample#field-text` (text/password), `#field-text-long`,
+`#field-text-phone` y `#field-text-email`.

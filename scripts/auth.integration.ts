@@ -61,11 +61,11 @@ try {
   const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
   const login = `auth_test_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
   const avatarUrl = "https://images.example.test/avatar.webp";
-  const saved = await saveUserRecord(prisma, actor, { ...newUserDefaults, login, name: "Prueba temporal de autenticación", password: "Test-password-123", avatarUrl });
+  const saved = await saveUserRecord(prisma, actor, { ...newUserDefaults, login, name: "Prueba temporal de autenticación", password: "test1234", avatarUrl });
   assert.equal(saved.ok, true);
   fixtureId = saved.values.id;
   const fixture = await prisma.user.findUniqueOrThrow({ where: { id: fixtureId } }); fixturePartnerId = fixture.partnerId;
-  assert.ok(fixturePartnerId); assert.equal(await verifyPassword("Test-password-123", fixture.password), true);
+  assert.ok(fixturePartnerId); assert.equal(await verifyPassword("test1234", fixture.password), true);
   assert.equal(saved.values.password, ""); assert.equal(JSON.stringify(saved.values).includes(fixture.password), false);
   assert.equal(saved.values.avatarUrl, avatarUrl);
   assert.equal((await prisma.partner.findUniqueOrThrow({ where: { id: fixturePartnerId! } })).avatarUrl, avatarUrl);
@@ -77,7 +77,7 @@ try {
   const listedPartners = await listRegistry.partner({ model: "partner", searchFields: ["name"], columns: [{ field: "name", label: "Contacto", widget: "partner", avatarField: "avatarUrl" }] }, { ...listState, query: saved.values.name });
   assert.equal(listedPartners.rows.find(row => row.id === fixturePartnerId)?.avatarUrl, avatarUrl);
 
-  const regular = new Client(); await regular.login(login, "Test-password-123");
+  const regular = new Client(); await regular.login(login, "test1234");
   assert.equal((await regular.session()).user.isAdmin, false);
   assert.equal((await regular.session()).user.image, avatarUrl);
   for (const path of ["/erp/perfil", "/erp/perfil/contrasena"]) {
@@ -98,9 +98,9 @@ try {
   assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: fixture.id } })).isAdmin, false);
   const forbiddenPage = await regular.request("/erp/usuarios");
   assert.ok((await forbiddenPage.text()).includes("Necesitas permisos de administrador"));
-  const denied = await saveUserRecord(prisma, { id: fixture.id, sessionVersion: fixture.sessionVersion }, { ...newUserDefaults, login: `${login}_evil`, name: "No autorizado", password: "Test-password-123", isAdmin: true });
+  const denied = await saveUserRecord(prisma, { id: fixture.id, sessionVersion: fixture.sessionVersion }, { ...newUserDefaults, login: `${login}_evil`, name: "No autorizado", password: "test1234", isAdmin: true });
   assert.equal(denied.ok, false);
-  const duplicate = await saveUserRecord(prisma, actor, { ...newUserDefaults, login, name: "Duplicado", password: "Test-password-123" });
+  const duplicate = await saveUserRecord(prisma, actor, { ...newUserDefaults, login, name: "Duplicado", password: "test1234" });
   assert.equal(duplicate.ok, false);
 
   let current = userFormValues(await prisma.user.findUniqueOrThrow({ where: { id: fixtureId }, select: userFormSelect }));
@@ -118,15 +118,15 @@ try {
   assert.equal((await prisma.partner.findUniqueOrThrow({ where: { id: fixturePartnerId! } })).avatarUrl, null);
   assert.equal((await regular.session()).user.image, null);
   current = cleared.values;
-  const changedPassword = await saveUserRecord(prisma, actor, { ...current, password: "Changed-password-123" });
+  const changedPassword = await saveUserRecord(prisma, actor, { ...current, password: "change12" });
   assert.equal(changedPassword.ok, true);
   assert.equal(await regular.session(), null);
   assert.equal((await regular.request("/erp")).status, 307);
-  await regular.login(login, "Changed-password-123"); assert.ok((await regular.session()).user);
+  await regular.login(login, "change12"); assert.ok((await regular.session()).user);
 
-  const otherSession = new Client(); await otherSession.login(login, "Changed-password-123");
+  const otherSession = new Client(); await otherSession.login(login, "change12");
   const passwordActor = { id: fixture.id, sessionVersion: (await regular.session()).user.sessionVersion };
-  const passwordChange = { currentPassword: "Changed-password-123", newPassword: "My-new-password-123", confirmPassword: "My-new-password-123" };
+  const passwordChange = { currentPassword: "change12", newPassword: "new12345", confirmPassword: "new12345" };
   assert.equal((await changeOwnPassword(prisma, passwordActor, { ...passwordChange, currentPassword: "Wrong-password" })).ok, false);
   assert.ok((await regular.session()).user);
   assert.equal((await changeOwnPassword(prisma, passwordActor, { ...passwordChange, id: admin.id })).ok, false);
@@ -141,7 +141,7 @@ try {
   const fresh = userFormValues(await prisma.user.findUniqueOrThrow({ where: { id: fixtureId }, select: userFormSelect }));
   const disabled = await saveUserRecord(prisma, actor, { ...fresh, active: false });
   assert.equal(disabled.ok, true); assert.equal(await regular.session(), null);
-  const inactive = await regular.login(login, "My-new-password-123"); assert.ok(String(inactive.url).includes("CredentialsSignin"));
+  const inactive = await regular.login(login, "new12345"); assert.ok(String(inactive.url).includes("CredentialsSignin"));
   const adminRecord = userFormValues(await prisma.user.findUniqueOrThrow({ where: { id: admin.id }, select: userFormSelect }));
   assert.equal((await saveUserRecord(prisma, actor, { ...adminRecord, active: false })).ok, false);
 

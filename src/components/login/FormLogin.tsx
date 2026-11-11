@@ -38,7 +38,7 @@ export default function FormLogin({ callbackUrl = "/erp" }: { callbackUrl?: stri
         <FormLayout methods={methods} onSubmit={onSubmit} aria-labelledby="login-title" className="mt-6">
           <FormGroup disabled={methods.formState.isSubmitting} legend={<span className="sr-only">Datos de acceso</span>} className="gap-5 border-0! bg-transparent! p-0! shadow-none!">
             <FieldText<LoginSchemaType> name="login" autoFocus label="Usuario" />
-            <FieldText<LoginSchemaType> name="password" label="Contraseña" type="password" />
+            <FieldText<LoginSchemaType> name="password" label="Contraseña" widget="password" />
             <button
               type="submit"
               disabled={methods.formState.isSubmitting}

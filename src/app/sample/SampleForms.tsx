@@ -11,6 +11,7 @@ import FieldBoolean from "@/components/ui/form/FieldBoolean";
 import FormLayout from "@/components/ui/form/FormLayout";
 import FormGroup from "@/components/ui/form/FormGroup";
 import {
+  emailSampleSchema, type EmailSampleValues,
   phoneSampleSchema, type PhoneSampleValues,
   textSampleSchema, textSampleDefaults, textSampleExample, type TextSampleValues,
   longTextSampleSchema, longTextSampleDefaults, longTextSampleExample, type LongTextSampleValues,
@@ -76,13 +77,33 @@ function TextSample() {
       <FormLayout methods={methods} onSubmit={(data) => setSubmitted(data)} onInvalid={() => setSubmitted(null)} aria-labelledby="field-text-title">
         <FormGroup legend="Texto y contraseña">
           <FieldText<TextSampleValues> name="username" label="Usuario de ejemplo" direction="inline" onChange={setChange} />
-          <FieldText<TextSampleValues> name="password" label="Contraseña de ejemplo" type="password" />
+          <FieldText<TextSampleValues> name="password" label="Contraseña de ejemplo" widget="password" />
         </FormGroup>
         <FormGroup legend="Sin label">
           <FieldText<TextSampleValues> name="alias" direction="inline" aria-label="Alias opcional" placeholder="Alias opcional" />
           <p className="text-xs text-base-content/60">Sin label, el input ocupa todo el ancho disponible. La contraseña se oculta en el resultado.</p>
         </FormGroup>
         <SampleActions onReset={() => reset(textSampleDefaults)} onExample={() => reset(textSampleExample)} />
+      </FormLayout>
+      <SampleResult value={submitted} change={change} />
+    </SampleCard>
+  );
+}
+
+function EmailSample() {
+  const methods = useForm<EmailSampleValues>({ resolver: zodResolver(emailSampleSchema), defaultValues: { email: "" } });
+  const [submitted, setSubmitted] = useState<EmailSampleValues | null>(null);
+  const [change, setChange] = useState<string>();
+  function reset(email: string) {
+    methods.reset({ email }); setSubmitted(null); setChange(undefined);
+  }
+  return (
+    <SampleCard id="field-text-email" title="FieldText · Correo" description={'widget="email": control de correo con teclado apropiado. RHF y Zod validan la dirección sin modificar su contenido.'}>
+      <FormLayout methods={methods} onSubmit={data => setSubmitted(data)} onInvalid={() => setSubmitted(null)} aria-labelledby="field-text-email-title">
+        <FormGroup legend="Correo electrónico">
+          <FieldText<EmailSampleValues> name="email" label="Correo" widget="email" direction="inline" placeholder="nombre@ejemplo.com" required maxLength={254} onChange={setChange} />
+        </FormGroup>
+        <SampleActions onReset={() => reset("")} onExample={() => reset("contacto@example.test")} />
       </FormLayout>
       <SampleResult value={submitted} change={change} />
     </SampleCard>
@@ -244,5 +265,5 @@ function BooleanSample() {
 }
 
 export default function SampleForms() {
-  return <><TextSample /><PhoneSample /><LongTextSample /><NumberSample /><SelectSample /><DateSample /><BooleanSample /></>;
+  return <><TextSample /><PhoneSample /><EmailSample /><LongTextSample /><NumberSample /><SelectSample /><DateSample /><BooleanSample /></>;
 }

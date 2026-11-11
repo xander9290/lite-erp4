@@ -112,6 +112,30 @@ actividad de vehículos cuando no exista confirmación explícita del usuario.
 
 ## Último trabajo y verificaciones
 
+- 2026-11-11: FieldText unifica variantes bajo `widget`: text por defecto,
+  password, long, phone y email. Se retiran type y widget=input de la API pública;
+  el componente deriva internamente el tipo HTML. Migrados login, Usuarios,
+  cambio de contraseña de Perfil y muestra de password. Conservados revelado
+  accesible, formato phone al blur, textarea, RHF y autocomplete off. Email usa
+  type/inputMode email sin transformar contenido; nuevo ejemplo RHF/Zod en
+  `/sample#field-text-email`. Contrato en
+  [FieldText](../src/components/ui/form/FieldText.md). No se infieren widgets por
+  nombre de campo ni se cambian modelos/scaffold: Text generado sigue usando
+  la variante por defecto. Verificados TypeScript, ESLint de archivos afectados,
+  pruebas phone (2), test:auth (9) y diff --check. Sin build ni revisión de navegador.
+
+- 2026-11-11: política de contraseñas nuevas unificada en
+  `src/schemas/password.schema.ts`: mínimo 4 y máximo 8 caracteres, libres de
+  requisitos de símbolos/mayúsculas y sin transformar su contenido. Usuarios
+  (alta/cambio) y Perfil reutilizan el esquema en cliente/servidor; contraseña
+  vacía al editar conserva el hash. Login/contraseña actual aceptan credenciales
+  anteriores bajo el límite existente de 72 bytes para no bloquear cuentas.
+  Actualizados mensajes UI, fixtures y [Autenticación](authentication.md).
+  Verificados test:auth (9), test:contacts (8), TypeScript y ESLint de archivos
+  afectados. Cubiertos límites 3/4/8/9, valores sin símbolos/mayúsculas, confirmación,
+  conservación al editar y compatibilidad de login anterior. No se modificaron
+  credenciales reales ni se ejecutaron seed, migraciones, integración BD o navegador.
+
 - 2026-11-11: FieldText añade `widget="phone"` para teléfonos mexicanos. Usa
   type/inputMode tel y formatea al perder foco: diez dígitos, con prefijo 52/+52
   opcional y separadores habituales, se convierten a `+52 33 2165 9874`.

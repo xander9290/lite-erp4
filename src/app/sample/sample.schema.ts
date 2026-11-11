@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { formatPhone } from "@/components/ui/form/phone";
 
+export const emailSampleSchema = z.object({
+  email: z.email({ error: "Correo: escribe una dirección válida." }).max(254),
+});
+export type EmailSampleValues = z.infer<typeof emailSampleSchema>;
+
 export const phoneSampleSchema = z.object({
   phone: z.string().transform(formatPhone).pipe(z.string().regex(/^\+52 \d{2} \d{4} \d{4}$/, "Teléfono: escribe diez dígitos mexicanos, con prefijo +52 opcional.")),
 });

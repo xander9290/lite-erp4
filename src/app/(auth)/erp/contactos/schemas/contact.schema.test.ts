@@ -55,7 +55,7 @@ test("Contacts, Users and Profile share the same contact validation rules", () =
     { name: "Mi contacto", email: "incorrecto", phone: "", avatarUrl: null },
   ]) {
     const contact = contactSchema.safeParse({ ...valid, ...fields });
-    const user = userSchema.safeParse({ ...newUserDefaults, login: "sample", password: "Test-password-123", ...fields });
+    const user = userSchema.safeParse({ ...newUserDefaults, login: "sample", password: "test1234", ...fields });
     const profile = profileSchema.safeParse({ revision, partnerRevision: null, ...fields });
     assert.equal(contact.success, user.success);
     assert.equal(contact.success, profile.success);
