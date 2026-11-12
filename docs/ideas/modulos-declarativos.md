@@ -25,6 +25,12 @@ export class Fabricante extends Model {
 
 ## Decisiones acordadas
 
+- Toda la lógica de negocio (campos, validación, onchange, cálculos, displayName,
+  hooks y acciones) se declara en la clase de modelo y corre sólo en servidor;
+  permisos/reglas en manifest y Control de accesos. React sólo presenta, interactúa,
+  valida rápido por comodidad y dispara eventos; nunca autoriza ni decide negocio.
+  Ejemplo orientativo discutido: módulo «Biblioteca» (Autor, Libro, Préstamo).
+
 - Avance por fases con aprobación entre cada una; empezar por medición y diseño.
 - Trabajo en una rama propia; antes, commit del trabajo pendiente **sólo con
   autorización del usuario** (hoy hay app Flota, 6 migraciones y artefactos sin versionar).
@@ -55,7 +61,12 @@ export class Fabricante extends Model {
 5. **Opciones en Field** (`searchable`, `sortable`, `groupable`, `public`) con
    defaults; sustituyen `clientFields`, publicación en `orm.config` y política
    `list` duplicada.
-6. **Convenciones de relaciones** (fase posterior a evaluar): Many2one nombrado por
+6. **Acciones de negocio** `@action({ label, states?, group?, confirm? })` en el
+   modelo, invocadas sólo por el despachador autorizado, y `FormView.Actions` para
+   mostrarlas según estado y permisos. Incluir en el diseño de la fase 1.
+7. **Efectos externos tras confirmar** (correo, APIs): mecanismo `afterCommit` o
+   cola, fuera de la transacción de beforeSave/afterSave. Evaluar en la fase 1.
+8. **Convenciones de relaciones** (fase posterior a evaluar): Many2one nombrado por
    entidad con `…Id` y objeto relacionado automáticos; `displayRelations`
    inferido. Respetar la decisión existente `Vehicle.name` como FK.
 
