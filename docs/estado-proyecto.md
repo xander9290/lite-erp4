@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-11.
+Última actualización: 2026-11-12.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
@@ -18,7 +18,8 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
   Procedimiento y límites en [Flujo del framework](flujo-framework.md).
 - Aplicaciones con manifest, dependencias y menús de navegación; servicios con
   autorización, validación, transacciones, concurrencia y hooks de negocio.
-  Contactos, Usuarios, Citas y Flota aportan casos reales con alcances distintos;
+  Contactos, Usuarios y Citas son aplicaciones activas; Flota se retiró para
+  reiniciar la tutoría. Mantienen alcances distintos;
   no asumir que todos usan el mismo adaptador o política de acceso.
 - ListView con selección y eliminación por lote desde «Acciones»; dominios fijos
   de servidor combinados con filtros visibles. Los dominios filtran consultas y
@@ -27,161 +28,175 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
   Ver [Auditoría](auditoria-modelos.md).
 - Historial de creación/cambios y notas internas por defecto en createModelService.
   Tracking explícito por Field y exclusión de sensibles; captura transaccional,
-  lectura paginada autorizada y borrador independiente de RHF. Scaffold y Flota
-  integrados. Contrato y límites en [Actividad](actividad-registros.md).
+  lectura paginada autorizada y borrador independiente de RHF. Scaffold integrado;
+  la aplicación Flota de esa etapa fue retirada. Contrato en [Actividad](actividad-registros.md).
 - Agrupación anidada opcional de ListView, hasta tres niveles escalares autorizados,
   carga al expandir, conteos SQL, paginación y selección por rama. URL con prefijo;
-  conserva dominios/filtros/permisos. Scaffold nuevo habilita active. Las aplicaciones
+  conserva dominios/filtros/permisos. Scaffold nuevo habilita Boolean, Selection y
+  Many2one directos. Las aplicaciones
   existentes requieren configurar columnas y regenerar su adaptador, sin migración.
-  Flota ya tiene active agrupable en el código y adaptador con groups; no atribuir
-  una prueba funcional nueva a esa inspección. Contrato en [Agrupación](agrupacion-listas.md).
+  Los grupos Many2one conservan ID y resuelven su etiqueta por proveedor autorizado.
+  Contrato en [Agrupación](agrupacion-listas.md).
 - Empaquetar como dependencia npm es una meta futura, conservando Next.js y Prisma.
   Primero madurar contratos y aplicaciones. Ver [Idea y alcance](ideas/aplicaciones-modulares.md).
 
 ## Tutoría de Flota
 
-El usuario ejecuta los ejercicios; el agente explica y verifica sin editar su
-aplicación por adelantado. Guía: [README de Flota](../src/app/(auth)/erp/flota/README.md).
+Reiniciada por petición expresa el 2026-11-12. La aplicación anterior y sus datos
+locales se retiraron. No existen sus rutas, vistas, modelos declarativos, contratos,
+bindings ni uploaders de aplicación. El catálogo y la propiedad instalada están
+libres para volver a usar el identificador flota. Las migraciones anteriores se
+conservan y una nueva migración registra la retirada; no se reinició toda la base.
 
-- Modelo actual con `name`, `plate`, `brand` opcional y `active`, más auditoría.
-  La instalación, migraciones y enlace de Prisma se realizaron durante la tutoría
-  en la máquina original; comprobar el entorno local al cambiar de máquina.
-- Por petición expresa del usuario se integró actividad: los cuatro campos tienen
-  tracking y RecordForm conecta lectura de historial y publicación de notas.
-  No se alteraron las reglas de negocio ni las personalizaciones de las listas.
-- `beforeSave` convierte placas a mayúsculas, exige marca para vehículos activos
-  y requiere desactivar y guardar antes de cambiar las placas de un vehículo activo.
-  La prueba temporal de rollback de `afterSave` permanece comentada.
-- El código contiene las listas general, «Mis vehículos» y «Mis vehículos activos».
-  Esta última combina `createBy = actor.id` AND `active = true`.
-  En esta actualización se inspeccionaron dominio, Server Actions, variante de
-  RecordList, página y entrada del dropdown: todos están presentes.
-- Pendiente: confirmación funcional del usuario de «Mis vehículos activos».
-  No dar por realizada esa prueba sólo porque exista el código.
+Las mejoras del framework y las demos /sample permanecen. El ejemplo histórico
+FleetVehicle del generador no es la aplicación instalada. Las pruebas de related
+se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
-Reacciones/decoradores implementados por petición expresa y aplicados a Flota:
-registro explícito y decoradores @onchange/@depends/@constraint/@displayName comparten
-motor. Preview virtual separado del formulario/Prisma; acciones con actor/revisión,
-transacción readonly, whitelist de dependencias/salidas y puente RHF sin cascadas.
-[Contrato y límites](reacciones-modelos.md). Vehicle muestra avatar del fabricante
-del Modelo y normaliza matrícula; FlotaRecord conserva reglas con constraints y
-previous, eliminando una consulta; Fabricante/Modelo usan displayName tipado.
-Se regeneraron contratos y binding de Vehicle, sin SQL ni migraciones de la BD real.
+El usuario ejecuta `npm run create:app -- Flota --dry-run`; revisar juntos el plan
+antes de crear nada. Después recorrer manifest, modelo inicial y contrato, vistas,
+sincronización y primer guardado en ejercicios pequeños. No crear Flota ni sus
+modelos por adelantado. [Punto de partida](tutorial-flota.md).
 
-Compatibilidad: decoradores estándar fallaron en runtime del Next instalado;
-experimentalDecorators:true y adaptador legacy verificados en build. Sin reflexión.
-Pruebas ORM/scaffold/instalación/formulario, TypeScript y ESLint aprobados; integración
-PostgreSQL temporal comprobó readonly, actores, validación, restricciones y ausencia
-de escrituras por reacción. Navegador de producción: uppercase ABC, total60 y rechazo
-sobre100000 en /sample#model-reactions. Microbenchmark del núcleo documentado, sin
-pretender medir HTTP/SQL ni atribuir una mejora de velocidad al decorador.
-
-Actualización solicitada: implementado orm:sync -- id --force para añadir unicidad y
-ajustar longitud/nulabilidad de String existentes. Mantiene revisión y aprobación SQL,
-propiedad/hashes, rechazo de retiradas e historial íntegro. Exige baseline sin drift,
-comprueba duplicados/longitudes/nulos y prepara migración transaccional con locks y
-guardas de datos; no los corrige ni trunca. Plan real de fuentes flota --plan --force
-aprobó plate @unique @db.VarChar(20), sin consultar ni aplicar cambios a la BD real.
-Pruebas de instalación/force, TypeScript y ESLint aprobados; integración PostgreSQL
-exclusiva de fixture verifica datos inválidos, cancelación/continuación, constraints
-y repetición conservando filas. También se verificó rechazo transaccional de un dato
-incompatible introducido después de la revisión; la recuperación explícita del
-intento fallido se hizo sólo en el fixture. Comando del usuario: npm run orm:sync -- flota --force.
-Dev continúa detenido. [Alcance/recuperación](sincronizar-aplicaciones.md).
-
-Revisión de Vehicle solicitada por el usuario: FlotaVehicle está registrado y tiene
-servicio, lookup de Modelo, vistas y migración 20261112024103_sync_flota presentes.
-TypeScript aprobado y comprobación local del contrato sin BD: name es Many2one
-obligatorio; plate opcional/no único, sin límite declarado; sólo active tiene tracking.
-Sin displayName propio, el lookup de Vehicle devuelve su ID. FlotaRecord permanece
-como modelo separado y sus reglas no se heredan. No se editaron archivos de Vehicle
-ni se comprobó la aplicación de su migración en la base real.
-
-Por petición expresa del usuario se implementó la simplificación de relaciones y
-vistas y se aplicó a Flota: lookup por convención en create:views, etiquetas en el
-servicio para todas las colecciones, modelColumns/ListView.Field, FormView/FormLayout
-con recordUI, withDisplayName tipado y update:views con propuesta/--write y edición
-AST acotada. [API y límites](contratos-vistas.md). El contrato generated de Flota se
-verificó con orm:generate --check, sin cambios de SQL. Se regeneró Prisma Client
-local; no se migró la base real en esta tarea. Fabricante conserva CardView y avatar
-squared; Modelo usa columnas JSX y nombre tipado; los tres formularios heredan
-metadatos conservando overrides. No se cambió la lógica de negocio de vehículos.
-
-Pruebas: ORM, scaffold en proyectos temporales, instalación/generación, formularios
-enlazados con RHF, colecciones y la integración PostgreSQL aislada. Build de producción
-aprobado. La integración elimina sus recursos y no modifica datos reales. La prueba
-funcional de «Mis vehículos activos» por el usuario sigue pendiente. Retomar tutoría
-con pasos pequeños; los cambios presentes fueron autorizados explícitamente y no
-habilitan modificaciones futuras por adelantado.
-
-Actualización 2026-11-11 en Windows: el usuario completó el historial de
-Fabricante y añadió avatar Image con folder fabricantes, manteniendo logo Text.
-Prisma migrate status confirmó las 14 migraciones al día en la base local del
-puerto 5433, incluida 20261111162622_sync_flota. Contrato, esquema y binding
-incluyen avatar. El bloqueo por historial anterior descrito más abajo es histórico.
-
-Por petición expresa se aplicaron las mejoras de imágenes a Fabricante: el
-formulario importa imageUploads.avatar del helper gestionado y conserva su
-presentación avatar/squared; la lista añade miniatura squared/sm. signAvatarUpload
-mantiene compatibilidad delegando en la acción generada. No se regeneraron vistas
-personalizadas ni se cambió el modelo durante esta adopción. Helpers se actualizan
-mediante orm:sync/orm:generate; no editarlos a mano.
-
-Estado contrastado con el commit `340be8e` el 2026-11-11: Fabricante ya fue
-recreado. Existen `models/Fabricante.ts`, registro en perfil/manifest, servicio,
-acciones, lista/formulario, rutas, contrato y binding generado. Sus campos son
-`name`, `logo` (Text opcional), `avatar` (Image opcional) y `active` en el checkout
-actual. La referencia al commit indica el punto inicial de la recreación.
-El esquema Prisma incluye FlotaFabricante y está versionada la migración
-`20261111043608_sync_flota`. La presencia de esos archivos no confirma que la
-migración esté aplicada ni que el cliente local esté actualizado en esta máquina.
-
-Fields.Image, miniaturas y generación de uploaders ya están implementados:
-ver [Campos de imagen](ideas/campos-imagen.md). Las subidas reales necesitan
-credenciales privadas de Cloudinary y no se probaron subiendo archivos en esta
-verificación; no guardar sus valores aquí. El borrado remoto queda pendiente del
-contrato de [inventario/referencias](ideas/limpieza-imagenes.md).
-No volver a ejecutar create:model/create:views para Fabricante ni reemplazar sus
-personalizaciones. Conservar la comprobación funcional pendiente de «Mis vehículos
-activos».
-
-Antecedente histórico de retirada (superado por la recreación anterior):
-
-El usuario pidió revertir Fabricante para probar el nuevo scaffold. La práctica se
-retiró de forma específica: ya no hay clase, registro en orm.config/manifest,
-servicio, acciones, contrato ni vistas/rutas de Fabricante. La tabla estaba vacía
-(cero filas) y sin claves foráneas entrantes; se retiró mediante la migración
-20261111042330_revert_fabricante_tutorial, aplicada a liteerp4/public. Conserva la
-migración original 20261111020207_add_fabricante_flota y todo el historial.
-La migración inversa bloquea la tabla, aborta si hay filas y no usa CASCADE.
-
-Se restauraron snapshots versionados coherentes del esquema/propiedad/artefactos
-anteriores a la instalación de Fabricante, tras verificar su alcance e integridad;
-no se inventaron hashes ni se forzó orm:install --update para aceptar retiradas.
-Después se regeneraron contratos, cliente Prisma y binding de vehículos con las
-herramientas actuales. FlotaRecord.store.ts quedó idéntico al respaldo previo,
-conservando las mejoras del framework. Los vehículos mantienen brand como texto.
-
-Ejercicio propuesto entonces y ya reflejado en el código actual:
-
-```bash
-npm run create:model -- flota Fabricante
-```
-
-Personalizar campos/reglas y clientFields; después create:views y orm:sync.
-El agente comprobó entonces --dry-run sin escribir. Esa comprobación es histórica;
-el modelo y las vistas ya existen en el checkout actual.
-
-Respaldo local de la práctica anterior: /private/tmp/lite-erp-fabricante-cj8494k2
-(con files.json y rollback.json). Es una copia temporal en esta máquina, no un
-recurso versionado ni disponible automáticamente en otra máquina. Las pruebas de
-nombres duplicados/guard de aquella UI quedaron pendientes y podrán retomarse con
-el scaffold nuevo. Conservar los pendientes funcionales previos de dominios y
-actividad de vehículos cuando no exista confirmación explícita del usuario.
+Las anotaciones de Flota que siguen son históricas de la aplicación retirada;
+no describen archivos ni datos actualmente presentes. Los contratos compartidos
+implementados siguen vigentes: [modelos/vistas](modelos-y-vistas.md),
+[related](campos-relacionados.md), [compute](campos-calculados.md) y
+[colecciones](vistas-colecciones.md).
 
 ## Último trabajo y verificaciones
+
+- 2026-11-12: retirada completa de la aplicación Flota por petición expresa, con
+  confirmación adicional para borrar también datos/tablas locales. Copia del código
+  previo en .tutorial-backups, ignorada por Git, sin configuración privada ni copia
+  de datos. Retirados fuentes/rutas y artefactos apps/bindings/uploads; validada
+  propiedad instalada antes de quitar su esquema/inversas/entrada. Registro del
+  scaffold regenerado mediante sus helpers y manifiesto, sin hashes manuales.
+  No se revirtieron las mejoras compartidas del framework ni los ejemplos.
+- Migración 20261112173158_remove_flota_tutorial revisada y aplicada a la base
+  local: cuatro tablas, enum y actividad sólo de sus cuatro modelos, en transacción
+  y sin CASCADE/reset. Se conserva todo el historial anterior de migraciones.
+  Verificados ausencia de tablas/actividad de Flota y conteos iguales del resto
+  de tablas/actividad. Prisma Client regenerado y diff BD/esquema sin diferencias.
+  No se eliminaron archivos remotos. [Procedimiento específico](retirar-aplicaciones.md).
+- Independizadas las pruebas SQL: related-collection.fixture instala tres modelos
+  propios exclusivamente en el proyecto/esquema desechables; el framework ya no
+  importa Vehicle ni servicios de la aplicación de tutoría. Retirado un createHref
+  obsoleto de una demo con Crear oculto. Documentación vigente y AGENTS actualizados
+  para comenzar desde cero; no recrear automáticamente el ejercicio anterior.
+- Verificación de la retirada: TypeScript, ESLint de archivos afectados, build de
+  producción (sin rutas de Flota), applications 10/10 y scaffold 12/12 aprobados.
+  create:app -- Flota --dry-run aprobado sin escribir archivos ni colisiones.
+  Se regeneraron tipos de rutas tras descartar únicamente la caché dev/types
+  obsoleta; no se inició ni reinició dev. Integración SQL completa aprobada, incluido
+  el fixture independiente de related, evolución, permisos/concurrencia, force y
+  vistas generadas con persistencia. Proyecto y esquema temporales eliminados.
+  No se hizo una inspección visual autenticada nueva; el build verifica las rutas
+  restantes y las pruebas SQL usan cuentas/datos desechables.
+- Oportunidad de simplificación: un desinstalador revisable evitaría coordinar
+  manualmente fuentes, catálogo, propiedad/inversas y migración. Aceptación:
+  dry-run, dependientes bloqueantes, política explícita de conservación/borrado,
+  integridad de artefactos y prueba de recreación sin afectar otras aplicaciones.
+  Se documenta como pendiente; no se creó una API genérica para esta retirada.
+
+- 2026-11-12: related Image/Text disponible en ListView, CardView y KanbanView.
+  CollectionFields publica sólo persistentes y related autorizados; el servicio
+  proyecta las salidas solicitadas por página y resuelve referencias únicas por
+  raíz en lotes de hasta 100, en la misma transacción autorizada. Binding con
+  delegates/rutas fijos; rechaza consultas SQL sobre salidas derivadas. Compute
+  permanece limitado a formularios. Contrato en [Campos relacionados](campos-relacionados.md).
+- Vehicle publica fabricanteAvatar en su lista y habilita agrupación por Modelo
+  en vista y servicio, con etiquetas autorizadas y claves por ID. Scaffold nuevo
+  publica CollectionFields y configura Many2one agrupables. Se preservaron las
+  vistas personalizadas; contratos y bindings de Flota regenerados por CLI, sin
+  migraciones ni cambios de datos reales.
+- Verificación de esta etapa: 23/23 pruebas de servicio/related/agrupación/etiquetas
+  y scaffold 12/12 aprobados; TypeScript, ESLint de archivos afectados, build de
+  producción, diff-check y orm:generate --check de Flota aprobados. En navegador,
+  /sample#image-collections mostró las seis imágenes relacionadas esperadas entre
+  lista, tarjetas y kanban, sin errores; datos ficticios, sin sesión de Flota.
+- La integración PostgreSQL alcanzó y aprobó los escenarios nuevos del fixture:
+  imágenes por página, referencias compartidas, grupos Many2one con etiquetas
+  iguales e IDs distintos y hojas filtradas por FK. También confirmó evolución y
+  orm:sync. No se conservó el resultado final del proceso completo; no atribuir
+  una aprobación nueva a sus etapas finales force/resource. Al cierre no quedó
+  directorio .framework-test-* en el proyecto. La prueba usa un esquema exclusivo
+  desechable; no escribe en las tablas del ERP.
+- Oportunidad acotada: evaluar publicaciones explícitas de related adicionales
+  cuando exista un caso real; conservar consultas por página/lote y políticas
+  SQL separadas. No convertir el soporte de imágenes en permiso para agrupar
+  por rutas o ejecutar compute por fila. Kanban mantiene columnas Selection.
+
+- 2026-11-12: campos calculados virtuales Integer/Text/Image con compute en la
+  clase y métodos @depends (forma corta o existente). Se infieren outputs de
+  lectura y se separan de campos persistentes, defaults, tipos de captura, payload,
+  auditoría y SQL. Un método de una salida devuelve el escalar; varias salidas
+  exigen objeto completo. Backend valida tipos/límites y sólo recibe dependencias
+  publicadas no sensibles, conservando la transacción readonly autorizada.
+  Guía en [Campos calculados](campos-calculados.md).
+- FieldText/FieldNumber añaden mode=display con presentación compartida y el mismo
+  acceso a lectura que FieldImage, sin inputs/RHF. Scaffold genera estos controles
+  para compute y related. Demo /sample#model-reactions migrada a total/resumen
+  declarativos; Flota y sus reglas no se modificaron para este alcance. En una
+  petición mixta, los compute activos consumen patches onchange ya validados,
+  evitando resultados anteriores a la transformación sin una cascada de React.
+- Verificaciones de esta etapa: 13/13 pruebas de compute/reacciones/related,
+  13/13 de modelo/imagen/contratos generados/ciclo, formularios 5/5 y scaffold
+  12/12 aprobados. TypeScript, ESLint de archivos cambiados, diff-check y build
+  final de producción aprobados. No se repitieron suites globales con fallos
+  históricos de symlinks de Windows para atribuirles una aprobación nueva.
+- Navegador: total inicial 10, edición 3×20=60, resumen coherente con el patch
+  uppercase y payload sólo name/quantity/unitPrice. Revertir vuelve a total 10;
+  los controles display no tienen inputs. Integración PostgreSQL completa aprobada:
+  incluye compute con servicio real y rechazo del valor falsificado en el contrato,
+  además de evolución, permisos, concurrencia, force y scaffold existentes.
+  Proyecto/esquema temporales eliminados, sin datos ni SQL de la base real.
+- Límites: sólo borradores de formularios y dependencias locales persistentes,
+  sin cadenas/ciclos, store/inverse ni proyección automática desde listas/read.
+  La siguiente etapa es diseñar cálculos persistidos e invalidación, después de
+  elegir un caso real con el usuario; no añadir cambios a Flota por anticipación.
+
+- 2026-11-12: primer alcance de related Image/Text, declarado directamente en la
+  clase y separado de persistencia/tipos de captura. Generación valida hasta tres
+  saltos Many2one publicados/no sensibles del perfil; binding con delegates
+  explícitos, guardas de metadata y proyección compartida por raíz. Reutiliza la
+  transacción readonly autorizada de reacciones. No se reciben rutas/selects del
+  navegador ni se crean columnas. Contrato en [Campos relacionados](campos-relacionados.md).
+- Vehicle sustituyó el método fabricantePreview por dos Fields related. El avatar
+  usa FieldImage mode=display con recordUI.readFields, sin RHF ni uploader; se
+  conserva normalización, onchange de matrícula, displayName y formato local del
+  usuario. Los componentes retirados siguen eliminados. Scaffold enlaza contratos
+  de lectura y genera presentación de imágenes en vistas nuevas; no se regeneraron
+  vistas personalizadas. orm:generate y orm:bind ejecutados por herramientas;
+  generate --check sin diferencias. Esquema/SQL sin cambios, sin migraciones ni
+  datos reales modificados. Prisma Client local regenerado por el build.
+- Verificación: cuatro pruebas nuevas de related aprobadas (separación de tipos y
+  payload, null/IDs, proyección mínima, publicación/sensibles/tipos, sesión/revisión);
+  formularios 4/4, imágenes 11/11 y scaffold 12/12 aprobados. TypeScript, ESLint de
+  los archivos modificados y build de producción aprobados. ORM global 59/60: el
+  caso restante falla con EPERM al crear un symlink de archivo en Windows, incluso
+  fuera del sandbox. Instalación 13/19: seis fixtures fallan al crear symlinks de
+  directorio; no presentar esas suites como aprobadas ni omitir las protecciones.
+- Integración PostgreSQL completa aprobada en proyecto/esquema temporales, con
+  prueba del binding related real de Vehicle: avatar y nombre en una llamada al
+  repositorio, rechazo de cuenta sin permisos/ID inexistente, null actualizado y
+  ausencia de escrituras en Vehicle/actividad. También conserva las comprobaciones
+  previas de persistencia, evolución, force, concurrencia y scaffold. Recursos
+  temporales eliminados; la base real no se migró ni se usó para datos de prueba.
+- Navegador en /sample#related-image: imagen pública cargada, payload sólo modelId,
+  ningún input en el FieldImage display y reset a relación vacía con «Sin imagen».
+  Se usó el dev existente. Los dos componentes dedicados de preview/estado no se
+  recuperaron. Pendiente siguiente: validar Vehicle con el usuario y diseñar
+  cálculos persistidos/proyecciones de colecciones sólo al retomar ese alcance.
+
+- 2026-11-12: revertidos los componentes ModelPreviewImage y ModelReactionStatus:
+  eliminado su archivo compartido y retiradas referencias en VehicleForm y la demo
+  de reacciones. Se conservaron los cambios locales de formato del formulario,
+  el motor/contexto de reacciones, las reglas de Vehicle y su contrato generado.
+  El preview del fabricante sigue calculándose pero ya no se muestra en Vehicle.
+  Guía y reglas de continuidad actualizadas. TypeScript y ESLint de ambos
+  consumidores aprobados; sin nueva prueba visual, SQL ni cambios en BD.
 
 - 2026-11-11: el instalador permite ampliar String VARCHAR(n) a un límite mayor
   conservando todos los demás atributos; las reducciones y otros cambios siguen

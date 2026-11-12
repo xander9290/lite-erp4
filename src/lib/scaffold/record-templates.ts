@@ -45,7 +45,7 @@ export async function lookupRecords(request: ModelLookupRequest): Promise<Many2O
     .replace('columns={recordColumns} searchFields={recordSearchFields}', 'fields={recordFields} searchFields={["name"]}')
     .replace('recordHref="' + base + '/{id}" />;', 'recordHref="' + base + '/{id}">\n    <ListView.Field name="name" sortable />\n    <ListView.Field name="active" sortable groupable />\n  </ListView>;');
   files["actions/record.actions.ts"] += `\nexport async function onchangeRecord(input: import("@/lib/orm/reactions.types").ReactionRequest): Promise<import("@/lib/orm/reactions.types").ReactionResult> {\n  try {return await recordService.react(prisma,await requireAdmin(),input);}\n  catch {return {ok:false,error:"No se pudo completar la reacción."};}\n}\n`;
-  files["schemas/record.schema.ts"] = files["schemas/record.schema.ts"].replace("export {",`export { ${n}ReactionRules as recordReactionRules,`);
-  files["schemas/record.ui.ts"] = 'import { recordFields,recordReactionRules } from "./record.schema";\nimport { onchangeRecord } from "../actions/record.actions";\nexport const recordUI = { fields: recordFields, reactions:{rules:recordReactionRules,load:onchangeRecord} };\n';
+  files["schemas/record.schema.ts"] = files["schemas/record.schema.ts"].replace("export {",`export { ${n}CollectionFields as recordCollectionFields, ${n}PreviewFields as recordReadFields, ${n}ReactionRules as recordReactionRules,`);
+  files["schemas/record.ui.ts"] = 'import { recordFields,recordReactionRules,recordReadFields } from "./record.schema";\nimport { onchangeRecord } from "../actions/record.actions";\nexport const recordUI = { fields: recordFields, readFields: recordReadFields, reactions:{rules:recordReactionRules,load:onchangeRecord} };\n';
   return files;
 }

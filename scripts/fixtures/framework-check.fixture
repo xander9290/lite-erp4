@@ -359,6 +359,9 @@ try {
   const {Fields,defineModel,onchange,depends,constraint,ModelValidationError}=await import("./src/lib/orm");
   const {EnsayoFrameworkRecord}=await import("./src/app/(auth)/erp/ensayo-framework/models/Record");
   class ReactionExample extends EnsayoFrameworkRecord {
+    doubleQuantity=Fields.Integer({compute:"computeDouble",required:true});
+    @depends("quantity")
+    computeDouble(values:ReactionValues){return Number(values.quantity??0)*2;}
     preview={login:Fields.Text()};
     @onchange({fields:["name"],writes:["name"]})
     async changeName(values:ReactionValues,{tx,actor}:ReactionContext){
@@ -378,6 +381,8 @@ try {
   const activitiesBeforeReaction=await prisma.recordActivity.count();
   const reacted=await reactionService.react(prisma,reactionActor,{field:"name",values:{name:"reaction"}});
   assert.deepEqual(reacted,{ok:true,patch:{name:"REACTION"},preview:{login:"fixture-reaction"}});
+  assert.deepEqual(await reactionService.react(prisma,reactionActor,{field:"quantity",values:{quantity:3}}),{ok:true,patch:{},preview:{doubleQuantity:6}});
+  assert.equal(reactionModel.schema.safeParse({...defaults,doubleQuantity:999}).success,false);
   assert.equal((await reactionService.react(prisma,reactionActor,{field:"name",values:{name:"try-write"}})).ok,false);
   assert.equal((await prisma.user.findUniqueOrThrow({where:{id:reactionActor.id}})).active,true);
   assert.equal(await prisma.ensayoFrameworkRecord.count(),countBeforeReaction);
@@ -389,4 +394,45 @@ try {
   assert.equal(rejected.ok,false);
   assert.equal(await prisma.ensayoFrameworkRecord.count({where:{name:"reject-constraint"}}),0);
   console.log("✓ Reacciones readonly, actor aislado, patches, restricciones y ausencia de persistencia/actividad verificados.");
+  // Real generated related projection, exclusively in this disposable PostgreSQL schema.
+  const {vehicleModel:relatedVehicleModel,variantModel:relatedVariantModel}=await import("./src/app/(auth)/erp/related-check/orm.config");
+  const {RelatedTestVehicleRepository}=await import("./src/generated/orm/bindings/related-check/RelatedTestVehicle.store");
+  const manufacturer=await prisma.relatedTestMaker.create({data:{name:"Related fixture",avatar:"https://example.com/fixture.png"}});
+  const variant=await prisma.relatedTestVariant.create({data:{name:"Related model",fabricanteId:manufacturer.id,vehicleType:"car"}});
+  let relatedQueries=0;
+  const relatedService=createModelService(relatedVehicleModel,{...RelatedTestVehicleRepository,related:async(tx,field,id)=>{relatedQueries++;return RelatedTestVehicleRepository.related!(tx,field,id);}}, {list:{fields:["name","plate","active"],searchFields:["plate"],sortable:[],filterable:[],groupable:[]}});
+  const relatedActivities=await prisma.recordActivity.count();
+  const relatedVehicles=await prisma.relatedTestVehicle.count();
+  assert.deepEqual(await relatedService.react(prisma,reactionActor,{field:"name",values:{name:variant.id}}),{ok:true,patch:{},preview:{fabricanteAvatar:"https://example.com/fixture.png",fabricanteNombre:"Related fixture"}});
+  assert.equal(relatedQueries,1);
+  assert.equal((await relatedService.react(prisma,{id:reader.id,sessionVersion:reader.sessionVersion},{field:"name",values:{name:variant.id}})).ok,false);
+  assert.equal(relatedQueries,1);
+  await prisma.relatedTestMaker.update({where:{id:manufacturer.id},data:{avatar:null}});
+  const refreshedRelated=await relatedService.react(prisma,reactionActor,{field:"name",values:{name:variant.id}});
+  assert.ok(refreshedRelated.ok);assert.equal(refreshedRelated.preview.fabricanteAvatar,null);
+  assert.equal((await relatedService.react(prisma,reactionActor,{field:"name",values:{name:"missing-related"}})).ok,false);
+  assert.equal(await prisma.relatedTestVehicle.count(),relatedVehicles);
+  assert.equal(await prisma.recordActivity.count(),relatedActivities);
+  console.log("✓ Related generado: dos salidas en una lectura, permisos, null/ausencia y sin escrituras en vehículos/actividad.");
+  // Page/branch projection uses the generated batched delegate, in the same list transaction.
+  await prisma.relatedTestMaker.update({where:{id:manufacturer.id},data:{avatar:"https://example.com/fixture.png"}});
+  const twinVariant=await prisma.relatedTestVariant.create({data:{name:"Related model",fabricanteId:manufacturer.id,vehicleType:"car"}});
+  await prisma.relatedTestVehicle.createMany({data:[{name:variant.id,plate:"RELATED-1"},{name:variant.id,plate:"RELATED-2"},{name:twinVariant.id,plate:"RELATED-3"}]});
+  let relatedBatches=0;
+  const {RelatedTestVariantRepository}=await import("./src/generated/orm/bindings/related-check/RelatedTestVariant.store");
+  const modeloLookup=createModelService(relatedVariantModel,RelatedTestVariantRepository,{list:{fields:["name","fabricanteId","vehicleType"],searchFields:["name"],sortable:["name"],filterable:[],groupable:[]}});
+  const collectionService=createModelService(relatedVehicleModel,{...RelatedTestVehicleRepository,relatedMany:async(tx,field,ids,outputs)=>{relatedBatches++;return RelatedTestVehicleRepository.relatedMany!(tx,field,ids,outputs);}}, {list:{fields:["name","plate","active","fabricanteAvatar"],searchFields:["plate"],sortable:["plate"],filterable:["plate"],groupable:["name"]},relations:{name:request=>modeloLookup.lookup(prisma,reactionActor,request)}});
+  const relatedState={query:"",page:1,pageSize:10,sort:"plate",direction:"asc" as const,filters:[]};
+  const relatedList=await collectionService.list(prisma,reactionActor,relatedState);assert.ok(relatedList.ok);
+  assert.equal(relatedList.data.rows.length,3);assert.equal(relatedBatches,1);
+  assert.ok(relatedList.data.rows.every(row=>row.fabricanteAvatar==="https://example.com/fixture.png"));
+  assert.ok(relatedList.data.rows.every(row=>row.fabricanteNombre===undefined));
+  const relatedGroups=await collectionService.list(prisma,reactionActor,{...relatedState,groupBy:["name"]});assert.ok(relatedGroups.ok);
+  assert.equal(relatedGroups.data.groups?.length,2);assert.equal(relatedBatches,1);
+  assert.equal(relatedGroups.data.groups?.[0].label,relatedGroups.data.groups?.[1].label);
+  assert.notEqual(relatedGroups.data.groups?.[0].value,relatedGroups.data.groups?.[1].value);
+  const relatedLeaf=await collectionService.list(prisma,reactionActor,{...relatedState,groupBy:["name"],groupPath:[variant.id]});assert.ok(relatedLeaf.ok);
+  assert.equal(relatedLeaf.data.rows.length,2);assert.equal(relatedBatches,2);
+  assert.ok(relatedLeaf.data.rows.every(row=>row.name===variant.id&&row.fabricanteAvatar));
+  console.log("✓ Related por lote en página/rama y agrupación Many2one SQL con etiquetas iguales e identidades distintas verificados.");
 } finally { await prisma.$disconnect(); }

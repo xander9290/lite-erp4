@@ -5,8 +5,15 @@ import type { PublishedFields } from "@/lib/orm/presentation";
 import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
 import type { ImageUploader } from "./image.types";
 
-export type FormModel = { reactions?:FormReactions; reactionState?:ReactionState; retryReaction?:()=>void; fields: PublishedFields; lookups?: Readonly<Record<string, Many2OneLoader>>; uploads?: Readonly<Record<string, ImageUploader>> };
+export type FormModel = { readFields?:PublishedFields; reactions?:FormReactions; reactionState?:ReactionState; retryReaction?:()=>void; fields: PublishedFields; lookups?: Readonly<Record<string, Many2OneLoader>>; uploads?: Readonly<Record<string, ImageUploader>> };
 export const FormModelContext = createContext<FormModel | undefined>(undefined);
+/** Shared readonly contract: never register computed/related values with RHF. */
+export function useModelReadField(name:string, kind:string) {
+  const model = useContext(FormModelContext);
+  const descriptor = model?.readFields?.[name];
+  if (!descriptor || descriptor.metadata.kind !== kind || descriptor.metadata.sensitive) throw new Error(`Campo de lectura no publicado o incompatible: ${name}.`);
+  return {metadata:descriptor.metadata,value:model?.reactionState?.preview[name],state:model?.reactionState,retry:model?.retryReaction};
+}
 /** Explicit props (including false/empty labels) override inherited presentation. */
 export function useModelField<P extends { name: string }>(props: P, kind: string): P {
   const model = useContext(FormModelContext);

@@ -53,7 +53,7 @@ export function withDisplayName<M extends DisplayModel, const R extends Record<s
 
 /** Infer decorated display projections from a class's Fields and declared displayRelations. */
 type DeclarationModel<I> = {
- fields:{[K in keyof I as I[K] extends Field ? K extends string ? K : never : never]:Extract<I[K],Field>};
+ fields:{[K in keyof I as I[K] extends {readonly related:string} | {readonly compute:string} ? never : I[K] extends Field ? K extends string ? K : never : never]:Extract<I[K],Field>};
  metadata:Readonly<Record<string,Field["metadata"]>>;schema:z.ZodType;
 };
 export type DisplayOf<I,R extends Record<string,DisplayModel>,P extends Paths<DeclarationModel<I>,R>> = DisplayValues<DeclarationModel<I>,R,P>;

@@ -6,6 +6,12 @@ manuales: ningún modelo decide automáticamente la distribución del formulario
 
 ## Un único contrato de presentación
 
+Los campos de lectura relacionados se conectan con `recordUI.readFields`, separados
+de `fields` editables. `FieldImage mode="display"` presenta su resultado sin RHF ni
+uploader. Declaración, generación y límites en [Campos relacionados](campos-relacionados.md).
+`FieldText` y `FieldNumber` también admiten mode=display para related/compute;
+el modelo calcula y los controles sólo presentan. Ver [Campos calculados](campos-calculados.md).
+
 El scaffold genera `schemas/recurso.ui.ts`:
 
 ```ts
@@ -45,6 +51,12 @@ heredado. Si la vista fija maxLength explícitamente, ese override sigue vigente
 La presentación no sustituye la validación ni la autorización del servidor.
 
 ## Columnas en el mismo TSX
+
+Para incluir imágenes o textos `related` en colecciones, usar el contrato generado
+`recordCollectionFields` en lugar de `recordFields` y publicar esas salidas en
+`list.fields` del servicio. Los campos derivados son de lectura: no admiten
+búsqueda, filtros, orden ni agrupación SQL. El contrato editable del formulario
+permanece separado. Ver [Campos relacionados](campos-relacionados.md).
 
 ```tsx
 import ListView from "@/components/ui/list/ListView";

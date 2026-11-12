@@ -111,7 +111,8 @@ ni modificar hashes para forzar una actualización.
 
 Cada README generado contiene los comandos concretos de su módulo, separados por
 primera instalación, evolución, validación, vistas/dominios, enlace y despliegue.
-Ejemplo vigente: [README de Flota](../src/app/(auth)/erp/flota/README.md).
+Cada aplicación nueva incluye su README. Flota se retiró para reiniciar la
+[tutoría desde cero](tutorial-flota.md); su README anterior ya no está instalado.
 La [retirada de aplicaciones](retirar-aplicaciones.md) todavía no tiene un comando
 automático; su alcance actual se documenta aparte.
 

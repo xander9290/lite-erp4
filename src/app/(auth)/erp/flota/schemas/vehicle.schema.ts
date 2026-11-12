@@ -1,1 +1,0 @@
-export { FlotaVehicleReactionRules as recordReactionRules, FlotaVehicleFields as recordFields, FlotaVehicleRecordSchema as recordSchema, createFlotaVehicleDefaults as createRecordDefaults, type FlotaVehicleRecordInput as RecordInput, type FlotaVehicleRecordValues as RecordValues } from "@/generated/orm/apps/flota/FlotaVehicle.schema";

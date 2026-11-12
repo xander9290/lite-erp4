@@ -3,6 +3,12 @@
 ERP modular con Next.js, React, TypeScript, Prisma ORM 7 y PostgreSQL.
 Las aplicaciones se componen con modelos declarativos y vistas TSX editables.
 
+Los modelos del servidor concentran negocio, métodos y cálculos; React presenta
+resultados y gestiona interacción. Para imágenes y textos derivados de relaciones,
+declarar `related` sin consultas manuales: [Campos relacionados](docs/campos-relacionados.md).
+Para fórmulas virtuales, declarar compute y un método @depends; los Fields display
+presentan el resultado del servidor: [Campos calculados](docs/campos-calculados.md).
+
 ## Comandos del scaffold, en orden
 
 Para añadir otro modelo a una aplicación, el flujo es **modelo → negocio → vistas → sincronizar**:
@@ -36,13 +42,13 @@ Muestra el SQL y pide aprobación antes de aplicarlo; se detiene ante errores.
 datos y mantiene la aprobación del SQL. [Guía del comando](docs/sincronizar-aplicaciones.md).
 
 Cada aplicación creada con `create:app` incluye un README con comandos concretos
-para su identificador, separados por caso. El módulo de tutoría actual es
-[Flota](src/app/(auth)/erp/flota/README.md).
+para su identificador, separados por caso. La tutoría de Flota se reinicia desde cero;
+[punto de partida y ritmo](docs/tutorial-flota.md). La aplicación anterior fue retirada.
 
 | Caso | Guía |
 | --- | --- |
 | Crear una aplicación y enlazar su persistencia | [Crear aplicaciones](docs/crear-aplicaciones.md) y [Flujo del framework](docs/flujo-framework.md). |
-| Añadir campos a una aplicación instalada | Caso 3 del [README de Flota](src/app/(auth)/erp/flota/README.md#3-añadir-un-campo-o-modelo-después-de-instalar), con el ID de tu módulo. |
+| Añadir campos a una aplicación instalada | [Sincronizar aplicaciones](docs/sincronizar-aplicaciones.md), con el ID de tu módulo. |
 | Cambiar vistas, menús, dominios o adaptadores | Casos 4–7 del README de cada módulo. |
 | Retirar una aplicación | [Alcance y procedimiento actuales](docs/retirar-aplicaciones.md). No hay comando de desinstalación. |
 
@@ -52,7 +58,7 @@ para su identificador, separados por caso. El módulo de tutoría actual es
 Los README detallan dónde intervienen `db:generate`, el enlace y el reinicio de dev.
 
 Los modelos admiten reacciones de borrador, restricciones, presentación y cálculos
-de lectura con registro explícito o decoradores. [Guía y ejemplo de Flota](docs/reacciones-modelos.md).
+de lectura con registro explícito o decoradores. [Guía de reacciones](docs/reacciones-modelos.md).
 
 ## Desarrollo
 

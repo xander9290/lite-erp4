@@ -3,6 +3,7 @@
 import { useId, useMemo, useState, type ComponentPropsWithoutRef } from "react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import { useModelField } from "./modelFields";
+import ReadFieldValue, { type ReadFieldProps } from "./ReadFieldValue";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { createNumberFormat, type ParsedNumber } from "./numberFormat";
@@ -12,18 +13,29 @@ type NumberVariant =
   | { type: "float"; decimals: number; currency?: never }
   | { type: "monetary"; decimals: number; currency?: string };
 
-export type FieldNumberProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, number | null> &
+type EditableFieldNumberProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, number | null> &
   Omit<
     ComponentPropsWithoutRef<"input">,
     keyof BaseFieldProps<TFieldValues, number | null> | "type" | "value" | "defaultValue" | "children" | "inputMode" | "dir" | "min" | "max" | "step"
   > & NumberVariant & {
     locale?: string;
     allowNegative?: boolean;
+    mode?:"edit";
   };
+type DisplayNumberProps = ReadFieldProps & NumberVariant & {locale?:string};
+export type FieldNumberProps<TFieldValues extends FieldValues = FieldValues> = EditableFieldNumberProps<TFieldValues> | DisplayNumberProps;
 
 type EditingNumber = ParsedNumber & { name: string; formatKey: string };
 
 export default function FieldNumber<TFieldValues extends FieldValues = FieldValues>(props: FieldNumberProps<TFieldValues>) {
+  if (props.mode === "display") {
+    const formatter=createNumberFormat({type:props.type,decimals:props.decimals,currency:props.currency,locale:props.locale??"es-MX",allowNegative:true});
+    return <ReadFieldValue {...props} kind="integer" format={formatter.format} />;
+  }
+  return <EditableNumber {...props} />;
+}
+
+function EditableNumber<TFieldValues extends FieldValues = FieldValues>(props:EditableFieldNumberProps<TFieldValues>) {
   const {
   name,
   label,
@@ -41,8 +53,10 @@ export default function FieldNumber<TFieldValues extends FieldValues = FieldValu
   className = "",
   style,
   "aria-describedby": describedBy,
+  mode,
   ...inputProps
 } = useModelField(props, "integer");
+  void mode;
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const errorId = `${inputId}-error`;

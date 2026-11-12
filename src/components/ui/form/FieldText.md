@@ -1,5 +1,10 @@
 # FieldText
 
+`mode="display"` muestra un Text de recordUI.readFields (compute/related), sin
+registrarlo en RHF ni crear un input. Hereda label y conserva direction inline/block.
+Ejemplo: `<FieldText mode="display" name="resumen" />`.
+Contrato y demo en [Campos calculados](../../../../docs/campos-calculados.md).
+
 Campo de texto integrado con RHF. `widget` es la única opción para elegir su uso;
 se retiran la prop `type` y el antiguo nombre `widget="input"`.
 

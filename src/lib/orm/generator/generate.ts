@@ -3,9 +3,10 @@ import type { Field, FieldMetadata } from "../fields";
 import { prismaBlocks, maskPrisma } from "./prisma-source";
 import { lookupProjectionPlan } from "./display";
 import { relationFieldName } from "../display";
+import { relatedProjectionPlan } from "./related";
 
 export type GenerationModel = {
-  model: { readonly name: string; readonly table: string; readonly fields: Readonly<Record<string, Field>>; readonly metadata: Readonly<Record<string, FieldMetadata>>; readonly reactionRules?: readonly import("../reactions.types").ReactionRule[]; readonly previewFields?: Readonly<Record<string,Field>>; readonly displayFields?: readonly string[] };
+  model: { readonly name: string; readonly table: string; readonly fields: Readonly<Record<string, Field>>; readonly metadata: Readonly<Record<string, FieldMetadata>>; readonly relatedFields?: Readonly<Record<string,Field>>; readonly computedFields?: Readonly<Record<string,Field>>; readonly reactionRules?: readonly import("../reactions.types").ReactionRule[]; readonly previewFields?: Readonly<Record<string,Field>>; readonly displayFields?: readonly string[] };
   /** Explicit publication boundary. Adding a private field must not publish it to the browser. */
   clientFields: readonly string[];
 };
@@ -37,6 +38,7 @@ function clientSource({ model, clientFields }: GenerationModel) {
     `export const ${n}Schema = z.strictObject({\n${clientFields.map(name => `  ${name}: ${n}Fields.${name}.schema,`).join("\n")}\n});\n\n` +
     `export const ${n}ReactionRules = ${quote(model.reactionRules ?? [])} as const;\n` +
     `export const ${n}PreviewFields = {\n${Object.entries(model.previewFields??{}).map(([name,field])=>`  ${name}: ${fieldExpression(field.metadata)},`).join("\n")}\n} as const;\n\n` +
+    `export const ${n}CollectionFields = { ...${n}Fields,\n${Object.keys(model.relatedFields??{}).map(name=>`  ${name}: { metadata: { ...${n}PreviewFields.${name}.metadata, readOnly: true } },`).join("\n")}\n} as const;\n\n` +
     `export function create${n}Defaults() {\n  return {\n${clientFields.map(name => `    ${name}: ${n}Fields.${name}.createDefault(),`).join("\n")}\n  };\n}\n\n` +
     `export type ${n}Input = z.input<typeof ${n}Schema>;\nexport type ${n}Values = z.output<typeof ${n}Schema>;\n\n` +
     `export const ${n}RecordSchema = ${n}Schema.extend(recordIdentityShape).superRefine(validateRecordIdentity);\n` +
@@ -78,6 +80,7 @@ export function generateModule(module: ModuleGeneration, context: GenerationCont
   for (const entry of module.models) {
     const { model } = entry;
     lookupProjectionPlan(module, entry);
+    relatedProjectionPlan(module, entry);
     const lines = modelLines.get(model.name)!;
     const indexes: string[] = [];
     const names = new Set(["id", "createdAt", "updatedAt", "createBy", "createByUser", ...Object.keys(model.fields)]);

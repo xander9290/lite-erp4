@@ -8,6 +8,8 @@ import type { ListGroup } from "../list/types";
 
 export type RepositoryQuery = { where: Record<string, unknown>; sort: string; direction: "asc" | "desc"; skip: number; take: number; audit?: boolean };
 export interface ModelRepository<T> {
+  related?(tx: Prisma.TransactionClient, field: string, id: string): Promise<Record<string, unknown>>;
+  relatedMany?(tx: Prisma.TransactionClient, field: string, ids: readonly string[], outputs: readonly string[]): Promise<Readonly<Record<string, Readonly<Record<string, unknown>>>>>;
   read(tx: Prisma.TransactionClient, id: string): Promise<SavedRecord<T> | null>;
   audit?(tx: Prisma.TransactionClient, id: string): Promise<RecordAudit | null>;
   create(tx: Prisma.TransactionClient, values: T, actorId: string): Promise<SavedRecord<T>>;

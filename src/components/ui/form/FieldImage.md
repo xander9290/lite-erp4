@@ -1,5 +1,11 @@
 # FieldImage
 
+`mode="display"` presenta una Image de `model.readFields` mediante su nombre,
+con label heredado y resultado del servidor, sin RHF ni controles de subida.
+Ejemplo: `<FieldImage mode="display" name="fabricanteAvatar" widget="avatar" />`.
+Contrato, generación y demo en [Campos relacionados](../../../../docs/campos-relacionados.md).
+El modo editable (predeterminado) continúa según lo descrito abajo.
+
 Selecciona JPEG, PNG o WebP; permite recortar con ratón, táctil o teclado, elegir proporción, ancho y alto en píxeles, formato de salida y calidad. Las dimensiones conservan la proporción y no amplían el original. Se admite una imagen por Field.
 
 ```tsx

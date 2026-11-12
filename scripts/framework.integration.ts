@@ -59,6 +59,15 @@ try {
   const next = await readFile(join(project, "next.config.ts"), "utf8");
   await writeFile(join(root, "next.config.ts"), next.replace("turbopack: {", `turbopack: {\n    root: ${JSON.stringify(project)},`));
   prisma(["migrate", "deploy"]);
+  // Keep relational coverage independent of user tutorial applications.
+  const relatedFixture = join(root, "src/app/(auth)/erp/related-check");
+  await mkdir(relatedFixture, { recursive: true });
+  await cp(join(project, "scripts/fixtures/related-collection.fixture"), join(relatedFixture, "orm.config.ts"));
+  script("orm-generate.ts", ["related-check", "--write"]);
+  script("orm-install.ts", ["related-check", "--write"]);
+  await migration("20980101000000_related_fixture", await readFile(join(root, "src/generated/orm/apps/related-check/migration.preview.sql"), "utf8"));
+  prisma(["migrate", "deploy"]); prisma(["generate"]);
+  script("orm-bind.ts", ["related-check", "--write"]);
   script("create-app.ts", ["Ensayo Framework"]);
   const firstModel = join(root, "src/app/(auth)/erp/ensayo-framework/models/Record.ts");
   await writeFile(firstModel, (await readFile(firstModel, "utf8")).replace('"unique":false', '"unique":true'));
@@ -181,4 +190,4 @@ try {
   await database.end();
   await rm(root, { recursive: true, force: true });
 }
-console.log("✓ Proyecto y esquema temporales eliminados. Flota y los datos del ERP permanecen intactos.");
+console.log("✓ Proyecto y esquema temporales eliminados. Los datos del ERP permanecen intactos.");

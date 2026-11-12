@@ -76,3 +76,30 @@ revisando código, dependencias y persistencia juntos.
 
 Guías relacionadas: [Crear aplicaciones](crear-aplicaciones.md),
 [Flujo del framework](flujo-framework.md), [Instalar modelos](instalar-modelos.md).
+
+## Retirada específica de Flota, 2026-11-12
+
+El usuario autorizó retirar la aplicación anterior y borrar sus datos locales para
+comenzar otra tutoría. Se preparó un cambio específico; no se añadió un comando
+genérico de desinstalación ni se amplió orm:sync para eliminar modelos.
+
+- Copia local del código anterior en `.tutorial-backups`, excluida de Git y sin
+  configuración privada. No es una copia de los registros eliminados.
+- Propiedad e inversas verificadas con readInstallationState antes de retirar el
+  esquema de Flota. Eliminados sólo sus segmentos gestionados de User y su entrada
+  de propiedad, como parte de esta retirada completa; no para forzar una evolución.
+- Catálogo/registro regenerados con scaffoldRegistryFiles y writeArtifacts,
+  conservando las comprobaciones y el manifiesto calculado por el generador.
+- Retirados fuentes y artefactos de aplicación (apps/bindings/uploads). El ejemplo
+  histórico del generador en src/generated/orm/flota permanece y no está instalado.
+- Migración `20261112173158_remove_flota_tutorial`: transacción explícita, cuatro
+  tablas de Flota, su enum y actividad únicamente de sus cuatro nombres de modelo.
+  Aplicada a la base local después de revisar que no había migraciones pendientes.
+  Sin CASCADE ni reset; las migraciones anteriores se conservan. Esta migración
+  elimina datos: su ejecución en otra base requiere revisar ese alcance allí.
+- Prisma Client regenerado; conteos de todas las demás tablas de negocio y de la
+  actividad ajena a Flota iguales antes/después. Archivos remotos no modificados.
+
+Las pruebas de related tienen su propio fixture, instalado sólo en el proyecto y
+esquema PostgreSQL desechables. El identificador de aplicación flota queda libre;
+el [nuevo tutorial](tutorial-flota.md) empieza por un dry-run, sin recreación automática.

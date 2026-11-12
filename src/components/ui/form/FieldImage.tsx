@@ -5,7 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState, type HTMLAttributes } 
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import ReactCrop from "react-image-crop";
 import { Camera, ImagePlus, Trash2, Upload, UserRound, X } from "lucide-react";
-import { useModelField } from "./modelFields";
+import { useModelReadField, useModelField } from "./modelFields";
 import type { BaseFieldProps } from "./field.types";
 import type { ImageOutputType, ImageSelection, ImageSize, ImageUploader } from "./image.types";
 import { IMAGE_ACCEPT, MAX_IMAGE_DIMENSION, exportImage, fitImageSize, imageCropPixels, initialImageCrop, loadImage, publicImageUrl, validateImageFile, validateImageSize } from "./imageProcessing";
@@ -16,7 +16,7 @@ import "react-image-crop/dist/ReactCrop.css";
 import { imageUploadDefaults } from "@/lib/uploads/config";
 
 export type { ImageUploader, ImageUploadOptions } from "./image.types";
-export type FieldImageProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string | null> &
+type EditableFieldImageProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string | null> &
   Omit<HTMLAttributes<HTMLDivElement>, keyof BaseFieldProps<TFieldValues, string | null> | "children" | "defaultValue"> & {
     upload?: ImageUploader;
     widget?: "image" | "avatar";
@@ -28,7 +28,13 @@ export type FieldImageProps<TFieldValues extends FieldValues = FieldValues> = Ba
     disabled?: boolean;
     readOnly?: boolean;
     required?: boolean;
+    mode?: "edit";
   };
+type DisplayFieldImageProps = {
+  mode: "display"; name: string; label?: string; direction?: "inline" | "block";
+  widget?: "image" | "avatar"; shape?: "rounded" | "squared"; className?: string;
+};
+export type FieldImageProps<TFieldValues extends FieldValues = FieldValues> = EditableFieldImageProps<TFieldValues> | DisplayFieldImageProps;
 
 type Draft = ImageSize & { url: string; file: File };
 type Phase = "idle" | "loading" | "editing" | "uploading";
@@ -41,12 +47,35 @@ const cropLabels = {
 };
 
 export default function FieldImage<TFieldValues extends FieldValues = FieldValues>(props: FieldImageProps<TFieldValues>) {
+  return props.mode === "display" ? <DisplayImage {...props} /> : <EditableImage {...props} />;
+}
+
+/** Read metadata + server result; never registers a virtual value with RHF. */
+function DisplayImage({name, label, direction="block", widget="image", shape, className=""}:DisplayFieldImageProps) {
+  const {metadata,value,state,retry}=useModelReadField(name,"image");
+  const labelId = useId();
+  const text = label ?? metadata.label ?? name;
+  let url: string | null = null;
+  try { if (value) url = publicImageUrl(value); } catch { /* Never render unsafe URLs. */ }
+  const rounded = shape === "rounded" || (shape === undefined && widget === "avatar");
+  return <div data-form-field={name} role="group" aria-labelledby={labelId} className={fieldDirectionClassName(direction,text)}>
+    <span id={labelId} className={fieldLabelClassName(direction)}>{text}</span>
+    <div className="min-w-0 space-y-2" aria-busy={state?.pending}>
+      {url ? <Image src={url} alt={text} width={112} height={112} unoptimized className={`size-28 object-contain ${rounded ? "rounded-full" : "rounded-none"} ${className}`} />
+        : <div className={`flex size-28 items-center justify-center border border-base-300 text-xs text-base-content/50 ${rounded ? "rounded-full" : "rounded-none"} ${className}`}>{state?.pending ? "Cargando…" : "Sin imagen"}</div>}
+      {state?.error && <p role="alert" className="text-sm text-error">{state.error} <button type="button" className="btn btn-ghost btn-xs" onClick={retry}>Reintentar</button></p>}
+    </div>
+  </div>;
+}
+
+function EditableImage<TFieldValues extends FieldValues = FieldValues>(props: EditableFieldImageProps<TFieldValues>) {
   const {
   name, label, direction = "block", widget = "image", shape, upload, onChange, onBlur, onFocus,
   maxSizeMB = imageUploadDefaults.maxSizeMB, aspectRatio, outputType = imageUploadDefaults.outputType, quality = imageUploadDefaults.quality,
   disabled, readOnly, required, id, className = "", "aria-label": ariaLabel,
-  "aria-describedby": describedBy, ...containerProps
+  "aria-describedby": describedBy, mode: _mode, ...containerProps
 } = useModelField(props, "image");
+  void _mode;
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const modalId = `${inputId}-editor-modal`;

@@ -21,7 +21,7 @@ export default function ListSelectionSample() {
   return <section id="list-selection" className="min-w-0 scroll-mt-6 space-y-3">
     <header className="space-y-1 px-1"><h3 className="text-lg font-semibold">Selección individual y múltiple</h3><p className="text-sm text-base-content/60">Selecciona filas o toda la página y prueba Eliminar. Datos ficticios en memoria; restablecer recupera el ejemplo. Crear está oculto con create=false.</p></header>
     <ListView key={version} model="SelectionDemo" title="Selección de proyectos" columns={demoColumns} searchFields={["name", "client"]} load={load} onDelete={remove}
-      create={false} createHref="/erp/flota/nuevo" pageSize={3} paramPrefix="selection" className="h-[34rem]"
+      create={false} pageSize={3} paramPrefix="selection" className="h-[34rem]"
       headerActions={<button type="button" className="btn btn-ghost btn-sm" onClick={() => { records.current = createDemoRecords(); setVersion(value => value + 1); }}>Restablecer ejemplo</button>}
       footer={<span>La casilla del encabezado selecciona sólo la página visible. Cambiar la consulta limpia la selección.</span>} />
   </section>;

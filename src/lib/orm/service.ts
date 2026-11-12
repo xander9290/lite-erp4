@@ -13,7 +13,8 @@ import { validImageColumnOptions } from "../list/types";
 import { recordIdentitySchema, type RecordIdentity } from "./record";
 import { ModelValidationError, type ModelActor, type ModelContext } from "./context";
 import type { ModelRepository } from "./repository";
-import { INTEGER_MIN, INTEGER_MAX, type FieldMetadata } from "./fields";
+import { INTEGER_MIN, INTEGER_MAX, type FieldMetadata, type Field } from "./fields";
+import { resolveCollectionRelated } from "./collection-related";
 import type { KanbanMoveResult, KanbanRequest } from "../kanban/types";
 import { auditAvatarField, auditColumnType } from "./audit";
 import { compileListDomain, type ListActionOptions, type ListDomainContext } from "./domain";
@@ -33,6 +34,7 @@ import { displayFieldPaths, projectDisplayRecord } from "./display";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = {
+  readonly relatedFields?:Readonly<Record<string,Field>>;
   reactionRules?:readonly ReactionRule[];
   react?(field:string,values:Readonly<Record<string,unknown>>,context:ReactionContext):Promise<{patch:Record<string,unknown>;preview:Record<string,string|number|boolean|null>}>;
   name: string; schema: z.ZodType<T>; metadata: Readonly<Record<string, FieldMetadata>>;
@@ -97,31 +99,33 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   type Values = T & RecordIdentity;
   const auditFields = new Set(presentation.audit ? ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.partner.name"] : []);
   const policy = presentation.list;
+  const relatedFields=model.relatedFields??{};
+  const collectionMetadata:Readonly<Record<string,FieldMetadata>>={...model.metadata,...Object.fromEntries(Object.entries(relatedFields).map(([name,field])=>[name,{...field.metadata,readOnly:true}]))};
   if (policy && (presentation.columns || presentation.searchFields)) throw new Error("Usa list o columns, no ambas políticas.");
   if (policy) {
     for (const names of [policy.searchFields, policy.sortable ?? [], policy.groupable ?? [], policy.filterable ?? []]) {
-      if (new Set(names).size !== names.length || names.some(name => !policy.fields.includes(name))) throw new Error("La política sólo puede consultar campos publicados en list.fields.");
+      if (new Set(names).size !== names.length || names.some(name => !policy.fields.includes(name) || Object.hasOwn(relatedFields,name))) throw new Error("La política sólo puede consultar campos persistentes publicados en list.fields; related es de lectura.");
     }
-    if (policy.fields.some(name => (!Object.hasOwn(model.metadata, name) && !auditFields.has(name)) || model.metadata[name]?.sensitive)) throw new Error("list.fields sólo permite campos declarados no sensibles.");
+    if (policy.fields.some(name => (!Object.hasOwn(collectionMetadata, name) && !auditFields.has(name)) || collectionMetadata[name]?.sensitive)) throw new Error("list.fields sólo permite campos declarados no sensibles.");
   }
   const config: ListViewConfig = { model: model.name, defaultSort: presentation.defaultSort,
-    columns: policy ? policy.fields.map(name => ({ ...(model.metadata[name] ? fieldColumn(name, model.metadata[name]) : { field: name, label: name, ...(auditAvatarField(name) ? { widget: "partner" as const, avatarField: auditAvatarField(name)! } : {}) }), sortable: policy.sortable?.includes(name) ?? false, groupable: policy.groupable?.includes(name) ?? false, filterable: policy.filterable?.includes(name) ?? false })) : presentation.columns!,
+    columns: policy ? policy.fields.map(name => ({ ...(collectionMetadata[name] ? fieldColumn(name, collectionMetadata[name]) : { field: name, label: name, ...(auditAvatarField(name) ? { widget: "partner" as const, avatarField: auditAvatarField(name)! } : {}) }), sortable: policy.sortable?.includes(name) ?? false, groupable: policy.groupable?.includes(name) ?? false, filterable: policy.filterable?.includes(name) ?? false })) : presentation.columns!,
     searchFields: policy?.searchFields ?? presentation.searchFields!,
   };
   for (const [name, loader] of Object.entries(presentation.relations ?? {})) {
     if (model.metadata[name]?.kind !== "many2one" || model.metadata[name].sensitive || typeof loader !== "function" || !config.columns.some(column => column.field === name)) throw new Error("Las etiquetas requieren una relación publicada y un lookup autorizado.");
   }
-  const allowed = new Set(["id", ...Object.keys(model.metadata)]);
+  const allowed = new Set(["id", ...Object.keys(collectionMetadata)]);
   if (presentation.audit) for (const field of ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.partner.name"]) allowed.add(field);
-  const columnType = (field: string) => model.metadata[field] ? fieldListType(model.metadata[field]) : presentation.audit ? auditColumnType(field) ?? "text" : "text";
+  const columnType = (field: string) => collectionMetadata[field] ? fieldListType(collectionMetadata[field]) : presentation.audit ? auditColumnType(field) ?? "text" : "text";
   if (!config.columns.length || config.columns.length > 12 || new Set(config.columns.map(column => column.field)).size !== config.columns.length || config.columns.some(column => {
     const avatar = presentation.audit && auditAvatarField(column.field);
-    const image = column.widget === "image" && model.metadata[column.field]?.kind === "image" && !model.metadata[column.field].sensitive && (!column.format || column.format === "text");
+    const image = column.widget === "image" && collectionMetadata[column.field]?.kind === "image" && !collectionMetadata[column.field].sensitive && (!column.format || column.format === "text");
     const relation = column.widget === "many2one" && model.metadata[column.field]?.kind === "many2one" && !model.metadata[column.field].sensitive && (!column.format || column.format === "text");
-    return !allowed.has(column.field) || !validImageColumnOptions(column) || (column.widget && !(image || relation || (column.widget === "partner" && avatar && (!column.avatarField || column.avatarField === avatar) && (!column.format || column.format === "text")))) || (column.avatarField !== undefined && (column.widget !== "partner" || column.avatarField !== avatar)) || (column.type && column.type !== columnType(column.field));
+    return !allowed.has(column.field) || (Object.hasOwn(relatedFields,column.field) && (column.sortable || column.filterable || column.groupable)) || !validImageColumnOptions(column) || (column.widget && !(image || relation || (column.widget === "partner" && avatar && (!column.avatarField || column.avatarField === avatar) && (!column.format || column.format === "text")))) || (column.avatarField !== undefined && (column.widget !== "partner" || column.avatarField !== avatar)) || (column.type && column.type !== columnType(column.field));
   }) || config.searchFields.length > 6 || config.searchFields.some(name => name !== "id" && model.metadata[name]?.kind !== "text" && model.metadata[name]?.kind !== "many2one" && !(presentation.audit && ["createByUser.login", "createByUser.partner.name"].includes(name)))) throw new Error("La lista sólo puede publicar campos declarados o auditoría habilitada y búsquedas de texto permitidas.");
   // Normalize date types for server filters even when the view omitted an explicit type.
-  config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));
+  config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(Object.hasOwn(relatedFields,column.field)?{filterable:false,sortable:false,groupable:false}:{}), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));
   async function readAudit(tx: Prisma.TransactionClient, id: string) {
     if (!presentation.audit) return {};
     if (!repository.audit) throw new Error("MODEL_NOT_BOUND");
@@ -240,7 +244,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
           return groupedPage({ ...state, page }, total, groups);
         }
         const page = Math.min(state.page, Math.max(1, Math.ceil(total / state.pageSize)));
-        const rows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize, audit: presentation.audit === true });
+        const sourceRows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize, audit: presentation.audit === true });
+        const rows = await resolveCollectionRelated(tx,sourceRows,config.columns.map(column=>column.field).filter(name=>Object.hasOwn(relatedFields,name)),relatedFields,repository);
         // Repository contracts can contain extra edit fields: collection DTOs honor the fixed server publication.
         const publishedRows = policy ? rows.map(row => projectListRow(row, [...policy.fields, ...policy.fields.flatMap(name => auditAvatarField(name) ? [auditAvatarField(name)!] : [])])) : rows;
         return { rows: publishedRows, total, page, pageSize: state.pageSize };
@@ -371,7 +376,9 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
           const current=await repository.read(tx,request.id);
           if(!current || current.revision!==request.revision) throw new ModelValidationError(conflict);
         }
-        return model.react!(request.field,request.values,Object.freeze({tx,actor:Object.freeze({...actor}),id:request.id}));
+        return model.react!(request.field,request.values,Object.freeze({tx,actor:Object.freeze({...actor}),id:request.id,
+          resolveRelated: repository.related ? (field:string,id:string) => repository.related!(tx,field,id) : undefined,
+        }));
       },{isolationLevel:"RepeatableRead"});
       return {ok:true,...result};
     } catch(error) {

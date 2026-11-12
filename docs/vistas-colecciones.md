@@ -1,5 +1,13 @@
 # CardView y KanbanView
 
+Los related Image/Text pueden presentarse con columnas creadas desde
+`<Modelo>CollectionFields` (reexportado como recordCollectionFields), usando
+modelColumns. Publicarlos en list.fields del servicio y regenerar contratos/binding:
+se resuelven por lote por página en servidor, sin copiar lógica a React. No admiten
+orden/filtros/grupos por ese valor virtual. [Contrato](campos-relacionados.md#listview-cardview-y-kanbanview).
+Agrupar Many2one directo en ListView requiere groupable en vista y servicio;
+las columnas Kanban mantienen el contrato Selection obligatorio.
+
 Componentes en `src/components/ui/card` y `src/components/ui/kanban`.
 Ejemplos interactivos: `/sample#card-view` y `/sample#kanban-view`.
 La demo es local y pública: sus proyectos son ficticios, no se guardan en la base

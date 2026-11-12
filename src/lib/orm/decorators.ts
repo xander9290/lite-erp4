@@ -14,7 +14,12 @@ function annotation(definition:Annotation):MethodDecorator {
 }
 export const onchange = (options:Omit<ReactionDeclaration,"method">) => annotation({kind:"onchange",options});
 /** Read-only, non-persisted calculations; dependencies are model fields, outputs are preview fields. */
-export const depends = (options:Omit<ReactionDeclaration,"method"|"writes">) => annotation({kind:"depends",options:{...options,writes:[]}});
+export function depends(options:Omit<ReactionDeclaration,"method"|"writes">):MethodDecorator;
+export function depends(...fields:string[]):MethodDecorator;
+export function depends(...args:[Omit<ReactionDeclaration,"method"|"writes">] | string[]):MethodDecorator {
+  const options = typeof args[0] === "object" ? args[0] : {fields:args as string[]};
+  return annotation({kind:"depends",options:{...options,writes:[]}});
+}
 export const constraint = (...fields:string[]) => annotation({kind:"constraint",fields});
 export const displayName = (...fields:string[]) => annotation({kind:"display",fields});
 

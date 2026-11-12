@@ -1,5 +1,11 @@
 # Agrupación anidada de ListView
 
+Many2one directo se agrupa por su ID persistente, con groupable en la columna y en
+list.groupable del servicio. Configurar su proveedor autorizado en relations para
+mostrar etiquetas; nombres iguales conservan grupos distintos. El scaffold nuevo
+habilita Many2one, Boolean y Selection agrupables. Vehicle habilita Modelo (name).
+Esto es distinto de agrupar por rutas como modelo.fabricante.name, aún pendiente.
+
 ListView permite hasta tres niveles ordenados, con grupos desplegables, conteos y
 carga al abrir cada rama. Se habilita por columna con `groupable: true` y una
 acción propia `load(state)`. Las aplicaciones creadas por el scaffold habilitan

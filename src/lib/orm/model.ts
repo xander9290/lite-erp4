@@ -24,7 +24,7 @@ export abstract class Model {
 }
 
 type Constructor = new () => Model;
-type DeclaredFields<I> = { [K in keyof I as I[K] extends Field ? K extends string ? K : never : never]: Extract<I[K], Field> };
+type DeclaredFields<I> = { [K in keyof I as I[K] extends { readonly related: string } | {readonly compute:string} ? never : I[K] extends Field ? K extends string ? K : never : never]: Extract<I[K], Field> };
 type Shape<I> = { [K in keyof DeclaredFields<I>]: DeclaredFields<I>[K]["schema"] };
 type Values<I> = { [K in keyof DeclaredFields<I>]: z.output<DeclaredFields<I>[K]["schema"]> };
 type Input<I> = { [K in keyof DeclaredFields<I>]: z.input<DeclaredFields<I>[K]["schema"]> };
@@ -36,6 +36,8 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
   const instance = new Declaration();
   if (!(instance instanceof Model)) throw new Error("La declaración debe extender Model.");
   const fields: Record<string, Field> = {};
+  const relatedFields: Record<string, Field> = {};
+  const computedFields: Record<string, Field> = {};
   const metadata: Record<string, FieldMetadata> = {};
   const shape: Record<string, z.ZodType> = {};
   for (const [name, value] of Object.entries(instance)) {
@@ -43,13 +45,15 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     if (typeof value === "function") continue;
     if (!isField(value)) throw new Error(`${options.name}.${name}: declara el dato mediante Fields.`);
     if (!/^[a-z][A-Za-z0-9]*$/.test(name) || reservedFields.has(name)) throw new Error(`Nombre de campo inválido o reservado: ${name}.`);
+    if (value.metadata.related) { relatedFields[name] = value; continue; }
+    if (value.metadata.compute) { computedFields[name] = value; continue; }
     fields[name] = value;
     metadata[name] = value.metadata;
     shape[name] = value.schema;
   }
   if (!Object.keys(fields).length) throw new Error("El modelo debe declarar al menos un Field.");
   for(const [alias,target] of Object.entries(instance.displayRelations??{})) if(displayRelation(metadata,alias)[1].target!==target.name) throw new Error(`Destino inválido: ${alias}.`);
-  const methods=compileModelMethods(instance,fields);
+  const methods=compileModelMethods(instance,fields,relatedFields,computedFields);
   if(methods.display && instance.displayFields) throw new Error("Usa displayFields o @displayName, no ambos.");
   const displayKeys = displayFieldPaths(metadata, methods.display?.fields ?? instance.displayFields);
   // Runtime collection filters precisely the descriptor keys represented by Shape.
@@ -63,6 +67,8 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     displayRelations:(instance.displayRelations??{}) as InstanceType<C> extends {displayRelations:infer R}?R:Record<never,never>,
     reactionRules: methods.rules,
     previewFields: methods.preview,
+    relatedFields: Object.freeze(relatedFields),
+    computedFields: Object.freeze(computedFields),
     react(field:string,values:Readonly<Record<string,unknown>>,context:ReactionContext) {return methods.react(field,values,context);},
     displayName(record: Readonly<Record<string, unknown>>): string {
       const projected = projectDisplayRecord(record, displayKeys);

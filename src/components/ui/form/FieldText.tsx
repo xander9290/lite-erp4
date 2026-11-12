@@ -4,18 +4,24 @@ import { useId, useState, type InputHTMLAttributes, type TextareaHTMLAttributes 
 import { Eye, EyeOff } from "lucide-react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import { useModelField } from "./modelFields";
+import ReadFieldValue, { type ReadFieldProps } from "./ReadFieldValue";
 import type { BaseFieldProps } from "./field.types";
 import { formatPhone } from "./phone";
 import { fieldDirectionClassName, fieldInputClassName, fieldTextareaClassName, fieldLabelClassName } from "./field.styles";
 
 type TextControl = HTMLInputElement | HTMLTextAreaElement;
 type ControlledProps<TFieldValues extends FieldValues> = keyof BaseFieldProps<TFieldValues, string> | "type" | "value" | "defaultValue" | "children";
-export type FieldTextProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string> & (
+type EditableFieldTextProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string> & {mode?:"edit"} & (
   | (Omit<InputHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget?: "text" | "password" | "phone" | "email"; type?: never })
   | (Omit<TextareaHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget: "long"; type?: never })
 );
+export type FieldTextProps<TFieldValues extends FieldValues = FieldValues> = EditableFieldTextProps<TFieldValues> | ReadFieldProps;
 
 export default function FieldText<TFieldValues extends FieldValues = FieldValues>(props: FieldTextProps<TFieldValues>) {
+  return props.mode === "display" ? <ReadFieldValue {...props} kind="text" /> : <EditableText {...props} />;
+}
+
+function EditableText<TFieldValues extends FieldValues = FieldValues>(props:EditableFieldTextProps<TFieldValues>) {
   const {
     name,
     label,
@@ -28,8 +34,10 @@ export default function FieldText<TFieldValues extends FieldValues = FieldValues
     className = "",
     style,
     "aria-describedby": describedBy,
+    mode,
     ...inputProps
   } = useModelField(props, "text");
+  void mode;
   const generatedId = useId();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const inputId = id ?? generatedId;

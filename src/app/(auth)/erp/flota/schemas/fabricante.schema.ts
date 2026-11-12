@@ -1,1 +1,0 @@
-export { FlotaFabricanteReactionRules as recordReactionRules, FlotaFabricanteFields as recordFields, FlotaFabricanteRecordSchema as recordSchema, createFlotaFabricanteDefaults as createRecordDefaults, type FlotaFabricanteRecordInput as RecordInput, type FlotaFabricanteRecordValues as RecordValues } from "@/generated/orm/apps/flota/FlotaFabricante.schema";

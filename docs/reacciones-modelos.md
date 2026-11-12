@@ -1,5 +1,13 @@
 # Reacciones, restricciones y presentación de modelos
 
+Para copiar un escalar de una relación sin lógica propia, usar un Field `related`
+en lugar de escribir una consulta en `@depends`: [Campos relacionados](campos-relacionados.md).
+`@depends` permanece para cálculos que requieren métodos.
+
+Para declarar un Field virtual en la clase sin configurar preview manualmente,
+usar compute con un método @depends: [Campos calculados](campos-calculados.md).
+La API de preview anterior se conserva.
+
 Implementado el 2026-11-11. Configuración explícita y decoradores producen el mismo
 registro y usan el mismo motor. Son código de servidor; las vistas reciben únicamente
 metadatos serializables publicados y una Server Action propia de la aplicación.
@@ -99,9 +107,6 @@ export const recordUI = {
 <FormView methods={methods} model={recordUI} onSubmit={saveRecord}>
   <FormGroup>
     <FieldMany2One<RecordInput> name="name" />
-    <ModelPreviewImage name="fabricanteAvatar"
-      label="Fabricante" widget="avatar" shape="squared" />
-    <ModelReactionStatus />
   </FormGroup>
 </FormView>
 ```
@@ -117,13 +122,15 @@ Los patches se aplican con shouldDirty/shouldValidate y no encadenan nuevas reac
 Al montar/resetear sólo inicializa cálculos de preview, sin aplicar patches ni ensuciar
 el formulario; calcula una vez por regla, usando su primer disparador. No hay cascadas
 ni grafo de dependencias entre cálculos. Al enviar, espera las peticiones vigentes y
-bloquea el envío si queda un error; ModelReactionStatus muestra estado y reintento.
+bloquea el envío si queda un error.
 El desmontaje invalida resultados, pero no promete cancelar SQL/HTTP ya iniciado.
 
-ModelPreviewImage es un contenedor de lectura, no una nueva columna ni un FieldImage
-editable. Soporta image/avatar y rounded/squared, sin uploader. El nombre calculado
-se puede consumir con FormModelContext.reactionState.preview. No pasar preview como
-values ni añadirlo a clientFields para hacerlo visible.
+La presentación de preview es propia de cada vista: los resultados se pueden
+consumir con `FormModelContext.reactionState.preview`, y el contexto mantiene el
+estado de carga/error y `retryReaction`. No pasar preview como values ni añadirlo
+a clientFields para hacerlo visible. Los componentes dedicados de imagen preview
+y estado de reacción se retiraron el 2026-11-12 por petición del usuario; el motor
+de reacciones permanece disponible.
 
 ## Validar reglas al guardar
 
@@ -197,7 +204,11 @@ renders. No demuestra ventaja de rendimiento del decorador ni representa la late
 del formulario. El registro/schema de entrada se compila una vez y ambas sintaxis
 usan las mismas funciones por petición; el beneficio comprobado es la ergonomía.
 
-## Adopción en Flota
+## Adopción histórica en Flota
+
+La aplicación de este ejemplo fue retirada el 2026-11-12 para reiniciar la tutoría.
+Los puntos siguientes documentan aquel ejercicio, no archivos actuales. El motor
+compartido y la demo /sample#model-reactions permanecen disponibles.
 
 - Vehicle: reacción de matrícula a mayúsculas, normalize definitivo al guardar,
   preview de nombre/avatar del fabricante vía Modelo y displayName compuesto.

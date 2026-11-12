@@ -1,5 +1,13 @@
 # ListView · Card con filtros por columna
 
+Para columnas related, pasar fields del contrato generado CollectionFields, no
+Fields de captura. Por ejemplo, importar FlotaVehicleCollectionFields como
+recordCollectionFields y usar `<ListView.Field name="fabricanteAvatar" />` bajo
+`<ListView fields={recordCollectionFields} ...>`. Publicarlo en list.fields del
+servicio; se resuelve por lote en servidor. No habilitar orden/filtros/grupos sobre
+related. Many2one directo permite groupable en columna y servicio.
+Detalles en [Campos relacionados](../../../../docs/campos-relacionados.md).
+
 Las filas de registros usan padding vertical compacto (`py-2`, 0.5rem por lado),
 también dentro de agrupaciones. Se conservan tamaño de avatares/casillas y ajuste
 multilínea; los encabezados mantienen su separación.

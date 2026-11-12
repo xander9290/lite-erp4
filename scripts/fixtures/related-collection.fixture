@@ -1,0 +1,40 @@
+import "server-only";
+import { Fields, Model, defineModel, displayName, type DisplayRecord } from "@/lib/orm";
+import type { GenerationProfile } from "@/lib/orm/generator/profile";
+
+// Installed only in the disposable integration project, never in the tutorial app.
+class RelatedTestMaker extends Model {
+  name = Fields.Text({ required: true, maxLength: 120 });
+  avatar = Fields.Image({ folder: "tests/related" });
+}
+const makerModel = defineModel(RelatedTestMaker, { name: "RelatedTestMaker", table: "related_test_makers" });
+
+class RelatedTestVariant extends Model {
+  name = Fields.Text({ required: true, maxLength: 120 });
+  fabricanteId = Fields.Many2one("RelatedTestMaker", { required: true, onDelete: "Restrict" });
+  vehicleType = Fields.Selection([{ value: "car", label: "Automóvil" }, { value: "bike", label: "Bicicleta" }], { required: true });
+  readonly displayRelations = { fabricante: makerModel };
+  @displayName("name", "fabricante.name")
+  label(record: DisplayRecord<RelatedTestVariant, "name" | "fabricante.name">): string {
+    return `${record.fabricante.name} · ${record.name}`;
+  }
+}
+export const variantModel = defineModel(RelatedTestVariant, { name: "RelatedTestVariant", table: "related_test_variants" });
+
+class RelatedTestVehicle extends Model {
+  name = Fields.Many2one("RelatedTestVariant", { required: true, onDelete: "Restrict" });
+  plate = Fields.Text({ unique: true, maxLength: 20 });
+  active = Fields.Boolean({ default: true });
+  fabricanteAvatar = Fields.Image({ related: "name.fabricanteId.avatar" });
+  fabricanteNombre = Fields.Text({ related: "name.fabricanteId.name" });
+}
+export const vehicleModel = defineModel(RelatedTestVehicle, { name: "RelatedTestVehicle", table: "related_test_vehicles" });
+
+export const generationProfile = {
+  module: { id: "related-check", depends: [], models: [
+    { model: makerModel, clientFields: ["name", "avatar"] },
+    { model: variantModel, clientFields: ["name", "fabricanteId", "vehicleType"] },
+    { model: vehicleModel, clientFields: ["name", "plate", "active"] },
+  ] },
+  externalOwners: {},
+} satisfies GenerationProfile;

@@ -1,1 +1,0 @@
-export { FlotaRecordReactionRules as recordReactionRules, FlotaRecordFields as recordFields, FlotaRecordRecordSchema as recordSchema, createFlotaRecordDefaults as createRecordDefaults, type FlotaRecordRecordInput as RecordInput, type FlotaRecordRecordValues as RecordValues } from "@/generated/orm/apps/flota/FlotaRecord.schema";

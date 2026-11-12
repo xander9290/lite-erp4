@@ -1,4 +1,6 @@
 import ModelFieldsSample from "./ModelFieldsSample";
+import RelatedImageSample from "./RelatedImageSample";
+import { relatedImageModel } from "./related-image.model";
 import ModelReactionsSample from "./ModelReactionsSample";
 import { sampleReactionModel } from "./reaction-model";
 import Link from "next/link";
@@ -31,6 +33,7 @@ export default function PageSample() {
           </div>
           <nav aria-label="Ejemplos de Fields" className="flex flex-wrap gap-2">
             <a className="btn btn-sm btn-outline" href="#model-reactions">Reacciones de modelo</a>
+            <a className="btn btn-sm btn-outline" href="#related-image">Imagen relacionada</a>
             <a className="btn btn-sm btn-outline" href="#model-fields">Contrato del modelo</a>
             <a className="btn btn-sm btn-outline" href="#list-view">ListView</a>
             <a className="btn btn-sm btn-outline" href="#list-selection">Selección de listas</a>
@@ -60,6 +63,7 @@ export default function PageSample() {
           </nav>
         </header>
         <ModelReactionsSample rules={sampleReactionModel.reactionRules} />
+        <RelatedImageSample rules={relatedImageModel.reactionRules} />
         <ModelFieldsSample />
         <ListViewSample />
         <ListGroupingSample />
