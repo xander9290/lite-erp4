@@ -97,3 +97,10 @@ el helper no añade invalidación, reintentos ni transforma errores en éxito.
 No exportar directamente el objeto queries ni funciones no async desde un archivo
 use-server. Las aplicaciones existentes pueden adoptar el helper gradualmente;
 no se sobrescriben sus acciones personalizadas.
+
+## Reacciones y restricciones registradas
+
+El motor explícito y los decoradores de reacciones/restricciones se documentan en
+[Reacciones de modelos](reacciones-modelos.md). Las constraints se ejecutan tras
+beforeSave revalidado y antes de persistir; no confundir onchange del borrador con
+las reglas definitivas del guardado.

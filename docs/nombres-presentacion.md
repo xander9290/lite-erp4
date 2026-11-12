@@ -124,3 +124,7 @@ sus artefactos por adelantado.
 `normalize(values)`, `context.previous` tipado en los hooks y `createQueryActions`
 ya están disponibles. Contratos, ejemplos y límites en
 [Ciclo de modelos y consultas compartidas](ciclo-modelos.md).
+
+
+El contrato enlazado y las nuevas APIs de presentación se documentan en
+[Contratos de vistas](contratos-vistas.md).

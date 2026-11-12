@@ -26,7 +26,7 @@ test("sync keeps destructive SQL on the manual path", () => {
 });
 
 test("CLI rejects noninteractive writes, unsafe IDs and approval bypasses before starting", () => {
-  for (const args of [["flota"], ["../flota", "--plan"], ["flota", "--yes"], ["flota", "--plan", "--plan"]]) {
+  for (const args of [["flota"], ["../flota", "--plan"], ["flota", "--yes"], ["flota", "--plan", "--plan"], ["flota", "--force"], ["flota", "--plan", "--force", "--force"]]) {
     const child = spawnSync(process.execPath, ["--conditions=react-server", "--import", "tsx", join(process.cwd(), "scripts/orm-sync.ts"), ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     assert.equal(child.status, 1); assert.match(child.stderr, /Uso:|interactiva/);
   }

@@ -149,3 +149,21 @@ test("CLI installs a real scaffold in an isolated project; examples and unsafe a
     for (const args of [["flota"], ["../auth"], ["taller-de-prueba", "--force"]]) assert.equal(run(...args).status, 1);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("force installs reviewed constraints through the ledger and rejects changed proposals before writing", {timeout:30000}, async()=>{
+  const root=await temporaryProject();
+  const declaration=(constrained:boolean):GenerationProfile=>({module:{id:"force-example",depends:[],models:[{
+    model:defineModel(class extends Model {plate=Fields.Text(constrained?{maxLength:20,unique:true}:{});},{name:"ForceExample",table:"force_examples"}),clientFields:["plate"],
+  }]},externalOwners:{}});
+  try {
+    await installModels(root,declaration(false),true);
+    await assert.rejects(installModels(root,declaration(true),false,true),/--force/);
+    const before=await readFile(join(root,"prisma/.orm-installations.json"),"utf8");
+    const plan=await installModels(root,declaration(true),false,true,true);
+    await assert.rejects(installModels(root,declaration(true),true,true,true,[]),/propuesta cambió/);
+    assert.equal(await readFile(join(root,"prisma/.orm-installations.json"),"utf8"),before);
+    await installModels(root,declaration(true),true,true,true,plan.changes);
+    assert.match(await readFile(join(root,"prisma/models/orm-force-example.prisma"),"utf8"),/plate String\? @unique @db.VarChar\(20\)/);
+    assert.equal((await installModels(root,declaration(true),false,true,true)).changes.length,0);
+  } finally { await rm(root,{recursive:true,force:true}); }
+});

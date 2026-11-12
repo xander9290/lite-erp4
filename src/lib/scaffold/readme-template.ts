@@ -44,6 +44,32 @@ la base. Sólo para desarrollo; no ejecuta reset ni reemplaza el diseño de vist
 Guía y continuación ante fallos: [Sincronizar aplicaciones](${docs}/sincronizar-aplicaciones.md).
 Las secuencias manuales siguientes sirven como referencia y diagnóstico.
 
+## Actualizar vistas enlazadas existentes
+
+\`\`\`bash
+npm run update:views -- ${id} NombreModelo
+# Revisa el diff antes de aplicar.
+npm run update:views -- ${id} NombreModelo --write
+npm run orm:sync -- ${id}
+\`\`\`
+
+El comando propone campos faltantes en estructuras literales simples, conserva
+personalizaciones y rechaza casos ambiguos. Los metadatos heredados cambian al
+regenerar el contrato. [API y límites](${docs}/contratos-vistas.md).
+
+## Restricciones de campos existentes
+
+Para unicidad, longitud o nulabilidad de String ya instalados:
+
+\`\`\`bash
+npm run orm:sync -- ${id} --plan --force
+npm run orm:sync -- ${id} --force
+\`\`\`
+
+--force comprueba datos, exige aprobar el SQL y aplica una migración transaccional.
+No corrige ni trunca valores, ni permite renombrar/borrar campos o resetear la base.
+[Alcance y continuación](${docs}/sincronizar-aplicaciones.md).
+
 ## Qué caso necesitas
 
 | Caso | Orden |

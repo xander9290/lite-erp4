@@ -103,6 +103,28 @@ export async function createViews(root: string, app: string, name: string, optio
     };
     menus.elements.forEach(element => visit(element as ts.Expression));
   }
+  // Resolve only the framework's explicit authorized action contract, never a class name alone.
+  const lookups = { ...options.lookups };
+  for (const [name, field] of Object.entries(entry.model.metadata)) {
+    if (field.kind !== "many2one" || lookups[name] || ["Partner", "User"].includes(field.target)) continue;
+    const candidates: string[] = [];
+    for (const directory of await readdir(join(root, "src/app/(auth)/erp"), { withFileTypes: true })) {
+      if (!directory.isDirectory()) continue;
+      const targetProfile = directory.name === app ? profile : await loadAppGenerationProfile(root, directory.name);
+      if (!targetProfile?.module.models.some(item => item.model.name === field.target)) continue;
+      const target = modelIdentity(directory.name, field.target);
+      const content = await readSource(join(root, "src/app/(auth)/erp", directory.name, "actions", `${target.slug}.actions.ts`));
+      const service = await readSource(join(root, "src/app/(auth)/erp", directory.name, "models", `${target.slug}.service.ts`));
+      if (content && service && /^\s*["']use server["'];?/.test(content) && /export async function lookupRecords\(/.test(content)
+        && /authorize:\s*requireAdmin/.test(content) && /lookupRecords:\s*recordService.lookup/.test(content)
+        && content.includes(`../models/${target.slug}.service`) && service.includes(`${field.target}Repository`)) {
+        candidates.push(`@/app/(auth)/erp/${directory.name}/actions/${target.slug}.actions#lookupRecords`);
+      }
+    }
+    if (candidates.length !== 1) throw new Error(`${name}: lookup autorizado ${candidates.length ? "ambiguo" : "ausente"} para ${field.target}. Usa --lookup campo=modulo#exportAsync.`);
+    lookups[name] = candidates[0];
+  }
+  options = { ...options, lookups };
   const template = resourceTemplates(identity, entry, reference, options);
   for (const menu of template.menus) if (ids.has(menu.id) || hrefs.has(menu.href)) throw new Error(`Ya existe un menú o ruta para ${menu.href}. No se duplicará.`);
   for (const [field, lookup] of Object.entries(options.lookups ?? {})) {

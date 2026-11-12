@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { RefreshCw } from "lucide-react";
 import FormView from "@/components/ui/form/FormView";
 import FormViewLoader from "@/components/ui/form/FormViewLoader";
+import { recordUI } from "../schemas/record.ui";
 import FormGroup from "@/components/ui/form/FormGroup";
 import FieldText from "@/components/ui/form/FieldText";
 import FieldBoolean from "@/components/ui/form/FieldBoolean";
@@ -25,7 +26,6 @@ import {
   type RecordInput,
   type RecordValues,
 } from "../schemas/record.schema";
-import FieldMany2One from "@/components/ui/form/FieldMany2One";
 
 function Editor({
   record,
@@ -55,6 +55,7 @@ function Editor({
       audit={audit ?? null}
       activity={{ recordId: savedId, load: loadActivity, addNote }}
       methods={methods}
+      model={recordUI}
       mode={savedId ? "edit" : "create"}
       onSubmit={saveRecord}
       onNew={savedId ? () => router.push("/erp/flota/nuevo") : undefined}
@@ -87,27 +88,21 @@ function Editor({
         <FieldText<RecordInput>
           name="name"
           label="Modelo"
-          required
-          maxLength={120}
           autoFocus={!savedId}
           direction="inline"
         />
         <FieldText<RecordInput>
           name="plate"
           label="Matrícula"
-          required
-          maxLength={20}
           direction="inline"
         />
         <FieldText<RecordInput>
           name="brand"
           label="Marca"
-          maxLength={80}
           direction="inline"
         />
         <FieldBoolean<RecordInput>
           name="active"
-          label="Activo"
           direction="inline"
         />
       </FormGroup>

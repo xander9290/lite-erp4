@@ -3,6 +3,7 @@
 import { useId, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
+import { useModelField } from "./modelFields";
 import type { BaseFieldProps } from "./field.types";
 import { formatPhone } from "./phone";
 import { fieldDirectionClassName, fieldInputClassName, fieldTextareaClassName, fieldLabelClassName } from "./field.styles";
@@ -28,7 +29,7 @@ export default function FieldText<TFieldValues extends FieldValues = FieldValues
     style,
     "aria-describedby": describedBy,
     ...inputProps
-  } = props;
+  } = useModelField(props, "text");
   const generatedId = useId();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const inputId = id ?? generatedId;

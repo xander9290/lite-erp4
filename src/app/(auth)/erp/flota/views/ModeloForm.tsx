@@ -7,13 +7,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { RefreshCw } from "lucide-react";
 import FormView from "@/components/ui/form/FormView";
 import FormViewLoader from "@/components/ui/form/FormViewLoader";
+import { recordUI } from "../schemas/modelo.ui";
 import FormGroup from "@/components/ui/form/FormGroup";
 import FieldText from "@/components/ui/form/FieldText";
 import FieldMany2One from "@/components/ui/form/FieldMany2One";
 import FieldSelect from "@/components/ui/form/FieldSelect";
 import FieldBoolean from "@/components/ui/form/FieldBoolean";
-import { lookupRecords as lookupFabricanteId } from "@/app/(auth)/erp/flota/actions/fabricante.actions";
-import { recordChoices } from "./modelo.list";
 import { useFormNavigation } from "@/components/ui/form/FormNavigationProvider";
 import { useAlerts } from "@/components/ui/alerts/AlertProvider";
 import {
@@ -54,6 +53,7 @@ function Editor({
       ]}
       title={savedId ? "Editar registro" : "Nuevo registro"}
       methods={methods}
+      model={recordUI}
       activity={{ recordId: savedId, load: loadActivity, addNote }}
       mode={savedId ? "edit" : "create"}
       onSubmit={saveRecord}
@@ -85,28 +85,18 @@ function Editor({
       <FormGroup legend="Datos generales">
         <FieldText<RecordInput>
           name="name"
-          label={"Nombre"}
           direction="inline"
-          required
-          maxLength={120}
         />
         <FieldMany2One<RecordInput>
           name="fabricanteId"
-          label={"Fabricante"}
           direction="inline"
-          required
-          load={lookupFabricanteId}
         />
         <FieldSelect<RecordInput>
           name="vehicleType"
-          label="Tipo"
           direction="inline"
-          required
-          options={recordChoices.vehicleType}
         />
         <FieldBoolean<RecordInput>
           name="active"
-          label={"Activo"}
           direction="inline"
         />
       </FormGroup>

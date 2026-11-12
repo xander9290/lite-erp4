@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { watch } from "node:fs";
@@ -120,6 +120,38 @@ try {
   await rm(join(root, "src/sync-type-error.ts"));
   command(process.execPath, ["--conditions=react-server", "--import", "tsx", "sync-check.ts", "repeat"], "sync idempotent repeat");
   console.log("✓ orm:sync: cancelación, continuación, evolución conservando datos, fallo de TypeScript y repetición verificados.");
+
+  // Force constraints exercise only this fixture's rows/schema, never Flota.
+  await cp(join(project, "scripts/fixtures/force-check.fixture"), join(root,"force-check.ts"));
+  await writeFile(syncModelPath, (await readFile(syncModelPath,"utf8")).replace('notes = Fields.Text({ maxLength: 80 });','notes = Fields.Text({ maxLength: 20, unique: true, required: true });'));
+  await database.query(`INSERT INTO "${schema}".facil_records (id,name,active,notes) VALUES ('force-long','Long',true,$1),('force-a','A',true,'same'),('force-b','B',true,'same')`,["x".repeat(40)]);
+  const beforeForceLedger=await readFile(join(root,"prisma/.orm-installations.json"),"utf8");
+  for(const mode of ["length","duplicate","null"]) {
+    command(process.execPath,["--conditions=react-server","--import","tsx","force-check.ts",mode],`force rejects ${mode}`);
+    assert.equal(await readFile(join(root,"prisma/.orm-installations.json"),"utf8"),beforeForceLedger);
+    if(mode==="length") await database.query(`UPDATE "${schema}".facil_records SET notes='short' WHERE id='force-long'`);
+    if(mode==="duplicate") await database.query(`UPDATE "${schema}".facil_records SET notes='different' WHERE id='force-b'`);
+  }
+  await database.query(`UPDATE "${schema}".facil_records SET notes='base' WHERE id='sync-preserved'`);
+  // Extra schema drift must not be silently imported by force.
+  await database.query(`ALTER TABLE "${schema}".facil_records ADD COLUMN force_drift TEXT`);
+  command(process.execPath,["--conditions=react-server","--import","tsx","force-check.ts","drift"],"force rejects unrelated drift");
+  await database.query(`ALTER TABLE "${schema}".facil_records DROP COLUMN force_drift`);
+  command(process.execPath,["--conditions=react-server","--import","tsx","force-check.ts","cancel"],"force cancellation");
+  assert.equal((await database.query("SELECT character_maximum_length FROM information_schema.columns WHERE table_schema=$1 AND table_name='facil_records' AND column_name='notes'",[schema])).rows[0].character_maximum_length,80);
+  command(process.execPath,["--conditions=react-server","--import","tsx","force-check.ts","race"],"force SQL guard rejects data changed after review");
+  assert.equal((await database.query("SELECT character_maximum_length FROM information_schema.columns WHERE table_schema=$1 AND table_name='facil_records' AND column_name='notes'",[schema])).rows[0].character_maximum_length,80);
+  assert.equal((await database.query(`SELECT char_length(notes) AS length FROM "${schema}".facil_records WHERE id='force-long'`)).rows[0].length,40);
+  await database.query(`UPDATE "${schema}".facil_records SET notes='short' WHERE id='force-long'`);
+  const forcedFile=(await readdir(join(root,"prisma/migrations"))).filter(name=>name.endsWith("_force")).sort().at(-1)!;
+  // Explicit test recovery only; the sync command must never auto-resolve a failed migration.
+  prisma(["migrate","resolve","--rolled-back",forcedFile]);
+  command(process.execPath,["--conditions=react-server","--import","tsx","force-check.ts","apply"],"force approved constraints");
+  assert.deepEqual((await database.query("SELECT character_maximum_length,is_nullable FROM information_schema.columns WHERE table_schema=$1 AND table_name='facil_records' AND column_name='notes'",[schema])).rows,[{character_maximum_length:20,is_nullable:"NO"}]);
+  await assert.rejects(database.query(`UPDATE "${schema}".facil_records SET notes='same' WHERE id='force-b'`),error=>(error as {code:string}).code==="23505");
+  assert.equal((await database.query(`SELECT notes FROM "${schema}".facil_records WHERE id='sync-preserved'`)).rows[0].notes,"base");
+  command(process.execPath,["--conditions=react-server","--import","tsx","force-check.ts","repeat"],"force idempotent repeat");
+  console.log("✓ --force: longitudes, duplicados, nulos, drift, cancelación, restricciones SQL y repetición verificados sin perder registros.");
 
   script("create-model.ts", ["facil", "Trabajo"]);
   const resourceModelPath = join(root, "src/app/(auth)/erp/facil/models/Trabajo.ts");

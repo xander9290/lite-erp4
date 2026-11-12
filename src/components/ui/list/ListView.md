@@ -224,3 +224,7 @@ declarar `recordService.defineListAction({ domain })`. El wrapper remoto sigue
 recibiendo sólo `ListState` y se pasa a `load`; el dominio no se serializa a la UI
 ni se limpia con los filtros. Contrato y ejemplos del scaffold en
 [Dominios de lista](../../../../docs/dominios-listas.md).
+
+
+El contrato enlazado y las nuevas APIs de presentación se documentan en
+[Contratos de vistas](../../../../docs/contratos-vistas.md).

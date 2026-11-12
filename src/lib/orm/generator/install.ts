@@ -9,7 +9,8 @@ import { assertNoSymlinks } from "./write";
 import { assertAdditiveEvolution } from "./evolution";
 
 /** Source installation only. SQL is a review artifact, never executed here. */
-export async function planModelInstallation(root: string, profile: GenerationProfile, update = false) {
+export async function planModelInstallation(root: string, profile: GenerationProfile, update = false, force = false) {
+  if (force && !update) throw new Error("--force requiere una actualización explícita.");
   const snapshot = await readInstallationState(root);
   const artifacts = await prepareModuleArtifacts(root, profile.module, profile.externalOwners);
   const id = profile.module.id, filename = `orm-${id}.prisma`;
@@ -17,7 +18,7 @@ export async function planModelInstallation(root: string, profile: GenerationPro
   const hash = sourceHash(artifacts["models.prisma"]);
   if (installed && installed.hash !== hash) {
     if (!update) throw new Error(`El modelo de ${id} cambió. Revisa la propuesta y usa --update para una actualización aditiva.`);
-    assertAdditiveEvolution(snapshot.clean[installed.file], artifacts["models.prisma"]);
+    assertAdditiveEvolution(snapshot.clean[installed.file], artifacts["models.prisma"], force);
   }
   const changes: { path: string; before: string | null; after: string }[] = [];
   if (!installed || installed.hash !== hash) {
@@ -61,15 +62,16 @@ export async function planModelInstallation(root: string, profile: GenerationPro
 }
 
 /** Exclusive installer lock, optimistic source checks and rollback for ordinary write failures. */
-export async function installModels(root: string, profile: GenerationProfile, write = false, update = false) {
-  if (!write) return planModelInstallation(root, profile, update);
+export async function installModels(root: string, profile: GenerationProfile, write = false, update = false, force = false, expectedChanges?: readonly { path: string; before: string | null; after: string }[]) {
+  if (!write) return planModelInstallation(root, profile, update, force);
   await assertNoSymlinks(join(root, "prisma"));
   const lock = join(root, "prisma/.orm-install.lock");
   const handle = await open(lock, "wx");
   let stage: string | undefined, preserve = false;
   const applied: { path: string; backup?: string }[] = [];
   try {
-    const plan = await planModelInstallation(root, profile, update);
+    const plan = await planModelInstallation(root, profile, update, force);
+    if (expectedChanges && JSON.stringify(plan.changes) !== JSON.stringify(expectedChanges)) throw new Error("La propuesta cambió durante la preparación. Repite orm:sync.");
     if (!plan.changes.length) return plan;
     stage = await mkdtemp(join(root, "prisma/.orm-install-"));
     await mkdir(join(stage, "next"));

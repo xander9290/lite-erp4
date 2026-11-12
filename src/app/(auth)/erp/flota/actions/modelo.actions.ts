@@ -12,10 +12,7 @@ import type { RecordInput } from "../schemas/modelo.schema";
 import { recordService } from "../models/modelo.service";
 
 import { createQueryActions } from "@/lib/orm/query-actions";
-import { resolveListLabels } from "@/lib/list/relation-labels";
-import { lookupRecords as lookupFabricantes } from "./fabricante.actions";
 
-const relationLookups = { fabricanteId: lookupFabricantes };
 
 const queries = createQueryActions({ prisma, authorize: requireAdmin }, {
   readRecord: recordService.read,
@@ -38,7 +35,7 @@ export async function saveRecord(input: unknown): Promise<FormViewResult<RecordI
 }
 
 export async function listRecords(state: ListState): Promise<ListResult> {
-  return resolveListLabels(await queries.listRecords(state), relationLookups);
+  return queries.listRecords(state);
 }
 
 
@@ -53,7 +50,7 @@ export async function deleteRecords(selection: readonly ListDeleteTarget[]): Pro
 
 // Enable a required Selection field in recordService's kanban configuration before using this view.
 export async function loadKanban(request: import("@/lib/kanban/types").KanbanRequest): Promise<ListResult> {
-  return resolveListLabels(await queries.loadKanban(request), relationLookups);
+  return queries.loadKanban(request);
 }
 
 export async function moveRecord(input: import("@/lib/kanban/types").KanbanMove): Promise<import("@/lib/kanban/types").KanbanMoveResult> {
@@ -80,4 +77,9 @@ import type { Many2OneResult } from "@/lib/many2one/types";
 
 export async function lookupRecords(request: ModelLookupRequest): Promise<Many2OneResult> {
   return queries.lookupRecords(request);
+}
+
+export async function onchangeRecord(input:import("@/lib/orm/reactions.types").ReactionRequest):Promise<import("@/lib/orm/reactions.types").ReactionResult> {
+  try {return await recordService.react(prisma,await requireAdmin(),input);}
+  catch {return {ok:false,error:"No se pudo completar la reacción."};}
 }

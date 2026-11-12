@@ -4,6 +4,7 @@
   "files": {
     "FlotaRecord.store.ts": "967d2c3c0b4aed3a3af5dd6633c14e4fc4f879935b0c53e00c2b158642d69ea0",
     "FlotaFabricante.store.ts": "073de6288dca7ece0671470a5fc72a7590152e4005f2bece23ee7515d4624b72",
-    "FlotaModelo.store.ts": "be46ebb870c0d053b1228c2e95d5d74ed3b2b32e4505a760fd8819f1a588b26c"
+    "FlotaModelo.store.ts": "be46ebb870c0d053b1228c2e95d5d74ed3b2b32e4505a760fd8819f1a588b26c",
+    "FlotaVehicle.store.ts": "9e1f3f8b3305bf9e17beac60147c57273434168903f6f487fcc6ca9277b14e21"
   }
 }

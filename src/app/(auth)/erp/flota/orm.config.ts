@@ -1,3 +1,4 @@
+import { flotaVehicleModel } from "./models/Vehicle";
 import { flotaModeloModel } from "./models/Modelo";
 import { flotaFabricanteModel } from "./models/Fabricante";
 import "server-only";
@@ -23,6 +24,8 @@ export const generationProfile = {
         model: flotaModeloModel,
         clientFields: ["name", "active", "fabricanteId", "vehicleType"],
       },
+
+      { model: flotaVehicleModel, clientFields: ["name", "active", "plate"] },
     ],
   },
   externalOwners: {},

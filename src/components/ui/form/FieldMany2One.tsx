@@ -5,6 +5,7 @@ import { useController, useFormContext, type FieldValues } from "react-hook-form
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { lookupModels, type Many2OneModel, type Many2OneOption, type Many2OneRecord } from "@/lib/many2one/types";
 import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
+import { useModelField } from "./modelFields";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { useFormFieldValidation } from "./formValidation";
@@ -23,7 +24,7 @@ type EditableProps<TFieldValues extends FieldValues = FieldValues> =
     onChange?: (id: string | null, record: Many2OneRecord | null) => void;
   } & (
     | { model: Many2OneModel; load?: never; searchFields?: readonly string[]; displayName?: string }
-    | { load: Many2OneLoader; model?: never; searchFields?: never; displayName?: never }
+    | { load?: Many2OneLoader; model?: never; searchFields?: never; displayName?: never }
   );
 
 export type FieldMany2OneDisplayProps = {
@@ -54,13 +55,15 @@ export default function FieldMany2One<TFieldValues extends FieldValues = FieldVa
   return props.mode === "display" ? <DisplayRelation {...props} /> : <EditableRelation<TFieldValues> {...props} />;
 }
 
-function EditableRelation<TFieldValues extends FieldValues = FieldValues>({
-  name, label, direction = "block", model = "partner", load, searchFields = lookupModels[model].searchFields,
-  displayName = lookupModels[model].displayName, columns, pageSize = 10, clearable = true,
+function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props: EditableProps<TFieldValues>) {
+  const {
+  name, label, direction = "block", model = "partner", load, searchFields = lookupModels[model as Many2OneModel].searchFields,
+  displayName = lookupModels[model as Many2OneModel].displayName, columns, pageSize = 10, clearable = true,
   onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y seleccionar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps
-}: EditableProps<TFieldValues>) {
+} = useModelField(props, "many2one");
   delete inputProps.mode;
+  if (!props.model && !load) throw new Error(`Configura un lookup autorizado para ${name}.`);
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const listId = `${inputId}-list`, errorId = `${inputId}-error`, statusId = `${inputId}-status`;

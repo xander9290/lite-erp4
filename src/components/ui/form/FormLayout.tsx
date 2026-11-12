@@ -10,6 +10,8 @@ import {
   type SubmitHandler,
   type UseFormReturn,
 } from "react-hook-form";
+import { FormModelContext, type FormModel } from "./modelFields";
+import { useModelReactions } from "./useModelReactions";
 import useFormErrorToasts from "./useFormErrorToasts";
 import { FormValidationContext, type FormFieldValidator, type FormFieldValidation } from "./formValidation";
 import { focusInvalidField, invalidFormFields, revealNotebookFieldEvent } from "./notebookErrors";
@@ -19,6 +21,7 @@ export type FormLayoutProps<
   TContext = unknown,
   TTransformedValues = TFieldValues,
 > = Omit<ComponentPropsWithoutRef<"form">, "onSubmit" | "onInvalid" | "children" | "autoComplete"> & {
+  model?: FormModel;
   methods: UseFormReturn<TFieldValues, TContext, TTransformedValues>;
   onSubmit: SubmitHandler<TTransformedValues>;
   onInvalid?: SubmitErrorHandler<TFieldValues>;
@@ -36,6 +39,7 @@ export default function FormLayout<
   TTransformedValues = TFieldValues,
 >({
   methods,
+  model,
   onSubmit,
   onInvalid,
   children,
@@ -48,6 +52,7 @@ export default function FormLayout<
   ...formProps
 }: FormLayoutProps<TFieldValues, TContext, TTransformedValues>) {
   useFormErrorToasts(methods, silentErrorTypes);
+  const reactions=useModelReactions(methods,model?.reactions);
   const formRef = useRef<HTMLFormElement>(null);
   const validators = useRef(new Map<string, FormFieldValidation>());
   const registerValidator = useCallback((name: string, validate: FormFieldValidator, errorType: string) => {
@@ -75,6 +80,7 @@ export default function FormLayout<
 
   return (
     <FormProvider {...methods}>
+      <FormModelContext.Provider value={model?{...model,reactionState:reactions.state,retryReaction:reactions.retry}:undefined}>
       <FormValidationContext.Provider value={registerValidator}>
       <form
         {...formProps}
@@ -84,6 +90,8 @@ export default function FormLayout<
         noValidate={noValidate}
         onSubmit={async (submitEvent) => {
           try {
+            if(!await reactions.settle()){methods.setError("root.reaction",{type:"reaction",message:"Revisa los datos relacionados o reintenta su consulta."});return;}
+            methods.clearErrors("root.reaction");
             await methods.handleSubmit(async (data, event) => {
               if (validateFields(true)) {
                 await onInvalid?.(methods.getErrors(), event);
@@ -114,6 +122,7 @@ export default function FormLayout<
         <div className={contentClassName}>{children}</div>
       </form>
       </FormValidationContext.Provider>
+    </FormModelContext.Provider>
     </FormProvider>
   );
 }

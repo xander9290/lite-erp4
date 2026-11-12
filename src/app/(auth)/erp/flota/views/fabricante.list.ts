@@ -1,16 +1,7 @@
-import type { CollectionField } from "@/components/ui/collection/types";
-
-export const recordColumns = [
-  { field: "name", label: "Nombre", type: "text", sortable: true },
-  {
-    field: "avatar",
-    label: "Imagen",
-    type: "text",
-    widget: "image",
-    imageShape: "squared",
-    imageSize: "sm",
-    sortable: false,
-    filterable: false,
-  },
-] as const satisfies readonly CollectionField[];
+import { modelColumns } from "@/lib/orm/presentation";
+import { recordFields } from "../schemas/fabricante.schema";
+export const recordColumns = modelColumns(recordFields, [
+  { field: "name", sortable: true },
+  { field: "avatar", label: "Imagen", imageShape: "squared", imageSize: "sm", sortable: false, filterable: false },
+]);
 export const recordSearchFields = ["name"] as const;

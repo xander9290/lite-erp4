@@ -153,3 +153,7 @@ Las pruebas usan recursos temporales, nunca datos reales de Flota.
 Guías relacionadas: [Sincronizar](sincronizar-aplicaciones.md),
 [Ciclo de modelos](ciclo-modelos.md), [Presentación](nombres-presentacion.md)
 y [Vistas de colecciones](vistas-colecciones.md).
+
+
+El contrato enlazado y las nuevas APIs de presentación se documentan en
+[Contratos de vistas](contratos-vistas.md).

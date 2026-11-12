@@ -5,6 +5,7 @@ import { useCallback, useEffect, useId, useRef, useState, type HTMLAttributes } 
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import ReactCrop from "react-image-crop";
 import { Camera, ImagePlus, Trash2, Upload, UserRound, X } from "lucide-react";
+import { useModelField } from "./modelFields";
 import type { BaseFieldProps } from "./field.types";
 import type { ImageOutputType, ImageSelection, ImageSize, ImageUploader } from "./image.types";
 import { IMAGE_ACCEPT, MAX_IMAGE_DIMENSION, exportImage, fitImageSize, imageCropPixels, initialImageCrop, loadImage, publicImageUrl, validateImageFile, validateImageSize } from "./imageProcessing";
@@ -17,7 +18,7 @@ import { imageUploadDefaults } from "@/lib/uploads/config";
 export type { ImageUploader, ImageUploadOptions } from "./image.types";
 export type FieldImageProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string | null> &
   Omit<HTMLAttributes<HTMLDivElement>, keyof BaseFieldProps<TFieldValues, string | null> | "children" | "defaultValue"> & {
-    upload: ImageUploader;
+    upload?: ImageUploader;
     widget?: "image" | "avatar";
     shape?: "rounded" | "squared";
     maxSizeMB?: number;
@@ -39,12 +40,13 @@ const cropLabels = {
   swDragHandle: "Esquina inferior izquierda", wDragHandle: "Borde izquierdo",
 };
 
-export default function FieldImage<TFieldValues extends FieldValues = FieldValues>({
+export default function FieldImage<TFieldValues extends FieldValues = FieldValues>(props: FieldImageProps<TFieldValues>) {
+  const {
   name, label, direction = "block", widget = "image", shape, upload, onChange, onBlur, onFocus,
   maxSizeMB = imageUploadDefaults.maxSizeMB, aspectRatio, outputType = imageUploadDefaults.outputType, quality = imageUploadDefaults.quality,
   disabled, readOnly, required, id, className = "", "aria-label": ariaLabel,
   "aria-describedby": describedBy, ...containerProps
-}: FieldImageProps<TFieldValues>) {
+} = useModelField(props, "image");
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const modalId = `${inputId}-editor-modal`;
@@ -147,6 +149,7 @@ export default function FieldImage<TFieldValues extends FieldValues = FieldValue
     try {
       const file = await exportImage({ source: draft.url, crop, size, type, quality: exportQuality, filename: draft.file.name, signal: controller.signal });
       validateImageFile(file, maxSizeMB);
+      if (!upload) throw new Error("Este campo necesita un proveedor de imágenes autorizado.");
       url = publicImageUrl(await upload(file, { signal: controller.signal, onProgress: (amount) => { if (!controller.signal.aborted) setProgress(Math.max(0, Math.min(100, amount))); } }));
       if (controller.signal.aborted || operation.current !== controller) return;
     } catch (error) {

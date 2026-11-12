@@ -1,3 +1,4 @@
+import type { ReactionValues,ReactionContext,ModelContext } from "./src/lib/orm";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { config } from "dotenv";
@@ -354,4 +355,38 @@ try {
   assert.equal((await service.remove(prisma, actor, [{ id: tracked.values.id, revision: toRemove.values.revision! }])).ok, true);
   assert.equal((await service.activity(prisma, actor, { id: tracked.values.id })).ok, false);
   assert.equal((await service.addNote(prisma, actor, { ...note, requestId: randomUUID() })).ok, false);
+  // Declarative reactions and decorators share the service's actor/revision policy.
+  const {Fields,defineModel,onchange,depends,constraint,ModelValidationError}=await import("./src/lib/orm");
+  const {EnsayoFrameworkRecord}=await import("./src/app/(auth)/erp/ensayo-framework/models/Record");
+  class ReactionExample extends EnsayoFrameworkRecord {
+    preview={login:Fields.Text()};
+    @onchange({fields:["name"],writes:["name"]})
+    async changeName(values:ReactionValues,{tx,actor}:ReactionContext){
+      if(values.name==="try-write")await tx.user.update({where:{id:actor.id},data:{active:false}});
+      return {name:typeof values.name==="string"?values.name.toUpperCase():null};
+    }
+    @depends({fields:["name"],preview:["login"]})
+    async previewLogin(_values:ReactionValues,{tx,actor}:ReactionContext){return {login:(await tx.user.findUniqueOrThrow({where:{id:actor.id},select:{login:true}})).login};}
+    @constraint("name")
+    rejectName(values:ReactionValues,_context:ModelContext){if(values.name==="reject-constraint")throw new ModelValidationError("Restricción declarativa.",{name:"Cambia el nombre."});}
+  }
+  const reactionModel=defineModel(ReactionExample,{name:recordModel.name,table:recordModel.table});
+  const reactionService=createModelService(reactionModel,EnsayoFrameworkRecordRepository,{columns:[{field:"name",label:"Nombre"}],searchFields:["name"]});
+  const reactionUser=await prisma.user.create({data:{login:"fixture-reaction",password:await hashPassword("framework-test-only"),isAdmin:true}});
+  const reactionActor={id:reactionUser.id,sessionVersion:reactionUser.sessionVersion};
+  const countBeforeReaction=await prisma.ensayoFrameworkRecord.count();
+  const activitiesBeforeReaction=await prisma.recordActivity.count();
+  const reacted=await reactionService.react(prisma,reactionActor,{field:"name",values:{name:"reaction"}});
+  assert.deepEqual(reacted,{ok:true,patch:{name:"REACTION"},preview:{login:"fixture-reaction"}});
+  assert.equal((await reactionService.react(prisma,reactionActor,{field:"name",values:{name:"try-write"}})).ok,false);
+  assert.equal((await prisma.user.findUniqueOrThrow({where:{id:reactionActor.id}})).active,true);
+  assert.equal(await prisma.ensayoFrameworkRecord.count(),countBeforeReaction);
+  assert.equal(await prisma.recordActivity.count(),activitiesBeforeReaction);
+  for(const bad of [{field:"deleteRecords",values:{}},{field:"name",values:{name:"x",notes:"secret"}},{field:"name",values:{name:"x",createBy:"fake"}}])assert.equal((await reactionService.react(prisma,reactionActor,bad)).ok,false);
+  assert.equal((await reactionService.react(prisma,{...reactionActor,sessionVersion:999},{field:"name",values:{name:"x"}})).ok,false);
+  assert.equal((await reactionService.react(prisma,{id:reader.id,sessionVersion:reader.sessionVersion},{field:"name",values:{name:"x"}})).ok,false);
+  const rejected=await reactionService.save(prisma,reactionActor,{...defaults,name:"reject-constraint"});
+  assert.equal(rejected.ok,false);
+  assert.equal(await prisma.ensayoFrameworkRecord.count({where:{name:"reject-constraint"}}),0);
+  console.log("✓ Reacciones readonly, actor aislado, patches, restricciones y ausencia de persistencia/actividad verificados.");
 } finally { await prisma.$disconnect(); }

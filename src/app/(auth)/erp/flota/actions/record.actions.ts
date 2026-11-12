@@ -61,3 +61,8 @@ export async function moveRecord(input: import("@/lib/kanban/types").KanbanMove)
     return result;
   } catch (error) { return { ok: false, kind: "server", error: error instanceof AccessError ? error.message : "No se pudo guardar el movimiento." }; }
 }
+
+export async function onchangeRecord(input:import("@/lib/orm/reactions.types").ReactionRequest):Promise<import("@/lib/orm/reactions.types").ReactionResult> {
+  try {return await recordService.react(prisma,await requireAdmin(),input);}
+  catch {return {ok:false,error:"No se pudo completar la reacción."};}
+}

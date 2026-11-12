@@ -41,14 +41,16 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
     } else throw new Error(`${name}: declara --lookup campo=modulo#exportAsync para resolver el Many2one con un proveedor autorizado.`);
   }
   const columns = fields.slice(0, 12).map(([name, field]) => ({ field: name, label: field.label ?? name, type: field.kind === "integer" ? "integer" : field.kind === "boolean" ? "boolean" : field.kind === "datetime" ? "datetime" : "text", sortable: field.kind !== "image", ...(field.kind === "many2one" ? { widget: "many2one" } : {}), ...(field.kind === "image" ? { widget: "image", imageShape: "rounded", imageSize: "sm", filterable: false } : {}), ...(field.kind === "boolean" || field.kind === "selection" ? { groupable: true } : {}) }));
-  const searchFields = fields.filter(([, field]) => field.kind === "text").slice(0, 6).map(([name]) => name);
+  const searchFields = fields.filter(([name, field]) => field.kind === "text" && columns.some(column => column.field === name)).slice(0, 6).map(([name]) => name);
   const selections = fields.filter(([, field]) => field.kind === "selection");
   const images = fields.filter(([, field]) => field.kind === "image");
   const choices = selections.map(([name]) => `${name}: recordFields.${name}.metadata.kind === "selection" ? recordFields.${name}.metadata.choices : []`).join(",\n  ");
-  const columnCode = columns.map(column => model.metadata[column.field].kind === "selection" ? quote(column).slice(0, -1) + `, options: recordChoices.${column.field}}` : quote(column));
-  files[`views/${slug}.list.ts`] = `import type { CollectionField } from "@/components/ui/collection/types";\n${selections.length ? `import { recordFields } from "../schemas/${slug}.schema";\nexport const recordChoices = {\n  ${choices}\n} as const;\n` : ""}\nexport const recordColumns = [${columnCode.join(",\n")} ] as const satisfies readonly CollectionField[];\nexport const recordSearchFields = ${quote(searchFields)} as const;\n`;
-  files[`schemas/${slug}.schema.ts`] = `export { ${n}Fields as recordFields, ${n}RecordSchema as recordSchema, create${n}Defaults as createRecordDefaults, type ${n}RecordInput as RecordInput, type ${n}RecordValues as RecordValues } from "@/generated/orm/apps/${app}/${n}.schema";\n`;
-  files[`models/${slug}.service.ts`] = `import "server-only";\nimport { createModelService } from "@/lib/orm/service";\nimport { ${n}Repository } from "@/generated/orm/bindings/${app}/${n}.store";\nimport { ${modelImport.exported} as recordModel } from ${quote("./" + modelImport.source.slice("./models/".length))};\nimport { recordColumns, recordSearchFields } from "../views/${slug}.list";\n\nexport const recordService = createModelService(recordModel, ${n}Repository, { columns: recordColumns, searchFields: recordSearchFields, audit: true${views.includes("kanban") ? `, kanban: { field: ${quote(group)} }` : ""} });\n`;
+  files[`views/${slug}.list.ts`] = `import { modelColumns } from "@/lib/orm/presentation";\nimport { recordFields } from "../schemas/${slug}.schema";\nexport const recordChoices = {\n  ${choices}\n} as const;\nexport const recordColumns = modelColumns(recordFields, ${quote(columns.map(column => ({field:column.field,sortable:column.sortable,...("groupable" in column ? {groupable:column.groupable}: {})})))});\nexport const recordSearchFields = ${quote(searchFields)} as const;\n`;
+  files[`schemas/${slug}.schema.ts`] = `export { ${n}ReactionRules as recordReactionRules, ${n}Fields as recordFields, ${n}RecordSchema as recordSchema, create${n}Defaults as createRecordDefaults, type ${n}RecordInput as RecordInput, type ${n}RecordValues as RecordValues } from "@/generated/orm/apps/${app}/${n}.schema";\n`;
+  if (views.includes("kanban") && !columns.some(column => column.field === group)) throw new Error("El campo kanban debe estar entre las primeras 12 columnas publicadas; ajusta el modelo o crea vistas propias.");
+  const policy = { fields: columns.map(column => column.field), searchFields, sortable: columns.filter(column => column.sortable).map(column => column.field), groupable: columns.filter(column => "groupable" in column && column.groupable).map(column => column.field), filterable: columns.filter(column => !("filterable" in column) || column.filterable !== false).map(column => column.field) };
+  files[`schemas/${slug}.ui.ts`] = `import { recordFields,recordReactionRules } from "./${slug}.schema";\nimport { onchangeRecord } from "../actions/${slug}.actions";\n${manualLookups ? 'import type { ModelLookupRequest } from "@/lib/many2one/model-lookup";\n' : ""}${lookupImports.join("\n")}\n${images.length ? `import { imageUploads } from "@/generated/orm/uploads/${app}/${n}.images";\n` : ""}export const recordUI = { fields: recordFields, reactions:{rules:recordReactionRules,load:onchangeRecord}, lookups: { ${lookupEntries.join(", ")} }${images.length ? ", uploads: imageUploads" : ""} };\n`;
+  files[`models/${slug}.service.ts`] = `import "server-only";\nimport { createModelService } from "@/lib/orm/service";\nimport { ${n}Repository } from "@/generated/orm/bindings/${app}/${n}.store";\nimport { ${modelImport.exported} as recordModel } from ${quote("./" + modelImport.source.slice("./models/".length))};\n\nexport const recordService = createModelService(recordModel, ${n}Repository, { list: ${quote(policy)}, audit: true${views.includes("kanban") ? `, kanban: { field: ${quote(group)} }` : ""}${relations.length ? `, relations: { ${relations.filter(([name]) => columns.some(column => column.field === name)).map(([name]) => `${name}: async request => (await import("../schemas/${slug}.ui")).recordUI.lookups.${name}(request)`).join(", ")} }` : ""} });\n`;
   const actions = recordTemplates({ id: app, name: label, modelName: n, table: model.table })["actions/record.actions.ts"];
   files[`actions/${slug}.actions.ts`] = actions
     .replaceAll(`"../models/record.service"`, `"../models/${slug}.service"`)
@@ -63,13 +65,6 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
     .replace(/  listMyRecords:.*\n/, "").replace(/  listActiveRecords:.*\n/, "")
     .replace(/export async function listMyRecords\([\s\S]*?\n}\n/, "")
     .replace(/export async function listActiveRecords\([\s\S]*?\n}\n/, "");
-  if (relations.length && collections.length) {
-    files[`actions/${slug}.actions.ts`] = files[`actions/${slug}.actions.ts`]
-      .replace('"use server";', `"use server";\nimport { resolveListLabels } from "@/lib/list/relation-labels";\n${lookupImports.join("\n")}\nconst relationLookups = { ${lookupEntries.join(", ")} };`)
-      .replace("return queries.listRecords(state);", "return resolveListLabels(await queries.listRecords(state), relationLookups);")
-      .replace("return queries.loadKanban(request);", "return resolveListLabels(await queries.loadKanban(request), relationLookups);");
-  }
-
   const kinds = { list: "Lista", card: "Tarjetas", kanban: "Tablero" };
   const routes = collections.map((kind, index) => ({ kind, route: index ? `${base}/${kind === "card" ? "tarjetas" : kind === "kanban" ? "tablero" : "lista"}` : base }));
   const navigation = routes.length > 1 ? `<nav aria-label="Vistas de ${stem}" className="flex gap-2">${routes.map(route => `<Link className="btn btn-ghost btn-sm" href=${quote(route.route)}>${kinds[route.kind]}</Link>`).join("")}</nav>` : undefined;
@@ -81,42 +76,31 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
     const collectionProps = kind === "list" ? `breadcrumbs={${breadcrumbs}} onDelete={deleteRecords}` : `breadcrumbs={${breadcrumbs}} titleField=${quote(title)}`;
     const formProps = hasForm ? `createHref=${quote(base + "/nuevo")} createLabel="Nuevo" recordHref=${quote(base + "/{id}")}` : kind === "list" ? "create={false}" : "";
     const groupProps = kind === "kanban" ? `groupField=${quote(group)} groups={recordChoices.${group}} onMove={moveRecord}` : "";
-    files[`views/${stem}${titleKind}.tsx`] = `${navigation ? 'import Link from "next/link";\n' : ""}import ${component} from "@/components/ui/${kind === "card" ? "card" : kind === "kanban" ? "kanban" : "list"}/${component}";\nimport { ${actions} } from "../actions/${slug}.actions";\nimport { recordColumns, recordSearchFields${kind === "kanban" ? ", recordChoices" : ""} } from "./${slug}.list";\n\nexport default function ${stem}${titleKind}() {\n  return <${component} model=${quote(n)} title={${quote(label)}} load={${kind === "kanban" ? "loadKanban" : "listRecords"}} columns={recordColumns} searchFields={recordSearchFields} ${collectionProps} ${formProps} ${groupProps}${navigation ? ` headerActions={${navigation}}` : ""} />;\n}\n`;
+    files[`views/${stem}${titleKind}.tsx`] = `${navigation ? 'import Link from "next/link";\n' : ""}import ${component} from "@/components/ui/${kind === "card" ? "card" : kind === "kanban" ? "kanban" : "list"}/${component}";\nimport { ${actions} } from "../actions/${slug}.actions";\n${kind === "list" ? `import { recordFields } from "../schemas/${slug}.schema";` : `import { recordColumns, recordSearchFields${kind === "kanban" ? ", recordChoices" : ""} } from "./${slug}.list";`}\n\nexport default function ${stem}${titleKind}() {\n  return <${component} model=${quote(n)} title={${quote(label)}} load={${kind === "kanban" ? "loadKanban" : "listRecords"}} ${kind === "list" ? `fields={recordFields} searchFields={${quote(searchFields)}}` : "columns={recordColumns} searchFields={recordSearchFields}"} ${collectionProps} ${formProps} ${groupProps}${navigation ? ` headerActions={${navigation}}` : ""}${kind === "list" ? `>\n${columns.map(column => `    <ListView.Field name=${quote(column.field)}${column.sortable ? " sortable" : ""}${"groupable" in column && column.groupable ? " groupable" : ""} />`).join("\n")}\n  </ListView>` : " />"};\n}\n`;
     const suffix = route.slice(base.length);
     files[`${slug}${suffix}/page.tsx`] = `import View from "${suffix ? "../../" : "../"}views/${stem}${titleKind}";\nexport default function Page() { return <View />; }\n`;
   }
   if (hasForm) {
     const imports = new Set<string>();
-    const relationImports: string[] = [];
-    if (images.length) {
-      relationImports.push(`import { imageUploads } from "@/generated/orm/uploads/${app}/${n}.images";`);
-    }
     const controls = fields.map(([name, field]) => {
       let component = "FieldText", extra = "";
       if (field.kind === "boolean") component = "FieldBoolean";
-      if (field.kind === "integer") { component = "FieldNumber"; extra = ` type="integer" allowNegative={${(field.min ?? -2147483648) < 0}}`; }
+      if (field.kind === "integer") { component = "FieldNumber"; extra = ' type="integer"'; }
       if (field.kind === "datetime") { component = "FieldDate"; extra = ' type="datetime"'; }
-      if (field.kind === "selection") { component = "FieldSelect"; extra = ` options={recordChoices.${name}}`; }
-      if (field.kind === "text" && field.maxLength) extra = ` maxLength={${field.maxLength}}`;
-      if (field.kind === "image") { component = "FieldImage"; extra = ` upload={imageUploads.${name}}`; }
+      if (field.kind === "selection") { component = "FieldSelect"; extra = ""; }
+
+      if (field.kind === "image") { component = "FieldImage"; extra = ""; }
       if (field.kind === "many2one") {
         component = "FieldMany2One";
-        const lookup = options.lookups?.[name];
-        if (lookup) {
-          const [path, exported] = lookup.split("#");
-          const alias = `lookup${name[0].toUpperCase() + name.slice(1)}`;
-          relationImports.push(`import { ${exported} as ${alias} } from ${quote(path)};`);
-          extra = ` load={${alias}}`;
-        } else if (field.target === "Partner" || field.target === "User") extra = ` model=${quote(field.target === "Partner" ? "partner" : "user")}`;
-        else throw new Error(`${name}: declara --lookup campo=modulo#exportAsync para resolver el Many2one con un proveedor autorizado.`);
+
       }
       imports.add(component);
-      return `<${component}<RecordInput> name=${quote(name)} label={${quote(field.label ?? name)}} direction="inline"${field.required && field.kind !== "boolean" ? " required" : ""}${extra} />`;
+      return `<${component}<RecordInput> name=${quote(name)} direction="inline"${extra} />`;
     });
     let form = recordTemplates({ id: app, name: label, modelName: n, table: model.table })["views/RecordForm.tsx"];
-    form = form.replaceAll(`/erp/${app}`, base).replaceAll("../actions/record.actions", `../actions/${slug}.actions`).replaceAll("../schemas/record.schema", `../schemas/${slug}.schema`)
+    form = form.replaceAll(`/erp/${app}`, base).replaceAll("../actions/record.actions", `../actions/${slug}.actions`).replaceAll("../schemas/record.schema", `../schemas/${slug}.schema`).replaceAll("../schemas/record.ui", `../schemas/${slug}.ui`)
       .replace('import FieldText from "@/components/ui/form/FieldText";\n', "").replace('import FieldBoolean from "@/components/ui/form/FieldBoolean";\n', "")
-      .replace('import FormGroup from "@/components/ui/form/FormGroup";', `import FormGroup from "@/components/ui/form/FormGroup";\n${[...imports].map(component => `import ${component} from "@/components/ui/form/${component}";`).join("\n")}\n${relationImports.join("\n")}${selections.length ? `\nimport { recordChoices } from "./${slug}.list";` : ""}`)
+      .replace('import FormGroup from "@/components/ui/form/FormGroup";', `import FormGroup from "@/components/ui/form/FormGroup";\n${[...imports].map(component => `import ${component} from "@/components/ui/form/${component}";`).join("\n")}\n`)
       .replace(/<FormGroup[^>]*>[\s\S]*?<\/FormGroup>/, `<FormGroup legend="Datos generales">\n      ${controls.join("\n      ")}\n    </FormGroup>`)
       .replace('record.name || "Registro"', `String(record.${title} ?? "Registro")`)
       .replace("export default function RecordForm", `export default function ${stem}Form`)

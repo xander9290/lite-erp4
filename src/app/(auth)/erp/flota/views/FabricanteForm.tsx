@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { RefreshCw } from "lucide-react";
 import FormView from "@/components/ui/form/FormView";
 import FormViewLoader from "@/components/ui/form/FormViewLoader";
+import { recordUI } from "../schemas/fabricante.ui";
 import FormGroup from "@/components/ui/form/FormGroup";
 import FieldText from "@/components/ui/form/FieldText";
 import FieldBoolean from "@/components/ui/form/FieldBoolean";
@@ -26,7 +27,6 @@ import {
   type RecordValues,
 } from "../schemas/fabricante.schema";
 import FieldImage from "@/components/ui/form/FieldImage";
-import { imageUploads } from "@/generated/orm/uploads/flota/FlotaFabricante.images";
 
 function Editor({
   record,
@@ -53,6 +53,7 @@ function Editor({
       ]}
       title={savedId ? "Editar registro" : "Nuevo registro"}
       methods={methods}
+      model={recordUI}
       activity={{ recordId: savedId, load: loadActivity, addNote }}
       mode={savedId ? "edit" : "create"}
       onSubmit={saveRecord}
@@ -88,20 +89,15 @@ function Editor({
       <FormGroup legend="Datos generales">
         <FieldImage<RecordInput>
           name="avatar"
-          upload={imageUploads.avatar}
           shape="squared"
           widget="avatar"
         />
         <FieldText<RecordInput>
           name="name"
-          label={"Nombre"}
           direction="inline"
-          required
-          maxLength={120}
         />
         <FieldBoolean<RecordInput>
           name="active"
-          label={"Activo"}
           direction="inline"
         />
       </FormGroup>

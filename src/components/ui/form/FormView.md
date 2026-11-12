@@ -179,3 +179,7 @@ Ejemplos con Zod en `/sample#form-view` y `/sample#field-select-statebar`. Las a
 Para organizar los Fields en pestañas, coloca `Notebook` y `NotebookPage` dentro del body. Comparten el contexto RHF y el guardado; consulta [Notebook.md](./Notebook.md).
 
 Para cargar registros antes de mostrarlos, usa FormViewLoader. Consulta [alertas y carga de registros](../alerts/README.md).
+
+
+El contrato enlazado y las nuevas APIs de presentación se documentan en
+[Contratos de vistas](../../../../docs/contratos-vistas.md).

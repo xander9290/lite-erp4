@@ -17,6 +17,11 @@ export const FlotaFabricanteSchema = z.strictObject({
   logo: FlotaFabricanteFields.logo.schema,
 });
 
+export const FlotaFabricanteReactionRules = [] as const;
+export const FlotaFabricantePreviewFields = {
+
+} as const;
+
 export function createFlotaFabricanteDefaults() {
   return {
     name: FlotaFabricanteFields.name.createDefault(),

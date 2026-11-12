@@ -326,3 +326,31 @@ El ejercicio conserva la política admin del servicio y no requiere cambiar mode
 migrar ni regenerar adaptadores. Los pasos 1–5 se conservan como recorrido de estudio;
 no es necesario volver a crear los archivos. Avance actual en
 [Estado del proyecto](../../../../../docs/estado-proyecto.md).
+
+## Contratos compartidos en Flota
+
+Fabricante, Modelo y vehículos enlazan FormView a schemas/*.ui.ts. Modelo utiliza
+ListView.Field, proveedor Many2one central y withDisplayName con inferencia de tipos.
+Los servicios fijan su política list independientemente de las vistas.
+Se conservan las tarjetas de Fabricante y sus imágenes cuadradas.
+[API, ejemplos y update:views](../../../../../docs/contratos-vistas.md).
+
+## Cambiar restricciones de Vehicle
+
+Para incorporar unique/maxLength de plate después de instalar el modelo:
+
+```bash
+npm run orm:sync -- flota --plan --force
+npm run orm:sync -- flota --force
+```
+
+Revisa el SQL y escribe aplicar. El comando rechaza duplicados y valores fuera del
+nuevo límite; no los elimina ni trunca. [Alcance y recuperación](../../../../../docs/sincronizar-aplicaciones.md).
+
+## Reacciones y decoradores
+
+Vehicle obtiene nombre/avatar del fabricante al seleccionar Modelo mediante @depends,
+sin duplicar esos datos en su tabla. @onchange normaliza la matrícula en el borrador y
+normalize garantiza mayúsculas al guardar. Fabricante/Modelo usan @displayName; el
+modelo anterior FlotaRecord conserva sus reglas con @constraint y context.previous.
+[API y ejemplos](../../../../../docs/reacciones-modelos.md).

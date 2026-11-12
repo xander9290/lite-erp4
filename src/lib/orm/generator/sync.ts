@@ -1,7 +1,9 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { open, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { tmpdir } from "node:os";
+import { forceChecks, forcedMigrationSQL, validateForceData } from "./force";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { Client } from "pg";
@@ -65,6 +67,7 @@ async function readApplied(url: string): Promise<AppliedMigration[]> {
 
 type SyncOptions = {
   plan?: boolean;
+  force?: boolean;
   name?: string;
   log: (message: string) => void;
   confirm: (message: string) => Promise<boolean>;
@@ -77,13 +80,14 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   const profile = await loadAppGenerationProfile(root, id);
   if (!profile) throw new Error("No existe un orm.config.ts para esta aplicación.");
   if (options.plan) {
-    const plan = await installModels(root, profile, false, true);
+    const plan = await installModels(root, profile, false, true, options.force);
     const uploadDirectory = join(root, "src/generated/orm/uploads", id);
     const uploads = await artifactPlan(uploadDirectory, `uploads-${id}`, imageUploadFiles(profile.module));
     options.log(`Plan de fuentes de ${id} (sin consultar la base):`);
     for (const change of plan.changes) options.log(relative(root, change.path));
     for (const change of uploads.changes.filter(change => change.action !== "unchanged")) options.log(`${change.action}: ${relative(root, join(uploadDirectory, change.name))}`);
     options.log(plan.sql);
+    if (options.force) options.log("--force: plan de restricciones; los datos se comprobarán al sincronizar con la base.");
     options.log("Sin escrituras ni SQL aplicado. El enlace se comprueba en la sincronización completa.");
     return;
   }
@@ -117,7 +121,9 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     const files = await pending();
     if (!files.length) return;
     stage("Revisar migraciones pendientes del proyecto");
-    for (const file of files) { options.log(`\n${file.name}/migration.sql\n${file.sql}`); assertSyncSQL(file.sql, file.name); }
+    for (const file of files) {
+      if (file.sql.startsWith("-- lite-erp: reviewed force migration") && !options.force) throw new Error(`La migración ${file.name} requiere repetir orm:sync con --force para revisar sus restricciones.`);
+      options.log(`\n${file.name}/migration.sql\n${file.sql}`); assertSyncSQL(file.sql, file.name); }
     if (!await options.confirm(`¿Aplicar estas ${files.length} migraciones a la base de desarrollo indicada? Escribe aplicar`)) throw new Error("Cancelado: las migraciones mostradas no se aplicaron. Los archivos preparados se conservan.");
     if (JSON.stringify(await pending()) !== JSON.stringify(files)) throw new Error("Las migraciones cambiaron durante la revisión. Vuelve a ejecutar orm:sync.");
     stage("Aplicar SQL aprobado");
@@ -132,13 +138,61 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     options.log(`Base de desarrollo: ${target.hostname}:${target.port || "5432"}${target.pathname}, schema=${target.searchParams.get("schema") || "public"}`);
     stage("Generar contratos y validar propuesta");
     await generate();
-    stage("Incorporar esquema (instalación o actualización aditiva)");
-    const installation = await installModels(root, profile, true, true);
-    for (const change of installation.changes) options.log(relative(root, change.path));
+    if (options.force) {
+      stage("Planificar actualización revisada --force");
+      const proposal = await installModels(root, profile, false, true, true);
+      await applyPending();
+      stage("Comprobar que la base coincide con el esquema instalado");
+      const baseline = await mkdtemp(join(tmpdir(), "lite-erp-force-"));
+      try {
+        const schema = join(baseline, "schema.prisma");
+        await writeFile(schema, Object.values(proposal.snapshot.sources).join("\n\n"));
+        if (prisma(["migrate", "diff", "--from-config-datasource", "--to-schema", schema, "--exit-code"], [0, 2]) !== 0) throw new Error("La base difiere del esquema instalado. Revisa migraciones o cambios manuales antes de usar --force; no se incorporará ese drift automáticamente.");
+      } finally { await rm(baseline, {recursive:true,force:true}); }
+      stage("Comprobar duplicados, longitudes y valores nulos");
+      const client = new Client({connectionString:databaseUrl,connectionTimeoutMillis:10000});
+      let checks: Awaited<ReturnType<typeof validateForceData>>;
+      try { await client.connect(); checks = await validateForceData(client, target.searchParams.get("schema") || "public", forceChecks(profile)); }
+      finally { await client.end(); }
+      assertSyncSQL(proposal.sql);
+      let prepared: string | undefined;
+      let preparedSQL: string | undefined;
+      try {
+        if (proposal.changes.length && !/^(?:\s|--[^\n]*(?:\n|$))*$/.test(proposal.sql)) {
+          stage("Preparar migración --force sin aplicar");
+          const files = await migrationFiles(root);
+          const last = files.map(file => file.name.slice(0,14)).filter(name => /^\d{14}$/.test(name)).sort().at(-1);
+          let now = new Date();
+          if (last) {
+            const previous = new Date(`${last.slice(0,4)}-${last.slice(4,6)}-${last.slice(6,8)}T${last.slice(8,10)}:${last.slice(10,12)}:${last.slice(12,14)}Z`);
+            if (previous >= now) now = new Date(previous.getTime()+1000);
+          }
+          const stamp = now.toISOString().replace(/[-:T]/g, "").slice(0,14);
+          const directory = join(root, "prisma/migrations", `${stamp}_${options.name ?? `sync_${id.replaceAll("-", "_")}`}_force`);
+          await assertNoSymlinks(directory);
+          await mkdir(directory);
+          prepared = directory;
+          preparedSQL = forcedMigrationSQL(proposal.sql, checks);
+          await writeFile(join(directory,"migration.sql"), preparedSQL, {flag:"wx"});
+        }
+        stage("Incorporar esquema y registro gestionado --force");
+        const installation = await installModels(root, profile, true, true, true, proposal.changes);
+        for (const change of installation.changes) options.log(relative(root, change.path));
+      } catch (error) {
+        // Remove only our unchanged, unapplied SQL on ordinary preparation failure.
+        if (prepared && preparedSQL && await readFile(join(prepared,"migration.sql"),"utf8").catch(()=>null) === preparedSQL) await rm(prepared,{recursive:true});
+        throw error;
+      }
+    } else {
+      stage("Incorporar esquema (instalación o actualización aditiva)");
+      const installation = await installModels(root, profile, true, true);
+      for (const change of installation.changes) options.log(relative(root, change.path));
+    }
     // migrate dev --create-only can apply older pending migrations: review them first.
     await applyPending();
     stage("Comparar base de datos con el esquema");
     if (prisma(["migrate", "diff", "--from-config-datasource", "--to-schema", join(root, "prisma/models"), "--exit-code"], [0, 2]) === 2) {
+      if (options.force) throw new Error("Quedan diferencias después de aplicar la migración revisada. Revisa el drift; --force no prepara cambios ajenos a su propuesta.");
       stage("Preparar nueva migración sin aplicar");
       // Closed stdin: Prisma must fail rather than accept a reset or a data-loss prompt.
       prisma(["migrate", "dev", "--name", options.name ?? `sync_${id.replaceAll("-", "_")}`, "--create-only"]);
@@ -156,7 +210,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     run(["--noEmit"], [0], "typescript/bin/tsc");
     options.log(`\n✓ ${id} sincronizada. Revisa los cambios en Git y reinicia dev si estaba abierto.`);
   } catch (error) {
-    throw new Error(redact(`Detenido en «${step}»: ${error instanceof Error ? error.message : "Error desconocido"}\nCorrige el problema y repite npm run orm:sync -- ${id}. Los pasos completados no se revierten automáticamente.`));
+    throw new Error(redact(`Detenido en «${step}»: ${error instanceof Error ? error.message : "Error desconocido"}\nCorrige el problema y repite npm run orm:sync -- ${id}${options.force ? " --force" : ""}. Los pasos completados no se revierten automáticamente.`));
   } finally {
     await handle.close();
     await rm(lock, { force: true });

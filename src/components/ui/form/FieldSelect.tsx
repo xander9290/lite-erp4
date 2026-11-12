@@ -3,6 +3,7 @@
 import { useId, useMemo, type HTMLAttributes } from "react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import { ChevronRight } from "lucide-react";
+import { useModelField } from "./modelFields";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldLabelClassName, fieldSelectClassName } from "./field.styles";
 import { prepareSelectOptions, type FieldSelectOption, type FieldSelectValue } from "./selectOptions";
@@ -18,7 +19,7 @@ export type FieldSelectProps<
     widget?: "statebar";
     /** Statebars are read-only by default; use actions for server-side transitions. */
     readOnly?: boolean;
-    options: readonly FieldSelectOption<TValue>[];
+    options?: readonly FieldSelectOption<TValue>[];
     placeholder?: string;
     disabled?: boolean;
     required?: boolean;
@@ -28,7 +29,8 @@ export type FieldSelectProps<
 export default function FieldSelect<
   TFieldValues extends FieldValues = FieldValues,
   TValue extends FieldSelectValue = FieldSelectValue,
->({
+>(props: FieldSelectProps<TFieldValues, TValue>) {
+  const {
   name,
   label,
   type = "dropdown",
@@ -51,7 +53,8 @@ export default function FieldSelect<
   "aria-labelledby": labelledBy,
   "aria-describedby": describedBy,
   ...controlProps
-}: FieldSelectProps<TFieldValues, TValue>) {
+} = useModelField(props, "selection");
+  if (!options) throw new Error(`FieldSelect ${name} requiere options o un contrato de modelo Selection.`);
   delete controlProps.autoComplete;
   const generatedId = useId();
   const inputId = id ?? generatedId;

@@ -1,5 +1,5 @@
 import "server-only";
-import { Fields, Model, defineModel } from "@/lib/orm";
+import { Fields, Model, defineModel, displayName, type DisplayRecord } from "@/lib/orm";
 
 export class FlotaFabricante extends Model {
   name = Fields.Text({
@@ -13,7 +13,9 @@ export class FlotaFabricante extends Model {
     folder: "fabricantes",
   });
   active = Fields.Boolean({ label: "Activo", default: true, tracking: true });
-  // Define aquí normalize, beforeSave y afterSave cuando tu negocio lo necesite.
+  @displayName("name")
+  fabricanteLabel(record:DisplayRecord<FlotaFabricante,"name">):string {return record.name;}
+
 }
 
 export const flotaFabricanteModel = defineModel(FlotaFabricante, {

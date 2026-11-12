@@ -153,3 +153,8 @@ export async function lookupRecords(
 export async function signAvatarUpload() {
   return signImageUpload("avatar");
 }
+
+export async function onchangeRecord(input:import("@/lib/orm/reactions.types").ReactionRequest):Promise<import("@/lib/orm/reactions.types").ReactionResult> {
+  try {return await recordService.react(prisma,await requireAdmin(),input);}
+  catch {return {ok:false,error:"No se pudo completar la reacción."};}
+}

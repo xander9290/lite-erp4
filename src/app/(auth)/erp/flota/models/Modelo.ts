@@ -1,5 +1,7 @@
 import "server-only";
-import { Fields, Model, defineModel } from "@/lib/orm";
+import { Fields, Model, defineModel, displayName, type DisplayRecord } from "@/lib/orm";
+
+import { flotaFabricanteModel } from "./Fabricante";
 
 export class FlotaModelo extends Model {
   name = Fields.Text({
@@ -24,21 +26,14 @@ export class FlotaModelo extends Model {
     },
   );
   active = Fields.Boolean({ label: "Activo", default: true, tracking: true });
-  // Define aquí normalize, beforeSave y afterSave cuando tu negocio lo necesite.
+  readonly displayRelations={fabricante:flotaFabricanteModel};
 
-  displayFields = ["name", "fabricante.name"] as const;
-
-  displayName(
-    record: Readonly<{
-      name: string;
-      fabricante: Readonly<{ name: string }> | null;
-    }>,
-  ) {
-    return [record.fabricante?.name, record.name].filter(Boolean).join(" · ");
+  @displayName("name","fabricante.name")
+  modeloLabel(record:DisplayRecord<FlotaModelo,"name"|"fabricante.name">):string {
+    return [record.fabricante.name,record.name].filter(Boolean).join(" · ");
   }
 }
 
 export const flotaModeloModel = defineModel(FlotaModelo, {
-  name: "FlotaModelo",
-  table: "flota_modelo",
+  name:"FlotaModelo",table:"flota_modelo",
 });

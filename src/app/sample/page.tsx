@@ -1,3 +1,6 @@
+import ModelFieldsSample from "./ModelFieldsSample";
+import ModelReactionsSample from "./ModelReactionsSample";
+import { sampleReactionModel } from "./reaction-model";
 import Link from "next/link";
 import SampleForms from "./SampleForms";
 import ImageSample from "./ImageSample";
@@ -27,6 +30,8 @@ export default function PageSample() {
             <p className="max-w-2xl text-sm text-base-content/65">Ejemplos con React Hook Form y Zod. Prueba los campos vacíos para ver los errores en toast o carga un ejemplo válido para consultar el resultado. Validar muestra los datos localmente; FormView demuestra acciones de servidor sin persistencia y FieldImage sube a Cloudinary al confirmar su edición.</p>
           </div>
           <nav aria-label="Ejemplos de Fields" className="flex flex-wrap gap-2">
+            <a className="btn btn-sm btn-outline" href="#model-reactions">Reacciones de modelo</a>
+            <a className="btn btn-sm btn-outline" href="#model-fields">Contrato del modelo</a>
             <a className="btn btn-sm btn-outline" href="#list-view">ListView</a>
             <a className="btn btn-sm btn-outline" href="#list-selection">Selección de listas</a>
             <a className="btn btn-sm btn-outline" href="#list-grouping">Agrupación anidada</a>
@@ -54,6 +59,8 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#field-image-avatar">Avatar</a>
           </nav>
         </header>
+        <ModelReactionsSample rules={sampleReactionModel.reactionRules} />
+        <ModelFieldsSample />
         <ListViewSample />
         <ListGroupingSample />
         <CollectionViewsSample />

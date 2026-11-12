@@ -17,6 +17,11 @@ export const FlotaRecordSchema = z.strictObject({
   active: FlotaRecordFields.active.schema,
 });
 
+export const FlotaRecordReactionRules = [] as const;
+export const FlotaRecordPreviewFields = {
+
+} as const;
+
 export function createFlotaRecordDefaults() {
   return {
     name: FlotaRecordFields.name.createDefault(),

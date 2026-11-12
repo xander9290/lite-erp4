@@ -131,3 +131,25 @@ test("group queries never run for inactive, non-admin or stale sessions", async 
     assert.equal(calls.length, 0);
   }
 });
+
+test("server list policy projects rows, rejects manipulated capabilities and resolves all collection labels", async () => {
+  const related=defineModel(class extends Model { name=Fields.Text({required:true}); brandId=Fields.Many2one("Brand"); state=Fields.Selection([{value:"draft",label:"Borrador"}],{required:true}); hidden=Fields.Text(); },{name:"PolicyWork",table:"policy_work"});
+  let reads=0, lookups=0;
+  const tx={user:{findUnique:async()=>({active:true,isAdmin:true,sessionVersion:3})}} as unknown as Prisma.TransactionClient;
+  const prisma={$transaction:async(run:(tx:Prisma.TransactionClient)=>unknown)=>run(tx)} as unknown as PrismaClient;
+  const service=createModelService(related,{...unboundRepository<ReturnType<typeof related.parse>>(),count:async()=>1,
+    list:async()=>{reads++;return [{id:"1",revision:"rev",name:"Car",brandId:"brand",state:"draft",hidden:"private"}];},
+    groups:async()=>[{value:"brand",count:1}],
+  },{list:{fields:["name","brandId","state"],searchFields:["name"],sortable:["name"],groupable:["brandId"],filterable:["name"]},kanban:{field:"state"},relations:{brandId:async request=>{
+    lookups++;assert.deepEqual(request.ids,["brand"]);return {ok:true,total:1,page:1,pageSize:100,items:[{value:"brand",label:"Marca",record:{id:"brand"}}]};
+  }}});
+  for(const result of [await service.list(prisma,actor,state),await service.defineListAction({domain:[{field:"state",operator:"eq",value:"draft"}]})(prisma,actor,state),await service.kanban(prisma,actor,{group:"draft",state})]) {
+    assert.ok(result.ok);assert.equal(result.data.rows[0].hidden,undefined);assert.deepEqual(result.data.rows[0].$labels,{brandId:{value:"brand",label:"Marca"}});
+  }
+  const grouped=await service.list(prisma,actor,{...state,groupBy:["brandId"]}); assert.ok(grouped.ok);assert.equal(grouped.data.groups?.[0].label,"Marca");
+  assert.equal(lookups,4);
+  const before=reads;
+  for(const bad of [{...state,sort:"hidden"},{...state,groupBy:["hidden"]},{...state,filters:[{field:"hidden",operator:"eq",value:"x"}]}]) assert.equal((await service.list(prisma,actor,bad)).ok,false);
+  assert.equal(reads,before);
+  assert.throws(()=>createModelService(related,unboundRepository(),{list:{fields:["name"],searchFields:["hidden"]}}),/política/);
+});

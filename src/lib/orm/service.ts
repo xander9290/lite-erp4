@@ -24,10 +24,17 @@ import { activityRequestSchema, activityNoteSchema, type ActivityResult, type Ac
 import { recordActivity, readActivity } from "./activity.server";
 import { modelLookupSchema } from "../many2one/model-lookup";
 import type { Many2OneResult } from "../many2one/types";
+import { resolveListLabels } from "../list/relation-labels";
+import type { Many2OneLoader } from "../many2one/model-lookup";
+import { fieldColumn } from "./presentation";
+import type { ReactionContext } from "./reactions";
+import type { ReactionRule, ReactionResult } from "./reactions.types";
 import { displayFieldPaths, projectDisplayRecord } from "./display";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = {
+  reactionRules?:readonly ReactionRule[];
+  react?(field:string,values:Readonly<Record<string,unknown>>,context:ReactionContext):Promise<{patch:Record<string,unknown>;preview:Record<string,string|number|boolean|null>}>;
   name: string; schema: z.ZodType<T>; metadata: Readonly<Record<string, FieldMetadata>>;
   normalize?(values: Record<string, unknown>): T;
   beforeSave?(values: T, context: ModelContext<T>): Promise<T>;
@@ -38,6 +45,25 @@ type Contract<T extends Record<string, unknown>> = {
 const idSchema = z.string().trim().min(1).max(100);
 const codeOf = (error: unknown) => error && typeof error === "object" && "code" in error ? String(error.code) : "";
 export const fieldListType = (field: FieldMetadata): ListDataType => field.kind === "integer" ? "integer" : field.kind === "boolean" ? "boolean" : field.kind === "datetime" ? "datetime" : "text";
+
+function projectListRow(row: import("../list/types").ListRecord, paths: readonly string[]) {
+  const result: import("../list/types").ListRecord = { id: row.id };
+  if (row.revision !== undefined) result.revision = row.revision;
+  for (const path of paths) {
+    const parts = path.split(".");
+    let source: import("../list/types").ListValue = row;
+    let target: Record<string, import("../list/types").ListValue> = result;
+    for (let index = 0; index < parts.length; index++) {
+      const key = parts[index];
+      if (!source || typeof source !== "object" || Array.isArray(source) || !Object.hasOwn(source, key)) break;
+      source = source[key];
+      if (index === parts.length - 1 || source === null) { target[key] = source; break; }
+      if (!Object.hasOwn(target, key)) target[key] = {};
+      target = target[key] as Record<string, import("../list/types").ListValue>;
+    }
+  }
+  return result;
+}
 
 async function assertActor(tx: Prisma.TransactionClient, actor: ModelActor) {
   const user = await tx.user.findUnique({ where: { id: actor.id }, select: { active: true, isAdmin: true, sessionVersion: true } });
@@ -54,10 +80,37 @@ function messageFor(error: unknown) {
   return "No se pudo completar la operación. Recarga los datos e intenta nuevamente.";
 }
 
+export type ModelListPolicy = {
+  fields: readonly string[];
+  searchFields: readonly string[];
+  sortable?: readonly string[];
+  groupable?: readonly string[];
+  filterable?: readonly string[];
+};
+type ServicePresentation = {
+  defaultSort?: ListViewConfig["defaultSort"]; kanban?: { field: string }; audit?: boolean;
+  relations?: Readonly<Record<string, Many2OneLoader>>;
+} & ({ list: ModelListPolicy; columns?: never; searchFields?: never } | { list?: never; columns: readonly ListColumn[]; searchFields: readonly string[] });
+
 /** Admin-only baseline. The repository and list policy are fixed on the server, never selected by a client. */
-export function createModelService<T extends Record<string, unknown>>(model: Contract<T>, repository: ModelRepository<T>, presentation: { columns: readonly ListColumn[]; searchFields: readonly string[]; defaultSort?: ListViewConfig["defaultSort"]; kanban?: { field: string }; audit?: boolean }) {
+export function createModelService<T extends Record<string, unknown>>(model: Contract<T>, repository: ModelRepository<T>, presentation: ServicePresentation) {
   type Values = T & RecordIdentity;
-  const config: ListViewConfig = { ...presentation, model: model.name };
+  const auditFields = new Set(presentation.audit ? ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.partner.name"] : []);
+  const policy = presentation.list;
+  if (policy && (presentation.columns || presentation.searchFields)) throw new Error("Usa list o columns, no ambas políticas.");
+  if (policy) {
+    for (const names of [policy.searchFields, policy.sortable ?? [], policy.groupable ?? [], policy.filterable ?? []]) {
+      if (new Set(names).size !== names.length || names.some(name => !policy.fields.includes(name))) throw new Error("La política sólo puede consultar campos publicados en list.fields.");
+    }
+    if (policy.fields.some(name => (!Object.hasOwn(model.metadata, name) && !auditFields.has(name)) || model.metadata[name]?.sensitive)) throw new Error("list.fields sólo permite campos declarados no sensibles.");
+  }
+  const config: ListViewConfig = { model: model.name, defaultSort: presentation.defaultSort,
+    columns: policy ? policy.fields.map(name => ({ ...(model.metadata[name] ? fieldColumn(name, model.metadata[name]) : { field: name, label: name, ...(auditAvatarField(name) ? { widget: "partner" as const, avatarField: auditAvatarField(name)! } : {}) }), sortable: policy.sortable?.includes(name) ?? false, groupable: policy.groupable?.includes(name) ?? false, filterable: policy.filterable?.includes(name) ?? false })) : presentation.columns!,
+    searchFields: policy?.searchFields ?? presentation.searchFields!,
+  };
+  for (const [name, loader] of Object.entries(presentation.relations ?? {})) {
+    if (model.metadata[name]?.kind !== "many2one" || model.metadata[name].sensitive || typeof loader !== "function" || !config.columns.some(column => column.field === name)) throw new Error("Las etiquetas requieren una relación publicada y un lookup autorizado.");
+  }
   const allowed = new Set(["id", ...Object.keys(model.metadata)]);
   if (presentation.audit) for (const field of ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.partner.name"]) allowed.add(field);
   const columnType = (field: string) => model.metadata[field] ? fieldListType(model.metadata[field]) : presentation.audit ? auditColumnType(field) ?? "text" : "text";
@@ -78,6 +131,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   }
   if (config.defaultSort && !config.columns.some(column => column.field === config.defaultSort?.field && column.sortable)) throw new Error("El orden predeterminado debe apuntar a una columna ordenable de la lista.");
   const groupField = presentation.kanban?.field;
+  if (policy && groupField && !policy.fields.includes(groupField)) throw new Error("El estado kanban debe estar publicado en list.fields.");
   const groupMetadata = groupField && Object.hasOwn(model.metadata, groupField) ? model.metadata[groupField] : null;
   if (groupField && (groupMetadata?.kind !== "selection" || !groupMetadata.required || groupMetadata.choices.length > 12)) throw new Error("El kanban inicial requiere una selección obligatoria con un máximo de 12 estados.");
   const groups = groupMetadata?.kind === "selection" ? groupMetadata.choices : [];
@@ -144,6 +198,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const fixedDomain = domain ? await domain({ actor: Object.freeze({ id: actor.id, sessionVersion: actor.sessionVersion }), tx }) : undefined;
         const parsed = listStateSchema.safeParse(input);
         if (!parsed.success || parsed.data.invalidFilters) throw new ModelValidationError("Revisa los filtros y parámetros de esta lista.");
+        if (policy && parsed.data.sort && !(parsed.data.sort === "id" && !policy.sortable?.length) && !policy.sortable?.includes(parsed.data.sort)) throw new ModelValidationError("El orden solicitado no está habilitado.");
+        if (policy && parsed.data.query && !policy.searchFields.length) throw new ModelValidationError("La búsqueda no está habilitada.");
         const state = normalizeListState(config, parsed.data);
         let grouping: ReturnType<typeof groupingPlan>;
         try { grouping = groupingPlan(config.columns, state); }
@@ -185,9 +241,13 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         }
         const page = Math.min(state.page, Math.max(1, Math.ceil(total / state.pageSize)));
         const rows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize, audit: presentation.audit === true });
-        return { rows, total, page, pageSize: state.pageSize };
+        // Repository contracts can contain extra edit fields: collection DTOs honor the fixed server publication.
+        const publishedRows = policy ? rows.map(row => projectListRow(row, [...policy.fields, ...policy.fields.flatMap(name => auditAvatarField(name) ? [auditAvatarField(name)!] : [])])) : rows;
+        return { rows: publishedRows, total, page, pageSize: state.pageSize };
       }, { isolationLevel: "RepeatableRead" });
-      return { ok: true, data };
+      // Labels use independently authorized lookups after the list snapshot; no cross-request cache.
+      // They are presentation, never predicates, ordering keys or authorization inputs.
+      return presentation.relations ? resolveListLabels({ ok: true, data }, presentation.relations) : { ok: true, data };
     } catch (error) { return { ok: false, error: messageFor(error) }; }
   }
 
@@ -299,5 +359,25 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     } catch (error) { return { ok: false, error: messageFor(error) }; }
   }
 
-  return { read, save, remove, activity, addNote, lookup, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
+  async function react(prisma:PrismaClient,actor:ModelActor,input:unknown):Promise<ReactionResult> {
+    try {
+      const request=z.strictObject({field:z.string().min(1).max(60),values:z.record(z.string(),z.unknown()),id:idSchema.optional(),revision:z.iso.datetime({precision:3}).optional()}).parse(input);
+      if(JSON.stringify(request.values).length>16000 || !recordIdentitySchema.safeParse({id:request.id,revision:request.revision}).success) throw new ModelValidationError("El borrador no es válido.");
+      if(!model.react || !model.reactionRules?.some(rule=>rule.fields.includes(request.field))) throw new ModelValidationError("La reacción no está habilitada.");
+      const result=await prisma.$transaction(async tx=>{
+        await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+        await assertActor(tx,actor);
+        if(request.id) {
+          const current=await repository.read(tx,request.id);
+          if(!current || current.revision!==request.revision) throw new ModelValidationError(conflict);
+        }
+        return model.react!(request.field,request.values,Object.freeze({tx,actor:Object.freeze({...actor}),id:request.id}));
+      },{isolationLevel:"RepeatableRead"});
+      return {ok:true,...result};
+    } catch(error) {
+      return {ok:false,error:error instanceof z.ZodError?"Revisa los campos necesarios para esta reacción.":messageFor(error),...(error instanceof ModelValidationError&&error.fieldErrors?{fieldErrors:error.fieldErrors}:{})};
+    }
+  }
+
+  return { react, read, save, remove, activity, addNote, lookup, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
 }

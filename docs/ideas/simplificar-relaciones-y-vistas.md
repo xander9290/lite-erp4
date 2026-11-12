@@ -1,7 +1,11 @@
 # Simplificar el desarrollo de relaciones y vistas
 
-Registrado el 2026-11-11 a petición del usuario. Estado: pendiente; estas propuestas
-no están implementadas ni fijan todavía una API definitiva.
+Registrado e implementado el 2026-11-11 a petición del usuario. Los puntos 1–7
+cuentan con un primer alcance operativo y se aplicaron a Flota conservando sus
+personalizaciones. API, ejemplos y límites vigentes en [Contratos de vistas](../contratos-vistas.md).
+El texto siguiente conserva el planteamiento original; sus sintaxis ilustrativas
+se concretan en la guía. La actualización automática se limita a estructuras
+inequívocas: no equivale a regenerar vistas personalizadas.
 
 ## Problema observado
 
@@ -50,8 +54,7 @@ presentación en las colecciones y grupos; esa mejora ya existe.
 
 ## Columnas declaradas dentro de la vista
 
-Propuesta adicional del usuario, registrada el 2026-11-11; pendiente de diseño e
-implementación. Permitir declarar columnas como hijos JSX para que `foo.list.ts`
+Propuesta adicional del usuario, registrada el 2026-11-11; resuelta en el primer alcance documentado. Permitir declarar columnas como hijos JSX para que `foo.list.ts`
 deje de ser obligatorio. Sintaxis ilustrativa, todavía no disponible:
 
 ```tsx
@@ -93,7 +96,7 @@ reducir configuración total en lugar de moverla íntegramente a otro archivo.
 
 ## Controles de formulario enlazados al contrato del modelo
 
-Propuesta aceptada para registrar el 2026-11-11; pendiente de diseño e implementación.
+Propuesta aceptada para registrar el 2026-11-11; resuelta en el primer alcance documentado.
 Reutilizar en los Fields existentes los metadatos publicados del modelo, evitando
 repetir etiqueta, obligatoriedad, longitud máxima, opciones Selection y proveedor
 Many2one configurado. Sintaxis ilustrativa del uso deseado:
@@ -130,7 +133,7 @@ Priorizar esta integración sobre los componentes actuales. Un futuro
 `<FormView.Field name="name" />` que seleccione automáticamente el control queda
 como alternativa posterior por evaluar, no como requisito ni API decidida.
 
-## Al retomar
+## Planteamiento original al retomar
 
 Diseñar primero la resolución de proveedores y la configuración central de
 etiquetas con ejemplos antes/después de código de aplicación. Comparar pasos y

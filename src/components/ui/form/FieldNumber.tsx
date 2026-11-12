@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState, type ComponentPropsWithoutRef } from "react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
+import { useModelField } from "./modelFields";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { createNumberFormat, type ParsedNumber } from "./numberFormat";
@@ -22,7 +23,8 @@ export type FieldNumberProps<TFieldValues extends FieldValues = FieldValues> = B
 
 type EditingNumber = ParsedNumber & { name: string; formatKey: string };
 
-export default function FieldNumber<TFieldValues extends FieldValues = FieldValues>({
+export default function FieldNumber<TFieldValues extends FieldValues = FieldValues>(props: FieldNumberProps<TFieldValues>) {
+  const {
   name,
   label,
   type,
@@ -40,7 +42,7 @@ export default function FieldNumber<TFieldValues extends FieldValues = FieldValu
   style,
   "aria-describedby": describedBy,
   ...inputProps
-}: FieldNumberProps<TFieldValues>) {
+} = useModelField(props, "integer");
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const errorId = `${inputId}-error`;

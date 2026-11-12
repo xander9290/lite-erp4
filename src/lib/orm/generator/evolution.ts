@@ -16,8 +16,25 @@ function widensVarchar(previous: string, next: string) {
   return !!before && !!after && after.length > before.length && before.rest === after.rest;
 }
 
+/** Explicit force still keeps field identity, defaults, mapping and scalar type unchanged. */
+function reviewedStringChange(previous: string, next: string) {
+  const parse = (line: string) => {
+    const match = /^(\w+) String(\?)?(?:\s+(.*))?$/.exec(line);
+    if (!match) return null;
+    const attributes = match[3] ?? "";
+    const unique = /@unique(?:\s|$)/.test(attributes);
+    const length = /@db\.VarChar\(\s*(\d+)\s*\)/.exec(attributes);
+    const rest = attributes.replace(/@unique(?=\s|$)/g, "").replace(/@db\.VarChar\(\s*\d+\s*\)/g, "").trim().replace(/\s+/g, " ");
+    return { name: match[1], unique, length: length ? Number(length[1]) : null, rest };
+  };
+  const before = parse(previous), after = parse(next);
+  return !!before && !!after && before.name === after.name && before.rest === after.rest
+    && !(before.unique && !after.unique)
+    && (after.length === null || Number.isSafeInteger(after.length) && after.length > 0);
+}
+
 /** Additions and bounded VARCHAR widening only; never narrow or silently change other attributes. */
-export function assertAdditiveEvolution(previous: string, next: string) {
+export function assertAdditiveEvolution(previous: string, next: string, force = false) {
   const before = prismaBlocks(previous), after = prismaBlocks(next);
   const normalize = (line: string) => line.trim().replace(/\s+/g, " ");
   for (const block of before) {
@@ -35,8 +52,8 @@ export function assertAdditiveEvolution(previous: string, next: string) {
     const retained = new Set(lines);
     for (const line of lines) {
       if (proposed.includes(line)) continue;
-      const widened = proposed.find(candidate => widensVarchar(line, candidate));
-      if (!widened) throw new Error(`No se permite retirar o modificar campos, índices o mapeos existentes de ${block.name}. Sólo se admite ampliar VARCHAR sin otros cambios.`);
+      const widened = proposed.find(candidate => (widensVarchar(line, candidate) || force && reviewedStringChange(line, candidate)));
+      if (!widened) throw new Error(`No se permite retirar o modificar campos, índices o mapeos existentes de ${block.name}. Sólo se admite ampliar VARCHAR sin otros cambios. Para unicidad, longitud o nulabilidad de String revisa orm:sync --force; no permite borrar ni renombrar campos.`);
       retained.add(widened);
     }
     for (const line of proposed.filter(line => !retained.has(line) && !line.startsWith("@@"))) {

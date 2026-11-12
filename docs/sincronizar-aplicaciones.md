@@ -37,6 +37,50 @@ físicos, no crea una migración vacía ni solicita aprobación SQL innecesaria.
 Las herramientas anteriores siguen disponibles para estudiar o ejecutar cada paso.
 Ya no necesitas repetir manualmente toda su secuencia para un cambio habitual.
 
+## Cambiar restricciones con --force
+
+Para añadir unicidad, acotar texto existente (TEXT → VARCHAR o reducir su longitud)
+o cambiar la nulabilidad de un String existente:
+
+```bash
+npm run orm:sync -- flota --plan --force
+npm run orm:sync -- flota --force
+```
+
+El primer comando sólo prepara un plan de fuentes: no consulta ni modifica la base.
+El segundo comprueba datos y prepara/aplica una migración después de escribir
+`aplicar`. `--force` no elimina esa aprobación ni habilita --yes, reset o borrado de datos.
+El identificador del módulo es `flota`, no `float`.
+
+Se conservan nombre, tipo base, mapeos y defaults de los campos. Se admite añadir
+`unique`, ajustar VARCHAR/TEXT y cambiar nulabilidad de String; no retirar unicidad,
+renombrar/eliminar campos, cambiar tipos base o modificar relaciones. Los demás
+cambios aditivos mantienen sus reglas habituales. No editar hashes para forzarlos.
+
+Antes de preparar la migración, exige que la base coincida con el esquema instalado,
+tras revisar las migraciones pendientes. Si hay drift o historial inválido, se detiene.
+Comprueba los campos String publicados por la declaración del módulo: valores que
+exceden el límite, duplicados no nulos para unique y nulos para campos obligatorios.
+No imprime datos de filas ni los corrige/trunca. Si encuentra un problema, indica el
+modelo/campo y conserva los datos para que el desarrollador decida cómo corregirlos.
+
+La migración se obtiene del diff de esquemas validado por Prisma y se guarda como
+`<fecha>_<nombre>_force/migration.sql`; no utiliza un prompt automático de pérdida de
+datos de migrate dev. Su SQL incluye BEGIN/COMMIT, timeout de locks, bloqueo de
+escrituras y comprobaciones de nuevo dentro de la transacción. Así se cubre el tiempo
+entre la revisión y la aplicación. Puede bloquear escrituras mientras se aplica;
+revisar el SQL completo. Cancelar conserva el esquema/registro y la migración preparada.
+Para continuar, repetir con --force; no crear otra migración ni borrar el historial.
+
+Si una condición cambia después del preflight y falla la migración, PostgreSQL
+revierte su transacción, pero Prisma puede registrar un intento fallido. Revisar
+`migrate status`, corregir la causa y resolver ese intento por el flujo de Prisma;
+el comando no marca migraciones fallidas como resueltas automáticamente. La operación
+completa (archivos, generación, SQL y TypeScript) sigue sin ser una única transacción;
+una interrupción entre preparación e instalación puede requerir reconciliación manual.
+Los locks, hashes, propiedad, comprobación de fuentes y rechazo de SQL con retiradas
+siguen activos. No ejecutar cambios de esquema en paralelo.
+
 ## Revisar sin escribir
 
 ```bash
@@ -78,7 +122,7 @@ como bypass general ni marcar migraciones como aplicadas sin comprobar el esquem
 Prisma puede aplicar migraciones anteriores incluso con --create-only; por eso
 orm:sync revisa y aplica las pendientes primero mediante deploy, sólo con aprobación.
 La preparación cierra stdin del subproceso para que no pueda aceptar un reset.
-La detección de cambios nuevos usa el flujo Prisma de desarrollo y su shadow DB.
+Sin --force, la detección de cambios nuevos usa el flujo Prisma de desarrollo y su shadow DB.
 La cuenta de desarrollo necesita los permisos habituales para ese flujo.
 
 Hay un lock de sincronización en prisma/.orm-sync.lock, además de las protecciones

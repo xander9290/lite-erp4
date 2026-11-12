@@ -84,8 +84,11 @@ de un `String @db.VarChar(n)` a un valor mayor, manteniendo idénticos nombre,
 nulabilidad, default, índices y mapeos. Esto permite aumentar `Fields.Text.maxLength`
 sin editar archivos gestionados ni hashes a mano; revisar el ALTER TABLE antes de
 aplicarlo, pues sigue siendo una migración de base de datos.
-Reducciones de longitud, renombrados, otros cambios de tipo, retiradas de campos y desinstalación requieren otro
-flujo. Cada actualización necesita revisar y aplicar su migración. Nunca se fuerza
+Para unicidad, longitud y nulabilidad de String existentes, `orm:sync --force`
+incorpora un flujo revisado con comprobaciones de datos y SQL transaccional;
+[alcance y continuación](sincronizar-aplicaciones.md#cambiar-restricciones-con---force).
+`orm:install --update` por sí solo conserva su alcance aditivo. Renombrados, cambios
+de tipo base, retiradas de campos y desinstalación requieren otro flujo. Cada actualización necesita revisar y aplicar su migración. Nunca se fuerza
 una actualización borrando el registro de propiedad.
 
 `orm:generate` puede seguir preparando propuestas y contratos cliente después de

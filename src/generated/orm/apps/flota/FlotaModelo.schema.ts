@@ -17,6 +17,11 @@ export const FlotaModeloSchema = z.strictObject({
   vehicleType: FlotaModeloFields.vehicleType.schema,
 });
 
+export const FlotaModeloReactionRules = [] as const;
+export const FlotaModeloPreviewFields = {
+
+} as const;
+
 export function createFlotaModeloDefaults() {
   return {
     name: FlotaModeloFields.name.createDefault(),

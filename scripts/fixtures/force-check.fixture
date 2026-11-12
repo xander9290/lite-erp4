@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import { config } from "dotenv";
+config({path:".env.local",quiet:true});
+const { syncApplication }=await import("./src/lib/orm/generator/sync");
+const mode=process.argv[2];
+const logs:string[]=[];
+const run=()=>syncApplication(process.cwd(),"facil",{force:true,log:message=>logs.push(message),confirm:async()=>{
+  if(mode==="race") {
+    const {Client}=await import("pg");
+    const client=new Client({connectionString:process.env.DATABASE_URL});
+    const schema=new URL(process.env.DATABASE_URL!).searchParams.get("schema")!;
+    try { await client.connect(); await client.query(`UPDATE "${schema.replaceAll('"','""')}".facil_records SET notes=$1 WHERE id='force-long'`,["x".repeat(40)]); }
+    finally {await client.end();}
+  }
+  return mode!=="cancel";
+}});
+if(["length","duplicate","null","drift"].includes(mode)) {
+  const expectations:Record<string,RegExp>={length:/mayores de 20/,duplicate:/duplicados/,null:/valores nulos/,drift:/difiere del esquema instalado/};
+  const expected=expectations[mode];
+  await assert.rejects(run(),expected);
+  assert.ok(!logs.some(message=>message.includes("→ Aplicar SQL aprobado")));
+} else if(mode==="race") {
+  await assert.rejects(run(),/Aplicar SQL aprobado/);
+  assert.ok(logs.some(message=>message.includes("mayores de 20")));
+} else if(mode==="cancel") {
+  await assert.rejects(run(),/Cancelado/);
+  assert.ok(logs.some(message=>message.includes("lite-erp: reviewed force migration")));
+} else {
+  await run();
+  assert.ok(logs.some(message=>message.includes("✓ facil sincronizada")));
+  if(mode==="repeat") assert.ok(!logs.some(message=>message.includes("→ Aplicar SQL aprobado")));
+}

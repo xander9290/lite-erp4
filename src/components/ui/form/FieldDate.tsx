@@ -2,6 +2,7 @@
 
 import { useCallback, useId, useMemo, useState, useSyncExternalStore, type ComponentPropsWithoutRef, type FocusEventHandler } from "react";
 import { useController, useFormContext, type FieldError, type FieldValues } from "react-hook-form";
+import { useModelField } from "./modelFields";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { createFieldDateFormat, readFieldDateRange, type FieldDateEndpoint, type FieldDateRange } from "./dateValues";
@@ -38,7 +39,7 @@ export default function FieldDate<TFieldValues extends FieldValues = FieldValues
     direction = "block", onFocus, onBlur, id, disabled, required, readOnly, autoFocus,
     className = "", style, "aria-label": ariaLabel, "aria-labelledby": labelledBy,
     "aria-describedby": describedBy, ...inputProps
-  } = props;
+  } = useModelField(props, "datetime");
   delete inputProps.onChange;
   const generatedId = useId();
   const inputId = id ?? generatedId;

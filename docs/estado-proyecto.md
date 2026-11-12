@@ -61,6 +61,61 @@ aplicación por adelantado. Guía: [README de Flota](../src/app/(auth)/erp/flota
 
 ## Siguiente paso concreto
 
+Reacciones/decoradores implementados por petición expresa y aplicados a Flota:
+registro explícito y decoradores @onchange/@depends/@constraint/@displayName comparten
+motor. Preview virtual separado del formulario/Prisma; acciones con actor/revisión,
+transacción readonly, whitelist de dependencias/salidas y puente RHF sin cascadas.
+[Contrato y límites](reacciones-modelos.md). Vehicle muestra avatar del fabricante
+del Modelo y normaliza matrícula; FlotaRecord conserva reglas con constraints y
+previous, eliminando una consulta; Fabricante/Modelo usan displayName tipado.
+Se regeneraron contratos y binding de Vehicle, sin SQL ni migraciones de la BD real.
+
+Compatibilidad: decoradores estándar fallaron en runtime del Next instalado;
+experimentalDecorators:true y adaptador legacy verificados en build. Sin reflexión.
+Pruebas ORM/scaffold/instalación/formulario, TypeScript y ESLint aprobados; integración
+PostgreSQL temporal comprobó readonly, actores, validación, restricciones y ausencia
+de escrituras por reacción. Navegador de producción: uppercase ABC, total60 y rechazo
+sobre100000 en /sample#model-reactions. Microbenchmark del núcleo documentado, sin
+pretender medir HTTP/SQL ni atribuir una mejora de velocidad al decorador.
+
+Actualización solicitada: implementado orm:sync -- id --force para añadir unicidad y
+ajustar longitud/nulabilidad de String existentes. Mantiene revisión y aprobación SQL,
+propiedad/hashes, rechazo de retiradas e historial íntegro. Exige baseline sin drift,
+comprueba duplicados/longitudes/nulos y prepara migración transaccional con locks y
+guardas de datos; no los corrige ni trunca. Plan real de fuentes flota --plan --force
+aprobó plate @unique @db.VarChar(20), sin consultar ni aplicar cambios a la BD real.
+Pruebas de instalación/force, TypeScript y ESLint aprobados; integración PostgreSQL
+exclusiva de fixture verifica datos inválidos, cancelación/continuación, constraints
+y repetición conservando filas. También se verificó rechazo transaccional de un dato
+incompatible introducido después de la revisión; la recuperación explícita del
+intento fallido se hizo sólo en el fixture. Comando del usuario: npm run orm:sync -- flota --force.
+Dev continúa detenido. [Alcance/recuperación](sincronizar-aplicaciones.md).
+
+Revisión de Vehicle solicitada por el usuario: FlotaVehicle está registrado y tiene
+servicio, lookup de Modelo, vistas y migración 20261112024103_sync_flota presentes.
+TypeScript aprobado y comprobación local del contrato sin BD: name es Many2one
+obligatorio; plate opcional/no único, sin límite declarado; sólo active tiene tracking.
+Sin displayName propio, el lookup de Vehicle devuelve su ID. FlotaRecord permanece
+como modelo separado y sus reglas no se heredan. No se editaron archivos de Vehicle
+ni se comprobó la aplicación de su migración en la base real.
+
+Por petición expresa del usuario se implementó la simplificación de relaciones y
+vistas y se aplicó a Flota: lookup por convención en create:views, etiquetas en el
+servicio para todas las colecciones, modelColumns/ListView.Field, FormView/FormLayout
+con recordUI, withDisplayName tipado y update:views con propuesta/--write y edición
+AST acotada. [API y límites](contratos-vistas.md). El contrato generated de Flota se
+verificó con orm:generate --check, sin cambios de SQL. Se regeneró Prisma Client
+local; no se migró la base real en esta tarea. Fabricante conserva CardView y avatar
+squared; Modelo usa columnas JSX y nombre tipado; los tres formularios heredan
+metadatos conservando overrides. No se cambió la lógica de negocio de vehículos.
+
+Pruebas: ORM, scaffold en proyectos temporales, instalación/generación, formularios
+enlazados con RHF, colecciones y la integración PostgreSQL aislada. Build de producción
+aprobado. La integración elimina sus recursos y no modifica datos reales. La prueba
+funcional de «Mis vehículos activos» por el usuario sigue pendiente. Retomar tutoría
+con pasos pequeños; los cambios presentes fueron autorizados explícitamente y no
+habilitan modificaciones futuras por adelantado.
+
 Actualización 2026-11-11 en Windows: el usuario completó el historial de
 Fabricante y añadió avatar Image con folder fabricantes, manteniendo logo Text.
 Prisma migrate status confirmó las 14 migraciones al día en la base local del
