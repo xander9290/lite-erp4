@@ -42,6 +42,13 @@ test("view templates support typed fields, modal guards and explicit kanban stat
     assert.deepEqual(result.diagnostics?.filter(diagnostic => diagnostic.category === ts.DiagnosticCategory.Error), [], path);
   }
   assert.match(template.files["views/WorkForm.tsx"], /FieldNumber<RecordInput>/);
+  assert.doesNotMatch(template.files["views/WorkCard.tsx"], /titleField=/);
+  assert.doesNotMatch(template.files["views/WorkKanban.tsx"], /titleField=/);
+  assert.match(template.files["views/WorkForm.tsx"], /savedDisplayName/);
+  assert.match(template.files["views/WorkForm.tsx"], /setSavedDisplayName\(name\)/);
+  assert.match(template.files["views/WorkForm.tsx"], /deletion=\{\{ action: deleteRecords/);
+  assert.match(template.files["views/WorkForm.tsx"], /returnPaths: \["\/erp\/test\/work"/);
+  assert.match(template.files["views/WorkForm.tsx"], /displayName=\{displayName\}/);
   assert.match(template.files["views/WorkForm.tsx"], /FieldDate<RecordInput>/);
   assert.match(template.files["views/WorkForm.tsx"], /FieldMany2One<RecordInput>/);
   assert.match(template.files["views/work.list.ts"], /modelColumns\(recordFields/);

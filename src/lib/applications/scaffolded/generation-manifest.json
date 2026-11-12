@@ -2,7 +2,7 @@
   "generator": "lite-erp-orm-v1",
   "module": "application-registry",
   "files": {
-    "catalog.json": "0b3d06f653c1743917ce27f8d1896fa267bfcf4922ceb40537151a2d28a0fb52",
-    "registry.ts": "69ec370ef107a5b6a32639b7d8a6610db73423059c1edb0be5067e3b35003436"
+    "catalog.json": "e727f1c9fc2515ebec5fec291c10007cc5ea51ea2f120e90b3747a26846f40d4",
+    "registry.ts": "25a453f345c5ffe169bb0c3e0de9e9841a5e9ed5b8772fe59997ff077b575dfd"
   }
 }

@@ -13,7 +13,7 @@ export const listConfigSchema = z.object({
   columns: z.array(z.object({
     field: z.string().min(1).max(60), label: z.string().trim().min(1).max(80), sortable: z.boolean().optional(),
     widget: z.literal("partner").optional(), avatarField: z.string().min(1).max(60).optional(),
-    filterable: z.boolean().optional(), groupable: z.boolean().optional(), type: z.enum(["text", "number", "integer", "date", "datetime", "boolean"]).optional(),
+    filterable: z.boolean().optional(), groupable: z.boolean().optional(), displayName: z.boolean().optional(), type: z.enum(["text", "number", "integer", "date", "datetime", "boolean"]).optional(),
     align: z.enum(["left", "center", "right"]).optional(),
     format: z.enum(["text", "number", "currency", "date", "datetime", "boolean"]).optional(),
     currency: z.string().regex(/^[A-Z]{3}$/).optional(), decimals: z.number().int().min(0).max(6).optional(),

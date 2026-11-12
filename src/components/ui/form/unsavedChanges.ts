@@ -27,22 +27,23 @@ export class UnsavedChanges {
     return true;
   };
 
-  confirm = (): Promise<boolean> => {
-    if (this.pending) return this.pending;
-    if (!this.blocked()) return Promise.resolve(true);
+  confirm = (ask?: () => Promise<boolean>): Promise<boolean> => {
+    // A generic leave prompt must never authorize a different destructive action.
+    if (this.pending) return ask ? Promise.resolve(false) : this.pending;
+    if (!ask && !this.blocked()) return Promise.resolve(true);
     const revision = this.revision;
-    this.pending = Promise.resolve().then(this.ask)
+    this.pending = Promise.resolve().then(ask ?? this.ask)
       .then(accepted => accepted && revision === this.revision, () => false)
       .finally(() => { this.pending = null; });
     return this.pending;
   };
 
   /** Ask before the side effect, and avoid asking again for its router navigation. */
-  run = async (action: () => void | Promise<void>): Promise<boolean> => {
+  run = async (action: () => void | Promise<void>, ask?: () => Promise<boolean>): Promise<boolean> => {
     if (this.running) return false;
     this.running = true;
     try {
-      if (!await this.confirm()) return false;
+      if (!await this.confirm(ask)) return false;
       this.bypass++;
       try { await action(); this.discard(); } finally { this.bypass--; }
       return true;

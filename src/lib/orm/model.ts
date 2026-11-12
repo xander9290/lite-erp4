@@ -5,7 +5,7 @@ import type { ModelContext } from "./context";
 import { compileModelMethods } from "./reactions";
 import type { ReactionDeclaration, ConstraintDeclaration } from "./decorators";
 import type { ReactionContext } from "./reactions";
-import { displayFieldPaths, displayRelation, projectDisplayRecord } from "./display";
+import { displayFieldPaths, displayRelation, normalizeDisplayName, projectDisplayRecord } from "./display";
 
 const modelTag = Symbol("orm.model");
 
@@ -72,9 +72,8 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     react(field:string,values:Readonly<Record<string,unknown>>,context:ReactionContext) {return methods.react(field,values,context);},
     displayName(record: Readonly<Record<string, unknown>>): string {
       const projected = projectDisplayRecord(record, displayKeys);
-      const label = methods.display ? methods.format(projected) : instance.displayName ? instance.displayName(projected) : projected.name ?? record.id;
-      if (typeof label !== "string") throw new Error("displayName debe devolver texto de forma síncrona.");
-      return label.trim() || projected.id;
+      const label = methods.display ? methods.format(projected) : instance.displayName ? instance.displayName(projected) : "";
+      return normalizeDisplayName(label, record, metadata);
     },
     createDefaults(): Input<InstanceType<C>> {
       return Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, field.createDefault()])) as Input<InstanceType<C>>;

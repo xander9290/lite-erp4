@@ -4,6 +4,19 @@ Implementado el 2026-11-11. Las clases siguen en el servidor; las vistas importa
 los Fields publicados del contrato generado. Se conservan TSX editable y componentes
 manuales: ningún modelo decide automáticamente la distribución del formulario.
 
+La presentación canónica se resuelve en el servidor: displayName personalizado,
+name Text público y, por último, ID. read/save publican displayName y colecciones
+$displayName sin alterar escalares/IDs. Card/Kanban usan ese título si se omite
+titleField; ListView lo presenta en columnas name/id de texto salvo override.
+create:app/create:model generan el método editable. Contrato y ejemplos en
+[Nombres de presentación](nombres-presentacion.md).
+
+Los formularios nuevos reciben displayName del servidor mediante FormViewLoader y
+onSaved, separado de values, y lo usan para el breadcrumb. El modelo define su
+nombre con el método/decorador existente; las rutas autorizadas requieren orm:bind.
+Las vistas existentes se adaptan de forma explícita, sin regenerar personalizaciones.
+Ver [Nombres de presentación](nombres-presentacion.md#encabezados-de-formularios).
+
 ## Un único contrato de presentación
 
 Los campos de lectura relacionados se conectan con `recordUI.readFields`, separados

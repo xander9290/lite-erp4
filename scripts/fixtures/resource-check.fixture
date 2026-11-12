@@ -4,6 +4,7 @@ config({ path: ".env.local", quiet: true });
 const { prisma } = await import("./src/lib/prisma");
 const { recordService } = await import("./src/app/(auth)/erp/facil/models/trabajo.service");
 const { createRecordDefaults } = await import("./src/app/(auth)/erp/facil/schemas/trabajo.schema");
+const { FacilTrabajo } = await import("./src/app/(auth)/erp/facil/models/Trabajo");
 try {
   const admin = await prisma.user.findUniqueOrThrow({ where: { login: "fixture-admin" } });
   const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
@@ -12,9 +13,12 @@ try {
   assert.equal(invalid.ok, false);
   const saved = await recordService.save(prisma, actor, { ...defaults, name: "Trabajo real de prueba", at: "2026-11-10T12:00:00.000Z", quantity: 4, logo: "https://images.example.test/logo.png" });
   assert.ok(saved.ok, JSON.stringify(saved));
+  assert.equal(new FacilTrabajo().displayName({ id: saved.values.id!, name: saved.values.name }), saved.values.name);
+  assert.equal(saved.displayName, saved.values.name);
   const read = await recordService.read(prisma, actor, saved.values.id); assert.ok(read.ok);
   assert.equal(read.values.name, saved.values.name); assert.equal(read.audit?.createBy?.id, actor.id);
   assert.equal(read.values.logo, "https://images.example.test/logo.png");
+  assert.equal(read.displayName, saved.displayName);
   const changed = await recordService.save(prisma, actor, { ...saved.values, logo: "https://images.example.test/new-logo.webp" });
   assert.ok(changed.ok, JSON.stringify(changed));
   const imageActivity = await recordService.activity(prisma, actor, { id: saved.values.id });
@@ -23,6 +27,8 @@ try {
   const state = { query: "Trabajo", filters: [], page: 1, pageSize: 10, sort: "name", direction: "asc" as const };
   const list = await recordService.list(prisma, actor, state); assert.ok(list.ok); assert.equal(list.data.total, 1);
   const kanban = await recordService.kanban(prisma, actor, { group: "draft", state }); assert.ok(kanban.ok); assert.equal(kanban.data.total, 1);
+  assert.equal(list.data.rows[0].$displayName, saved.displayName);
+  assert.equal(kanban.data.rows[0].$displayName, saved.displayName);
   const moved = await recordService.move(prisma, actor, { id: changed.values.id, revision: changed.values.revision!, from: "draft", to: "done" }); assert.ok(moved.ok, JSON.stringify(moved));
   const reader = await prisma.user.findUniqueOrThrow({ where: { login: "fixture-reader" } });
   assert.equal((await recordService.list(prisma, { id: reader.id, sessionVersion: reader.sessionVersion }, state)).ok, false);

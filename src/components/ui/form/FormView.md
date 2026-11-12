@@ -2,11 +2,67 @@
 
 Card de formulario con un único `FormLayout`/`FormProvider`. El header contiene Guardar, Revertir, `headerActions`, `menuActions` y `statebar`; el body organiza los `FormGroup` en una o dos columnas según el ancho disponible; `footer` permite contenido adicional.
 
+## Eliminación opcional
+
+`deletion` añade «Eliminar» al menú de acciones del formulario:
+
+```tsx
+<FormView
+  title="Fabricante"
+  methods={methods}
+  onSubmit={saveRecord}
+  deletion={{ action: deleteRecords, returnHref: "/erp/flota/fabricante" }}
+>
+  {/* Fields */}
+</FormView>
+```
+
+La acción recibe un array con un único `{id, revision}` de los últimos valores
+guardados (`defaultValues`/`reset` de RHF), nunca el borrador editable. Debe devolver
+`ListDeleteResult` y autorizar y comprobar la revisión en el servidor; la UI no
+sustituye esas comprobaciones. Se oculta en creación, consulta o sin identidad y
+revisión válidas. El scaffold conecta la acción `deleteRecords` existente; Flota
+también está conectada. Otros formularios deben proporcionar su acción autorizada.
+
+Siempre pide una confirmación destructiva, que incluye descartar cambios y notas
+pendientes de la página. Cancelar o fallar conserva los borradores y permanece en
+el formulario. Sólo `ok: true, deleted: 1` confirma la eliminación. Ante un fallo de
+red con resultado desconocido, se solicita recargar antes de volver a intentarlo;
+no hay reintentos automáticos ni éxito optimista. Las restricciones de relaciones
+del servidor se muestran sin forzar el borrado.
+
+Tras el éxito usa `router.replace` para regresar a la colección de `returnTo`,
+conservando su query (filtros/paginación). Sólo acepta rutas internas cuyo pathname
+coincida exactamente con `returnHref` o `returnPaths`; no vuelve a detalles ni
+URLs externas y no depende del historial del navegador. Si se abrió directamente
+o el destino no está permitido, usa `returnHref`. Para variantes de una colección:
+
+```tsx
+deletion={{
+  action: deleteRecords,
+  returnHref: "/erp/flota/vehicle",
+  returnPaths: ["/erp/flota/vehicle/tarjetas"],
+}}
+```
+
+Si falla la navegación después de confirmar el borrado, se bloquea la edición y
+se ofrece un enlace de retorno. No se eliminan automáticamente archivos remotos.
+Demo RHF/Zod reversible, con cancelación/rechazo/consulta, en `/sample#form-deletion`.
+
+## Presentación
+
 El header es compacto: navegación y acciones comparten fila cuando hay espacio,
 sin bloque visible de icono, título, descripción ni badge de cambios. `title` sigue
 siendo obligatorio como encabezado accesible; `description` e `icon` se aceptan
 por compatibilidad, pero no se renderizan. El estado del formulario permanece en
 el footer. Las acciones adicionales y el `statebar` conservan su fila propia.
+
+El nombre de presentación del servidor llega separado de los valores editables:
+FormViewLoader entrega `(values, audit, displayName)` y FormView llama
+`onSaved(values, audit, displayName)`. Los callbacks anteriores siguen siendo
+compatibles. La vista puede mantener ese texto para sus breadcrumbs; el scaffold
+ya lo conecta y lo actualiza sólo tras guardar. No pasarlo a reset/defaultValues
+ni registrarlo como Field de RHF. Contrato en [Nombres de presentación](../../../../docs/nombres-presentacion.md).
 
 Por defecto, la tarjeta está centrada, ocupa el ancho disponible hasta `max-w-5xl`
 (64rem) y su altura depende del contenido. Para formularios con tablas o más columnas,

@@ -32,6 +32,18 @@ export function displayFieldPaths(metadata: Metadata, declared?: readonly string
   return Object.freeze([...new Set(["id", ...paths])]);
 }
 
+/** The safe default is loaded for fallback, without becoming a method dependency. */
+export function displayProjectionPaths(metadata: Metadata, declared?: readonly string[]): readonly string[] {
+  return [...new Set([...displayFieldPaths(metadata, declared), ...(metadata.name?.kind === "text" && !metadata.name.sensitive ? ["name"] : [])])];
+}
+
+export function normalizeDisplayName(label: unknown, record: Readonly<Record<string, unknown>>, metadata: Metadata): string {
+  if (typeof label !== "string") throw new Error("displayName debe devolver texto de forma síncrona.");
+  const name = metadata.name?.kind === "text" && !metadata.name.sensitive && typeof record.name === "string" ? record.name.trim() : "";
+  if (typeof record.id !== "string" || !record.id) throw invalid();
+  return label.trim() || name || record.id;
+}
+
 /** Fresh, deeply readonly projection. Methods never see fields outside their dependencies. */
 export function projectDisplayRecord(record: Readonly<Record<string, unknown>>, paths: readonly string[]): Readonly<Record<string, unknown>> & { readonly id: string } {
   if (!Object.hasOwn(record, "id") || typeof record.id !== "string" || !record.id) throw new Error("displayName necesita el ID del registro.");
@@ -66,7 +78,7 @@ export type LookupSelect = { [field: string]: true | { select: LookupSelect } };
 
 /** Server-generated whitelist only. Never accept this policy or a select tree from the browser. */
 export function displayLookupSelect(fields: readonly string[], policy: Readonly<Record<string, readonly DisplayGuard[]>>): LookupSelect {
-  if (fields.length > 13 || new Set(fields).size !== fields.length) throw invalid();
+  if (fields.length > 14 || new Set(fields).size !== fields.length) throw invalid();
   const select: LookupSelect = {};
   for (const path of fields) {
     const parts = displayPathParts(path);

@@ -74,7 +74,7 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
     const component = kind === "list" ? "ListView" : kind === "card" ? "CardView" : "KanbanView";
     const titleKind = kind === "list" ? "List" : kind === "card" ? "Card" : "Kanban";
     const actions = kind === "kanban" ? "loadKanban, moveRecord" : kind === "list" ? "listRecords, deleteRecords" : "listRecords";
-    const collectionProps = kind === "list" ? `breadcrumbs={${breadcrumbs}} onDelete={deleteRecords}` : `breadcrumbs={${breadcrumbs}} titleField=${quote(title)}`;
+    const collectionProps = kind === "list" ? `breadcrumbs={${breadcrumbs}} onDelete={deleteRecords}` : `breadcrumbs={${breadcrumbs}}`;
     const formProps = hasForm ? `createHref=${quote(base + "/nuevo")} createLabel="Nuevo" recordHref=${quote(base + "/{id}")}` : kind === "list" ? "create={false}" : "";
     const groupProps = kind === "kanban" ? `groupField=${quote(group)} groups={recordChoices.${group}} onMove={moveRecord}` : "";
     files[`views/${stem}${titleKind}.tsx`] = `${navigation ? 'import Link from "next/link";\n' : ""}import ${component} from "@/components/ui/${kind === "card" ? "card" : kind === "kanban" ? "kanban" : "list"}/${component}";\nimport { ${actions} } from "../actions/${slug}.actions";\n${kind === "list" ? `import { recordCollectionFields as recordFields } from "../schemas/${slug}.schema";` : `import { recordColumns, recordSearchFields${kind === "kanban" ? ", recordChoices" : ""} } from "./${slug}.list";`}\n\nexport default function ${stem}${titleKind}() {\n  return <${component} model=${quote(n)} title={${quote(label)}} load={${kind === "kanban" ? "loadKanban" : "listRecords"}} ${kind === "list" ? `fields={recordFields} searchFields={${quote(searchFields)}}` : "columns={recordColumns} searchFields={recordSearchFields}"} ${collectionProps} ${formProps} ${groupProps}${navigation ? ` headerActions={${navigation}}` : ""}${kind === "list" ? `>\n${columns.map(column => `    <ListView.Field name=${quote(column.field)}${column.sortable ? " sortable" : ""}${"groupable" in column && column.groupable ? " groupable" : ""} />`).join("\n")}\n  </ListView>` : " />"};\n}\n`;
@@ -114,6 +114,8 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
       .replace('record.name || "Registro"', `String(record.${title} ?? "Registro")`)
       .replace("export default function RecordForm", `export default function ${stem}Form`)
       .replace('key={router.bfcacheId + ":" + attempt}', 'key={router.bfcacheId + ":" + id + ":" + attempt}');
+    form = form.replace(`returnPaths: ["${base}/mis-registros", "${base}/activos"]`, `returnPaths: ${quote(routes.map(route => route.route))}`);
+    if (!routes.length) form = form.replace(`returnHref: "${base}"`, `returnHref: "/erp/${app}"`);
     if (modal) form = form.replace('layout="page"', 'layout="content"');
     files[`views/${stem}Form.tsx`] = form;
     const renderer = modal ? `${stem}Modal` : `${stem}Form`;

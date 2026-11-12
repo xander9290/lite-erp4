@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useFormState, type FieldPath, type FieldValues } from "react-hook-form";
-import { Plus, RotateCcw, Save } from "lucide-react";
+import { Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import FormLayout, { type FormLayoutProps } from "./FormLayout";
 import FormViewActionMenu, { type FormViewMenuAction } from "./FormViewActionMenu";
@@ -14,9 +15,11 @@ import Breadcrumbs, { type Breadcrumb } from "../Breadcrumbs";
 import FormAuditPanel from "./FormAuditPanel";
 import type { RecordAudit } from "@/lib/orm/audit";
 import type { FormActivity } from "@/lib/orm/activity";
+import { deleteFormRecord, formDeleteReturnHref, formDeleteTarget, FormDeletionError, type FormDeletion } from "./formDeletion";
 
 export type { FormViewContext, FormViewResult, FormViewSubmit } from "./formView.types";
 export type { FormViewMenuAction } from "./FormViewActionMenu";
+export type { FormDeletion } from "./formDeletion";
 
 type Slot<TValues extends FieldValues, TContext, TOutput> = ReactNode | ((context: FormViewContext<TValues, TContext, TOutput>) => ReactNode);
 export type FormViewProps<TValues extends FieldValues, TContext = unknown, TOutput = TValues> =
@@ -45,8 +48,10 @@ export type FormViewProps<TValues extends FieldValues, TContext = unknown, TOutp
     newLabel?: string;
     onNew?: () => void | Promise<void>;
     onSubmit: FormViewSubmit<TValues, TOutput>;
-    onSaved?: (values: TValues, audit?: import("@/lib/orm/audit").RecordAudit) => void;
+    onSaved?: (values: TValues, audit?: import("@/lib/orm/audit").RecordAudit, displayName?: string) => void;
     onRevert?: () => void;
+    /** Explicit authorized action; hidden for unsaved or read-only records. */
+    deletion?: FormDeletion;
   };
 
 class SaveRejected extends Error {
@@ -56,27 +61,34 @@ const serverErrorTypes = ["server"];
 
 export default function FormView<TValues extends FieldValues, TContext = unknown, TOutput = TValues>({
   title, width = "normal", layout = "content", breadcrumbs, audit, activity, methods, mode = "edit", disabled = false, readOnly = false, busy: actionBusy = false,
-  headerActions, menuActions, statebar, footer, saveLabel = "Guardar", revertLabel = "Revertir", newLabel = "Nuevo", onNew, onSubmit, onSaved, onRevert,
+  headerActions, menuActions, statebar, footer, saveLabel = "Guardar", revertLabel = "Revertir", newLabel = "Nuevo", onNew, onSubmit, onSaved, onRevert, deletion,
   children, id, className = "", onSubmitCapture, ...formProps
 }: FormViewProps<TValues, TContext, TOutput>) {
   const generatedId = useId();
   const alerts = useAlerts();
+  const router = useRouter();
   const navigation = useFormNavigation();
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const titleId = `${id ?? generatedId}-title`;
-  const { isDirty, isSubmitting, errors } = useFormState({ control: methods.control });
+  const { isDirty, isSubmitting, errors, defaultValues } = useFormState({ control: methods.control });
   const markClean = useFormLeaveGuard(isDirty && !readOnly, methods.reset);
   const [saving, setSaving] = useState(false);
   const [startingNew, setStartingNew] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deletedHref, setDeletedHref] = useState<string | null>(null);
   const inFlight = useRef(false);
   const submitter = useRef<HTMLElement | null>(null);
   const pending = useRef<Extract<FormViewResult<TValues>, { ok: true }> | null>(null);
-  const busy = actionBusy || isSubmitting || saving || startingNew;
+  const busy = actionBusy || isSubmitting || saving || startingNew || deleting || deletedHref !== null;
   const locked = disabled || busy;
   const context = { methods, isDirty, busy: locked, readOnly };
   const actions = typeof headerActions === "function" ? headerActions(context) : headerActions;
-  const secondaryActions = typeof menuActions === "function" ? menuActions(context) : menuActions;
+  const customActions = typeof menuActions === "function" ? menuActions(context) : menuActions;
+  const savedTarget = formDeleteTarget({ id: defaultValues?.id, revision: defaultValues?.revision });
+  const canDelete = Boolean(deletion && mode === "edit" && !readOnly && savedTarget);
+  const hasSecondaryActions = Boolean(customActions?.length) || canDelete;
+  const secondaryActions: readonly FormViewMenuAction[] = [...(customActions ?? []), ...(canDelete ? [{ id: "form-delete", label: "Eliminar", icon: <Trash2 size={16} />, danger: true, onSelect: () => { void removeRecord(); } }] : [])];
   const footerContent = typeof footer === "function" ? footer(context) : footer;
   const serverError = errors.root?.server?.message;
   const pageLayout = layout === "page";
@@ -85,6 +97,41 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
   // Legacy presentation metadata must not be forwarded to the HTML form.
   delete formProps.description;
   delete formProps.icon;
+
+  async function removeRecord() {
+    if (!deletion || locked || readOnly || mode !== "edit" || inFlight.current) return;
+    const target = savedTarget;
+    if (!target) return;
+    inFlight.current = true; setDeleting(true);
+    let close = () => {};
+    let confirmedDeleted = false;
+    try {
+      const href = formDeleteReturnHref(new URLSearchParams(window.location.search).get("returnTo"), deletion.returnHref, deletion.returnPaths);
+      await navigation.run(async () => {
+        if (!mounted.current) throw new FormDeletionError("El formulario cambió. Abre nuevamente el registro.");
+        const current = formDeleteTarget(methods.getValues());
+        if (current?.id !== target.id || current?.revision !== target.revision) throw new FormDeletionError("El registro cambió. Confirma nuevamente su eliminación.", "validation");
+        methods.clearErrors("root.server");
+        close = alerts.loading({ title: "Eliminando…", message: "Espera mientras se elimina el registro." });
+        await deleteFormRecord(target, deletion.action);
+        close();
+        if (!mounted.current) throw new FormDeletionError("El formulario se cerró.");
+        confirmedDeleted = true;
+        markClean(); navigation.discard(); setDeletedHref(href);
+        toast.success("Registro eliminado.");
+        router.replace(href);
+      }, () => alerts.confirm({
+        title: "Eliminar registro", message: "Se eliminará este registro. Esta acción no se puede deshacer. También se descartarán los cambios sin guardar de esta página.",
+        confirmLabel: "Eliminar", cancelLabel: "Cancelar", danger: true,
+      }));
+    } catch (error) {
+      close();
+      if (!mounted.current) return;
+      const message = confirmedDeleted ? "El registro fue eliminado. Usa el enlace para volver a la vista anterior." : error instanceof FormDeletionError ? error.message : "No se pudo confirmar la eliminación. Recarga el registro antes de volver a intentarlo.";
+      methods.setError("root.server", { type: "server", message });
+      await (error instanceof FormDeletionError && error.kind === "validation" ? alerts.validation : alerts.error)({ title: confirmedDeleted ? "Registro eliminado" : "No se pudo eliminar", message });
+    } finally { close(); inFlight.current = false; if (mounted.current) setDeleting(false); }
+  }
 
   return <FormLayout {...formProps} id={id} methods={methods} aria-labelledby={titleId} aria-busy={busy} silentErrorTypes={serverErrorTypes}
     className={`card w-full ${pageLayout ? "flex min-h-0 flex-1 flex-col" : `mx-auto shrink-0 ${width === "wide" ? "max-w-7xl" : "max-w-5xl"}`} rounded-2xl border border-base-300 bg-base-100 shadow-sm ${className}`} contentClassName={`flex min-w-0 flex-col ${pageLayout ? "min-h-0 flex-1" : ""}`}
@@ -142,13 +189,13 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
       markClean();
       setActivityVersion(version => version + 1);
       toast.success(saved.message ?? "Cambios guardados.");
-      onSaved?.(saved.values, saved.audit);
+      onSaved?.(saved.values, saved.audit, saved.displayName);
     }}>
     <h2 id={titleId} className="sr-only">{title}</h2>
     <header data-slot="header" className="shrink-0 space-y-3 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-3 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {!!breadcrumbs?.length && <div className="min-w-0 flex-1 basis-48"><Breadcrumbs items={breadcrumbs} /></div>}
-        {(!readOnly || onNew || Boolean(secondaryActions?.length)) && <fieldset disabled={locked} className="m-0 ml-auto flex min-w-0 flex-wrap items-center gap-1 border-0 p-0 sm:gap-2">
+        {(!readOnly || onNew || hasSecondaryActions) && <fieldset disabled={locked} className="m-0 ml-auto flex min-w-0 flex-wrap items-center gap-1 border-0 p-0 sm:gap-2">
           {onNew && <button type="button" disabled={locked} className="btn btn-soft btn-primary btn-sm gap-1.5" onClick={async () => {
             if (locked) return;
             setStartingNew(true);
@@ -160,7 +207,7 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
           <button type="submit" disabled={locked || (mode === "edit" && !isDirty)} className="btn btn-primary btn-sm gap-2">{saving || isSubmitting ? <span className="loading loading-spinner loading-xs" aria-hidden="true" /> : <Save size={15} aria-hidden="true" />}{saving || isSubmitting ? "Guardando…" : saveLabel}</button>
           <button type="button" disabled={locked || !isDirty} className="btn btn-ghost btn-sm gap-1.5 px-2" onClick={() => { methods.reset(); markClean(); onRevert?.(); }}><RotateCcw size={15} aria-hidden="true" />{revertLabel}</button>
           </>}
-          {Boolean(secondaryActions?.length) && <FormViewActionMenu actions={secondaryActions!} disabled={locked} />}
+          {hasSecondaryActions && <FormViewActionMenu actions={secondaryActions} disabled={locked} />}
         </fieldset>}
       </div>
       {(actions || statebar) && <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-base-300/70 pt-4">
@@ -177,7 +224,8 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
       </div>
     </div>
     <footer data-slot="footer" className="shrink-0 space-y-3 rounded-b-2xl border-t border-base-300 bg-base-200/20 px-4 py-3 sm:px-6">
-      <p role="status" className="text-xs text-base-content/60">{busy ? saving || isSubmitting ? "Guardando cambios…" : "Procesando acción…" : readOnly ? "Formulario de solo lectura" : isDirty ? "Tienes cambios sin guardar" : "Sin cambios pendientes"}</p>
+      <p role="status" className="text-xs text-base-content/60">{deletedHref ? "Registro eliminado" : deleting ? "Eliminando registro…" : busy ? saving || isSubmitting ? "Guardando cambios…" : "Procesando acción…" : readOnly ? "Formulario de solo lectura" : isDirty ? "Tienes cambios sin guardar" : "Sin cambios pendientes"}</p>
+      {deletedHref && <button type="button" className="btn btn-link btn-sm px-0" onClick={() => { void navigation.run(() => router.replace(deletedHref)); }}>Volver a la vista anterior</button>}
       {typeof serverError === "string" && <p role="alert" className="text-sm text-error">{serverError}</p>}
       {footerContent && <div className="border-t border-base-300 pt-3">{footerContent}</div>}
     </footer>

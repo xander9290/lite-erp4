@@ -1,5 +1,12 @@
 # ListView · Card con filtros por columna
 
+Los servicios declarativos publican `$displayName` por registro, separado de sus
+escalares. Las columnas name/id de texto lo presentan por defecto y los controles
+accesibles lo usan como nombre del registro. `displayName: false` conserva el valor
+original de una columna; renderCell mantiene su prioridad. Esto no autoriza filtros,
+orden o agrupación por el texto calculado. La identidad/selección sigue usando id.
+Ver [convención compartida](../../../../docs/nombres-presentacion.md).
+
 Para columnas related, pasar fields del contrato generado CollectionFields, no
 Fields de captura. Por ejemplo, importar FlotaVehicleCollectionFields como
 recordCollectionFields y usar `<ListView.Field name="fabricanteAvatar" />` bajo

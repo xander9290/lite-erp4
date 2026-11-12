@@ -18,8 +18,8 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
   Procedimiento y límites en [Flujo del framework](flujo-framework.md).
 - Aplicaciones con manifest, dependencias y menús de navegación; servicios con
   autorización, validación, transacciones, concurrencia y hooks de negocio.
-  Contactos, Usuarios y Citas son aplicaciones activas; Flota se retiró para
-  reiniciar la tutoría. Mantienen alcances distintos;
+  Contactos, Usuarios y Citas son aplicaciones activas; Flota se recreó como
+  cascarón para la nueva tutoría. Mantienen alcances distintos;
   no asumir que todos usan el mismo adaptador o política de acceso.
 - ListView con selección y eliminación por lote desde «Acciones»; dominios fijos
   de servidor combinados con filtros visibles. Los dominios filtran consultas y
@@ -43,10 +43,24 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 ## Tutoría de Flota
 
 Reiniciada por petición expresa el 2026-11-12. La aplicación anterior y sus datos
-locales se retiraron. No existen sus rutas, vistas, modelos declarativos, contratos,
-bindings ni uploaders de aplicación. El catálogo y la propiedad instalada están
-libres para volver a usar el identificador flota. Las migraciones anteriores se
-conservan y una nueva migración registra la retirada; no se reinició toda la base.
+locales se retiraron; las migraciones anteriores y la de retirada se conservan.
+Después el usuario ejecutó create:app -- Flota y limpió menús/rutas sobrantes.
+Inspección del código: manifest admin con un enlace Flota a /erp/flota y modelo
+FlotaRecord; Record.ts y orm.config.ts contienen/publican sólo name/active.
+Permanecen lista principal, nuevo, [id] y layout; no están activos ni mis-registros.
+El usuario creó Fabricante mediante create:model: Fabricante.ts declara name
+obligatorio, maxLength 120 y tracking; active con default true y tracking.
+Se verificaron su import/publicación name/active en orm.config y su registro en
+manifest. El usuario ejecutó create:views para Fabricante; se verificaron la entrada
+Fabricantes en manifest y el README de lista/formulario. En ese momento no había
+Modelo/Vehicle; se crearon después (ver «Tutoría y pendientes de imágenes»).
+El usuario compartió orm:sync exitoso (migraciones aplicadas, sin diferencias,
+cliente/adaptadores y TypeScript correctos) y confirmó guardar/reabrir un fabricante.
+Se verificó además la entrada flota del registro instalado. La prueba funcional
+fue confirmada por el usuario; no se repitió en navegador ni se consultó la BD.
+
+Objetivo acordado: Configuración con Fabricantes/Modelos, y menú Vehículos.
+Cada modelo pertenece a un fabricante; cada vehículo referencia un modelo.
 
 Las mejoras del framework y las demos /sample permanecen. El ejemplo histórico
 FleetVehicle del generador no es la aplicación instalada. Las pruebas de related
@@ -54,18 +68,150 @@ se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
-El usuario ejecuta `npm run create:app -- Flota --dry-run`; revisar juntos el plan
-antes de crear nada. Después recorrer manifest, modelo inicial y contrato, vistas,
-sincronización y primer guardado en ejercicios pequeños. No crear Flota ni sus
-modelos por adelantado. [Punto de partida](tutorial-flota.md).
+### Eliminación desde FormView (2026-11-12)
 
-Las anotaciones de Flota que siguen son históricas de la aplicación retirada;
-no describen archivos ni datos actualmente presentes. Los contratos compartidos
-implementados siguen vigentes: [modelos/vistas](modelos-y-vistas.md),
-[related](campos-relacionados.md), [compute](campos-calculados.md) y
-[colecciones](vistas-colecciones.md).
+Implementado `deletion` opcional en el menú de FormView y conectado en los cuatro
+formularios existentes de Flota y en el scaffold. CardView conserva su comportamiento
+actual, sin selección añadida. Se reutiliza `deleteRecords` autorizado y su control
+transaccional de revisiones/relaciones; no se añadieron migraciones ni nuevas reglas
+de servidor. Confirmación única antes del efecto; cancelar o fallar conserva los
+borradores. El éxito confirmado vuelve a la colección mediante returnTo validado
+por rutas exactas, conservando query, o a un fallback explícito al abrir directamente.
+Demo reversible RHF/Zod en `/sample#form-deletion`, sin datos reales.
+
+Verificación de esta tarea: test:form-navigation (guard y eliminación) 12/12;
+test:list-selection 8/8; test:scaffold 12/12; TypeScript y build aprobados. ESLint
+de los componentes, helpers, demo y generadores modificados aprobado tras corregir
+el acceso a refs en render. No se borraron registros reales ni se repitió
+integración PostgreSQL; se reutiliza el servicio de borrado existente.
+
+Verificación interactiva 2026-11-12 en `/sample#form-deletion` (dev en :3000 ya
+servía el código vigente): cancelar cierra la confirmación y conserva el nombre
+editado y «Tienes cambios sin guardar»; con la relación simulada aparece «No se
+pudo eliminar» y el borrador se conserva; sin ella se muestra «Registro eliminado.»,
+el enlace de retorno y se navega a `#form-deletion-result`. Sin errores de consola.
+Datos ficticios en memoria. La prueba con un Fabricante desechable se omitió por
+decisión del usuario (sin sesión en el navegador de pruebas); el retorno real a la
+colección con returnTo/filtros sigue sin comprobar en navegador.
+Contrato: [FormView](../src/components/ui/form/FormView.md#eliminación-opcional).
+
+### Tutoría y pendientes de imágenes
+
+Tutoría de imágenes 2026-11-12: Fabricante.logo Image opcional, carpeta
+flota-fabricantes, ya está publicado, conectado al uploader y sincronizado en fuentes.
+Revisión solicitada por el usuario: CardView consume listRecords, columnas name/logo,
+recordHref, metadata canónica y helper firmado admin con carpeta fija. Se verificaron
+logo en esquema instalado y select/dto/data del binding. Captura del usuario muestra
+la tarjeta Volkswagen con miniatura; no se ejecutaron nuevas subidas ni consultas BD.
+TypeScript y test:images 11/11 aprobados. ESLint de afectados: 0 errores y 3 avisos
+por imports sin uso en FabricanteList (ListView, deleteRecords, recordFields).
+
+Oportunidades registradas, sin implementación: CollectionImage usa object-cover y
+el formulario widget avatar recorta 1:1; para logos no cuadrados conviene evaluar
+contain/padding y preservar aspecto (aceptación: marcas anchas completas sin afectar
+avatares). logo no tiene tracking: activar sólo si se decide auditar cambios de URL.
+active existe en modelo/servicio pero no en columnas CardView: decidir badge/filtro
+sin imponer dominio de negocio. Breadcrumbs ocupan basis-48 en CollectionShell y se
+parten en escritorio; evaluar ancho adaptable conservando wrap móvil y acciones.
+Limpiar imports sin uso y centralizar recordSearchFields, ya existente, para evitar
+repetir la misma lista. Limpieza remota sigue pendiente según su guía, sin borrados.
+Próximo ejercicio elegido por el usuario: related de Vehicle por name.fabricanteId.logo;
+no añadirlo por anticipación. La ergonomía de conectar uploads al actualizar vistas
+existentes puede mejorarse con una propuesta AST revisable, sin sobreescrituras.
+
+La matrícula plate ya persistía según confirmación del usuario; se volvió a activar
+required:true y se retiró un lock huérfano tras comprobar procesos. No se recibió
+confirmación nueva del estado NOT NULL en BD; no confundirlo con la verificación
+funcional de guardar/reabrir la matrícula opcional.
+
+Tutoría: Fabricante y Modelo con vistas y relaciones completas; el usuario confirmó
+sus guardados/reaperturas y validación del fabricante obligatorio. Vehicle también
+se creó y sincronizó según el usuario, con captura de un registro guardado. Usa
+name como Many2one obligatorio a FlotaModelo (label Modelo, Restrict/tracking),
+active y clientFields name/active. No renombrar esa FK ni duplicar Fabricante.
+
+Menú verificado: Vehículos y Configuración → Fabricantes/Modelos; /erp/flota redirige
+a /erp/flota/vehicle. El cascarón FlotaRecord sigue instalado y conserva sus archivos;
+no retirarlo automáticamente ni asumir que ya se sustituyeron todas sus rutas.
+
+Convención de presentación ya unificada por petición expresa: displayName personalizado
+→ name Text no sensible → ID. Servicios declarativos comparten read/save/lookup y
+colecciones con metadata $displayName por página/rama. Card/Kanban usan el título
+canónico por defecto y conservan titleField/renderCard explícitos; ListView permite
+conservar un valor de columna con displayName:false. Scaffold crea el método
+editable en modelos nuevos. Se adaptaron los formularios existentes de Flota sin
+regenerarlos; Vehicle usa @displayName("nameRecord.fabricante.name",
+"nameRecord.name") en vehicleLabel («Fabricante · Modelo»). No hay SQL nuevo.
+Retomar con la comprobación del usuario en Flota y elegir el próximo ejercicio;
+no añadir campos/reglas por anticipación. Los proveedores manuales externos al
+servicio declarativo conservan sus propios contratos y se adaptan explícitamente.
+[Recorrido](tutorial-flota.md).
+
+Las verificaciones que siguen incluyen etapas históricas de la aplicación anterior,
+retirada para reiniciar la tutoría; no confundirlas con los archivos nuevos.
 
 ## Último trabajo y verificaciones
+
+- 2026-11-12: convención canónica de nombres en modelos, withDisplayName,
+  read/save, lookup y colecciones declarativas. Personalizado vacío usa name Text
+  público y después ID; respuestas no textuales siguen siendo error. Métodos
+  reciben sólo dependencias declaradas, con fallback público cargado aparte.
+  Colecciones publican $displayName separado de escalares, usando proyección por
+  lotes <=100 de IDs de esta página/rama en la misma transacción autorizada.
+  Sin SQL, caché global, consultas por fila ni publicación de objetos del formato.
+- ListView aplica nombres a identidad textual name/id y controles accesibles;
+  displayName:false conserva columna, renderCell tiene prioridad. No sustituye
+  imágenes/números/fechas/Selection por defecto. Card/Kanban omiten titleField
+  obligatorio y respetan titleField/renderCard explícitos. La metadata no autoriza
+  búsqueda, orden, filtros o grupos SQL; IDs/revisiones/valores se conservan.
+- create:app/create:model generan displayName(record: DisplayRecord<Clase,"name">)
+  que devuelve record.name. Dependencia name implícita; el desarrollador modifica
+  método/dependencias con los contratos existentes. No se sobreescribieron clases
+  de Flota para añadir stubs. Se conectaron los formularios Fabricante/Modelo/Record
+  a la metadata ya disponible, conservando sus personalizaciones y guardados.
+- Verificación: 30/30 pruebas específicas de nombre/proyección/servicio/colecciones,
+  24/24 de regresión de modelos/ciclo/etiquetas/grupos/kanban y scaffold 12/12.
+  TypeScript, ESLint de afectados y build aprobados. En navegador, la demo pública
+  /sample#image-collections mostró el mismo prefijo «Ficha · …» en tres filas de
+  lista, tres tarjetas y tres tarjetas kanban, incluidos controles accesibles.
+  Datos ficticios, sin sesión del ERP ni guardados reales. Integración SQL completa
+  aprobada: nombres por página/rama sin consultas por fila, método generado de
+  create:model y misma etiqueta en read/save/list/kanban, además de permisos,
+  concurrencia, evolución, sync, force y vistas generadas. Proyecto y esquema
+  temporales eliminados; sin escrituras ni SQL en datos reales para este alcance.
+- Oportunidad pendiente: adaptar proveedores y vistas manuales restantes sólo con
+  su contrato explícito, sin descubrimiento de clases/consultas desde el cliente
+  ni regeneración de vistas personalizadas. Aceptación: mismos nombres en sus
+  relaciones/encabezados/colecciones, sin mezclar metadata y valores de escritura.
+
+
+- 2026-11-12: nombre de presentación conectado a formularios por petición expresa.
+  read/save publica displayName separado de values, sin RHF/defaults/payload ni
+  columna nueva. Proyección por ID con rutas/guardas del binding en la misma
+  transacción autorizada; dependencias locales sin otra consulta. Save calcula
+  después de hooks/lectura final; un fallo revierte el guardado. Callback tercero
+  de FormViewLoader/onSaved compatible con consumidores anteriores. Scaffold
+  mantiene el nombre guardado en el breadcrumb, sin reaccionar a borradores locales.
+- Vehicle declaró @displayName("nameRecord.name") y displayRelations a Modelo
+  (después ampliado a fabricante · modelo; ver arriba);
+  VehicleForm consume el resultado al abrir/guardar. Se conservaron sus campos,
+  tracking, rutas, permisos y decisiones del usuario. orm:generate sin cambios y
+  orm:bind actualizó únicamente Vehicle mediante CLI; sin SQL ni datos reales.
+- Verificaciones de esta etapa: pruebas de nombre de formulario/servicio 12/12,
+  TypeScript, ESLint de archivos afectados, build y diff-check aprobados. Pruebas
+  de scalar/fallback sensible, autorización antes de proyectar, binding viejo,
+  ID ajeno y rollback, metadata fuera de values y rechazo de payload falsificado.
+  Scaffold: 11 casos pasaron en la primera ejecución y uno agotó 90s bajo carga
+  concurrente; el caso cancelado pasó al repetirse por separado (51s). Integración
+  SQL completa aprobada: escenarios nuevos de abrir/guardar/reabrir y metadata
+  falsificada, además de evolución, permisos/concurrencia, sync, force y vistas
+  generadas. Proyecto y esquema temporales eliminados; sin escrituras en datos reales.
+  No se hizo una inspección visual autenticada nueva; el navegador de pruebas
+  disponible no comparte la sesión del navegador del usuario.
+- Oportunidad aceptada en este alcance: reutilizar displayName en encabezados
+  evita resolver etiquetas en cada vista. El siguiente límite es adaptar vistas
+  personalizadas existentes sólo cuando se solicite, conservando sus fallbacks,
+  borradores y navegación; no regenerarlas para adoptar la nueva metadata.
 
 - 2026-11-12: retirada completa de la aplicación Flota por petición expresa, con
   confirmación adicional para borrar también datos/tablas locales. Copia del código
@@ -631,6 +777,30 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
   Las pruebas de código anteriores son históricas y no se repitieron para esta nota.
 
 ## Oportunidades de mejora pendientes
+
+- **Revisión de Fabricantes/CardView**, registrada por petición expresa el
+  2026-11-12. Pendientes sin implementación; priorizar logos y decisión de auditoría:
+  1. **Logos sin recortes:** evaluar contain/padding en miniaturas y proporción
+     del editor, frente a object-cover y avatar 1:1. Aceptación: logos cuadrados y
+     rectangulares completos, sin deformación y sin alterar los avatares existentes;
+     documentar opciones y comprobar los ejemplos de formulario/colecciones.
+  2. **Auditoría del logo:** decidir activar tracking:true en Fabricante.logo.
+     Aceptación: cambios de URL guardados aparecen en historial, sin eventos por
+     borradores/cancelaciones ni snapshot de campos en creación. No implica borrar
+     archivos remotos, cuya limpieza conserva su pendiente independiente.
+  3. **Fabricantes inactivos:** decidir indicador visual y/o filtro de active en
+     CardView. Aceptación: distinguir activos/inactivos y consultarlos con política
+     de servidor; no imponer un dominio que oculte registros sin decisión de negocio.
+  4. **Breadcrumbs adaptables:** revisar basis-48 del contenedor compartido.
+     Aceptación: aprovechar el ancho de escritorio para evitar saltos innecesarios,
+     conservando texto completo, wrap móvil y espacio para búsqueda/acciones.
+  5. **Limpieza de la vista:** retirar imports sin uso de ListView, deleteRecords
+     y recordFields en FabricanteList, y reutilizar recordSearchFields existente.
+     Aceptación: ESLint sin esos avisos y mismo comportamiento de CardView,
+     navegación, búsqueda y permisos; no retirar acciones de servidor por estar
+     ausentes de esta vista.
+  Esta anotación sólo modifica documentación; no autoriza ejecutar estos cambios
+  por adelantado durante la tutoría. Verificación de la nota: git diff --check.
 
 - **Simplificar relaciones y vistas**, registrado el 2026-11-11, sin implementación:
   incluye también Fields de formulario enlazados al contrato cliente del modelo

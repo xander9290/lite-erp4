@@ -1,7 +1,7 @@
 import "server-only";
 import type { z } from "zod";
 import type { Field } from "./fields";
-import { displayFieldPaths, displayRelation, projectDisplayRecord } from "./display";
+import { displayFieldPaths, displayRelation, normalizeDisplayName, projectDisplayRecord } from "./display";
 
 type DisplayModel = { fields: Readonly<Record<string, Field>>; metadata: Readonly<Record<string, Field["metadata"]>>; schema: z.ZodType; displayFields?: readonly string[] };
 type Scalars<M extends DisplayModel> = Extract<keyof M["fields"], string> | "id";
@@ -45,8 +45,7 @@ export function withDisplayName<M extends DisplayModel, const R extends Record<s
   return Object.freeze({ ...model, displayRelations: Object.freeze({ ...relations }), displayFields: fields,
     displayName(record: Readonly<Record<string, unknown>>): string {
       const label = format(projectDisplayRecord(record, fields) as DisplayValues<M, R, P[number]>);
-      if (typeof label !== "string") throw new Error("displayName debe devolver texto de forma síncrona.");
-      return label.trim() || String(record.id);
+      return normalizeDisplayName(label, record, model.metadata);
     },
   });
 }

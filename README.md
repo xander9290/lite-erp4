@@ -9,6 +9,11 @@ declarar `related` sin consultas manuales: [Campos relacionados](docs/campos-rel
 Para fórmulas virtuales, declarar compute y un método @depends; los Fields display
 presentan el resultado del servidor: [Campos calculados](docs/campos-calculados.md).
 
+La presentación comparte una convención: displayName personalizado → name Text
+público → ID. create:app/create:model incluyen el método displayName editable;
+formularios, lookups y colecciones reutilizan el resultado del servidor.
+[Contrato y overrides](docs/nombres-presentacion.md).
+
 ## Comandos del scaffold, en orden
 
 Para añadir otro modelo a una aplicación, el flujo es **modelo → negocio → vistas → sincronizar**:

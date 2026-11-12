@@ -1,0 +1,10 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "binding-flota",
+  "files": {
+    "FlotaRecord.store.ts": "ede12ff285b1905c9cc09400b7cc35650d4d5ceb787063e25dc199321febabf2",
+    "FlotaFabricante.store.ts": "d1dde56eb791273af96609f7cbfb39810712fc544bd59c1dd8e7aad7b97bc54b",
+    "FlotaModelo.store.ts": "08bbf963116f4d18790bdf7ae4c96bb23fbf2b03188fc30a5a8d6ed7e7222689",
+    "FlotaVehicle.store.ts": "e0db86da00e9f0f4a2cb95e29b2ad7d8ce60c5fa057e25106a1453a5dfe2f70a"
+  }
+}

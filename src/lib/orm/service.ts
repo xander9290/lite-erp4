@@ -30,7 +30,8 @@ import type { Many2OneLoader } from "../many2one/model-lookup";
 import { fieldColumn } from "./presentation";
 import type { ReactionContext } from "./reactions";
 import type { ReactionRule, ReactionResult } from "./reactions.types";
-import { displayFieldPaths, projectDisplayRecord } from "./display";
+import { displayProjectionPaths } from "./display";
+import { modelDisplayName, resolveDisplayNames } from "./display.server";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = {
@@ -133,6 +134,10 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (!audit) throw new ModelValidationError("El registro ya no está disponible.");
     return { audit };
   }
+  async function readDisplayName(tx: Prisma.TransactionClient, values: Values) {
+    const names = await resolveDisplayNames(tx, [values], model, repository);
+    return { displayName: names.get(values.id!)! };
+  }
   if (config.defaultSort && !config.columns.some(column => column.field === config.defaultSort?.field && column.sortable)) throw new Error("El orden predeterminado debe apuntar a una columna ordenable de la lista.");
   const groupField = presentation.kanban?.field;
   if (policy && groupField && !policy.fields.includes(groupField)) throw new Error("El estado kanban debe estar publicado en list.fields.");
@@ -147,7 +152,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const id = idSchema.safeParse(input);
         if (!id.success) throw new ModelValidationError("El registro no es válido.");
         const values = await repository.read(tx, id.data);
-        return values ? { values, ...await readAudit(tx, id.data) } : null;
+        return values ? { values, ...await readAudit(tx, id.data), ...await readDisplayName(tx, values) } : null;
       }, { isolationLevel: "RepeatableRead" });
       return record ? { ok: true, ...record } : { ok: false, error: "No se encontró este registro." };
     } catch (error) { return { ok: false, kind: error instanceof ModelValidationError ? "validation" : "server", error: messageFor(error) }; }
@@ -185,7 +190,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     try {
       const record = await prisma.$transaction(async tx => {
         const values = await persist(tx, actor, input);
-        return { values, ...await readAudit(tx, values.id) };
+        return { values, ...await readAudit(tx, values.id), ...await readDisplayName(tx, values) };
       }, { isolationLevel: "Serializable" });
       return { ok: true, ...record, message: "Registro guardado." };
     } catch (error) {
@@ -246,9 +251,10 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const page = Math.min(state.page, Math.max(1, Math.ceil(total / state.pageSize)));
         const sourceRows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize, audit: presentation.audit === true });
         const rows = await resolveCollectionRelated(tx,sourceRows,config.columns.map(column=>column.field).filter(name=>Object.hasOwn(relatedFields,name)),relatedFields,repository);
+        const names = await resolveDisplayNames(tx, sourceRows, model, repository);
         // Repository contracts can contain extra edit fields: collection DTOs honor the fixed server publication.
         const publishedRows = policy ? rows.map(row => projectListRow(row, [...policy.fields, ...policy.fields.flatMap(name => auditAvatarField(name) ? [auditAvatarField(name)!] : [])])) : rows;
-        return { rows: publishedRows, total, page, pageSize: state.pageSize };
+        return { rows: publishedRows.map(row => ({ ...row, $displayName: names.get(row.id)! })), total, page, pageSize: state.pageSize };
       }, { isolationLevel: "RepeatableRead" });
       // Labels use independently authorized lookups after the list snapshot; no cross-request cache.
       // They are presentation, never predicates, ordering keys or authorization inputs.
@@ -339,7 +345,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       return await prisma.$transaction(async tx => {
         await assertActor(tx, actor);
         if (!repository.lookup) throw new Error("MODEL_NOT_BOUND");
-        const fields = displayFieldPaths(model.metadata, model.displayFields);
+        const fields = displayProjectionPaths(model.metadata, model.displayFields);
         if (fields.some(field => field.includes(".") && !repository.lookupPaths?.includes(field))) throw new Error("MODEL_NOT_BOUND");
         const search = config.searchFields.filter(field => model.metadata[field]?.kind === "text" && !model.metadata[field].sensitive);
         const predicates: Record<string, unknown>[] = [];
@@ -355,9 +361,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const records = total ? await repository.lookup(tx, { fields, where, skip: (page - 1) * pageSize, take: pageSize }) : [];
         return { ok: true as const, total, page, pageSize, items: records.map(row => {
           if (typeof row.id !== "string") throw new Error("Invalid lookup record");
-          const record = projectDisplayRecord(row, fields);
           // Only the label and ID leave this service, never the inputs used to construct it.
-          const label = model.displayName ? model.displayName(record) : typeof record.name === "string" ? record.name.trim() || row.id : row.id;
+          const label = modelDisplayName(model, row);
           return { value: row.id, label, record: { id: row.id } };
         }) };
       }, { isolationLevel: "RepeatableRead" });

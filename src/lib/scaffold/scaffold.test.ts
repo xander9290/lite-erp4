@@ -29,6 +29,8 @@ test("dry run writes nothing; creation emits editable source, owned artifacts an
     await createApplication(root, template, generated);
     const model = await readFile(join(root, "src/app/(auth)/erp/prueba/models/Record.ts"), "utf8");
     assert.match(model, /class PruebaRecord extends Model/);
+    assert.match(model, /displayName\(record: DisplayRecord<PruebaRecord, "name">\)/);
+    assert.match(model, /return record.name/);
     const profile = await readFile(join(root, "src/app/(auth)/erp/prueba/orm.config.ts"), "utf8");
     assert.match(profile, /clientFields: \["name", "active"\]/);
     const action = await readFile(join(root, "src/app/(auth)/erp/prueba/actions/record.actions.ts"), "utf8");

@@ -13,8 +13,14 @@ npm run create:model -- flota Mantenimiento
 ```
 
 Crea models/Mantenimiento.ts con la clase FlotaMantenimiento, campos iniciales
-name/active y su defineModel. Registra el import y clientFields en orm.config.ts,
+name/active, su defineModel y un método displayName tipado que devuelve record.name.
+Este método es el punto de personalización de la presentación del registro;
+la convención compartida usa name Text público y luego ID como fallback.
+Registra el import y clientFields en orm.config.ts,
 y el nombre del modelo en manifest.models. No crea tablas ni toca vistas existentes.
+
+create:app incluye el mismo método en su modelo inicial. No se insertan métodos
+automáticamente en clases existentes. [Nombres y dependencias](nombres-presentacion.md).
 
 Después personaliza el modelo: campos, restricciones, normalize, beforeSave,
 afterSave y displayName cuando corresponda. Mantén la publicación explícita en
@@ -53,6 +59,14 @@ En este ejemplo la colección abre en /erp/flota/mantenimiento.
   keys de navegación, Revertir, Nuevo, recarga protegida, historial y notas.
 - Rutas de colección y, si se elige form, nuevo y [id]; menús dentro del manifest.
 - Un README del recurso con sus vistas y siguiente paso.
+
+Los formularios nuevos conectan `deletion` de FormView a `deleteRecords`:
+confirmación, identidad/revisión guardadas y vuelta a la colección después del
+éxito. El generador permite como destinos sólo las rutas de colección que creó
+(incluidas tarjetas/tablero); sin colección usa el inicio de la aplicación.
+`returnTo` conserva filtros y paginación si coincide con una ruta permitida.
+Esto no regenera formularios personalizados ni cambia las reglas de borrado del
+servicio. [Contrato y conexión manual](../src/components/ui/form/FormView.md#eliminación-opcional).
 
 Los exports internos son consistentes entre recursos (recordService, listRecords,
 readRecord, saveRecord, lookupRecords…), separados por archivo. Los componentes

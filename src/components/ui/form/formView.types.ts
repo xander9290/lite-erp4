@@ -3,7 +3,7 @@ import type { FieldPath, FieldValues, UseFormReturn } from "react-hook-form";
 import type { RecordAudit } from "@/lib/orm/audit";
 
 export type FormViewResult<TValues extends FieldValues> =
-  | { ok: true; values: TValues; message?: string; audit?: RecordAudit }
+  | { ok: true; values: TValues; message?: string; audit?: RecordAudit; displayName?: string }
   | { ok: false; error: string; kind?: "validation" | "server"; fieldErrors?: Partial<Record<FieldPath<TValues>, string>> };
 
 export type FormViewSubmit<TValues extends FieldValues, TOutput = TValues> =

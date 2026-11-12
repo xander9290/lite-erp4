@@ -11,6 +11,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { ListState,ListResult } from "@/lib/list/types";
 import type { KanbanRequest } from "@/lib/kanban/types";
 import { createDemoRecords,demoPage,demoGroups } from "./collection-demo";
+import { Fields, Model, defineModel } from "@/lib/orm";
+import { resolveDisplayNames } from "@/lib/orm/display.server";
 
 // Public fixture only. No database, credentials, persistence or real ERP records.
 const rows = [
@@ -38,6 +40,10 @@ export async function reactRelatedImage(input:ReactionRequest):Promise<ReactionR
 }
 
 const collectionRows=createDemoRecords().slice(0,3).map((row,index)=>({...row,status:demoGroups[index].value,modelId:index===1?"without-photo":"with-photo"}));
+const collectionDisplayModel=defineModel(class extends Model {
+  name=Fields.Text({required:true});
+  displayName(record:Readonly<Record<string,unknown>>):string { return `Ficha · ${record.name}`; }
+},{name:"CollectionDisplayDemo",table:"collection_display_demo"});
 async function relatedCollectionPage(state:ListState,group?:string):Promise<ListResult> {
   const page=demoPage(collectionRows,state,group);
   if (!page.ok) return page;
@@ -45,7 +51,8 @@ async function relatedCollectionPage(state:ListState,group?:string):Promise<List
     // The repository is a public in-memory fixture; actual apps use generated Prisma bindings.
     const repository={...unboundRepository(),relatedMany:async(_tx:Prisma.TransactionClient,_field:string,ids:readonly string[])=>Object.fromEntries(ids.map(id=>[id,relatedValues(rows.find(row=>row.id===id),{photo:"maker.avatar"})]))};
     const enriched=await resolveCollectionRelated({} as Prisma.TransactionClient,page.data.rows,["photo"],relatedImageModel.relatedFields,repository);
-    return {...page,data:{...page.data,rows:enriched}};
+    const names=await resolveDisplayNames({} as Prisma.TransactionClient,enriched,collectionDisplayModel,repository);
+    return {...page,data:{...page.data,rows:enriched.map(row=>({...row,$displayName:names.get(row.id)!}))}};
   } catch { return {ok:false,error:"No se pudo resolver la imagen relacionada del ejemplo."}; }
 }
 export async function sampleRelatedImagesList(state:ListState):Promise<ListResult> {return relatedCollectionPage(state);}

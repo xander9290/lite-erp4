@@ -70,7 +70,10 @@ el conjunto completo con sus filtros y devuelve una página; no se filtra única
 la página que ya está en el navegador. Se muestran total, tamaño de página y controles
 anterior/siguiente.
 
-`titleField` identifica el título y `subtitleField` es opcional. La tarjeta por
+Si se omite `titleField`, el título usa `$displayName` del servidor, después name
+y finalmente ID. Un `titleField` explícito tiene prioridad; `subtitleField` es opcional.
+Convención, lotes y límites en [Nombres de presentación](nombres-presentacion.md).
+La tarjeta por
 defecto muestra hasta cuatro campos adicionales de `columns`; estas columnas
 también definen filtros/orden y su formato. `recordHref` añade enlaces de apertura
 que incluyen `returnTo` con la URL actual. La vista de destino debe validar y usar

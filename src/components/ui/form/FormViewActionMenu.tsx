@@ -8,6 +8,7 @@ export type FormViewMenuAction = {
   label: string;
   icon?: ReactNode;
   disabled?: boolean;
+  danger?: boolean;
   onSelect: () => void;
 };
 
@@ -43,12 +44,12 @@ export default function FormViewActionMenu({ actions, disabled }: { actions: rea
     </button>
     {open && <ul id={id} aria-label="Acciones adicionales" className="menu dropdown-content z-40 mt-2 w-52 max-w-[calc(100vw-2rem)] rounded-xl border border-base-300 bg-base-100 p-1.5 shadow-lg">
       {actions.map(action => <li key={action.id}>
-        <button type="button" disabled={disabled || action.disabled} className="gap-3 rounded-lg py-2.5 text-sm disabled:pointer-events-none disabled:opacity-40" onClick={() => {
+        <button type="button" disabled={disabled || action.disabled} className={`gap-3 rounded-lg py-2.5 text-sm disabled:pointer-events-none disabled:opacity-40 ${action.danger ? "text-error" : ""}`} onClick={() => {
           setOpen(false);
           trigger.current?.focus();
           action.onSelect();
         }}>
-          {action.icon && <span aria-hidden="true" className="text-base-content/55">{action.icon}</span>}{action.label}
+          {action.icon && <span aria-hidden="true" className={action.danger ? "text-error" : "text-base-content/55"}>{action.icon}</span>}{action.label}
         </button>
       </li>)}
     </ul>}

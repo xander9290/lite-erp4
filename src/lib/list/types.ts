@@ -11,6 +11,8 @@ export type ListFilter = { field: string; operator: ListFilterOperator; value?: 
 export type ListColumn = {
   field: string;
   label: string;
+  /** Use the server record label; defaults to true for name/id. False preserves the field value. */
+  displayName?: boolean;
   widget?: "partner" | "image" | "many2one";
   options?: readonly { value: string; label: string }[];
   imageSize?: "sm" | "md" | "lg";
@@ -43,7 +45,7 @@ export type ListViewConfig = Omit<ListConfig, "model"> & { model: string };
 export type ListGroupValue = string | number | boolean | null;
 export type ListState = { query: string; page: number; pageSize: number; sort: string; direction: "asc" | "desc"; filters: ListFilter[]; invalidFilters?: boolean; groupBy?: string[]; groupPath?: ListGroupValue[] };
 export type ListValue = string | number | boolean | null | ListValue[] | { [key: string]: ListValue };
-export type ListRecord = { id: string; [key: string]: ListValue };
+export type ListRecord = { id: string; [key: string]: ListValue } & { $displayName?: string };
 export type ListGroup = { value: ListGroupValue; count: number; label?: string };
 export type ListPage = { rows: ListRecord[]; total: number; page: number; pageSize: number; groups?: ListGroup[]; groupField?: string; hasMoreGroups?: boolean };
 export type ListResult = { ok: true; data: ListPage } | { ok: false; error: string };
@@ -84,9 +86,17 @@ export function readListValue(record: ListRecord, path: string): ListValue {
 
 /** Presentation only: the stored scalar remains available through readListValue. */
 export function readListDisplayValue(record: ListRecord, column: ListColumn): ListValue {
+  const identity = (column.field === "name" || column.field === "id") && !column.options && (!column.type || column.type === "text") && (!column.format || column.format === "text");
+  if (column.widget !== "image" && column.displayName !== false && (column.displayName || identity) && typeof record.$displayName === "string" && record.$displayName.trim()) return record.$displayName;
   const value = readListValue(record, column.field);
   if (column.widget !== "many2one" || value === null || value === "") return value;
   const labels = Object.hasOwn(record, "$labels") ? record.$labels : null;
   const label = labels && typeof labels === "object" && !Array.isArray(labels) && Object.hasOwn(labels, column.field) ? labels[column.field] : null;
   return label && typeof label === "object" && !Array.isArray(label) && label.value === value && typeof label.label === "string" ? label.label : "No disponible";
+}
+
+/** A record's server label is presentation metadata, never its identity. */
+export function recordDisplayName(record: ListRecord, fallback?: string): string {
+  const label = typeof record.$displayName === "string" ? record.$displayName.trim() : "";
+  return label || (typeof record.name === "string" ? record.name.trim() : "") || fallback?.trim() || record.id;
 }

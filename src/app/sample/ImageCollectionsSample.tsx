@@ -28,7 +28,8 @@ export default function ImageCollectionsSample() {
     </label>
     <label className="flex items-center gap-2 text-sm"><input type="checkbox" autoComplete="off" className="checkbox checkbox-sm" checked={related} onChange={event=>setRelated(event.target.checked)} />Resolver imágenes related en servidor (datos ficticios)</label>
     <ListView model="ImageDemo" title="Imágenes en lista" columns={columns} searchFields={["name", "client"]} load={related?sampleRelatedImagesList:load} create={false} delete={false} pageSize={5} paramPrefix="imagesList" />
-    <CardView model="ImageDemo" title="Imágenes en tarjetas" titleField="name" columns={columns} searchFields={["name", "client"]} load={related?sampleRelatedImagesList:load} pageSize={3} paramPrefix="imagesCards" />
-    <KanbanView model="ImageDemo" title="Imágenes en tablero" titleField="name" columns={columns} searchFields={["name", "client"]} groupField="status" groups={demoGroups} load={related?sampleRelatedImagesKanban:loadColumn} pageSize={3} paramPrefix="imagesBoard" className="h-[38rem]" />
+    <p className="text-sm text-base-content/60">Con el servidor activo, «Ficha · …» es el displayName compartido por lista, tarjetas y kanban. Sin metadata se usa name; titleField permite elegir otro título explícitamente.</p>
+    <CardView model="ImageDemo" title="Imágenes en tarjetas" columns={columns} searchFields={["name", "client"]} load={related?sampleRelatedImagesList:load} pageSize={3} paramPrefix="imagesCards" />
+    <KanbanView model="ImageDemo" title="Imágenes en tablero" columns={columns} searchFields={["name", "client"]} groupField="status" groups={demoGroups} load={related?sampleRelatedImagesKanban:loadColumn} pageSize={3} paramPrefix="imagesBoard" className="h-[38rem]" />
   </section>;
 }

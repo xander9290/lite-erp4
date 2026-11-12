@@ -1,8 +1,92 @@
 # Nombres de presentación de modelos
 
-Los modelos declarativos definen la etiqueta compartida de sus Many2one en el
-servidor. Por defecto se usa `name` si es Text no sensible; sin él, el ID.
-Una etiqueta vacía también usa el ID. No se almacena otra columna.
+Los modelos declarativos definen una presentación canónica en el servidor:
+`displayName` personalizado → `name` Text no sensible y no vacío → ID.
+Un método vacío también usa esa cadena de fallback; uno que devuelve otro tipo
+se rechaza como error del modelo. No se almacena otra columna.
+
+## Modelos nuevos del scaffold
+
+create:app y create:model generan un método explícito, tipado y editable:
+
+```ts
+displayName(record: DisplayRecord<FlotaFabricante, "name">): string {
+  return record.name;
+}
+```
+
+Se importa DisplayRecord como tipo desde @/lib/orm. Con name Text se infiere la
+dependencia por defecto; al personalizarlo para otros campos declarar displayFields
+o decorar el mismo método con @displayName y ajustar su tipo. No crear un segundo
+formateador en React. Las clases existentes no se sobrescriben para añadir el stub.
+
+## Convención en colecciones y relaciones
+
+lookup publica el nombre como `item.label`; read/save, como `displayName` junto a
+values. list, acciones con dominio y kanban lo publican por registro en `$displayName`.
+Es metadata de lectura: no añadirla a list.fields, clientFields, RHF, payloads ni SQL.
+Las operaciones de búsqueda/filtro/orden/agrupación siguen las políticas y campos
+persistentes publicados; el texto calculado no se convierte en una capacidad SQL.
+
+El servicio calcula nombres para la página/rama autorizada antes de proyectar el DTO.
+Dependencias locales reutilizan los registros ya leídos. Las rutas usan lookup del
+repositorio en lotes de hasta 100 IDs del registro principal, en la misma transacción;
+no se hace una consulta por fila ni se publican los objetos usados para formatear.
+Los encabezados de grupo no resuelven nombres de registros que aún no se cargaron.
+El fallback name puede cargarse implícitamente si es Text público, pero los métodos
+de clase siguen recibiendo sólo sus dependencias declaradas.
+
+- ListView usa la metadata en las columnas de identidad name/id de texto y en
+  sus controles accesibles. `displayName: false` conserva el valor/etiqueta original;
+  `displayName: true` permite usar el nombre del registro en otra columna textual.
+  No sustituye imágenes, números, fechas o selecciones por defecto. renderCell
+  sigue teniendo prioridad. Los IDs y revisiones permanecen intactos.
+- CardView/KanbanView usan el nombre del servidor como título cuando se omite
+  titleField. Un titleField explícito o renderCard conserva su presentación propia.
+- Los formularios nuevos del scaffold reciben la metadata; los formularios
+  existentes de Flota fueron adaptados sin regenerarse. Los proveedores/vistas
+  manuales conservan sus DTOs y overrides; para adoptar un método de clase deben
+  publicar/consumir la metadata desde su servidor autorizado, no inferir clases
+  ni políticas a partir de una cadena enviada por el cliente.
+
+Demo ficticia de servidor en /sample#image-collections: «Ficha · …» aparece en
+las tres colecciones sin modificar sus IDs ni sus imágenes. No usa la base del ERP.
+
+## Encabezados de formularios
+
+Desde 2026-11-12, createModelService.read/save también devuelve `displayName` como
+metadato junto a `values` y `audit`, sin incorporarlo al contrato editable, defaults,
+RHF ni auditoría de cambios. Se calcula desde el registro persistido dentro de la
+transacción autorizada: RepeatableRead al abrir y Serializable al guardar,
+después de hooks y lectura final. Si falla la proyección/formato durante el guardado,
+se rechaza la transacción; no se presenta como guardado confirmado.
+
+Las dependencias escalares salen de la lectura existente. Las rutas Many2one usan
+una proyección por ID mediante el lookup del repositorio generado, en la misma
+transacción y con sus guardas de publicación/privacidad; no invocan otra acción
+ni hacen consultas desde React. Si se añaden rutas, ejecutar orm:generate y orm:bind;
+esto no crea columnas ni requiere migración SQL. Adaptadores sin las rutas necesarias
+fallan cerrados hasta regenerarse.
+
+FormViewLoader entrega `(values, audit, displayName)` a su render prop y FormView
+entrega los mismos tres argumentos en `onSaved`. Los callbacks anteriores de uno
+o dos argumentos siguen siendo compatibles. El scaffold enlaza el nombre al
+breadcrumb y lo actualiza después de guardar; un borrador local no cambia el nombre
+persistido. Las vistas personalizadas existentes requieren conectar esos argumentos;
+no se regeneran automáticamente.
+
+```tsx
+<FormViewLoader recordKey={id} load={load}>
+  {(record, _audit, displayName) => (
+    <Editor record={record} displayName={displayName} />
+  )}
+</FormViewLoader>
+```
+
+En Vehicle, `name` conserva el ID de Modelo y
+`@displayName("nameRecord.fabricante.name", "nameRecord.name")` produce
+«Fabricante · Modelo» (el alias `fabricante` corresponde a `fabricanteId`). El breadcrumb usa el texto del servidor, sin convertir ese ID en
+Text ni añadir otra columna persistente.
 
 ```ts
 class Vehicle extends Model {
