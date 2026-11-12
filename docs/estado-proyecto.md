@@ -68,6 +68,16 @@ se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
+### Módulos declarativos y Control de accesos (plan para 2026-11-13)
+
+Acordado con el usuario el 2026-11-12, sin implementación todavía: reducir el
+código por módulo (ruta comodín, despachador único autorizado, repositorio
+genérico, vistas por defecto con eject, opciones en Field) e incorporar una app
+nativa de Control de accesos tipo Odoo. Flota se adaptará al final como módulo de
+referencia. Al retomar: pedir autorización para commit de lo pendiente, crear
+rama, fase 0 (línea base) y fase 1 (diseño para aprobación). Plan completo, fases,
+estimaciones y riesgos en [Módulos declarativos](ideas/modulos-declarativos.md).
+
 ### Eliminación desde FormView (2026-11-12)
 
 Implementado `deletion` opcional en el menú de FormView y conectado en los cuatro

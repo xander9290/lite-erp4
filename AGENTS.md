@@ -80,6 +80,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Ideas pendientes
 
+- Plan acordado el 2026-11-12 para módulos declarativos (manifest + modelos; rutas, acciones y vistas por convención con eject a TSX) y app nativa de Control de accesos tipo Odoo aplicada en un despachador único autorizado. Avanzar por fases con aprobación del usuario entre cada una; Flota sólo se adapta en la fase final como módulo de referencia. Detalle en [docs/ideas/modulos-declarativos.md](docs/ideas/modulos-declarativos.md).
+
 - Pendiente de ergonomía de formularios: enlazar los Fields existentes a metadatos publicados del modelo para evitar repetir label, required, maxLength, opciones y lookup configurado, conservando props personalizadas, RHF/Zod y validación del servidor. Priorizar controles explícitos; FormView.Field automático sólo se evaluará después. Alcance y aceptación en [Controles enlazados al contrato](docs/ideas/simplificar-relaciones-y-vistas.md#controles-de-formulario-enlazados-al-contrato-del-modelo). Sin implementación autorizada por esta anotación.
 
 - Añadida a la propuesta de simplificación: columnas JSX `ListView.Field` dentro de ListView, sin foo.list.ts obligatorio, conservando columns como alternativa. Separar metadatos de presentación de la proyección y políticas de consulta/búsqueda/orden/agrupación fijadas por el servicio; JSX no autoriza operaciones. Diseño pendiente, sin implementación. Detalles y aceptación en [Columnas declaradas dentro de la vista](docs/ideas/simplificar-relaciones-y-vistas.md#columnas-declaradas-dentro-de-la-vista).
