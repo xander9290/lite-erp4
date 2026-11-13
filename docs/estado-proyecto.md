@@ -68,6 +68,50 @@ se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
+### PENDIENTE URGENTE (acordado 2026-11-13): preparar el tutorial de Flota con módulos declarativos
+
+El usuario decidió reiniciar Flota como tutorial del nuevo enfoque (`src/modules`).
+La fase 5 completa no es necesaria; ejecutar en este orden, con aprobación del
+usuario donde se indica:
+
+1. Confirmar que las fases 3–4 tienen commit en `refactor/modulos-declarativos`
+   (el usuario dijo «listo»; verificar con `git status`).
+2. Correr las integraciones aún no ejecutadas tras los cambios compartidos
+   (`AccessError`, registro de aplicaciones, layout ERP): `test:auth:integration`,
+   `test:contacts:integration`, `test:appointments:service` y
+   `test:theme:integration`. Registrar resultado.
+3. Herramientas (≈2 h, con pruebas en `src/lib/modules/*.test.ts` e integración):
+   - `npm run create:module -- <id>`: crea `src/modules/<id>/manifest.ts`
+     (esqueleto mínimo, icono por nombre, sin imports de React) y lo registra en
+     `src/modules/index.ts` (edición AST, sin sobrescribir; `--dry-run`).
+   - `npm run create:model -- <id> <Modelo>` en variante módulo: crea
+     `models/<clave>.ts` con la clase base y la añade a `models` del manifest
+     (AST; reutilizar `src/lib/modules/eject.ts` / `scaffold/source-edit.ts`).
+     Hoy `create:model` sólo sirve a apps del flujo anterior.
+   - `orm:sync` registra el módulo en `src/modules/index.ts` si falta y avisa de
+     reiniciar dev.
+4. Documentación: reescribir `docs/tutorial-flota.md` para el nuevo flujo (plan y
+   sólo el primer paso; no adelantar ejercicios) y actualizar «Tutoría de
+   desarrollo» en `AGENTS.md`. Recorrido propuesto: create:module → Fabricante
+   (orm:sync, vistas por defecto) → Modelo (Many2one) → Vehicle (`@displayName`
+   «Fabricante · Modelo») → opciones de Field → `eject:view` del form de Vehicle →
+   grupos/permisos/reglas → imagen `related` del logo del fabricante.
+5. Retirar la Flota actual (`src/app/(auth)/erp/flota`, tablas `flota_record`,
+   `flota_fabricante`, `flota_modelo`, `flota_vehicle` **con sus datos**) y el
+   módulo `demo` (tablas `demo_*`, `src/modules/demo`, su registro y migración de
+   retirada). Destructivo: mostrar SQL y pedir aprobación; ofrecer exportar datos
+   antes. Seguir [Retirar aplicaciones](retirar-aplicaciones.md). Ajustar el
+   fixture de integración sólo si dependiera de demo (no depende: usa
+   `scripts/fixtures/modules-ensayo`). El usuario `prueba-accesos` (miembro de
+   `demo.usuario`) se conserva por decisión del usuario; su asignación queda
+   huérfana al retirar demo (se ignora) — informar.
+6. Empezar el tutorial en el paso 1 (lo ejecuta el usuario; explicar y verificar).
+
+Hallazgos abiertos (no bloquean): límite de contraseña **máximo** 8 en
+`src/schemas/password.schema.ts` (UI dice «al menos 8»); aviso dev
+`instant-unrendered-segment` en `/erp/[module]/[[...path]]`. Detalle de fases 0–4
+en [el plan](ideas/modulos-declarativos.md).
+
 ### Módulos declarativos y Control de accesos (plan para 2026-11-13)
 
 Acordado con el usuario el 2026-11-12, sin implementación todavía: reducir el
