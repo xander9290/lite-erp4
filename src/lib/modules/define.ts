@@ -117,7 +117,6 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
   const id = spec.id;
   if (!/^[a-z][a-z0-9]*$/.test(id)) throw new Error(`Identificador de módulo inválido: ${id}. Usa minúsculas sin guiones.`);
   const entries = Object.entries(spec.models);
-  if (!entries.length) throw new Error(`El módulo ${id} necesita al menos un modelo.`);
   const models: ModuleModel[] = entries.map(([modelKey, declaration]) => {
     if (!key.test(modelKey) || modelKey === "nuevo") throw new Error(`${id}: clave de modelo inválida o reservada: ${modelKey}.`);
     const options = typeof declaration === "function" ? { model: declaration } : declaration;

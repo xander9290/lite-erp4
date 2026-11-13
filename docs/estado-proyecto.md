@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-12.
+Última actualización: 2026-11-13.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
@@ -40,7 +40,10 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 - Empaquetar como dependencia npm es una meta futura, conservando Next.js y Prisma.
   Primero madurar contratos y aplicaciones. Ver [Idea y alcance](ideas/aplicaciones-modulares.md).
 
-## Tutoría de Flota
+## Tutoría de Flota (aplicación actual conservada)
+
+Este apartado describe la práctica anterior; el nuevo recorrido y su siguiente
+paso están en la sección siguiente. No retirar ni recrear esta aplicación.
 
 Reiniciada por petición expresa el 2026-11-12. La aplicación anterior y sus datos
 locales se retiraron; las migraciones anteriores y la de retirada se conservan.
@@ -68,76 +71,79 @@ se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
-### PENDIENTE URGENTE (acordado 2026-11-13): preparar el tutorial de Flota con módulos declarativos
+### Preparación del tutorial con módulos declarativos (2026-11-13)
 
-El usuario decidió reiniciar Flota como tutorial del nuevo enfoque (`src/modules`).
-La fase 5 completa no es necesaria; ejecutar en este orden, con aprobación del
-usuario donde se indica:
+Alcance autorizado: integraciones, herramientas y documentación, **sin retirar
+Flota ni Demo**. No se migran sus fuentes ni se borran tablas/datos/asignaciones.
+La rama es `refactor/modulos-declarativos`; las fases 3 y 4 están en los commits
+`af14d66` y `5e77ef6`. El último punto de continuidad previo era `e058e69`.
+La comprobación inicial encontró el árbol limpio; no se hicieron commit/push/pull.
 
-1. Confirmar que las fases 3–4 tienen commit en `refactor/modulos-declarativos`
-   (el usuario dijo «listo»; verificar con `git status`).
-2. Correr las integraciones aún no ejecutadas tras los cambios compartidos
-   (`AccessError`, registro de aplicaciones, layout ERP): `test:auth:integration`,
-   `test:contacts:integration`, `test:appointments:service` y
-   `test:theme:integration`. Registrar resultado.
-3. Herramientas (≈2 h, con pruebas en `src/lib/modules/*.test.ts` e integración):
-   - `npm run create:module -- <id>`: crea `src/modules/<id>/manifest.ts`
-     (esqueleto mínimo, icono por nombre, sin imports de React) y lo registra en
-     `src/modules/index.ts` (edición AST, sin sobrescribir; `--dry-run`).
-   - `npm run create:model -- <id> <Modelo>` en variante módulo: crea
-     `models/<clave>.ts` con la clase base y la añade a `models` del manifest
-     (AST; reutilizar `src/lib/modules/eject.ts` / `scaffold/source-edit.ts`).
-     Hoy `create:model` sólo sirve a apps del flujo anterior.
-   - `orm:sync` registra el módulo en `src/modules/index.ts` si falta y avisa de
-     reiniciar dev.
-4. Documentación: reescribir `docs/tutorial-flota.md` para el nuevo flujo (plan y
-   sólo el primer paso; no adelantar ejercicios) y actualizar «Tutoría de
-   desarrollo» en `AGENTS.md`. Recorrido propuesto: create:module → Fabricante
-   (orm:sync, vistas por defecto) → Modelo (Many2one) → Vehicle (`@displayName`
-   «Fabricante · Modelo») → opciones de Field → `eject:view` del form de Vehicle →
-   grupos/permisos/reglas → imagen `related` del logo del fabricante.
-5. Retirar la Flota actual (`src/app/(auth)/erp/flota`, tablas `flota_record`,
-   `flota_fabricante`, `flota_modelo`, `flota_vehicle` **con sus datos**) y el
-   módulo `demo` (tablas `demo_*`, `src/modules/demo`, su registro y migración de
-   retirada). Destructivo: mostrar SQL y pedir aprobación; ofrecer exportar datos
-   antes. Seguir [Retirar aplicaciones](retirar-aplicaciones.md). Ajustar el
-   fixture de integración sólo si dependiera de demo (no depende: usa
-   `scripts/fixtures/modules-ensayo`). El usuario `prueba-accesos` (miembro de
-   `demo.usuario`) se conserva por decisión del usuario; su asignación queda
-   huérfana al retirar demo (se ignora) — informar.
-6. Empezar el tutorial en el paso 1 (lo ejecuta el usuario; explicar y verificar).
+Implementado en esta tarea:
 
-Hallazgos abiertos (no bloquean): límite de contraseña **máximo** 8 en
-`src/schemas/password.schema.ts` (UI dice «al menos 8»); aviso dev
-`instant-unrendered-segment` en `/erp/[module]/[[...path]]`. Detalle de fases 0–4
-en [el plan](ideas/modulos-declarativos.md).
+- `create:module -- id [--dry-run]`: manifest mínimo (vacío, icono por nombre) e
+  import/registro en `src/modules/index.ts` con edición AST.
+- `create:model -- id Modelo [--dry-run]`: detecta módulos, crea la clase en
+  `models/<clave>.ts` y añade su import/entrada al manifest. Las aplicaciones con
+  `orm.config.ts` conservan su flujo anterior. No genera vistas/clientFields.
+- `orm:sync`: preflight del índice; registro si falta después de esquema/cliente
+  y antes de TypeScript; idempotente y visible en `--plan`, con aviso de reinicio.
+  Rechaza el mismo ID con manifest de módulo y orm.config.ts a la vez.
+- Módulos vacíos admitidos para el esqueleto: ocultos del cajón, ruta 404 y petición
+  de crear un modelo antes de sincronizar. Permisos de módulos con modelos intactos.
+- `test:legacy:integration` ejecuta las cuatro suites de autenticación, Contactos,
+  Citas y tema en proyecto/esquema/servidor/cuentas temporales. El seed de auth se
+  ejecuta sólo ahí; no depende del administrador real. El servidor usa build/start.
+- Tutorial, README y reglas actualizados para el nuevo enfoque sin adelantar
+  ejercicios. Guía técnica: [Módulos declarativos](modulos-declarativos.md).
 
-### Módulos declarativos y Control de accesos (plan para 2026-11-13)
+Verificación final 2026-11-13:
 
-Acordado con el usuario el 2026-11-12, sin implementación todavía: reducir el
-código por módulo (ruta comodín, despachador único autorizado, repositorio
-genérico, vistas por defecto con eject, opciones en Field) e incorporar una app
-nativa de Control de accesos tipo Odoo. Flota se adaptará al final como módulo de
-referencia. 2026-11-13: pull de `8de98f2`, rama `refactor/modulos-declarativos`,
-fase 0 medida (Fabricante 16 archivos/406 líneas; Vehicle 16/452), fase 1
-aprobada y fase 2 (prototipo) implementada sin commit: `src/lib/modules`, ruta
-`erp/[module]/[[...path]]`, vistas por defecto y módulo desechable `demo`,
-instalado en la BD local (migración `20261113154528_demo_module`) y registrado.
-Verificado con pruebas unitarias, integración PostgreSQL temporal, tsc, ESLint y
-build, y revisado en navegador en `:3000` (crear, reglas, historial, lista,
-agrupación y eliminación; dos correcciones menores aplicadas). Fase 2 en commit
-`5ea812b`. Fase 3 implementada sin commit: opciones de colección en Fields,
-vistas perezosas, `FormValues`, `eject:view` y guía
-[Módulos declarativos](modulos-declarativos.md); verificada con pruebas,
-integración temporal, build y Chrome. Fase 4 (Control de accesos) implementada
-sin commit: grupos/permisos/reglas en manifests, motor en `src/lib/access`,
-`authorize` en `createModelService`, menús por grupos y app `/erp/accesos`;
-verificada con pruebas, integración temporal y en la BD local (migración aplicada,
-app revisada en Chrome, usuario de prueba `prueba-accesos` en `demo.usuario`).
-Fases 3 y 4 sin commit. Pendientes anotados en el plan: límite de contraseña de
-máximo 8 caracteres y aviso de dev `instant-unrendered-segment`. Siguiente:
-commit y fase 5 (convivencia) o fase 6 (migrar Flota). Detalle en el plan. Plan completo, fases,
-estimaciones y riesgos en [Módulos declarativos](ideas/modulos-declarativos.md).
+- `test:modules`: 20/20; cubre AST, creación, dry-run, conservación de
+  personalizaciones, colisiones, configuración doble, concurrencia y junctions.
+- `test:modules:integration`: aprobado en proyecto/esquema temporales; recorrido
+  CLI completo, `orm:sync --plan` sin escritura, registro faltante/idempotente,
+  SQL aprobado exclusivamente por fixture, guardado/reapertura/lookup y compilación
+  de las clases generadas. También repositorio/servicio, grupos/permisos/reglas y
+  vistas expulsadas de ensayo. Recursos temporales eliminados.
+- `test:legacy:integration`: las cuatro suites aprobadas (auth, Contactos,
+  appointments-service y tema), con build/start de producción en un proyecto
+  temporal. Esquema, cuentas y servidor eliminados. No usa el admin real.
+- `test:scaffold`: 12/12; `test:applications`: 10/10; pruebas de sync: 3/3.
+  TypeScript y ESLint de archivos afectados aprobados; `git diff --check` limpio.
+
+Límites: sin revisión visual nueva ni build en el directorio real; el build se
+comprobó en la copia temporal con las mismas fuentes, raíz Turbopack explícita y
+base del scanner Tailwind acotada a src. El fixture usa localhost en ambos lados
+porque Next normaliza loopback y Auth.js valida el origen del callback.
+Las operaciones de BD/renombrado/junction necesitaron salir del sandbox. La primera
+prueba HTTP con next dev agotó el tiempo; el resultado aprobado corresponde a
+producción. Un timeout de tsc del scaffold durante compilaciones concurrentes se
+resolvió al repetirlo; no se relajaron límites ni se omitieron pruebas. No se
+repitieron test:orm, test:orm:install ni test:framework:integration completos.
+
+Siguiente paso: el usuario ejecuta sólo
+`npm run create:module -- flotaensayo --dry-run`; revisar su plan antes de avanzar.
+`flotaensayo` permite practicar en paralelo: `flota` colisiona con la aplicación
+actual y no se puede reutilizar sin una decisión posterior. No se ha creado ese
+módulo ni ninguno de sus modelos. [Recorrido y primer paso](tutorial-flota.md).
+
+Retirar Flota/Demo queda fuera del alcance actual. Si se retoma, requiere revisión
+separada del SQL, datos y asignaciones, y aprobación explícita antes de aplicarlo.
+
+Hallazgos abiertos: límite de contraseña máximo 8 frente al mensaje de UI,
+aviso dev `instant-unrendered-segment`, breadcrumbs del formulario por defecto y
+límites de reglas en etiquetas Many2one/displayName. No corregidos en esta tarea.
+
+### Módulos declarativos y Control de accesos
+
+Fases 0–4 implementadas y versionadas. El prototipo aporta ruta comodín,
+despachador fijo autorizado, repositorio genérico, vistas por defecto/expulsadas,
+opciones de colección en Fields y Control de accesos con grupos/CRUD/reglas.
+Manifests conservan declaraciones; la BD guarda asignaciones, overrides y estados.
+Las verificaciones anteriores de las fases, incluida instalación y revisión local
+de Demo y Control de accesos, son históricas; no equivalen a pruebas de esta tarea.
+Detalle y límites en [el plan](ideas/modulos-declarativos.md).
 
 ### Eliminación desde FormView (2026-11-12)
 
@@ -848,6 +854,15 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
   Las pruebas de código anteriores son históricas y no se repitieron para esta nota.
 
 ## Oportunidades de mejora pendientes
+
+- **Unificar escrituras de eject:view:** el comando aún tiene su propia secuencia
+  de creación/edición/restauración, mientras los nuevos generadores reutilizan
+  `writeResource`. Motivo: compartir preflight, lock y rechazo de cambios
+  concurrentes. Aceptación: conservar vistas y comentarios personalizados,
+  `--dry-run` sin escrituras, rechazo de enlaces y restauración ante fallos
+  ordinarios, sin reescribir el manifest entero. Pendiente independiente,
+  sin implementación en esta tarea.
+
 
 - **Revisión de Fabricantes/CardView**, registrada por petición expresa el
   2026-11-12. Pendientes sin implementación; priorizar logos y decisión de auditoría:

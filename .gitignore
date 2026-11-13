@@ -14,6 +14,7 @@
 /coverage
 /.framework-test-*/
 /.modules-test-*/
+/.legacy-test-*/
 
 # next.js
 /.next/

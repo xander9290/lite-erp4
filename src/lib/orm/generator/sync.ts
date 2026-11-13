@@ -13,6 +13,8 @@ import { artifactPlan, assertNoSymlinks, writeArtifacts } from "./write";
 import { imageUploadFiles } from "./image-uploads";
 import { prepareModuleArtifacts } from "./prepare";
 import { bindRepositories } from "./bind";
+import { moduleRegistration } from "../../modules/scaffold";
+import { writeResource } from "../../scaffold/resource-write";
 
 export type MigrationFile = { name: string; sql: string };
 export type AppliedMigration = { migration_name: string; checksum: string; finished_at: unknown; rolled_back_at: unknown };
@@ -78,13 +80,17 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id) || (options.name !== undefined && !/^[a-z][a-z0-9_]{0,59}$/.test(options.name))) throw new Error("Identificador o nombre de migración inválido.");
   if (process.env.NODE_ENV === "production") throw new Error("orm:sync es sólo para desarrollo. Usa el flujo de despliegue en producción.");
   const profile = await loadAppGenerationProfile(root, id);
-  if (!profile) throw new Error("No existe un orm.config.ts para esta aplicación.");
+  if (!profile) throw new Error("No existe orm.config.ts ni un manifest de módulo para este ID.");
+  if (profile.runtime && !profile.module.models.length) throw new Error(`Añade primero un modelo: npm run create:model -- ${id} NombreDelModelo.`);
+  // Preflight before touching the schema or the database. Reject ambiguous source indexes early.
+  const registration = profile.runtime ? await moduleRegistration(root, id) : [];
   if (options.plan) {
     const plan = await installModels(root, profile, false, true, options.force);
     const uploadDirectory = join(root, "src/generated/orm/uploads", id);
     const uploads = await artifactPlan(uploadDirectory, `uploads-${id}`, profile.runtime ? {} : imageUploadFiles(profile.module));
     options.log(`Plan de fuentes de ${id} (sin consultar la base):`);
     for (const change of plan.changes) options.log(relative(root, change.path));
+    for (const change of registration) options.log(`update: ${relative(root, change.path)}`);
     for (const change of uploads.changes.filter(change => change.action !== "unchanged")) options.log(`${change.action}: ${relative(root, join(uploadDirectory, change.name))}`);
     options.log(plan.sql);
     if (options.force) options.log("--force: plan de restricciones; los datos se comprobarán al sincronizar con la base.");
@@ -208,6 +214,10 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     stage("Sincronizar contratos y compilar adaptadores");
     await generate();
     if (!profile.runtime) await bindRepositories(root, profile, true);
+    if (registration.length) {
+      stage("Registrar módulo en src/modules/index.ts");
+      await writeResource(root, registration);
+    }
     stage("Comprobar TypeScript");
     run(["--noEmit"], [0], "typescript/bin/tsc");
     options.log(`\n✓ ${id} sincronizada. Revisa los cambios en Git y reinicia dev si estaba abierto.`);

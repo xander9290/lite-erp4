@@ -16,6 +16,10 @@ export async function loadAppGenerationProfile(root: string, id: string): Promis
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id)) throw new Error("Identificador de aplicación inválido.");
   const path = join(root, "src/app/(auth)/erp", id, "orm.config.ts");
   await assertNoSymlinks(path);
+  const manifest = join(root, "src/modules", id, "manifest.ts");
+  await assertNoSymlinks(manifest);
+  const present = (file: string) => lstat(file).then(() => true, error => { if (error.code === "ENOENT") return false; throw error; });
+  if (await present(path) && await present(manifest)) throw new Error(`El ID ${id} tiene orm.config.ts y manifest de módulo; resuelve la configuración ambigua antes de sincronizar.`);
   try { if (!(await lstat(path)).isFile()) throw new Error("orm.config.ts debe ser un archivo."); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return loadModuleGenerationProfile(root, id); throw error; }
   const imported = await import(pathToFileURL(path).href);

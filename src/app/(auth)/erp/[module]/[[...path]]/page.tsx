@@ -10,7 +10,7 @@ type Props = { params: Promise<{ module: string; path?: string[] }> };
 async function Resolve({ params }: Props) {
   const { module: moduleId, path = [] } = await params;
   const definition = getModule(moduleId);
-  if (!definition) notFound();
+  if (!definition || !definition.models.length) notFound();
   if (!path.length) redirect(definition.models[0].route);
   const found = getModuleModel(`${moduleId}.${path[0]}`);
   if (!found || path.length > 2) notFound();

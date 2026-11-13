@@ -1,8 +1,11 @@
 # Plan: módulos declarativos y Control de accesos
 
 Acordado con el usuario el 2026-11-12. Ejecución prevista desde el 2026-11-13.
-Estado: **plan aprobado en lo general, sin implementación**. Cada fase requiere
-aprobación del usuario antes de iniciar la siguiente.
+Estado al 2026-11-13: **fases 0–4 implementadas y versionadas**. El usuario
+autorizó herramientas e integraciones para el nuevo tutorial, conservando Flota y
+Demo. Las secciones de diseño y verificaciones siguientes documentan su evolución;
+el siguiente paso vigente está en [estado-proyecto](../estado-proyecto.md). Cada
+fase posterior requiere aprobación del usuario antes de iniciar la siguiente.
 
 ## Objetivo
 
@@ -496,7 +499,8 @@ displayName no filtran por reglas del modelo destino, sin permisos por campo.
 
 ## Primeros pasos al retomar (2026-11-13)
 
-1. Leer AGENTS.md, README, estado-proyecto y este documento; contrastar con Git.
-2. Pedir autorización para el commit del trabajo pendiente y crear la rama.
-3. Fase 0: medir Fabricante/Vehicle y registrar los números aquí.
-4. Fase 1: redactar el diseño en este documento y presentarlo para aprobación.
+1. Leer AGENTS.md, README y [estado vigente](../estado-proyecto.md); contrastar con Git.
+2. Las fases 0–4 ya están completadas/versionadas; no repetir preparación ni diseño.
+3. Seguir las verificaciones y el tutorial documentados en el estado. Flota y Demo
+   se conservan por decisión posterior del usuario; su retirada/migración no forma
+   parte de la preparación actual.

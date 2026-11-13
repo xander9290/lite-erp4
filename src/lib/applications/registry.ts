@@ -15,7 +15,7 @@ function moduleIcon(name: string): LucideIcon {
   if (!icon) throw new Error(`Icono Lucide desconocido: ${name}.`);
   return icon;
 }
-const moduleApplications: ApplicationManifest[] = installedModules().map(definition => ({ ...definition.application, icon: moduleIcon(definition.icon) }));
+const moduleApplications: ApplicationManifest[] = installedModules().filter(definition => definition.models.length > 0).map(definition => ({ ...definition.application, icon: moduleIcon(definition.icon) }));
 
 /** Explicit imports keep modules reviewable and avoid filesystem discovery at runtime. */
 export const applications = createApplicationRegistry([

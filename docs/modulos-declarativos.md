@@ -1,6 +1,6 @@
 # Módulos declarativos
 
-Guía para crear aplicaciones con `defineModule` (fases 2–3 del
+Guía para crear aplicaciones con `defineModule` (fases 2–4 del
 [plan](ideas/modulos-declarativos.md)). Un módulo se compone de un manifest y clases
 de modelo; rutas, acciones, servicios, repositorio y vistas salen por convención.
 Sólo se escribe TSX para lo que se personaliza.
@@ -19,6 +19,29 @@ src/modules/index.ts                módulos instalados (import explícito)
 ```
 
 ## 1. Declarar el módulo
+
+```bash
+npm run create:module -- biblioteca --dry-run
+npm run create:module -- biblioteca
+npm run create:model -- biblioteca Libro --dry-run
+npm run create:model -- biblioteca Libro
+```
+
+`create:module` crea el manifest mínimo y registra su import en `src/modules/index.ts`.
+El módulo vacío no aparece en el cajón y su ruta devuelve 404 hasta añadir un modelo.
+`create:model` detecta el manifest, crea `models/libro.ts` con `name`/`active` y
+añade `libro: Libro` con su import. La clave es el nombre de clase en minúsculas.
+No crea vistas ni clientFields: personaliza la clase y ejecuta `orm:sync` antes de
+abrir la aplicación. Nombre, icono, menús, grupos, permisos y reglas son decisiones
+que puedes editar en el manifest; sin menú se deriva un enlace por modelo y sin
+grupos el acceso sigue limitado a administradores.
+
+Ambos comandos admiten `--dry-run` sin escrituras, rechazan colisiones, rutas
+estáticas del mismo ID, enlaces y declaraciones ambiguas. No sobrescriben modelos
+ni manifests existentes; las ediciones del registro y del manifest se limitan a su
+AST. El `create:model` de aplicaciones con `orm.config.ts` conserva su flujo anterior.
+No hay SQL en estos comandos. `create:views` sigue siendo del flujo anterior;
+para módulos usa las vistas por defecto o `eject:view`.
 
 ```ts
 // src/modules/demo/manifest.ts
@@ -93,8 +116,12 @@ npm run orm:sync -- demo
 
 Muestra el SQL y pide `aplicar`. Para un módulo declarativo sólo genera esquema y
 migración: no hay contratos, bindings ni uploads en `src/generated/orm`. Después
-registra el módulo en `src/modules/index.ts` y **reinicia `npm run dev`** (el
-cliente Prisma cambió).
+registra el módulo en `src/modules/index.ts` si falta, sin duplicarlo, y avisa de
+**reiniciar `npm run dev`** (el cliente Prisma cambió). El índice se revisa antes de
+consultar la base; se escribe después de aplicar/verificar el esquema y generar
+Prisma, antes de TypeScript. Un error posterior conserva los pasos completados.
+`--plan` también muestra el registro pendiente sin escribir ni consultar la base.
+Si el manifest está vacío, pide crear el primer modelo antes de sincronizar.
 
 ## 4. Personalizar una vista (eject)
 
@@ -179,3 +206,15 @@ npm run test:modules:integration
 
 La integración instala un módulo de prueba propio (`scripts/fixtures/modules-ensayo`)
 en un proyecto y esquema PostgreSQL temporales y los elimina al terminar.
+También ejecuta `create:module → create:model → orm:sync` sobre un módulo temporal,
+con aprobación exclusiva del fixture, y comprueba registro y persistencia.
+
+Para verificar la convivencia con autenticación, Contactos, Citas y tema:
+
+```bash
+npm run test:legacy:integration
+```
+
+Este wrapper ejecuta las cuatro suites existentes en un proyecto, esquema PostgreSQL,
+servidor y cuentas temporales; el seed de autenticación se aplica sólo ahí. No requiere
+las credenciales del administrador del ERP. Elimina sus recursos al terminar.

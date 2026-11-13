@@ -47,6 +47,21 @@ try {
   await writeFile(join(root, "next.config.ts"), next.replace("turbopack: {", `turbopack: {\n    root: ${JSON.stringify(project)},`));
   prisma(["migrate", "deploy"]);
 
+  // Exercise the public creation commands and automatic sync registration on an
+  // independent module; no tutorial sources or ERP data are modified.
+  const indexBefore = await readFile(join(root, "src/modules/index.ts"), "utf8");
+  tsx(join(root, "scripts/create-module.ts"), ["andamio", "--dry-run"]);
+  assert.equal(await exists(join(root, "src/modules/andamio")), false);
+  assert.equal(await readFile(join(root, "src/modules/index.ts"), "utf8"), indexBefore);
+  tsx(join(root, "scripts/create-module.ts"), ["andamio"]);
+  tsx(join(root, "scripts/create-model.ts"), ["andamio", "Categoria", "--dry-run"]);
+  assert.equal(await exists(join(root, "src/modules/andamio/models/categoria.ts")), false);
+  tsx(join(root, "scripts/create-model.ts"), ["andamio", "Categoria"]);
+  command("next", ["typegen"], "Next route types before sync");
+  await cp(join(project, "scripts/fixtures/module-scaffold-check.fixture"), join(root, "module-scaffold-check.ts"));
+  tsx(join(root, "module-scaffold-check.ts"), [], "module scaffold, sync registration and persistence");
+  console.log("✓ create:module → create:model → orm:sync: dry-run, registro automático/idempotente, SQL aprobado sólo en fixture y guardado/reapertura.");
+
   // Own fixture module, independent of demo/tutorial modules in the repository.
   const fixture = join(project, "scripts/fixtures/modules-ensayo"), target = join(root, "src/modules/ensayo");
   await mkdir(join(target, "models"), { recursive: true }); await mkdir(join(target, "views"), { recursive: true });

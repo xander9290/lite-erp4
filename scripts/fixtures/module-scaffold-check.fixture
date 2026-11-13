@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+import { readFile, writeFile } from "node:fs/promises";
+import { syncApplication } from "./src/lib/orm/generator/sync";
+
+const indexPath = "src/modules/index.ts";
+const original = await readFile(indexPath, "utf8");
+// Simulate a hand-created module missing from the explicit runtime index.
+const unregistered = 'import "server-only";\nimport type { ModuleDefinition } from "@/lib/modules/define";\nexport const modules: readonly ModuleDefinition[] = [];\n';
+await writeFile(indexPath, unregistered);
+let approvals = 0;
+const messages: string[] = [];
+await syncApplication(process.cwd(), "andamio", {
+  plan: true, log: message => messages.push(message), confirm: async () => { throw new Error("plan no debe pedir aprobación"); },
+});
+assert.equal(await readFile(indexPath, "utf8"), unregistered);
+assert.ok(messages.some(message => /src[\\/]modules[\\/]index.ts/.test(message)));
+messages.length = 0;
+await syncApplication(process.cwd(), "andamio", {
+  log: message => messages.push(message),
+  confirm: async () => {
+    approvals++;
+    assert.ok(messages.some(message => message.includes('CREATE TABLE "andamio_categoria"')));
+    return true; // Explicit fixture approval: only the disposable project/schema.
+  },
+});
+assert.equal(approvals, 1);
+assert.match(await readFile(indexPath, "utf8"), /andamio\/manifest/);
+assert.ok(messages.some(message => message.includes("reinicia dev")));
+// Repeat registration/sync must not duplicate imports or apply more SQL.
+await syncApplication(process.cwd(), "andamio", { log: () => {}, confirm: async () => { throw new Error("No hay SQL pendiente"); } });
+assert.equal((await readFile(indexPath, "utf8")).match(/andamio\/manifest/g)?.length, 1);
+assert.ok(original.includes("andamio/manifest"));
+
+// Import runtime only after sync has generated Prisma and restored the index.
+const { config } = await import("dotenv"); config({ path: ".env.local", quiet: true });
+const { prisma } = await import("./src/lib/prisma");
+const { modelService } = await import("./src/lib/modules/registry");
+const { hashPassword } = await import("./src/lib/auth/password");
+try {
+  const actor = await prisma.user.create({ data: { login: "scaffold-admin", password: await hashPassword("fixture-only"), isAdmin: true } });
+  const service = modelService("andamio.categoria");
+  const saved = await service.save(prisma, actor, { name: "Categoría generada", active: true });
+  assert.ok(saved.ok, JSON.stringify(saved));
+  const read = await service.read(prisma, actor, saved.values.id);
+  assert.ok(read.ok); assert.equal(read.values.name, "Categoría generada");
+  const lookup = await service.lookup(prisma, actor, { query: "generada", pageSize: 10 });
+  assert.ok(lookup.ok);
+} finally { await prisma.$disconnect(); }

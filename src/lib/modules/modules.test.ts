@@ -119,7 +119,9 @@ test("defineModule rechaza identificadores, claves y menús inválidos", () => {
   assert.throws(() => defineModule({ ...base, id: "prueba", models: { nuevo: Etiqueta } }), /reservada/);
   assert.throws(() => defineModule({ ...base, id: "prueba", models: { "Mal": Etiqueta } }), /inválida/);
   assert.throws(() => defineModule({ ...base, id: "prueba", menu: { Otro: "inexistente" } }), /modelo inexistente/);
-  assert.throws(() => defineModule({ ...base, id: "prueba", models: {} }), /al menos un modelo/);
+  const empty = defineModule({ ...base, id: "prueba", models: {} });
+  assert.deepEqual(empty.models, []);
+  assert.deepEqual(empty.application.menus, []);
   assert.throws(() => defineModule({ ...base, id: "prueba", icon: "Flask" }), /icono Lucide/);
 });
 

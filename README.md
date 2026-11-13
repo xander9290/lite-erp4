@@ -14,6 +14,12 @@ público → ID. create:app/create:model incluyen el método displayName editabl
 formularios, lookups y colecciones reutilizan el resultado del servidor.
 [Contrato y overrides](docs/nombres-presentacion.md).
 
+Para el nuevo flujo de módulos declarativos: `npm run create:module -- biblioteca`,
+`npm run create:model -- biblioteca Libro`, personalizar la clase y
+`npm run orm:sync -- biblioteca`. Manifest y registro del modelo se crean
+automáticamente; lista y formulario se resuelven por convención. No requiere
+`create:views`. [Guía y límites](docs/modulos-declarativos.md).
+
 ## Comandos del scaffold, en orden
 
 Para añadir otro modelo a una aplicación, el flujo es **modelo → negocio → vistas → sincronizar**:
@@ -47,8 +53,9 @@ Muestra el SQL y pide aprobación antes de aplicarlo; se detiene ante errores.
 datos y mantiene la aprobación del SQL. [Guía del comando](docs/sincronizar-aplicaciones.md).
 
 Cada aplicación creada con `create:app` incluye un README con comandos concretos
-para su identificador, separados por caso. La tutoría de Flota se reinicia desde cero;
-[punto de partida y ritmo](docs/tutorial-flota.md). La aplicación anterior fue retirada.
+para su identificador, separados por caso. La nueva tutoría de Flota usará módulos
+declarativos en paralelo: la Flota actual y Demo se conservan.
+[Punto de partida y ritmo](docs/tutorial-flota.md).
 
 | Caso | Guía |
 | --- | --- |

@@ -98,7 +98,7 @@ export default function ${name}({ config }: { config: ModelClientConfig }) {
 `;
 }
 
-function defineModuleObject(file: ts.SourceFile) {
+export function defineModuleObject(file: ts.SourceFile) {
   const exported = file.statements.filter(ts.isExportAssignment).map(statement => unwrap(statement.expression));
   const call = exported.find(node => ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "defineModule");
   if (exported.length !== 1 || !call || !ts.isCallExpression(call) || call.arguments.length !== 1) throw new Error("El manifest debe exportar por defecto una única llamada a defineModule con un objeto literal.");
