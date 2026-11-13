@@ -38,6 +38,7 @@ const finish = (plan: ModuleOperationPlan) => successful(request({ command: "fin
 const exists = (path: string) => access(path).then(() => true, () => false);
 
 try {
+  if (!process.argv.includes("--legacy-only")) {
   node("scripts/create-module.ts", ["ciclo"]); node("scripts/create-model.ts", ["ciclo", "Item"]);
   const source = join(process.cwd(), "src/modules/ciclo/models/item.ts");
   const initial = await readFile(source, "utf8");
@@ -59,6 +60,8 @@ try {
   plan = apply(plan); assert.equal(plan.phase, "complete");
   assert.equal((await database.query(`SELECT COUNT(*)::text AS n FROM ${quote(schema)}.users`)).rows[0].n, before);
   await assert.rejects(assertNoModuleMaintenance(), /mantenimiento/);
+  const blockedGenerator = spawnSync(process.execPath, ["--conditions=react-server", "--import", "tsx", "scripts/create-module.ts", "bloqueado", "--dry-run"], { encoding: "utf8", timeout: 30000 });
+  assert.equal(blockedGenerator.status, 1); assert.match(blockedGenerator.stderr, /mantenimiento/);
   assert.equal(apply(plan).phase, "complete", "repetir no vuelve a aplicar SQL");
   finish(plan); await assertNoModuleMaintenance();
   await database.query(`INSERT INTO ${table} (id,name,active) VALUES ('preserved','Registro conservado',true)`);
@@ -99,5 +102,22 @@ try {
   assert.equal(await exists(`.module-operations/backup-${plan.id}/verified.json`), true, "respaldo restaurado antes de eliminar");
   node("scripts/create-module.ts", ["ciclo", "--dry-run"]);
   assert.equal((await database.query(`SELECT COUNT(*)::text AS n FROM ${quote(schema)}.users`)).rows[0].n, before);
-  console.log("✓ Operaciones: permisos, planes sin DDL, obsolescencia, SQL JSON no confiable, instalar, actualizar conservando registros, mantenimiento, keep/ID reservado, dependencias SQL y drop con respaldo restaurado; usuarios ajenos intactos.");
+  }
+  // The previous scaffold has static routes and generated contracts/bindings.
+  // Exercise its adapter independently of the real Flota tutorial.
+  node("scripts/create-app.ts", ["Ensayoheredado"]);
+  const legacyReview = (operation: "install" | "uninstall") => successful(request({ command: "review", input: { module: "ensayoheredado", operation, policy: "keep" } }));
+  let legacy = legacyReview("install"); assert.deepEqual(legacy.blockers, []);
+  legacy = apply(legacy, "ensayoheredado"); finish(legacy);
+  const legacyTable = `${quote(schema)}."ensayoheredado_records"`;
+  await database.query(`INSERT INTO ${legacyTable} (id,name,active) VALUES ('legacy-preserved','Registro heredado',true)`);
+  legacy = legacyReview("uninstall"); assert.deepEqual(legacy.blockers, []);
+  legacy = apply(legacy, "ensayoheredado"); finish(legacy);
+  assert.equal(await exists("src/app/(auth)/erp/ensayoheredado/manifest.ts"), false);
+  assert.equal((await database.query(`SELECT name FROM ${legacyTable}`)).rows[0].name, "Registro heredado");
+  legacy = legacyReview("install"); assert.deepEqual(legacy.blockers, []); assert.equal(legacy.sql, "");
+  legacy = apply(legacy, "ensayoheredado"); finish(legacy);
+  assert.equal(await exists("src/app/(auth)/erp/ensayoheredado/manifest.ts"), true);
+  assert.equal((await database.query(`SELECT name FROM ${legacyTable}`)).rows[0].name, "Registro heredado");
+  console.log("✓ Operaciones verificadas; scaffold anterior instalado, retirado y reactivado conservando registros.");
 } finally { await database.end(); await prisma.$disconnect(); }

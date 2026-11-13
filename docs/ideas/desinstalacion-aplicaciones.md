@@ -1,12 +1,18 @@
 # Estrategia de desinstalación de aplicaciones y módulos
 
-Diseño propuesto el 2026-11-13, solicitado por el usuario. **Sin implementación ni
-autorización para retirar aplicaciones o datos.** Flota y Demo se conservan.
-Estado operativo vigente: [Retirar aplicaciones](../retirar-aplicaciones.md).
+Diseño propuesto el 2026-11-13 y ampliado con implementación el mismo día por
+autorización del usuario. Contrato operativo vigente:
+[Gestor de Módulos](../gestor-modulos.md). Los comandos hipotéticos de este diseño
+no son la sintaxis del CLI; el comando implementado es `module:manage`.
 
-Ampliación posterior del mismo día: el usuario pidió comenzar la aplicación
-Módulos. Su [primera etapa](../gestor-modulos.md) aporta catálogo y consulta de
-estados/dependencias; el motor de retirada descrito aquí sigue sin implementarse.
+Estado: catálogo, planes compartidos CLI/UI y ejecución en desarrollo para
+declarativo/scaffold; keep con reserva y reactivación desde archivo verificado;
+drop con respaldo del schema restaurado, SQL preciso y migración nueva.
+Aplicaciones manuales, ejecución de producción, coordinación distribuida y
+reanudación automática tras efectos siguen pendientes. El contenido siguiente
+mantiene los criterios del diseño; no todos constituyen capacidades verificadas.
+Las retiradas reales de Citas/Flota se hicieron en otro trabajo específico
+autorizado, no como prueba del gestor; Demo se conserva.
 
 ## Objetivo y alcance
 
@@ -42,12 +48,12 @@ No revoca Server Actions ni constituye una desinstalación. El modo `keep` tampo
 consiste en quitar el esquema Prisma mientras deja las tablas sin representar:
 eso produciría drift y futuras migraciones podrían eliminarlas.
 
-Para `keep`, se propone un registro versionado de retiradas separado del ledger
-de propiedad, por ejemplo `prisma/.app-retirements.json`. Guardaría únicamente ID,
-tipo, política, modelos/grupos/reglas reservados y versión del plan; sin datos ni
-secretos. `prisma/.orm-installations.json` conserva hashes e inversas de los modelos
-retenidos. Crear/instalar/sincronizar debe consultar esa reserva y rechazar una
-reutilización accidental. No se implementa este archivo con el presente diseño.
+Para `keep` está implementado `prisma/.app-retirements.json`, separado del ledger
+de propiedad: ID, tipo, versión, dependencias, modelos/grupos/reglas y huella/ID del
+archivo local de código; sin registros ni secretos. `prisma/.orm-installations.json`
+conserva hashes e inversas de los modelos retenidos. Los generadores consultan esa
+reserva y rechazan la reutilización accidental. Reactivar exige el archivo local
+verificado de la misma ruta y entorno; Git no lo comparte entre máquinas.
 
 Si se desea conservar auditoría tras `drop`, la identidad sigue reservada: antes
 de permitir reutilizarla se necesitaría una política de archivo o generaciones
@@ -102,12 +108,12 @@ el plan. No habrá `--cascade` que desinstale otros módulos ni `DROP ... CASCAD
 Las referencias dinámicas o integraciones externas requieren declaración/revisión
 manual. Los ciclos se resuelven antes de preparar una retirada.
 
-Ejemplos del código actual:
+Ejemplos de propiedad y sus límites:
 
-- Flota y Demo tienen propiedad gestionada y sus propias inversas de auditoría en
-  User. Son candidatos para los adaptadores de módulos/scaffold; esta propuesta
-  no solicita retirarlos ni verifica aquí el estado de su BD.
-- Contactos publica Partner y tiene dependientes Usuarios y Citas. Partner también
+- Demo tiene propiedad gestionada e inversas de auditoría en User. Flota tenía
+  una instalación scaffold equivalente antes de su retirada específica.
+  Los fixtures del gestor usan otros IDs y no modifican estas aplicaciones.
+- Contactos publica Partner y tiene como dependiente Usuarios. Partner también
   sirve al perfil y a autenticación. No es una tabla que se pueda purgar por
   borrar Contactos del registro.
 - Usuarios publica User, pero la propiedad funcional de las cuentas es compartida
@@ -181,8 +187,8 @@ deben detectar planes obsoletos y tablas ajenas incluso con el mismo código Git
   las que tengan consumidores ajenos o exigir resolver esas referencias.
 - Artefactos generados: retirada por inventario/hash conocido con soporte explícito
   para eliminar; `writeArtifacts` actual rechaza retiradas, no sirve invocarlo con
-  archivos omitidos. `writeResource` también necesita una operación de eliminación
-  con preflight, exclusión mutua y restauración, no un `rm -r` paralelo sin control.
+  archivos omitidos. `writeResource` ya admite eliminación con preflight, exclusión
+  mutua y restauración ante fallos ordinarios; el gestor usa ese inventario explícito.
 - Archivo de retirada y esquema retenido deben permanecer coherentes en `keep`.
   En `drop`, retirar propiedad e inversas junto al esquema mediante el plan, nunca
   por manipulación manual destinada a eludir el instalador.
@@ -208,7 +214,13 @@ mantener mantenimiento y reanudar desde esa fase; no repetir el borrado ni prome
 que `git restore` recupera datos. Si la migración falla, comprobar el estado real y
 usar la recuperación explícita de Prisma antes de continuar, sin resolve automático.
 
-## Fases propuestas de implementación
+## Fases y trabajo restante
+
+Las fases 1–3 tienen implementación acotada a desarrollo y pruebas propias:
+inventario, review/apply/status/finish, keep/reactivación y drop con respaldo
+restaurado. La recuperación automática después de preparar cambios o aplicar SQL
+no está resuelta: se mantiene mantenimiento y se exige revisión manual. Las
+fases 4–5 permanecen como propuestas, sin implementación autorizada por esta nota.
 
 | Fase | Entregable | Criterio de aceptación |
 | --- | --- | --- |
@@ -218,9 +230,40 @@ usar la recuperación explícita de Prisma antes de continuar, sin resolve autom
 | 4 | Adaptadores explícitos para aplicaciones manuales | Contrato revisado por aplicación; proteger entidades compartidas; no exigir convertirla en módulo declarativo. Empezar con fixture manual, no Contactos/Usuarios reales. |
 | 5 | Despliegue protegido y operación de producción | Gate para migraciones destructivas, ensayo en staging, coordinación de versiones, recuperación y comprobaciones operativas documentadas. |
 
-Recomendación: empezar por la fase 1 y revisar el informe antes de ampliar a
-escrituras. Implementar herramientas no autoriza ejecutar retiradas de aplicaciones
-reales. El caso Flota/Demo se decide después, por separado.
+Siguiente incremento posible: recuperación verificable por pasos después de efectos,
+con pruebas de interrupción y sin repetir SQL; después adaptadores manuales y gate
+de despliegue. Criterio: ninguna recuperación debe aceptar SQL/rutas editados ni
+habilitar versiones incompatibles. Implementar herramientas no autoriza ejecutar
+retiradas de aplicaciones reales.
+
+## Pendiente solicitado: desinstalación en producción
+
+Registrado el 2026-11-13 por petición expresa del usuario. Pendiente de diseño e
+implementación; el bloqueo actual de operaciones en producción se mantiene.
+
+Motivo: el mantenimiento local del gestor de desarrollo no coordina todas las
+instancias, trabajos y versiones de un despliegue. Habilitar el mismo botón sin
+esa coordinación podría dejar procesos ejecutando rutas o consultando tablas
+retiradas.
+
+Alcance y criterios de aceptación:
+
+- Mantener conservación de datos por defecto y purga explícita, con dependencias
+  resueltas e infraestructura compartida protegida.
+- Plan autorizado para el entorno de destino, SQL y archivos exactos; aprobación
+  del despliegue y gate de migraciones destructivas en CI/CD.
+- Ensayo previo en staging y respaldo compatible cuya restauración se haya
+  comprobado antes de una purga.
+- Mantenimiento coordinado: impedir nuevas escrituras y drenar las que estén en
+  curso; detener o actualizar todas las instancias y trabajos afectados antes de
+  cambiar tablas. Verificar que ninguna versión anterior siga atendiendo tráfico.
+- Publicar la versión compatible, regenerar los artefactos necesarios, comprobar
+  rutas, permisos, datos ajenos y ausencia de drift antes de reabrir el ERP.
+- Recuperación documentada y probada ante interrupciones antes y después del SQL,
+  sin repetir operaciones destructivas ni prometer rollback global.
+
+Esta anotación registra trabajo futuro; no habilita operaciones de producción ni
+autoriza una desinstalación sobre ese entorno.
 
 ## Verificación exigida antes de usarlo
 
@@ -236,13 +279,15 @@ después del commit SQL; eliminación por claves exactas de historial/accesos;
 conservación de usuarios e imágenes; restauración del respaldo y drift nulo final.
 
 Probar rutas/acciones antiguas con la nueva versión y confirmar que la versión vieja
-no sigue sirviendo. Regresión de autenticación, Contactos, Citas, tema, módulos,
+no sigue sirviendo. Regresión de autenticación, Contactos, tema, módulos,
 scaffold y ORM; TS/lint/build. Los fallos de entorno se registran, no se omiten.
 
-## Comprobación de este diseño
+## Comprobación histórica del diseño
 
 2026-11-13: revisión de manifests/registros, propiedad ORM, instalador, helpers de
 integridad, modelo de accesos y migración histórica de retirada de Flota. Sin
 consultas a BD, comandos de migración, cambios de código ni retirada de archivos.
-Verificación documental: `git diff --check`. Todo lo descrito como comando o fase
-del desinstalador es propuesta, no capacidad existente.
+Verificación documental de aquella etapa: `git diff --check`. La implementación
+posterior y sus pruebas vigentes se registran en
+[estado-proyecto](../estado-proyecto.md); no confundir esta revisión de diseño con
+la verificación del motor actual.

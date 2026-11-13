@@ -62,10 +62,12 @@ declarativos en paralelo: la Flota actual y Demo se conservan.
 | Crear una aplicación y enlazar su persistencia | [Crear aplicaciones](docs/crear-aplicaciones.md) y [Flujo del framework](docs/flujo-framework.md). |
 | Añadir campos a una aplicación instalada | [Sincronizar aplicaciones](docs/sincronizar-aplicaciones.md), con el ID de tu módulo. |
 | Cambiar vistas, menús, dominios o adaptadores | Casos 4–7 del README de cada módulo. |
-| Retirar una aplicación | [Alcance y procedimiento actuales](docs/retirar-aplicaciones.md). No hay comando de desinstalación. |
+| Instalar, actualizar o retirar una aplicación | [Gestor de Módulos](docs/gestor-modulos.md): UI y `module:manage` en desarrollo, con plan previo. |
 
-La [estrategia propuesta de desinstalación](docs/ideas/desinstalacion-aplicaciones.md)
-cubre módulos declarativos y aplicaciones anteriores; su implementación está pendiente.
+La [retirada de aplicaciones](docs/retirar-aplicaciones.md) conserva datos por
+defecto y permite reactivación desde su archivo local verificado. La purga requiere
+SQL aprobado y respaldo restaurado. Producción y aplicaciones manuales necesitan
+su procedimiento específico.
 
 `orm:generate`, `orm:install` y `orm:bind` revisan sin escribir cuando omites
 `--write`; no aplican SQL. Para cambios físicos, primero se crea la migración con
@@ -105,7 +107,7 @@ permisos, concurrencia y eliminación con cuentas y un esquema PostgreSQL tempor
 
 ## Otras guías
 
-- [Gestor de Módulos](docs/gestor-modulos.md): catálogo administrativo en `/erp/modulos`, estados y dependencias; operaciones de instalación/desinstalación pendientes.
+- [Gestor de Módulos](docs/gestor-modulos.md): catálogo administrativo en `/erp/modulos`, planes e instalación/actualización/desinstalación en desarrollo.
 - [Estado actual y continuidad entre agentes](docs/estado-proyecto.md). Leer junto con [AGENTS.md](AGENTS.md) al retomar el proyecto.
 - [Módulos declarativos](docs/modulos-declarativos.md) (prototipo: `defineModule`, opciones de Field y `eject:view`).
 - [Aplicaciones y navegación](docs/desarrollo-aplicaciones.md).

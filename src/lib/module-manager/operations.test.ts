@@ -3,12 +3,14 @@ import { test } from "node:test";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { unregisterModule, sourceDependents, sourceFingerprint } from "./operation-files";
+import { unregisterModule, removalFiles, sourceDependents, sourceFingerprint } from "./operation-files";
+import { writeArtifacts } from "../orm/generator/write";
 import { assertApplicationIdAvailable, readRetirements } from "./retirements";
 import { writeResource } from "../scaffold/resource-write";
 import { sourceFile } from "../scaffold/source-edit";
-import { assertNoOtherModuleOperation } from "./operation-lock";
+import { assertNoFrameworkWriters, assertNoOtherModuleOperation } from "./operation-lock";
 import { normalizedSQL } from "./operation-sql";
+import { verifyOperationTypes } from "./operation-typecheck";
 
 async function fixture(run: (root: string) => Promise<void>) {
   const root = await mkdtemp(join(await realpath(tmpdir()), "module-operations-"));
@@ -31,6 +33,28 @@ test("la comparación SQL conserva valores literales y descarta sólo comentario
   assert.equal(normalizedSQL("SELECT /* outside */ '-- inside';"), "SELECT '-- inside';");
   assert.throws(() => normalizedSQL("SELECT 'unfinished"));
 });
+
+test("retira Prisma generado verificable y bloquea artefactos modificados o assets sin adaptador", async () => fixture(async root => {
+  await mkdir(join(root, "src/modules/unit"), { recursive: true });
+  await writeFile(join(root, "src/modules/unit/manifest.ts"), "export default {};\n");
+  await writeFile(join(root, "src/modules/index.ts"), 'import unit from "./unit/manifest"; export const modules = [unit];\n');
+  const directory = join(root, "src/generated/orm/apps/unit");
+  const source = "model UnitItem { id String @id }\n";
+  await writeArtifacts(directory, "unit", { "models.prisma": source });
+  const plan = await removalFiles(root, "unit", "declarative");
+  assert.ok(plan.some(change => change.path === join(directory, "models.prisma") && change.after === null));
+  await writeFile(join(directory, "models.prisma"), `${source}// manual edit\n`);
+  await assert.rejects(removalFiles(root, "unit", "declarative"), /modificado/);
+  await writeFile(join(directory, "models.prisma"), source);
+  await writeFile(join(root, "src/modules/unit/asset.png"), Buffer.from([0, 1, 2]));
+  await assert.rejects(removalFiles(root, "unit", "declarative"), /retirada manual/);
+}));
+
+test("una herramienta del framework ya abierta bloquea el plan de módulos", async () => fixture(async root => {
+  await assertNoFrameworkWriters(root);
+  await writeFile(join(root, "prisma/.orm-sync.lock"), "active");
+  await assert.rejects(assertNoFrameworkWriters(root), /herramienta del framework activa/);
+}));
 
 test("borrado de fuentes tiene preflight, dry-run y restauración ante un fallo posterior", async () => fixture(async root => {
   const victim = join(root, "src/victim.ts"), blocker = join(root, "src/blocking.ts");
@@ -82,4 +106,26 @@ test("el lock permite al ejecutor propietario y bloquea otros escritores", async
   const lock = join(root, "prisma/.module-operation.lock");
   await writeFile(lock, "otro-proceso"); await assert.rejects(assertNoOtherModuleOperation(root), /activa/);
   await writeFile(lock, String(process.pid)); await assertNoOtherModuleOperation(root);
+}));
+
+test("el mantenimiento conserva el bloqueo de generadores después de liberar el proceso", async () => fixture(async root => {
+  await mkdir(join(root, ".module-operations"));
+  await writeFile(join(root, ".module-operations/maintenance.json"), "{}");
+  await assert.rejects(assertNoOtherModuleOperation(root), /mantenimiento/);
+  await writeFile(join(root, "prisma/.module-operation.lock"), String(process.pid));
+  await assertNoOtherModuleOperation(root);
+}));
+
+test("verifica fuentes y tipos de rutas actuales aunque el servidor dev conserve rutas retiradas", async () => fixture(async root => {
+  await writeFile(join(root, "tsconfig.json"), JSON.stringify({ compilerOptions: { strict: true, noEmit: true, types: [], skipLibCheck: true }, include: ["src/**/*.ts", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"] }));
+  await mkdir(join(root, ".next/dev/types"), { recursive: true });
+  await mkdir(join(root, ".next/types"), { recursive: true });
+  await writeFile(join(root, ".next/dev/types/validator.ts"), 'import "../../../retired-route";\nconst stale: number = "old";\n');
+  await writeFile(join(root, "src/current.ts"), 'export const current: number = 1;\n');
+  verifyOperationTypes(root);
+  await writeFile(join(root, ".next/types/validator.ts"), 'const current: number = "invalid";\n');
+  assert.throws(() => verifyOperationTypes(root), /TypeScript/);
+  await writeFile(join(root, ".next/types/validator.ts"), "");
+  await writeFile(join(root, "src/current.ts"), 'export const current: number = "invalid";\n');
+  assert.throws(() => verifyOperationTypes(root), /TypeScript/);
 }));

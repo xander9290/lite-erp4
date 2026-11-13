@@ -28,6 +28,8 @@ import { inspectRemovalDatabase } from "./operation-database";
 import { schemaTables } from "./inventory";
 import type { ModuleOperationPlan } from "./operation.types";
 import { normalizedSQL } from "./operation-sql";
+import { assertNoFrameworkWriters } from "./operation-lock";
+import { verifyOperationTypes } from "./operation-typecheck";
 
 export const operationInput = z.strictObject({ module: z.string().max(100).regex(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/), operation: z.enum(["install", "update", "uninstall"]), policy: z.enum(["keep", "drop"]).default("keep") }).superRefine((value, context) => {
   if (value.operation !== "uninstall" && value.policy !== "keep") context.addIssue({ code: "custom", message: "La política de eliminación sólo se aplica a desinstalar." });
@@ -125,6 +127,7 @@ function cleanupSQL(schema: string, models: readonly string[], modelIds: readonl
 
 async function buildPlan(root: string, actor: ModelActor, input: z.output<typeof operationInput>, id = randomBytes(16).toString("hex")): Promise<StoredPlan> {
   await authorizeOperation(actor);
+  await assertNoFrameworkWriters(root);
   await assertDatabaseBaseline(root);
   const snapshot = await readInstallationState(root);
   const retired = await readRetirements(root);
@@ -269,9 +272,9 @@ export async function applyModuleOperation(root: string, actor: ModelActor, id: 
   if (stored.view.fingerprint !== fingerprint || stored.environment !== environment() || Date.now() - Date.parse(stored.view.createdAt) > 30 * 60000 || confirmedModule !== stored.input.module) throw new Error("Confirmación o plan obsoletos. Vuelve a revisar la operación.");
   const lockPath = join(root, "prisma/.module-operation.lock"); await assertNoSymlinks(lockPath);
   const lock = await open(lockPath, "wx").catch(error => { throw new Error((error as NodeJS.ErrnoException).code === "EEXIST" ? "Hay otra operación activa. Consulta su resultado antes de continuar." : "No se pudo reservar la operación."); });
-  await lock.writeFile(String(process.pid));
   let maintenanceCreated = false;
   try {
+    await lock.writeFile(String(process.pid));
     const fresh = await buildPlan(root, actor, stored.input, stored.view.id);
     if (fresh.view.fingerprint !== fingerprint || fresh.view.blockers.length) throw new Error("El proyecto, la base o el alcance cambiaron. Revisa un plan nuevo.");
     // Stored JSON is only a review record: executable SQL/paths always come from
@@ -311,8 +314,9 @@ export async function applyModuleOperation(root: string, actor: ModelActor, id: 
         prismaCommand(root, ["migrate", "deploy"]);
       }
       prismaCommand(root, ["generate"]);
-      const compiled = spawnSync(process.execPath, [join(root, "node_modules/typescript/bin/tsc"), "--noEmit", "--incremental", "false"], { cwd: root, encoding: "utf8", timeout: 120000, windowsHide: true });
-      if (compiled.error || compiled.status !== 0) throw new Error("La retirada se preparó pero TypeScript no pudo verificarse. Conserva el mantenimiento y revisa las referencias restantes.");
+      const routes = spawnSync(process.execPath, [join(root, "node_modules/next/dist/bin/next"), "typegen"], { cwd: root, encoding: "utf8", timeout: 120000, windowsHide: true });
+      if (routes.error || routes.status !== 0) throw new Error("No se pudieron actualizar los tipos de rutas tras la retirada. Conserva el mantenimiento y revisa el proyecto.");
+      verifyOperationTypes(root);
       // Remove empty source directories only; never recursively delete a source tree.
       const allowed = [join(root, "src/modules", stored.input.module), join(root, "src/app/(auth)/erp", stored.input.module), ...["apps", "bindings", "uploads"].map(folder => join(root, "src/generated/orm", folder, stored.input.module))];
       for (const path of [...new Set(fresh.changes.filter(change => change.after === null).map(change => dirname(change.path)))].sort((a, b) => b.length - a.length)) {

@@ -1,14 +1,12 @@
 # Retirar aplicaciones: alcance actual
 
-El proyecto todavía **no tiene un comando para desinstalar aplicaciones**.
-Los scripts disponibles crean cascarones, generan contratos, incorporan/evolucionan
-modelos y enlazan repositorios. No existen `remove:app`, `delete:app`,
-`orm:uninstall`, ni una opción `--remove` en los comandos actuales.
-
-La [estrategia de desinstalación](ideas/desinstalacion-aplicaciones.md), propuesta
-el 2026-11-13, define un flujo común para módulos declarativos, scaffold anterior
-y aplicaciones manuales, con conservación de datos por defecto y purga explícita.
-Es un diseño pendiente: sus comandos no existen y no autoriza retiradas reales.
+Desde el 2026-11-13, `/erp/modulos` y `npm run module:manage` comparten un flujo
+de revisión y ejecución **sólo en desarrollo** para módulos declarativos y
+aplicaciones del scaffold anterior. Conserva datos por defecto; la purga exige
+confirmación expresa, SQL revisado y un respaldo restaurado antes del borrado.
+Procedimiento, requisitos y recuperación en [Gestor de Módulos](gestor-modulos.md).
+Las aplicaciones manuales requieren adaptador específico; la infraestructura
+compartida está protegida. Producción conserva el catálogo de consulta.
 
 ## Operaciones distintas
 
@@ -18,7 +16,9 @@ Es un diseño pendiente: sus comandos no existen y no autoriza retiradas reales.
 | Ocultar Crear/Eliminar en una lista | Usar `create={false}` o `delete={false}`. | Conserva registros y tablas; no cambia permisos del servidor. |
 | Excluir una aplicación del catálogo de ejecución | Filtrar su entrada en el registro principal, resolviendo primero dependencias. | Conserva fuentes, tablas, datos y propiedad instalada. |
 | Eliminar registros | Usar ListView → seleccionar → Acciones → Eliminar, cuando el servidor lo autorice. | Elimina las filas seleccionadas; no desinstala la aplicación. |
-| Retirar fuentes, registro gestionado, modelos y tablas | No hay flujo automatizado implementado. | Requiere una retirada específica y una migración revisada para cambios físicos. |
+| Retirar una aplicación conservando datos | Módulos → ficha → Desinstalar → Conservar datos → Revisar plan. | Conserva esquema/propiedad, tablas, registros, actividad y accesos; reserva el ID y archiva el código local. |
+| Reactivar una aplicación retirada | Instalar desde su ficha, con el archivo local verificado disponible. | Recupera el código y la misma identidad sin SQL adicional. |
+| Retirar también tablas y datos | Desinstalar → Eliminar datos, revisar alcance, confirmar ID y mantenimiento. | Respalda/restaura antes de aplicar una migración nueva y la limpieza auxiliar exacta. |
 
 ## Ocultar una aplicación del catálogo sin desinstalarla
 
@@ -54,7 +54,7 @@ npm run lint -- src/lib/applications/registry.ts
 npm run test:applications
 ```
 
-## Retirada completa: todavía sin comando
+## Retirada completa con plan
 
 Una desinstalación completa necesita un flujo que coordine:
 
@@ -65,8 +65,10 @@ Una desinstalación completa necesita un flujo que coordine:
 5. El registro de propiedad y los esquemas instalados, junto con una migración
    explícita si corresponde cambiar la estructura física.
 
-Ese flujo no está implementado. `orm:install --update` permite adiciones, no sirve
-para desinstalar ni para retirar campos/modelos. No se fuerza una retirada borrando
+El gestor coordina ese flujo para las instalaciones cuya propiedad puede verificar.
+Rechaza dependientes y casos incompatibles en lugar de forzar el borrado.
+`orm:install --update` sigue siendo aditivo; la retirada usa el motor específico
+de `module:manage`. No se fuerza una retirada borrando
 hashes o entradas de `prisma/.orm-installations.json`, ni editando a mano el catálogo
 de `src/lib/applications/scaffolded`.
 
@@ -75,9 +77,15 @@ estáticos y el instalador conserva su propiedad e inversas. Las migraciones ya
 aplicadas forman parte del historial y se conservan. `prisma migrate reset` reinicia
 la base del entorno; no es un comando para quitar una sola aplicación.
 
-Hasta disponer de un desinstalador, la exclusión reversible del catálogo cubre la
-retirada visual. La retirada completa debe prepararse como un cambio específico,
-revisando código, dependencias y persistencia juntos.
+Los archivos de trabajo y respaldos en `.module-operations` son privados y locales;
+el registro `prisma/.app-retirements.json` sí se versiona junto con los esquemas.
+Conservar el archivo local es necesario para la reactivación automática. Si ya
+se prepararon cambios y ocurre un error, mantener el mantenimiento y revisar la
+recuperación manual: no se promete rollback global ni retirada en caliente.
+
+La exclusión reversible del catálogo sigue siendo sólo una retirada visual.
+Editar el registro con expresiones dinámicas puede impedir que el gestor lo
+inspeccione; resolver esa incompatibilidad antes de preparar operaciones.
 
 Guías relacionadas: [Crear aplicaciones](crear-aplicaciones.md),
 [Flujo del framework](flujo-framework.md), [Instalar modelos](instalar-modelos.md).
@@ -107,9 +115,10 @@ genérico de desinstalación ni se amplió orm:sync para eliminar modelos.
 
 Las pruebas de related tienen su propio fixture, instalado sólo en el proyecto y
 esquema PostgreSQL desechables. El ID quedó libre en aquella retirada histórica,
-pero después el usuario recreó la aplicación Flota: actualmente está ocupado y
-se conserva, igual que Demo. El [nuevo tutorial](tutorial-flota.md) propone otro
-ID para practicar en paralelo, sin retirar automáticamente la aplicación actual.
+pero después el usuario recreó la aplicación Flota y volvió a retirarla junto con
+Citas el 2026-11-13 (apartado siguiente). Demo se conserva. El
+[nuevo tutorial](tutorial-flota.md) propone `flotaensayo`; `flota` está libre si
+el usuario decide reutilizarlo.
 
 ## Retirada de Citas odontológicas y Flota, 2026-11-13
 

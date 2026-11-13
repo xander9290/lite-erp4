@@ -95,20 +95,20 @@ export async function removalFiles(root: string, id: string, kind: string): Prom
   const sources = kind === "declarative" ? `src/modules/${id}` : `src/app/(auth)/erp/${id}`;
   const paths = await treeFiles(root, sources);
   const changes: ResourceChange[] = [];
-  for (const directory of [`src/generated/orm/apps/${id}`, `src/generated/orm/bindings/${id}`, `src/generated/orm/uploads/${id}`]) {
+  for (const [folder, owner] of [["apps", id], ["bindings", `binding-${id}`], ["uploads", `uploads-${id}`]]) {
+    const directory = `src/generated/orm/${folder}/${id}`;
     const generated = await treeFiles(root, directory);
     if (!generated.length) continue;
-    const manifest = JSON.parse(await readSource(join(root, directory, "generation-manifest.json")) ?? "null") as { files?: Record<string, string> } | null;
-    if (!manifest?.files) throw new Error(`No se puede comprobar la propiedad de ${directory}.`);
+    const files: Record<string, string> = {};
     for (const path of generated) {
       const name = relative(join(root, directory), path);
-      if (name !== "generation-manifest.json" && (!manifest.files[name] || sourceHash(await readSource(path) ?? "") !== manifest.files[name])) throw new Error(`Artefacto modificado o ajeno: ${directory}/${name}.`);
+      if (name !== "generation-manifest.json") files[name] = (await readSource(path))!;
     }
-    if (Object.keys(manifest.files).some(name => !generated.includes(join(root, directory, name)))) throw new Error("Faltan artefactos gestionados.");
+    await artifactPlan(join(root, directory), owner, files);
     paths.push(...generated);
   }
   for (const path of paths) {
-    if (!/\.(?:tsx?|jsx?|json|md|css|svg|txt|sql)$/.test(path)) throw new Error("La carpeta contiene archivos que requieren una retirada manual revisada.");
+    if (!/\.(?:tsx?|jsx?|json|md|css|svg|txt|sql|prisma)$/.test(path)) throw new Error(`Archivo que requiere una retirada manual revisada: ${relative(root, path)}.`);
     const before = await readSource(path);
     if (before !== null) changes.push({ path, before, after: null });
   }

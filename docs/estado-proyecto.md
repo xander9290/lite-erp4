@@ -18,8 +18,8 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
   Procedimiento y límites en [Flujo del framework](flujo-framework.md).
 - Aplicaciones con manifest, dependencias y menús de navegación; servicios con
   autorización, validación, transacciones, concurrencia y hooks de negocio.
-  Contactos, Usuarios y Citas son aplicaciones activas; Flota se recreó como
-  cascarón para la nueva tutoría. Mantienen alcances distintos;
+  Contactos y Usuarios son aplicaciones activas; Citas y Flota se retiraron el
+  2026-11-13 mediante otro cambio específico autorizado. Mantienen alcances distintos;
   no asumir que todos usan el mismo adaptador o política de acceso.
 - ListView con selección y eliminación por lote desde «Acciones»; dominios fijos
   de servidor combinados con filtros visibles. Los dominios filtran consultas y
@@ -40,10 +40,11 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 - Empaquetar como dependencia npm es una meta futura, conservando Next.js y Prisma.
   Primero madurar contratos y aplicaciones. Ver [Idea y alcance](ideas/aplicaciones-modulares.md).
 
-## Tutoría de Flota (aplicación actual conservada)
+## Tutoría anterior de Flota (histórico; retirada el 2026-11-13)
 
-Este apartado describe la práctica anterior; el nuevo recorrido y su siguiente
-paso están en la sección siguiente. No retirar ni recrear esta aplicación.
+Este apartado describe la práctica anterior, posteriormente retirada; el nuevo
+recorrido y su siguiente paso están en la sección siguiente. No recrearla por
+anticipación.
 
 Reiniciada por petición expresa el 2026-11-12. La aplicación anterior y sus datos
 locales se retiraron; las migraciones anteriores y la de retirada se conservan.
@@ -71,6 +72,16 @@ se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
+### Pendiente: desinstalación en producción (2026-11-13)
+
+Registrado por petición del usuario. Diseñar el despliegue y mantenimiento
+coordinados, las modalidades conservar/purgar, el gate de SQL destructivo,
+respaldo/restauración y recuperación ante fallos. Alcance y criterios en
+[el pendiente](ideas/desinstalacion-aplicaciones.md#pendiente-solicitado-desinstalación-en-producción).
+El gestor sigue bloqueado en producción. Este incremento sólo modifica
+documentación; sin cambios de ejecución, BD, procesos ni despliegues.
+Verificación documental: `git diff --check` en los tres documentos afectados.
+
 ### Retirada de Citas odontológicas y Flota (2026-11-13)
 
 Autorizada por el usuario; Demo y Contactos/Usuarios se conservan. Código, esquema,
@@ -85,7 +96,62 @@ test:legacy:integration y test:framework:integration completo aprobadas. El trab
 sigue en el árbol junto con esta retirada. Reiniciar `npm run dev` tras regenerar el
 cliente Prisma: `.next/dev/types` conserva rutas retiradas hasta entonces.
 
-### Aplicación Módulos: catálogo inicial (2026-11-13)
+### Aplicación Módulos: operaciones (2026-11-13)
+
+Autorización posterior del usuario: conectar instalar, actualizar y desinstalar.
+Implementado en la UI y el CLI compartido `module:manage`, sólo en desarrollo.
+Plan persistido y recalculado con permisos/sesión vigentes, caducidad/huellas,
+bloqueos de dependencias, migraciones pendientes/drift y herramientas activas.
+El navegador no decide ejecutable, SQL, rutas, conexión ni actor.
+
+Instalar/actualizar reutiliza orm:sync con SQL aditivo exacto. Keep retira código y
+registro conservando esquema/propiedad/datos/accesos, reserva ID versionado y
+permite reactivación desde archivo local verificado. Drop comprueba dependencias
+SQL, crea/restaura un respaldo del schema en base temporal, elimina sólo alcance
+propio con migración nueva y limpia actividad/accesos por identidades exactas.
+Genera cliente y tipos Next antes de comprobar TS tras retirar rutas estáticas.
+
+Mantenimiento compartido con accesos autenticados e inicio de sesión; la página de
+trabajo permanece disponible al admin y permite cierre tras reinicio. Fallos antes
+de preparar cambios permiten cierre verificado; después de efectos requieren
+revisión manual. No hay rollback global, retirada en caliente ni coordinación
+distribuida. Otros procesos/instancias deben detenerse por el operador.
+Producción y aplicaciones manuales siguen fuera del ejecutor; infraestructura
+protegida. Archivos remotos intactos. Contrato y recuperación:
+[Gestor de Módulos](gestor-modulos.md).
+
+Verificación vigente: gestor 20/20, módulos 20/20, scaffold 12/12, TypeScript y
+ESLint de afectados aprobados. La ejecución inicial de módulos en sandbox falló
+por permisos de rename/junction; repetida fuera de sandbox, 20/20 aprobadas.
+test:modules:integration aprobado para ciclo declarativo completo: permisos,
+planes obsoletos, SQL de JSON alterado ignorado, instalar/actualizar con registros,
+keep/reactivación, bloqueo de vista SQL, falta de pg_tools recuperable y drop con
+respaldo restaurado; recursos temporales eliminados. La extensión con scaffold
+detectó que el retiro rechazaba sus propios archivos `.prisma`; corregido y cubierto
+por regresión de artefactos gestionados/modificados y assets sin adaptador.
+Se reutiliza artifactPlan para verificar propietario/hashes en lugar de duplicar
+su validador. Tipos de rutas: se comprueban fuentes y `.next/types` recién generados,
+omitiendo sólo raíces obsoletas de `.next/dev/types`; prueba verifica que errores
+de fuentes y tipos actuales siguen fallando. Tras corregir el fallo, la corrida
+focalizada `test:modules:integration -- --legacy-only` aprobó instalar, retirar y
+reactivar una app scaffold nueva con su registro intacto, catálogo, repositorio,
+accesos y tipos de rutas; proyecto/schema temporales eliminados. La corrida amplia
+previa había completado el ciclo declarativo y se había detenido al encontrar el
+archivo Prisma en el recorrido heredado; no se presenta como una corrida completa
+aprobada de la versión final.
+test:legacy:integration aprobado en copia/esquema temporales: build de producción,
+trace sin .env/respaldos, auth, Contactos, tema y rutas admin/no admin.
+No hubo operaciones del gestor sobre datos reales ni commit/push desde este chat.
+Se detectó el commit concurrente `2e9ef45` con la retirada específica de Citas/Flota;
+se respetó y se actualizaron las referencias documentales.
+
+Pendientes: revisión visual de interacción; recuperación automática después de
+efectos; adaptadores manuales y despliegue de producción. La reutilización de
+sync/instalador evita tres motores de persistencia. Para ampliar recuperación,
+exigir pruebas de interrupción y estado confirmado sin repetir SQL ni levantar
+mantenimiento con versiones incompatibles.
+
+### Catálogo inicial (comprobaciones históricas)
 
 Por solicitud del usuario se inició la app nativa `/erp/modulos`, sólo para
 administradores. Primera etapa implementada: lista con búsqueda/filtros/orden y
@@ -99,12 +165,11 @@ readonly. No añade tablas ni modifica datos de negocio. TypeScript pasa a
 dependencia de ejecución (misma versión) y Next incluye fuentes de catálogo en
 los traces de las nuevas rutas. [Contrato y límites](gestor-modulos.md).
 
-Instalar/actualizar/desinstalar desde UI sigue pendiente: la ficha informa ese
-alcance y no presenta ejecuciones simuladas. El próximo incremento es el plan
-revisable compartido con CLI; después, ejecución controlada. Las dependencias
+La primera etapa era de lectura; las operaciones actuales están descritas arriba.
+Las dependencias
 mostradas son `depends`, no todo el grafo de relaciones/imports. Tampoco se
 certifican constraints/drift ni cambios de campos presentes sólo en clases TS.
-Flota, Demo y la tutoría se conservan. No se hicieron commit/push/pull.
+Demo se conserva. No se hicieron commit/push/pull desde este chat.
 
 Verificación de la etapa: test:module-manager 8/8, test:applications 10/10,
 TypeScript y ESLint de afectados aprobados. Integración de módulos aprobada, incluida la corrida ampliada con módulo
@@ -125,7 +190,7 @@ HTTP no equivalen a verificar la presentación e interacción en navegador.
 
 Solicitud posterior del usuario: planificar la retirada de aplicaciones, módulos
 declarativos y aplicaciones heredadas. Diseño guardado en
-[Desinstalación](ideas/desinstalacion-aplicaciones.md), sin implementación.
+[Desinstalación](ideas/desinstalacion-aplicaciones.md), inicialmente sin implementación.
 Revisión inicial: rama `refactor/modulos-declarativos`, commit `beecf84`
 (`Fase final terminada`) y árbol limpio; las herramientas de la tarea anterior
 ya estaban versionadas. Esta tarea no hizo commit/push/pull.
@@ -137,10 +202,9 @@ Incluye catálogos/hashes/inversas, historial/accesos exactos, recuperación por
 y mantenimiento coordinado para cortar las acciones legacy. No promete retirada
 en caliente ni rollback global; archivos remotos fuera de alcance.
 
-Siguiente paso de esa propuesta: revisar/priorizar fase 1 (inventario y plan
-de lectura) antes de implementar escrituras. No se han creado comandos de
-desinstalación ni retirado Flota/Demo. El primer paso del tutorial documentado más
-abajo sigue disponible y no se ejecutó durante este diseño.
+En aquella etapa sólo se propuso revisar la fase 1 antes de ampliar escrituras;
+el incremento autorizado e implementado después se describe arriba. El primer
+paso del tutorial documentado más abajo no se ejecutó como parte de este gestor.
 
 Verificación: lectura de código, registros y migración histórica; corrección en
 la guía de retirada de la nota obsoleta que decía que el ID flota seguía libre.
