@@ -90,9 +90,17 @@ export type ModelListPolicy = {
   groupable?: readonly string[];
   filterable?: readonly string[];
 };
+export type ServiceOperation = "read" | "create" | "write" | "unlink";
+/**
+ * Authorizes an operation inside the service transaction and returns a record predicate
+ * (record rules) that every query and record check must satisfy, or undefined for none.
+ * Without it the service keeps the admin-only baseline.
+ */
+export type ServiceAuthorizer = (tx: Prisma.TransactionClient, actor: ModelActor, operation: ServiceOperation) => Promise<Record<string, unknown> | undefined>;
 type ServicePresentation = {
   defaultSort?: ListViewConfig["defaultSort"]; kanban?: { field: string }; audit?: boolean;
   relations?: Readonly<Record<string, Many2OneLoader>>;
+  authorize?: ServiceAuthorizer;
 } & ({ list: ModelListPolicy; columns?: never; searchFields?: never } | { list?: never; columns: readonly ListColumn[]; searchFields: readonly string[] });
 
 /** Admin-only baseline. The repository and list policy are fixed on the server, never selected by a client. */
@@ -127,6 +135,11 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   }) || config.searchFields.length > 6 || config.searchFields.some(name => name !== "id" && model.metadata[name]?.kind !== "text" && model.metadata[name]?.kind !== "many2one" && !(presentation.audit && ["createByUser.login", "createByUser.partner.name"].includes(name)))) throw new Error("La lista sólo puede publicar campos declarados o auditoría habilitada y búsquedas de texto permitidas.");
   // Normalize date types for server filters even when the view omitted an explicit type.
   config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(Object.hasOwn(relatedFields,column.field)?{filterable:false,sortable:false,groupable:false}:{}), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));
+  const authorize: ServiceAuthorizer = presentation.authorize ?? (async (tx, actor) => { await assertActor(tx, actor); return undefined; });
+  /** Record rules: the record must exist and satisfy the predicate returned by authorize. */
+  async function inScope(tx: Prisma.TransactionClient, id: string, scope: Record<string, unknown> | undefined) {
+    return !scope || await repository.count(tx, { AND: [{ id }, scope] }) > 0;
+  }
   async function readAudit(tx: Prisma.TransactionClient, id: string) {
     if (!presentation.audit) return {};
     if (!repository.audit) throw new Error("MODEL_NOT_BOUND");
@@ -148,9 +161,11 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   async function read(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<FormViewLoadResult<Values>> {
     try {
       const record = await prisma.$transaction(async tx => {
-        await assertActor(tx, actor);
+        const scope = await authorize(tx, actor, "read");
         const id = idSchema.safeParse(input);
         if (!id.success) throw new ModelValidationError("El registro no es válido.");
+        // Records outside the rules behave as not found, without revealing that they exist.
+        if (!await inScope(tx, id.data, scope)) return null;
         const values = await repository.read(tx, id.data);
         return values ? { values, ...await readAudit(tx, id.data), ...await readDisplayName(tx, values) } : null;
       }, { isolationLevel: "RepeatableRead" });
@@ -159,7 +174,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   }
 
   async function persist(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) {
-    await assertActor(tx, actor);
+    const updating = Boolean(input && typeof input === "object" && !Array.isArray(input) && (input as Record<string, unknown>).id);
+    const scope = await authorize(tx, actor, updating ? "write" : "create");
     if (!input || typeof input !== "object" || Array.isArray(input)) throw new ModelValidationError("Revisa los datos del registro.");
     const { id, revision, ...fields } = input as Record<string, unknown>;
     const identity = recordIdentitySchema.safeParse({ id, revision });
@@ -171,7 +187,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       throw new ModelValidationError("Revisa los datos del registro.", errors);
     }
     const metadata = identity.data;
-    const current = metadata.id ? await repository.read(tx, metadata.id) : null;
+    const current = metadata.id && await inScope(tx, metadata.id, scope) ? await repository.read(tx, metadata.id) : null;
     if (metadata.id) {
       if (!current || current.revision !== metadata.revision) throw new ModelValidationError(conflict);
     }
@@ -182,6 +198,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     await model.afterSave?.(saved, context);
     const final = await repository.read(tx, saved.id);
     if (!final) throw new ModelValidationError("El registro no está disponible después de guardar.");
+    // The saved values must stay inside the actor's rules; otherwise the transaction rolls back.
+    if (!await inScope(tx, final.id, scope)) throw new AccessError("DENIED");
     await recordActivity(tx, model.name, actor.id, model.metadata, current, final);
     return final;
   }
@@ -203,7 +221,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>): Promise<ListResult> {
     try {
       const data = await prisma.$transaction(async tx => {
-        await assertActor(tx, actor);
+        const scope = await authorize(tx, actor, "read");
         const fixedDomain = domain ? await domain({ actor: Object.freeze({ id: actor.id, sessionVersion: actor.sessionVersion }), tx }) : undefined;
         const parsed = listStateSchema.safeParse(input);
         if (!parsed.success || parsed.data.invalidFilters) throw new ModelValidationError("Revisa los filtros y parámetros de esta lista.");
@@ -217,6 +235,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const predicates: Record<string, unknown>[] = group ? [{ [group.field]: group.value }] : [];
         predicates.push(...grouping.predicates);
         if (fixedDomain) predicates.push(fixedDomain);
+        if (scope) predicates.push(scope);
         for (const filter of state.filters) {
           const column = config.columns.find(column => column.field === filter.field && column.filterable !== false);
           if (!column || !allowed.has(filter.field)) throw new ModelValidationError("La columna del filtro no está habilitada.");
@@ -271,10 +290,10 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   async function move(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<KanbanMoveResult> {
     try {
       await prisma.$transaction(async tx => {
-        await assertActor(tx, actor);
+        const scope = await authorize(tx, actor, "write");
         const parsed = z.strictObject({ id: idSchema, revision: z.iso.datetime({ precision: 3 }), from: z.string().min(1).max(100), to: z.string().min(1).max(100) }).safeParse(input);
         if (!groupField || !parsed.success || !groups.some(group => group.value === parsed.data.from) || !groups.some(group => group.value === parsed.data.to)) throw new ModelValidationError("El movimiento no corresponde a los estados permitidos.");
-        const current = await repository.read(tx, parsed.data.id);
+        const current = await inScope(tx, parsed.data.id, scope) ? await repository.read(tx, parsed.data.id) : null;
         if (!current || current.revision !== parsed.data.revision || current[groupField] !== parsed.data.from) throw new ModelValidationError(conflict);
         if (parsed.data.from !== parsed.data.to) await persist(tx, actor, { ...current, [groupField]: parsed.data.to });
       }, { isolationLevel: "Serializable" });
@@ -294,18 +313,20 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   }
 
   function remove(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<ListDeleteResult> {
+    let scope: Record<string, unknown> | undefined;
     return deleteListSelection(prisma, actor, input, {
-      read: (tx, id) => repository.read(tx, id),
+      // Records outside the rules read as missing: the whole batch is rejected as a conflict.
+      read: async (tx, id) => await inScope(tx, id, scope) ? repository.read(tx, id) : null,
       remove: async (tx, id, revision) => {
         if (!repository.remove) throw new Error("MODEL_NOT_BOUND");
         await repository.remove(tx, id, revision);
       },
-    });
+    }, undefined, presentation.authorize ? async (tx, actor) => { scope = await authorize(tx, actor, "unlink"); } : undefined);
   }
 
-  async function assertActivityRecord(tx: Prisma.TransactionClient, actor: ModelActor, id: string) {
-    await assertActor(tx, actor);
-    if (!await repository.read(tx, id)) throw new ModelValidationError("El registro ya no está disponible.");
+  async function assertActivityRecord(tx: Prisma.TransactionClient, actor: ModelActor, id: string, operation: ServiceOperation) {
+    const scope = await authorize(tx, actor, operation);
+    if (!await inScope(tx, id, scope) || !await repository.read(tx, id)) throw new ModelValidationError("El registro ya no está disponible.");
   }
 
   async function activity(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<ActivityResult> {
@@ -313,7 +334,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       const parsed = activityRequestSchema.safeParse(input);
       if (!parsed.success) throw new ModelValidationError("La consulta de actividad no es válida.");
       const data = await prisma.$transaction(async tx => {
-        await assertActivityRecord(tx, actor, parsed.data.id);
+        await assertActivityRecord(tx, actor, parsed.data.id, "read");
         return readActivity(tx, model.name, model.metadata, parsed.data);
       }, { isolationLevel: "RepeatableRead" });
       return { ok: true, data };
@@ -326,7 +347,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       if (!parsed.success) throw new ModelValidationError("Escribe una nota de entre 1 y 4000 caracteres.");
       const { id, body, requestId } = parsed.data;
       await prisma.$transaction(async tx => {
-        await assertActivityRecord(tx, actor, id);
+        await assertActivityRecord(tx, actor, id, "write");
         // Retrying a request after an unknown network outcome must not duplicate its note.
         const note = await tx.recordActivity.upsert({
           where: { actorId_requestId: { actorId: actor.id, requestId } }, update: {},
@@ -343,12 +364,12 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     try {
       const request = modelLookupSchema.parse(input);
       return await prisma.$transaction(async tx => {
-        await assertActor(tx, actor);
+        const scope = await authorize(tx, actor, "read");
         if (!repository.lookup) throw new Error("MODEL_NOT_BOUND");
         const fields = displayProjectionPaths(model.metadata, model.displayFields);
         if (fields.some(field => field.includes(".") && !repository.lookupPaths?.includes(field))) throw new Error("MODEL_NOT_BOUND");
         const search = config.searchFields.filter(field => model.metadata[field]?.kind === "text" && !model.metadata[field].sensitive);
-        const predicates: Record<string, unknown>[] = [];
+        const predicates: Record<string, unknown>[] = scope ? [scope] : [];
         if (request.id) predicates.push({ id: request.id });
         if (request.ids) predicates.push({ id: { in: request.ids } });
         for (const word of request.query.trim().split(/\s+/).filter(Boolean)) {
@@ -376,9 +397,9 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       if(!model.react || !model.reactionRules?.some(rule=>rule.fields.includes(request.field))) throw new ModelValidationError("La reacción no está habilitada.");
       const result=await prisma.$transaction(async tx=>{
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-        await assertActor(tx,actor);
+        const scope=await authorize(tx,actor,request.id?"write":"create");
         if(request.id) {
-          const current=await repository.read(tx,request.id);
+          const current=await inScope(tx,request.id,scope)?await repository.read(tx,request.id):null;
           if(!current || current.revision!==request.revision) throw new ModelValidationError(conflict);
         }
         return model.react!(request.field,request.values,Object.freeze({tx,actor:Object.freeze({...actor}),id:request.id,

@@ -91,7 +91,7 @@ assert.equal(await prisma.ensayoTarea.count(), 3);
 ok(await tareas.remove(prisma, actor, selection), "borrar tareas");
 ok(await categorias.remove(prisma, actor, [{ id: hogar.values.id, revision: categoriaRead.values.revision }]), "borrar categoría libre");
 
-// Superuser-only baseline (groups come in phase 4): non-admins and stale sessions are rejected.
+// Users without groups and stale sessions are rejected.
 for (const denied of [readerActor, { ...actor, sessionVersion: actor.sessionVersion + 1 }]) {
   assert.equal((await categorias.read(prisma, denied, trabajo.values.id)).ok, false);
   assert.equal((await categorias.save(prisma, denied, { name: "No", active: true })).ok, false);
@@ -99,5 +99,88 @@ for (const denied of [readerActor, { ...actor, sessionVersion: actor.sessionVers
   assert.equal((await categorias.lookup(prisma, denied, { query: "" })).ok, false);
 }
 assert.equal(await prisma.ensayoCategoria.count({ where: { name: "No" } }), 0);
+
+// Access control: groups, CRUD per model and record rules (usuario ⊂ responsable).
+const member = async (login: string, group: string) => {
+  const user = await prisma.user.create({ data: { login, password, isAdmin: false, accessGroups: { create: { groupId: group } } } });
+  return { id: user.id, sessionVersion: user.sessionVersion };
+};
+const ana = await member("modules-ana", "ensayo.usuario");
+const beto = await member("modules-beto", "ensayo.usuario");
+const jefa = await member("modules-jefa", "ensayo.responsable");
+const denied = (result: { ok: boolean; error?: string }, label: string) => { assert.equal(result.ok, false, label); assert.match(result.error ?? "", /No tienes permiso|ya no está disponible|cambió|No se encontró/, label); };
+
+// Read-only model for usuario: list yes, create/delete no.
+ok(await categorias.list(prisma, ana, state), "usuario lee categorías");
+denied(await categorias.save(prisma, ana, { name: "Ajena", active: true }), "usuario no crea categorías");
+const taskOf = async (who: typeof ana, name: string) => ok(await tareas.save(prisma, who, { ...base, categoria: trabajo.values.id, name }), `crear ${name}`).values;
+const deAna = await taskOf(ana, "De Ana");
+const deBeto = await taskOf(beto, "De Beto");
+const deJefa = await taskOf(jefa, "De Jefa");
+const names = async (who: typeof ana) => (ok(await withActor(who, () => tareas.list(prisma, who, state)), "lista").data.rows.map(row => row.name)).sort();
+assert.deepEqual(await names(ana), ["De Ana"], "regla: sólo sus tareas");
+assert.deepEqual(await names(jefa), ["De Ana", "De Beto", "De Jefa"], "responsable: reglas de grupo con OR");
+assert.deepEqual(await names({ id: admin.id, sessionVersion: admin.sessionVersion }), ["De Ana", "De Beto", "De Jefa"], "superusuario sin reglas");
+assert.equal((await tareas.read(prisma, ana, deBeto.id)).ok, false, "registro ajeno se comporta como inexistente");
+denied(await tareas.save(prisma, ana, { ...deBeto, name: "Robada" }), "no edita tareas ajenas");
+assert.deepEqual(ok(await tareas.lookup(prisma, ana, { query: "" }), "lookup").items.map(item => item.label), ["De Ana"]);
+assert.equal((await tareas.activity(prisma, ana, { id: deBeto.id })).ok, false, "actividad ajena");
+assert.equal((await tareas.addNote(prisma, ana, { id: deBeto.id, body: "x", requestId: "00000000-0000-4000-8000-000000000002" })).ok, false, "nota ajena");
+denied(await tareas.move(prisma, ana, { id: deBeto.id, revision: deBeto.revision, from: "pendiente", to: "curso" }), "mover ajena");
+ok(await tareas.move(prisma, ana, { id: deAna.id, revision: deAna.revision, from: "pendiente", to: "curso" }), "mover propia");
+const anaNow = ok(await tareas.read(prisma, ana, deAna.id), "leer propia").values;
+denied(await tareas.remove(prisma, ana, [{ id: anaNow.id, revision: anaNow.revision }]), "usuario sin unlink");
+assert.equal(await prisma.ensayoTarea.count({ where: { id: deBeto.id, name: "De Beto" } }), 1);
+
+// Database override: grant unlink to usuario; the rule still limits it to own tasks.
+await prisma.accessModelOverride.create({ data: { groupId: "ensayo.usuario", model: "ensayo.tarea", read: true, create: true, write: true, unlink: true } });
+denied(await tareas.remove(prisma, ana, [{ id: deBeto.id, revision: deBeto.revision }]), "override no salta la regla");
+ok(await tareas.remove(prisma, ana, [{ id: anaNow.id, revision: anaNow.revision }]), "override permite borrar la propia");
+// Override can also remove access entirely.
+await prisma.accessModelOverride.update({ where: { groupId_model: { groupId: "ensayo.usuario", model: "ensayo.tarea" } }, data: { read: false } });
+denied(await withActor(beto, () => tareas.list(prisma, beto, state)), "override sin lectura");
+await prisma.accessModelOverride.delete({ where: { groupId_model: { groupId: "ensayo.usuario", model: "ensayo.tarea" } } });
+
+// Disabling a rule in the database: usuario then sees every task.
+await prisma.accessRuleState.create({ data: { ruleId: "ensayo.tareas-propias", active: false } });
+assert.deepEqual(await names(beto), ["De Beto", "De Jefa"]);
+await prisma.accessRuleState.update({ where: { ruleId: "ensayo.tareas-propias" }, data: { active: true } });
+assert.deepEqual(await names(beto), ["De Beto"]);
+
+// Implied groups: with its own rule off, responsable keeps usuario's rule (OR of the remaining ones).
+await prisma.accessRuleState.create({ data: { ruleId: "ensayo.tareas-todas", active: false } });
+assert.deepEqual(await names(jefa), ["De Jefa"], "responsable hereda la regla de usuario si se apaga la suya");
+await prisma.accessRuleState.delete({ where: { ruleId: "ensayo.tareas-todas" } });
+const remaining = ok(await withActor(jefa, () => tareas.list(prisma, jefa, state)), "lista final").data.rows.map(row => ({ id: row.id, revision: row.revision! }));
+ok(await tareas.remove(prisma, jefa, remaining), "responsable borra todas");
+assert.equal(await prisma.ensayoTarea.count(), 0);
+
+// Access administration (Control de accesos): superuser only, ids checked against the code catalog.
+const { accessOverview, groupDetail, setGroupMembers, setModelAccess, setRulesActive } = await import("./src/lib/access/admin");
+const root = { id: admin.id, sessionVersion: admin.sessionVersion };
+await assert.rejects(accessOverview(prisma, ana), /administrador/);
+await assert.rejects(setGroupMembers(prisma, ana, "ensayo.usuario", [ana.id]), /administrador/);
+await assert.rejects(setGroupMembers(prisma, root, "otro.grupo", [ana.id]), /No tienes permiso/);
+const overview = await accessOverview(prisma, root);
+assert.deepEqual(overview.find(module => module.id === "ensayo")?.groups.map(group => [group.id, group.members]), [["ensayo.usuario", 2], ["ensayo.responsable", 1]]);
+await setGroupMembers(prisma, root, "ensayo.usuario", [ana.id]);
+assert.deepEqual((await prisma.accessUserGroup.findMany({ where: { groupId: "ensayo.usuario" } })).map(row => row.userId), [ana.id]);
+denied(await withActor(beto, () => tareas.list(prisma, beto, state)), "sin grupo tras quitarlo");
+const flags = (read: boolean, create: boolean, write: boolean, unlink: boolean) => ({ read, create, write, unlink });
+await setModelAccess(prisma, root, "ensayo.usuario", new Map([["ensayo.categoria", flags(true, true, false, false)]]));
+assert.equal(await prisma.accessModelOverride.count(), 1);
+ok(await categorias.save(prisma, ana, { name: "Creada por Ana", active: true }), "override permite crear categoría");
+// Setting the manifest defaults again removes the override instead of storing a copy.
+await setModelAccess(prisma, root, "ensayo.usuario", new Map([["ensayo.categoria", flags(true, false, false, false)]]));
+assert.equal(await prisma.accessModelOverride.count(), 0);
+await setRulesActive(prisma, root, new Map([["ensayo.tareas-propias", false]]));
+assert.equal((await prisma.accessRuleState.findUniqueOrThrow({ where: { ruleId: "ensayo.tareas-propias" } })).active, false);
+await setRulesActive(prisma, root, new Map([["ensayo.tareas-propias", true]]));
+assert.equal(await prisma.accessRuleState.count(), 0, "una regla activa no se guarda");
+await assert.rejects(setRulesActive(prisma, root, new Map([["ensayo.inventada", false]])), /Regla inexistente/);
+const detail = (await groupDetail(prisma, root, "ensayo.usuario"))!;
+assert.deepEqual(detail.rules.map(rule => [rule.id, rule.scope, rule.active]), [["ensayo.tareas-propias", "grupo", true]]);
+assert.deepEqual(detail.models.find(model => model.id === "ensayo.tarea")?.perms, flags(true, true, true, false));
+assert.equal(await groupDetail(prisma, root, "otro.grupo"), null);
 await prisma.$disconnect();
 console.log("modules-check ok");

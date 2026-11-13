@@ -23,4 +23,20 @@ export default defineModule({
     Tareas: "tarea",
     Configuración: { Categorías: "categoria" },
   },
+
+  // Control de accesos (como res.groups, ir.model.access e ir.rule de Odoo).
+  groups: {
+    usuario: "Usuario",
+    responsable: { label: "Responsable", implies: ["usuario"] },
+  },
+  access: [
+    { group: "usuario", models: "tarea", perms: "cru" },
+    { group: "usuario", models: "categoria", perms: "r" },
+    { group: "responsable", models: ["tarea", "categoria"], perms: "crud" },
+  ],
+  rules: [
+    // Un usuario sólo ve y edita sus propias tareas; el responsable, todas (reglas de grupo con OR).
+    { id: "tareas-propias", label: "Sólo mis tareas", models: "tarea", groups: ["usuario"], domain: ({ actor }) => [{ field: "createBy", operator: "eq", value: actor.id }] },
+    { id: "tareas-todas", label: "Todas las tareas", models: "tarea", groups: ["responsable"], domain: [] },
+  ],
 });

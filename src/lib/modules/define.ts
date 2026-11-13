@@ -7,6 +7,7 @@ import type { FieldMetadata } from "../orm/fields";
 import type { ModelListPolicy } from "../orm/service";
 import type { GenerationProfile } from "../orm/generator/profile";
 import type { ListViewConfig } from "../list/types";
+import { declareAccess, readGroups, type AccessSpec, type ModuleAccess } from "../access/declare";
 
 type ModelClass = new () => Model;
 export type ModuleModelSpec = ModelClass | {
@@ -44,7 +45,7 @@ export type ModuleSpec = {
   readonly depends?: readonly string[];
   readonly models: Readonly<Record<string, ModuleModelSpec>>;
   readonly menu?: ModuleMenu;
-};
+} & AccessSpec;
 
 export type ModuleModel = {
   /** Public identifier used by actions and routes: `<module>.<key>`. */
@@ -72,6 +73,7 @@ export type ModuleDefinition = {
   readonly icon: string;
   readonly models: readonly ModuleModel[];
   readonly profile: GenerationProfile;
+  readonly access: ModuleAccess;
 };
 
 const key = /^[a-z][a-z0-9]*$/;
@@ -132,18 +134,26 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
     });
   });
   const byKey = new Map(models.map(model => [model.key, model]));
+  const access = declareAccess(id, spec, Object.fromEntries(models.map(model => [model.key, model.metadata])));
+  // Without groups the module stays admin-only (superuser), as before access control existed.
+  const grouped = access.groups.length > 0;
+  const visibility = (groups: readonly string[]) => grouped ? { access: "authenticated" as const, groups } : { access: "admin" as const };
   const link = (label: string, target: string): ApplicationMenuLink => {
     const model = byKey.get(target);
     if (!model) throw new Error(`${id}: el menú «${label}» apunta a un modelo inexistente: ${target}.`);
-    return { id: `${target}-list`, label, href: model.route, access: "admin" };
+    return { id: `${target}-list`, label, href: model.route, ...visibility(readGroups(access, model.id)) };
   };
   const menus: ApplicationMenu[] = Object.entries(spec.menu ?? Object.fromEntries(models.map(model => [model.label, model.key])))
-    .map(([label, value]) => typeof value === "string" ? link(label, value)
-      : { id: `${label.normalize("NFD").replace(/\p{Mn}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "grupo"}-group`, label, access: "admin" as const, items: Object.entries(value).map(([child, target]) => link(child, target)) });
+    .map(([label, value]) => {
+      if (typeof value === "string") return link(label, value);
+      const items = Object.entries(value).map(([child, target]) => link(child, target));
+      return { id: `${label.normalize("NFD").replace(/\p{Mn}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "grupo"}-group`, label,
+        ...visibility([...new Set(items.flatMap(item => item.groups ?? []))]), items };
+    });
   if (typeof spec.icon !== "string" || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(spec.icon)) throw new Error(`${id}: usa el nombre de un icono Lucide, por ejemplo "flask-conical".`);
   const application = {
     id, name: spec.name, description: spec.description ?? `Aplicación ${spec.name}.`, version: spec.version ?? "0.1.0",
-    access: "admin" as const, depends: spec.depends ?? [], models: models.map(model => model.contract.name), menus,
+    ...visibility(access.groups.map(group => group.id)), depends: spec.depends ?? [], models: models.map(model => model.contract.name), menus,
   };
   // Validate ids, menus and dependencies now; the icon component is attached by the registry.
   defineApplication({ ...application, icon: (() => null) as unknown as ApplicationManifest["icon"] });
@@ -151,5 +161,5 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
     module: { id, depends: spec.depends ?? [], models: models.map(model => ({ model: model.contract, clientFields: model.clientFields })) },
     externalOwners: {}, runtime: true,
   };
-  return Object.freeze({ id, application, icon: spec.icon, models: Object.freeze(models), profile });
+  return Object.freeze({ id, application, icon: spec.icon, models: Object.freeze(models), profile, access });
 }

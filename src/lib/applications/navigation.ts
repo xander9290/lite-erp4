@@ -1,11 +1,11 @@
-import { applicationHref, canOpenApplication, type ApplicationManifest, type ApplicationMenu, type ApplicationMenuLink } from "./manifest";
+import { applicationHref, canOpenApplication, memberOf, type ApplicationManifest, type ApplicationMenu, type ApplicationMenuLink, type ApplicationUser } from "./manifest";
 
 /** Serializable presentation metadata; no model profiles or icon components. */
 export type ApplicationNavigation = { id: string; name: string; href: string; menus: readonly ApplicationMenu[] };
 
-export function applicationNavigation(application: ApplicationManifest, actor: { isAdmin: boolean } | null): ApplicationNavigation | null {
+export function applicationNavigation(application: ApplicationManifest, actor: ApplicationUser): ApplicationNavigation | null {
   if (!canOpenApplication(application, actor)) return null;
-  const visible = (item: { access?: "authenticated" | "admin" }) => item.access !== "admin" || Boolean(actor?.isAdmin);
+  const visible = (item: { access?: "authenticated" | "admin"; groups?: readonly string[] }) => (item.access !== "admin" || Boolean(actor?.isAdmin)) && memberOf(actor, item.groups);
   const menus: ApplicationMenu[] = [];
   for (const item of application.menus ?? []) {
     if (!visible(item)) continue;

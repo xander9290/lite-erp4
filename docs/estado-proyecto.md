@@ -85,8 +85,14 @@ agrupación y eliminación; dos correcciones menores aplicadas). Fase 2 en commi
 `5ea812b`. Fase 3 implementada sin commit: opciones de colección en Fields,
 vistas perezosas, `FormValues`, `eject:view` y guía
 [Módulos declarativos](modulos-declarativos.md); verificada con pruebas,
-integración temporal, build y Chrome. Siguiente: fase 4 (Control de accesos),
-previa aprobación. Detalle en el plan. Plan completo, fases,
+integración temporal, build y Chrome. Fase 4 (Control de accesos) implementada
+sin commit: grupos/permisos/reglas en manifests, motor en `src/lib/access`,
+`authorize` en `createModelService`, menús por grupos y app `/erp/accesos`;
+verificada con pruebas, integración temporal y en la BD local (migración aplicada,
+app revisada en Chrome, usuario de prueba `prueba-accesos` en `demo.usuario`).
+Fases 3 y 4 sin commit. Pendientes anotados en el plan: límite de contraseña de
+máximo 8 caracteres y aviso de dev `instant-unrendered-segment`. Siguiente:
+commit y fase 5 (convivencia) o fase 6 (migrar Flota). Detalle en el plan. Plan completo, fases,
 estimaciones y riesgos en [Módulos declarativos](ideas/modulos-declarativos.md).
 
 ### Eliminación desde FormView (2026-11-12)

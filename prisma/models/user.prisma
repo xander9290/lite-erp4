@@ -11,6 +11,7 @@ model User {
     partnerId String?  @unique @map("partner_id")
     partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: Restrict)
     recordActivities RecordActivity[] @relation("RecordActivity_actor")
+    accessGroups AccessUserGroup[] @relation("AccessUserGroup_user")
 
     createdAt DateTime @default(now()) @map("created_at")
     updatedAt DateTime @default(now()) @updatedAt @map("updated_at")

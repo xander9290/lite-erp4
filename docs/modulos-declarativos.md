@@ -5,8 +5,8 @@ Guía para crear aplicaciones con `defineModule` (fases 2–3 del
 de modelo; rutas, acciones, servicios, repositorio y vistas salen por convención.
 Sólo se escribe TSX para lo que se personaliza.
 
-> Estado: prototipo en la rama `refactor/modulos-declarativos`. Autorización
-> actual: sólo administradores (los grupos de Control de accesos llegan en la fase 4).
+> Estado: prototipo en la rama `refactor/modulos-declarativos`. Autorización por
+> grupos, permisos por modelo y reglas de registro (sección 5); sin grupos, sólo administradores.
 > Las apps existentes (Contactos, Usuarios, Citas, Flota) siguen con su flujo anterior.
 
 ## Estructura
@@ -117,6 +117,48 @@ vistas ya registradas; `--dry-run` sólo muestra el plan.
 - **Lista**: ordena, renombra o restringe columnas (`{ field: "vence", label: "Fecha
   límite", filterable: false }`). Sólo campos publicados por la política del
   servidor; una columna puede quitar capacidades, nunca añadirlas.
+
+## 5. Control de accesos
+
+Como `res.groups`, `ir.model.access` e `ir.rule` de Odoo, declarado en el manifest:
+
+```ts
+groups: {
+  usuario: "Usuario",
+  responsable: { label: "Responsable", implies: ["usuario"] },
+},
+access: [
+  { group: "usuario", models: "tarea", perms: "cru" },          // c=crear r=leer u=editar d=eliminar
+  { group: "usuario", models: "categoria", perms: "r" },
+  { group: "responsable", models: ["tarea", "categoria"], perms: "crud" },
+],
+rules: [
+  { id: "tareas-propias", label: "Sólo mis tareas", models: "tarea", groups: ["usuario"],
+    domain: ({ actor }) => [{ field: "createBy", operator: "eq", value: actor.id }] },
+  { id: "tareas-todas", label: "Todas las tareas", models: "tarea", groups: ["responsable"], domain: [] },
+],
+```
+
+- **Grupos**: id público `<módulo>.<clave>`; `implies` hereda permisos y reglas.
+- **Permisos**: un usuario puede una operación si alguno de sus grupos la concede.
+- **Reglas de registro**: dominios con la sintaxis de `defineListAction` (estáticos o
+  callback con `actor`). Sin `groups` son globales y se combinan con AND; con
+  `groups`, las de los grupos del usuario se combinan con OR (por eso el responsable
+  necesita su regla «todas»). `operations` limita a qué operaciones aplican.
+- Se aplican en lista, conteo, grupos, kanban, lookup, lectura, guardado (antes y
+  después de escribir), movimiento, borrado, reacciones, historial y notas. Un
+  registro fuera de las reglas se comporta como inexistente.
+- **Superusuario**: `isAdmin` tiene acceso total. Un módulo sin `groups` sigue
+  siendo sólo para administradores.
+- La app **Control de accesos** (`/erp/accesos`, sólo administradores) asigna
+  usuarios a grupos, ajusta permisos por modelo (se guardan sólo las diferencias
+  con el manifest) y activa o desactiva reglas. Los cambios se aplican en la
+  siguiente operación: los permisos se leen dentro de cada transacción.
+- Cajón y menús se muestran según los grupos con lectura declarados en el código;
+  es presentación: el servidor vuelve a autorizar cada operación.
+
+Fuera de alcance por ahora: permisos por campo, multiempresa y crear reglas desde
+la interfaz (los dominios son código).
 
 ## Seguridad
 

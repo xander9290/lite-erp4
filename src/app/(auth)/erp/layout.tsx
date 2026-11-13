@@ -5,13 +5,13 @@ import Clock from "@/components/Clock";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import UserTheme from "@/components/ui/UserTheme";
 import UserMenu from "@/components/login/UserMenu";
-import { getCurrentUser } from "@/lib/auth/access";
+import { getCurrentAccessUser } from "@/lib/access/current";
 import ApplicationNavigation from "@/components/ui/ApplicationNavigation";
 import { applications } from "@/lib/applications/registry";
 import { applicationNavigation } from "@/lib/applications/navigation";
 
 async function ProtectedErp({ children }: { children: ReactNode }) {
-  const user = await getCurrentUser();
+  const user = await getCurrentAccessUser();
   if (!user) redirect("/auth");
   const navigation = applications.forUser(user).flatMap(application => {
     const item = applicationNavigation(application, user);

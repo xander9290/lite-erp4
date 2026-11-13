@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/auth/access";
+import { requireUser } from "@/lib/auth/access";
 import { AccessError } from "@/lib/auth/policy";
 import { prisma } from "@/lib/prisma";
 import type { FormViewLoadResult } from "@/components/ui/form/FormViewLoader";
@@ -32,64 +32,64 @@ function resolve(id: unknown) {
 }
 
 export async function modelRead(model: string, id: unknown): Promise<FormViewLoadResult<Values>> {
-  try { const { service } = resolve(model); return await service.read(prisma, await requireAdmin(), id); }
+  try { const { service } = resolve(model); return await service.read(prisma, await requireUser(), id); }
   catch (error) { return { ok: false, error: failure(error, unknownModel) }; }
 }
 
 export async function modelSave(model: string, input: unknown): Promise<FormViewResult<Values>> {
   try {
     const { entry, service } = resolve(model);
-    const result = await service.save(prisma, await requireAdmin(), input);
+    const result = await service.save(prisma, await requireUser(), input);
     if (result.ok) revalidatePath(entry.route);
     return result;
   } catch (error) { return { ok: false, kind: "server", error: failure(error, "No se pudo guardar el registro.") }; }
 }
 
 export async function modelList(model: string, state: unknown): Promise<ListResult> {
-  try { const { service } = resolve(model); const actor = await requireAdmin(); return await withActor(actor, () => service.list(prisma, actor, state)); }
+  try { const { service } = resolve(model); const actor = await requireUser(); return await withActor(actor, () => service.list(prisma, actor, state)); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar la lista.") }; }
 }
 
 export async function modelDelete(model: string, selection: unknown): Promise<ListDeleteResult> {
   try {
     const { entry, service } = resolve(model);
-    const result = await service.remove(prisma, await requireAdmin(), selection);
+    const result = await service.remove(prisma, await requireUser(), selection);
     if (result.ok) revalidatePath(entry.route, "layout");
     return result;
   } catch (error) { return { ok: false, kind: "server", error: failure(error, "No se pudo eliminar la selección.") }; }
 }
 
 export async function modelLookup(model: string, request: unknown): Promise<Many2OneResult> {
-  try { const { service } = resolve(model); return await service.lookup(prisma, await requireAdmin(), request); }
+  try { const { service } = resolve(model); return await service.lookup(prisma, await requireUser(), request); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar los registros.") }; }
 }
 
 export async function modelKanban(model: string, request: unknown): Promise<ListResult> {
-  try { const { service } = resolve(model); const actor = await requireAdmin(); return await withActor(actor, () => service.kanban(prisma, actor, request as never)); }
+  try { const { service } = resolve(model); const actor = await requireUser(); return await withActor(actor, () => service.kanban(prisma, actor, request as never)); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar el tablero.") }; }
 }
 
 export async function modelMove(model: string, input: unknown): Promise<KanbanMoveResult> {
   try {
     const { entry, service } = resolve(model);
-    const result = await service.move(prisma, await requireAdmin(), input);
+    const result = await service.move(prisma, await requireUser(), input);
     if (result.ok) revalidatePath(entry.route);
     return result;
   } catch (error) { return { ok: false, kind: "server", error: failure(error, "No se pudo guardar el movimiento.") }; }
 }
 
 export async function modelReact(model: string, input: unknown): Promise<ReactionResult> {
-  try { const { service } = resolve(model); return await service.react(prisma, await requireAdmin(), input); }
+  try { const { service } = resolve(model); return await service.react(prisma, await requireUser(), input); }
   catch { return { ok: false, error: "No se pudo completar la reacción." }; }
 }
 
 export async function modelActivity(model: string, request: unknown): Promise<ActivityResult> {
-  try { const { service } = resolve(model); return await service.activity(prisma, await requireAdmin(), request); }
+  try { const { service } = resolve(model); return await service.activity(prisma, await requireUser(), request); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar la actividad.") }; }
 }
 
 export async function modelNote(model: string, request: unknown): Promise<ActivityNoteResult> {
-  try { const { service } = resolve(model); return await service.addNote(prisma, await requireAdmin(), request); }
+  try { const { service } = resolve(model); return await service.addNote(prisma, await requireUser(), request); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo publicar la nota.") }; }
 }
 

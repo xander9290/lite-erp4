@@ -5,6 +5,7 @@ import { defineModule, derivedListPolicy } from "./define";
 import { fieldFromMetadata } from "./fields";
 import { modelIdPattern } from "./config";
 import demo from "../../modules/demo/manifest";
+import { closeGroups } from "../access/engine";
 
 class Etiqueta extends Model {
   name = Fields.Text({ required: true, maxLength: 40 });
@@ -25,10 +26,45 @@ test("defineModule deriva nombres, tablas, rutas, delegates y perfil desde las c
   assert.equal(demo.icon, "flask-conical");
   assert.deepEqual(demo.profile.module.models.map(model => model.model.name), ["DemoTarea", "DemoCategoria"]);
   assert.deepEqual(demo.application.models, ["DemoTarea", "DemoCategoria"]);
+  // With groups, the application and menus are visible to members with read access (presentation only).
+  assert.equal(demo.application.access, "authenticated");
+  assert.deepEqual(demo.application.groups, ["demo.usuario", "demo.responsable"]);
   assert.deepEqual(demo.application.menus, [
-    { id: "tarea-list", label: "Tareas", href: "/erp/demo/tarea", access: "admin" },
-    { id: "configuracion-group", label: "Configuración", access: "admin", items: [{ id: "categoria-list", label: "Categorías", href: "/erp/demo/categoria", access: "admin" }] },
+    { id: "tarea-list", label: "Tareas", href: "/erp/demo/tarea", access: "authenticated", groups: ["demo.usuario", "demo.responsable"] },
+    { id: "configuracion-group", label: "Configuración", access: "authenticated", groups: ["demo.usuario", "demo.responsable"], items: [{ id: "categoria-list", label: "Categorías", href: "/erp/demo/categoria", access: "authenticated", groups: ["demo.usuario", "demo.responsable"] }] },
   ]);
+  // Without groups a module stays admin-only.
+  const plain = defineModule({ id: "prueba", name: "Prueba", icon: "flask-conical", models: { etiqueta: Etiqueta } });
+  assert.equal(plain.application.access, "admin");
+  assert.equal(plain.application.groups, undefined);
+});
+
+test("declareAccess normaliza grupos, permisos CRUD y reglas", () => {
+  assert.deepEqual(demo.access.groups.map(group => [group.id, group.implies]), [["demo.usuario", []], ["demo.responsable", ["demo.usuario"]]]);
+  assert.deepEqual(demo.access.grants.map(grant => [grant.group, grant.model, grant.perms]), [
+    ["demo.usuario", "demo.tarea", { read: true, create: true, write: true, unlink: false }],
+    ["demo.usuario", "demo.categoria", { read: true, create: false, write: false, unlink: false }],
+    ["demo.responsable", "demo.tarea", { read: true, create: true, write: true, unlink: true }],
+    ["demo.responsable", "demo.categoria", { read: true, create: true, write: true, unlink: true }],
+  ]);
+  assert.deepEqual(demo.access.rules.map(rule => [rule.id, rule.models, rule.groups, rule.operations]), [
+    ["demo.tareas-propias", ["demo.tarea"], ["demo.usuario"], ["read", "create", "write", "unlink"]],
+    ["demo.tareas-todas", ["demo.tarea"], ["demo.responsable"], ["read", "create", "write", "unlink"]],
+  ]);
+  const base = { id: "prueba", name: "Prueba", icon: "flask-conical", models: { etiqueta: Etiqueta } } as const;
+  assert.throws(() => defineModule({ ...base, groups: { "Mal": "x" } }), /clave de grupo inválida/);
+  assert.throws(() => defineModule({ ...base, groups: { uno: { label: "Uno", implies: ["dos"] } } }), /grupo no declarado/);
+  assert.throws(() => defineModule({ ...base, groups: { uno: "Uno" }, access: [{ group: "dos", models: "etiqueta", perms: "r" }] }), /grupo no declarado/);
+  assert.throws(() => defineModule({ ...base, groups: { uno: "Uno" }, access: [{ group: "uno", models: "otra", perms: "r" }] }), /modelo inexistente/);
+  assert.throws(() => defineModule({ ...base, groups: { uno: "Uno" }, access: [{ group: "uno", models: "etiqueta", perms: "rx" }] }), /crud/);
+  assert.throws(() => defineModule({ ...base, rules: [{ id: "r", label: "R", models: "etiqueta", domain: [{ field: "noexiste", operator: "eq", value: 1 }] as never }] }), /Dominio de lista inválido/);
+  assert.throws(() => defineModule({ ...base, rules: [{ id: "r", label: "R", models: "etiqueta", domain: [] }, { id: "r", label: "R2", models: "etiqueta", domain: [] }] }), /duplicado/);
+});
+
+test("closeGroups resuelve grupos implicados e ignora ids desconocidos", () => {
+  const groups = new Map(demo.access.groups.map(group => [group.id, group]));
+  assert.deepEqual([...closeGroups(["demo.responsable"], groups)].sort(), ["demo.responsable", "demo.usuario"]);
+  assert.deepEqual([...closeGroups(["demo.usuario", "borrado.grupo"], groups)], ["demo.usuario"]);
 });
 
 test("la política de lista sale de los metadatos y excluye sensibles", () => {

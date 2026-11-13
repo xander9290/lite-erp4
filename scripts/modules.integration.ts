@@ -65,7 +65,8 @@ try {
 
   await cp(join(project, "scripts/fixtures/modules-check.fixture"), join(root, "modules-check.ts"));
   tsx(join(root, "modules-check.ts"), [], "modules check");
-  console.log("✓ Repositorio genérico y servicio: crear, normalize, beforeSave, revisión, listas, búsqueda, filtros, agrupación con etiquetas, lookup, kanban, historial, notas, borrado y permisos.");
+  console.log("✓ Repositorio genérico y servicio: crear, normalize, beforeSave, revisión, listas, búsqueda, filtros, agrupación con etiquetas, lookup, kanban, historial, notas y borrado.");
+  console.log("✓ Control de accesos: grupos implicados, CRUD por modelo, reglas de registro (AND/OR), overrides y reglas desactivadas en BD, superusuario y administración.");
 
   command("next", ["typegen"], "Next route types");
   command("tsc", ["--noEmit", "--incremental", "false"], "typecheck with modules and ejected views");

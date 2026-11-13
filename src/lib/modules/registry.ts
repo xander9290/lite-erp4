@@ -5,6 +5,7 @@ import { AccessError } from "../auth/policy";
 import type { ModelActor } from "../orm/context";
 import { prisma } from "../prisma";
 import { createModelService } from "../orm/service";
+import { authorizeModel } from "../access/engine";
 import { createModelImageSigner } from "../uploads/model-image.server";
 import type { Many2OneLoader } from "../many2one/model-lookup";
 import type { FieldMetadata } from "../orm/fields";
@@ -60,6 +61,8 @@ export function modelService(id: string): Service {
   }
   const service = createModelService(entry.contract, createRepository(entry, module.profile.module), {
     list: entry.list, audit: true, defaultSort: entry.defaultSort,
+    // Group access and record rules, revalidated inside each service transaction.
+    authorize: (tx, actor, operation) => authorizeModel(tx, actor, entry.id, operation),
     ...(entry.kanban ? { kanban: { field: entry.kanban } } : {}),
     ...(Object.keys(relations).length ? { relations } : {}),
   });
@@ -85,8 +88,16 @@ export function imageSigner(id: string) {
   let signer = signers.get(id);
   if (!signer) {
     const images = Object.entries(found.entry.metadata).filter(([, field]) => field.kind === "image" && !field.sensitive).map(([name]) => name);
-    // Session lookup is loaded on demand so the registry stays usable outside Next (scripts, tests).
-    signer = createModelImageSigner({ authorize: async () => (await import("../auth/access")).requireAdmin() }, { metadata: found.entry.metadata }, images);
+    // Uploading needs create or write access. Session lookup is loaded on demand so the
+    // registry stays usable outside Next (scripts, tests).
+    const authorize = async () => {
+      const actor = await (await import("../auth/access")).requireUser();
+      await prisma.$transaction(async tx => {
+        try { await authorizeModel(tx, actor, id, "write"); }
+        catch (error) { if (error instanceof AccessError && error.code === "DENIED") await authorizeModel(tx, actor, id, "create"); else throw error; }
+      });
+    };
+    signer = createModelImageSigner({ authorize }, { metadata: found.entry.metadata }, images);
     signers.set(id, signer);
   }
   return signer;

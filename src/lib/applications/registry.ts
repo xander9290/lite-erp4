@@ -4,6 +4,7 @@ import { icons, type LucideIcon } from "lucide-react";
 import { contactsManifest } from "@/app/(auth)/erp/contactos/manifest";
 import { appointmentsManifest } from "@/app/(auth)/erp/citas/manifest";
 import { usersManifest } from "@/app/(auth)/erp/usuarios/manifest";
+import { accessManifest } from "@/app/(auth)/erp/accesos/manifest";
 import { createApplicationRegistry, type ApplicationManifest } from "./manifest";
 import { scaffoldApplications } from "./scaffolded/registry";
 import { installedModules } from "../modules/registry";
@@ -20,6 +21,7 @@ const moduleApplications: ApplicationManifest[] = installedModules().map(definit
 export const applications = createApplicationRegistry([
   contactsManifest,
   usersManifest,
+  accessManifest,
   appointmentsManifest,
   ...scaffoldApplications,
   ...moduleApplications,

@@ -420,6 +420,72 @@ errores de consola.
 Pendiente detectado: el formulario por defecto usa breadcrumb «Aplicaciones >
 modelo» sin el nombre del módulo, a diferencia de la lista (heredado del scaffold).
 
+## Fase 4: Control de accesos (2026-11-13)
+
+Implementado sin commit. Uso en [docs/modulos-declarativos.md](../modulos-declarativos.md#5-control-de-accesos).
+
+- **Cambio respecto al diseño:** grupos, permisos y reglas viven sólo en el código
+  (manifest); la BD guarda únicamente lo que cambia un administrador:
+  `access_user_groups`, `access_model_overrides` (diferencias con el manifest) y
+  `access_rule_states` (sólo reglas desactivadas). Así no hace falta sincronizar
+  catálogos ni hay estados divergentes. Migración `20261113170000_access_control`
+  (3 tablas, índice y FK a `users` con Cascade), aditiva.
+- **Cambio respecto al diseño:** cambiar grupos no incrementa `sessionVersion`: los
+  permisos se leen en cada transacción, así que surten efecto en la siguiente
+  operación sin cerrar sesiones.
+- `src/lib/access/declare.ts` valida y normaliza; `engine.ts` (`authorizeModel`)
+  revalida sesión, resuelve superusuario, grupos implicados, overrides y reglas
+  activas, y devuelve el predicado; `admin.ts` sirve a la app; `current.ts` da los
+  grupos del usuario a cajón, menús y layout (presentación).
+- `createModelService` acepta `authorize(tx, actor, operación)`; sin él conserva
+  la base admin (Contactos, Usuarios, Citas, Flota sin cambios). El predicado se
+  aplica en list/count/groups/kanban/lookup, read, save (antes y después),
+  move, remove (lote completo), react, activity y notes. `deleteListSelection`
+  acepta un autorizador que sustituye su comprobación admin interna.
+- El despachador usa `requireUser`; el servicio decide. Firmar imágenes exige
+  write o create. `AccessError("DENIED")`: «No tienes permiso para esta operación.»
+- Manifests de aplicación admiten `groups` en la app y en menús
+  (`memberOf`/`canOpenApplication`); módulos con grupos usan acceso
+  `authenticated` y menús visibles a los grupos con lectura en el código.
+- App nativa `/erp/accesos` (admin): grupos por módulo con miembros, detalle con
+  miembros, matriz CRUD por modelo y activación de reglas.
+- Hallazgo corregido por la integración: una regla `domain: []` compila a `{}` y
+  Prisma descarta objetos vacíos dentro de `OR`; el motor trata esa regla como
+  «sin restricción» en lugar de enviarla.
+
+Verificación 2026-11-13: `test:modules` 14/14; `test:modules:integration`
+aprobado con usuarios reales en esquema temporal (usuario sólo ve/edita/mueve/lee
+historial de sus tareas, sin unlink; responsable ve todo vía OR; superusuario sin
+reglas; override que concede unlink sin saltar la regla y que quita lectura;
+reglas desactivadas; administración sólo admin, ids validados, overrides que
+vuelven al manifest se eliminan); tsc, ESLint y `next build` aprobados; regresión
+scaffold, applications, list-selection, list-grouping y form-navigation
+completas; `test:framework:integration` completo aprobado (apps scaffold con el
+servicio modificado: permisos, concurrencia, hooks, sync, force, create:views).
+
+BD local: la migración `20261113170000_access_control` figura aplicada a las
+10:37:59 (hora local) del 2026-11-13 por un comando no identificado; descartado
+que fueran las integraciones (no hay tablas, usuarios ni migraciones de sus
+fixtures en `public`). `db:deploy` posterior: sin pendientes, sin diferencias.
+Revisión con el usuario: `/erp/accesos` en Chrome (grupos, matriz y reglas según el
+manifest; asignación de miembros guardada); usuario de prueba `prueba-accesos`
+(no admin) creado desde Usuarios: sin grupo, Demo responde «No tienes acceso»;
+con «Usuario», verificado contra la BD local mediante el registro/servicio que usa
+la UI (script temporal eliminado): ve sólo su tarea, el admin ve todas, no lee
+tareas ajenas, no crea categorías, no borra; su tarea de prueba se eliminó. El
+panel del navegador integrado no hidrató la lista como ese usuario (websocket de
+HMR fallido), así que su vista en navegador no se comprobó. `prueba-accesos` sigue
+en la BD, miembro de `demo.usuario`.
+
+Hallazgos pendientes: (1) `src/schemas/password.schema.ts` limita la contraseña
+a **máximo** 8 caracteres mientras la UI pide «al menos 8»; parece un error previo
+ajeno a esta fase. (2) Aviso sólo de desarrollo `instant-unrendered-segment` en
+`/erp/[module]/[[...path]]` (no afecta build ni funcionamiento); evaluar
+`export const instant = false` en el layout o reestructurar según la guía de
+navegación instantánea de Next 16.
+Límites: menús según el código (no reflejan overrides), etiquetas Many2one y
+displayName no filtran por reglas del modelo destino, sin permisos por campo.
+
 ## Riesgos
 
 - Seguridad del despachador único: lista blanca estricta y revalidación en transacción.

@@ -7,11 +7,14 @@ export type ApplicationMenuLink = {
   readonly href: string;
   readonly match?: "exact" | "prefix";
   readonly access?: ApplicationAccess;
+  /** Navigation only: visible to administrators or members of any of these groups. */
+  readonly groups?: readonly string[];
 };
 export type ApplicationMenu = ApplicationMenuLink | {
   readonly id: string;
   readonly label: string;
   readonly access?: ApplicationAccess;
+  readonly groups?: readonly string[];
   readonly items: readonly ApplicationMenuLink[];
 };
 
@@ -23,6 +26,8 @@ export type ApplicationManifest = {
   readonly icon: LucideIcon;
   readonly depends: readonly string[];
   readonly access: ApplicationAccess;
+  /** Declarative modules: members of any of these groups (or administrators) may open the application. */
+  readonly groups?: readonly string[];
   /** Navigation only: routes and server actions still authorize their operations. */
   readonly menus?: readonly ApplicationMenu[];
   /** Prisma model names owned by this module; references to other modules are dependencies. */
@@ -41,6 +46,7 @@ function validateMenus(application: ApplicationManifest) {
     if (!item || !identifier.test(item.id) || ids.has(item.id) || typeof item.label !== "string" || !item.label.trim()) throw new Error(`Menú inválido o duplicado en ${application.id}.`);
     ids.add(item.id);
     if (item.access !== undefined && !["authenticated", "admin"].includes(item.access)) throw new Error(`Acceso de menú inválido en ${application.id}.`);
+    if (item.groups !== undefined && (!Array.isArray(item.groups) || item.groups.some(group => typeof group !== "string"))) throw new Error(`Grupos de menú inválidos en ${application.id}.`);
     if ("items" in item) {
       if (nested || "href" in item || !Array.isArray(item.items) || !item.items.length) throw new Error(`Grupo de menú inválido en ${application.id}.`);
       item.items.forEach(child => validateItem(child, true));
@@ -69,8 +75,13 @@ export function applicationHref(manifest: ApplicationManifest): `/erp/${string}`
   return `/erp/${manifest.id}`;
 }
 
-export function canOpenApplication(manifest: ApplicationManifest, user: { isAdmin: boolean } | null): boolean {
-  return user !== null && (manifest.access === "authenticated" || user.isAdmin);
+export type ApplicationUser = { isAdmin: boolean; groups?: ReadonlySet<string> } | null;
+/** Presentation only: groups and admin flags decide visibility; every operation is authorized on the server. */
+export function memberOf(user: ApplicationUser, groups: readonly string[] | undefined) {
+  return !groups || Boolean(user?.isAdmin) || groups.some(group => user?.groups?.has(group));
+}
+export function canOpenApplication(manifest: ApplicationManifest, user: ApplicationUser): boolean {
+  return user !== null && (manifest.access === "authenticated" || user.isAdmin) && memberOf(user, manifest.groups);
 }
 
 /** Validate the complete set before exposing any application. Dependencies come first. */
@@ -104,6 +115,6 @@ export function createApplicationRegistry(manifests: readonly ApplicationManifes
   return {
     get: (id: string) => byId.get(id),
     all: (): readonly ApplicationManifest[] => [...ordered],
-    forUser: (user: { isAdmin: boolean } | null) => ordered.filter(manifest => canOpenApplication(manifest, user)),
+    forUser: (user: ApplicationUser) => ordered.filter(manifest => canOpenApplication(manifest, user)),
   };
 }

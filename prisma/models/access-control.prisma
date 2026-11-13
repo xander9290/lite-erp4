@@ -1,0 +1,38 @@
+// Access control for declarative modules. Groups, model access and record rules are
+// declared in module manifests (code); these tables only store what an administrator
+// changes: user memberships, model access overrides and rule activation.
+
+model AccessUserGroup {
+  userId    String   @map("user_id")
+  user      User     @relation("AccessUserGroup_user", fields: [userId], references: [id], onDelete: Cascade)
+  /** `<module>.<group>` as declared in a manifest. */
+  groupId   String   @map("group_id") @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([userId, groupId])
+  @@index([groupId])
+  @@map("access_user_groups")
+}
+
+model AccessModelOverride {
+  groupId   String   @map("group_id") @db.VarChar(120)
+  /** `<module>.<model>` public model id. */
+  model     String   @db.VarChar(120)
+  read      Boolean
+  create    Boolean
+  write     Boolean
+  unlink    Boolean
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@id([groupId, model])
+  @@map("access_model_overrides")
+}
+
+model AccessRuleState {
+  /** `<module>.<rule>` as declared in a manifest. */
+  ruleId    String   @id @map("rule_id") @db.VarChar(120)
+  active    Boolean
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("access_rule_states")
+}

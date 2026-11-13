@@ -1,13 +1,13 @@
 import { ChartColumnBig } from "lucide-react";
 import { Suspense } from "react";
-import { getCurrentUser } from "@/lib/auth/access";
+import { getCurrentAccessUser } from "@/lib/access/current";
 import AppContainer from "@/components/ui/AppContainer";
 import AppGrid from "@/components/ui/AppGrid";
 import { applications } from "@/lib/applications/registry";
 import { applicationHref } from "@/lib/applications/manifest";
 
 async function Applications() {
-  const user = await getCurrentUser();
+  const user = await getCurrentAccessUser();
   return (
     <AppGrid>
       <AppContainer name="Ventas" icon={<ChartColumnBig size={26} strokeWidth={1.8} />} />

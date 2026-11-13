@@ -8,7 +8,9 @@ export function safeErpRedirect(value: unknown) {
 }
 
 export class AccessError extends Error {
-  constructor(readonly code: "UNAUTHENTICATED" | "FORBIDDEN") { super(code === "UNAUTHENTICATED" ? "Tu sesión no está activa. Inicia sesión nuevamente." : "Necesitas permisos de administrador."); }
+  constructor(readonly code: "UNAUTHENTICATED" | "FORBIDDEN" | "DENIED") {
+    super(code === "UNAUTHENTICATED" ? "Tu sesión no está activa. Inicia sesión nuevamente." : code === "DENIED" ? "No tienes permiso para esta operación." : "Necesitas permisos de administrador.");
+  }
 }
 
 export function assertUserChange(actorId: string, target: { id: string; active: boolean; isAdmin: boolean }, next: { active: boolean; isAdmin: boolean }, activeAdmins: number) {
