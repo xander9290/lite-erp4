@@ -72,6 +72,36 @@ se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
+### Tutoría de Flota: pausa para cambiar de máquina (2026-11-13)
+
+Rama `codex/flota`. Fabricante instalado con name/active y logo Image opcional
+(folder flota/fabricantes, tracking). Modelo instalado con name/active y
+fabricanteId obligatorio a FlotaFabricante, Restrict/tracking; conservar su nombre.
+Su alias fabricante permite @displayName("name", "fabricante.name") y el formato
+«Modelo / Fabricante». Manifest icon car y ambos modelos registrados; vistas,
+lookup y uploader por convención, sin eject ni helpers de scaffold.
+
+El usuario confirmó guardar/reabrir fabricante, subir/guardar/reabrir su logo y,
+tras instalar Modelo/reiniciar/finalizar mantenimiento, crear/reabrir Modelo con
+fabricante y presentación «Corolla / Toyota». Confirmación funcional del usuario,
+sin repetición visual ni consulta independiente de BD por el asistente.
+Al pausar se verificaron fuentes/esquema instalado, las tres migraciones del
+recorrido y ausencia de marcador de mantenimiento. Sin suites/build nuevos;
+git diff --check de la documentación. Detalle en [la tutoría](tutorial-flota.md).
+
+**Próximo paso pendiente:** vehículos (punto 4 del recorrido). Confirmar nombre
+con el usuario (Vehicle propuesto, no decidido), revisar create:model --dry-run
+y después declarar la relación con Modelo. No se creó ese modelo ni se adelantaron
+campos, relaciones, reglas o vistas. Mantener un ejercicio por vez.
+
+**Cambio de máquina:** hay cambios locales sin commit en docs, src/modules/flota,
+índice, prisma/models, propiedad y migraciones. Commit/push/pull requieren
+autorización; no se ejecutaron durante este cierre. Para retomar, obtener esa
+rama con sus cambios, preparar dependencias/configuración privada, generar cliente
+y comprobar destino de BD/migraciones antes de aplicar SQL. No asumir que el código
+compartido transporta datos, secretos, backups locales o procesos dev. Guía de
+continuidad y nombres de migraciones en [la tutoría](tutorial-flota.md#continuidad-en-la-otra-máquina).
+
 ### Pendiente: desinstalación en producción (2026-11-13)
 
 Registrado por petición del usuario. Diseñar el despliegue y mantenimiento
@@ -262,14 +292,10 @@ producción. Un timeout de tsc del scaffold durante compilaciones concurrentes s
 resolvió al repetirlo; no se relajaron límites ni se omitieron pruebas. No se
 repitieron test:orm, test:orm:install ni test:framework:integration completos.
 
-Siguiente paso: el usuario ejecuta sólo
-`npm run create:module -- flotaensayo --dry-run`; revisar su plan antes de avanzar.
-`flotaensayo` permite practicar en paralelo: `flota` colisiona con la aplicación
-actual y no se puede reutilizar sin una decisión posterior. No se ha creado ese
-módulo ni ninguno de sus modelos. [Recorrido y primer paso](tutorial-flota.md).
-
-Retirar Flota/Demo queda fuera del alcance actual. Si se retoma, requiere revisión
-separada del SQL, datos y asignaciones, y aprobación explícita antes de aplicarlo.
+En aquella preparación se propuso `flotaensayo` para evitar colisiones con la
+aplicación entonces existente, sin crear sus modelos ni autorizar retiradas.
+La situación cambió después: ver el inicio vigente en `codex/flota` y
+[el primer paso actualizado](tutorial-flota.md).
 
 Hallazgos abiertos: límite de contraseña máximo 8 frente al mensaje de UI,
 aviso dev `instant-unrendered-segment`, breadcrumbs del formulario por defecto y

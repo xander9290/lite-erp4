@@ -117,8 +117,7 @@ Las pruebas de related tienen su propio fixture, instalado sólo en el proyecto 
 esquema PostgreSQL desechables. El ID quedó libre en aquella retirada histórica,
 pero después el usuario recreó la aplicación Flota y volvió a retirarla junto con
 Citas el 2026-11-13 (apartado siguiente). Demo se conserva. El
-[nuevo tutorial](tutorial-flota.md) propone `flotaensayo`; `flota` está libre si
-el usuario decide reutilizarlo.
+[nuevo tutorial](tutorial-flota.md) usa ahora el ID disponible `flota`.
 
 ## Retirada de Citas odontológicas y Flota, 2026-11-13
 
@@ -140,5 +139,4 @@ sin comando genérico, siguiendo el procedimiento de la retirada anterior:
 - Migración `20261113190000_remove_citas_flota`: transacción explícita, borra el
   historial sólo de esos seis modelos, FKs, seis tablas y el enum de Citas; sin CASCADE.
   Esta migración elimina datos: en otra base, revisar su alcance antes de aplicarla.
-- El ID `flota` queda libre; el tutorial nuevo propone `flotaensayo` y puede usar `flota`
-  si el usuario lo decide.
+- El ID `flota` quedó libre y se adoptó después para la nueva tutoría en `codex/flota`.

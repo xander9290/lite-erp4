@@ -7,7 +7,7 @@ Sólo se escribe TSX para lo que se personaliza.
 
 > Estado: prototipo en la rama `refactor/modulos-declarativos`. Autorización por
 > grupos, permisos por modelo y reglas de registro (sección 5); sin grupos, sólo administradores.
-> Las apps existentes (Contactos, Usuarios, Citas, Flota) siguen con su flujo anterior.
+> Contactos y Usuarios conservan su flujo anterior. Citas y la Flota anterior fueron retiradas.
 
 ## Estructura
 

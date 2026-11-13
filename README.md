@@ -53,8 +53,8 @@ Muestra el SQL y pide aprobación antes de aplicarlo; se detiene ante errores.
 datos y mantiene la aprobación del SQL. [Guía del comando](docs/sincronizar-aplicaciones.md).
 
 Cada aplicación creada con `create:app` incluye un README con comandos concretos
-para su identificador, separados por caso. La nueva tutoría de Flota usará módulos
-declarativos en paralelo: la Flota actual y Demo se conservan.
+para su identificador, separados por caso. La nueva tutoría de Flota usa módulos
+declarativos con el ID `flota`, disponible tras retirar la aplicación anterior.
 [Punto de partida y ritmo](docs/tutorial-flota.md).
 
 | Caso | Guía |
