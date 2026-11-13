@@ -9,7 +9,14 @@ export default defineModule({
   name: "Demo módulos",
   icon: "flask-conical",
   models: {
-    tarea: { model: Tarea, kanban: "estado" },
+    tarea: {
+      model: Tarea,
+      kanban: "estado",
+      views: {
+        form: () => import("./views/TareaForm"),
+        list: () => import("./views/TareaList"),
+      },
+    },
     categoria: Categoria,
   },
   menu: {

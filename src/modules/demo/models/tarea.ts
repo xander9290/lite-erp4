@@ -2,14 +2,15 @@ import "server-only";
 import { Fields, Model, ModelValidationError } from "@/lib/orm";
 
 export class Tarea extends Model {
-  name = Fields.Text({ label: "Título", required: true, maxLength: 120, tracking: true });
+  name = Fields.Text({ label: "Título", required: true, maxLength: 120, tracking: true, searchable: true });
   categoria = Fields.Many2one("DemoCategoria", { label: "Categoría", required: true, tracking: true });
   estado = Fields.Selection([
     { value: "pendiente", label: "Pendiente" },
     { value: "curso", label: "En curso" },
     { value: "hecha", label: "Hecha" },
   ], { label: "Estado", required: true, default: "pendiente", tracking: true });
-  prioridad = Fields.Integer({ label: "Prioridad", min: 1, max: 5, default: 3 });
+  // Presentation options: the list policy (search, order, filters, groups) is declared on each Field.
+  prioridad = Fields.Integer({ label: "Prioridad", min: 1, max: 5, default: 3, groupable: true });
   vence = Fields.DateTime({ label: "Vence" });
 
   // Business rules stay in the model and run on the server.

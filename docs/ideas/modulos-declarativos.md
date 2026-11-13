@@ -378,6 +378,48 @@ Suspense (aviso de Next 16, ya sin errores en consola) y el repositorio genéric
 mostraba un mensaje de `orm:bind`; ahora indica reiniciar dev tras `orm:sync`
 (ocurrió porque dev conservaba el cliente Prisma anterior a la instalación).
 
+## Fase 3: eject y opciones de Field (2026-11-13)
+
+Implementado sobre el commit `5ea812b`, sin commit propio todavía. Guía de uso en
+[docs/modulos-declarativos.md](../modulos-declarativos.md).
+
+- `Fields.*` aceptan `list`, `searchable`, `sortable`, `filterable`, `groupable`
+  (booleanos, validados por tipo; prohibidos en sensibles; los virtuales sólo
+  `list`). Se guardan en metadata sólo si se declaran: los contratos generados de
+  apps existentes no cambian (`orm:generate -- flota --check`: `*.schema.ts`,
+  stores y uploads sin cambios). `derivedListPolicy` los usa y conserva las
+  convenciones anteriores cuando faltan; el override del manifest sigue ganando.
+- Vistas perezosas: `views: { form: () => import(...), list: () => import(...) }`,
+  para que scripts como `orm:sync` no carguen React al leer el manifest.
+- `FormValues<typeof Clase>` (type-only) tipa los Fields de una vista expulsada.
+- `ModelCollection` acepta `columns`, `view` y `title`; las columnas deben estar
+  en la política del servidor y sólo pueden restringir capacidades.
+- `npm run eject:view -- modulo modelo form|list [--dry-run]`: genera la vista con
+  los controles por defecto y registra el loader en el manifest editando el AST
+  (`src/lib/modules/eject.ts`); no sobrescribe archivos ni vistas registradas y
+  revierte la vista si el manifest no se puede escribir.
+- Demo: Tarea con `searchable`/`groupable`, formulario expulsado en dos grupos y
+  lista expulsada con columnas reordenadas y «Fecha límite» sin filtro. Módulo
+  completo: 5 archivos / 112 líneas (con las dos vistas personalizadas).
+- La integración usa ahora su propio módulo `scripts/fixtures/modules-ensayo`
+  (incluye vistas expulsadas), independiente de `demo`; limpieza con reintentos
+  porque un `next dev` abierto puede bloquear la carpeta temporal en Windows.
+
+Verificación 2026-11-13: `test:modules` 12/12 (opciones, política, validaciones,
+`registerView` en casos simple/una línea/multilínea/duplicado/inválidos y
+plantillas); `test:modules:integration` aprobado (instalación de `ensayo`, servicio
+completo, `next typegen` + tsc con vistas expulsadas; temporales eliminados);
+`tsc` también rechaza un nombre de campo inexistente en la vista; ESLint y
+`next build` aprobados. Regresión: scaffold 12/12, applications 10/10,
+list-selection 8/8, form-navigation 12/12, form-model 5/5; test:orm y
+test:orm:install sólo con los fallos `EPERM` de symlinks ya conocidos. En Chrome
+(`:3000`, sesión del usuario, sin guardar datos): lista expulsada con columnas y
+etiqueta personalizadas, agrupación por Prioridad, formulario en dos grupos, sin
+errores de consola.
+
+Pendiente detectado: el formulario por defecto usa breadcrumb «Aplicaciones >
+modelo» sin el nombre del módulo, a diferencia de la lista (heredado del scaffold).
+
 ## Riesgos
 
 - Seguridad del despachador único: lista blanca estricta y revalidación en transacción.

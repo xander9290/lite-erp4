@@ -1,5 +1,5 @@
 export { Fields, type Field, type FieldMetadata, type SelectionOption } from "./fields";
-export { Model, defineModel, type ModelInput, type ModelValues, type ModelOptions } from "./model";
+export { Model, defineModel, type ModelInput, type ModelValues, type ModelOptions, type FormValues } from "./model";
 export { ModelValidationError, type ModelContext, type ModelActor } from "./context";
 export { createQueryActions } from "./query-actions";
 export type { ListDomain, DomainNode, ListDomainContext, ListActionOptions } from "./domain";

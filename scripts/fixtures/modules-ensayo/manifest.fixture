@@ -1,0 +1,26 @@
+import "server-only";
+import { defineModule } from "@/lib/modules/define";
+import { Categoria } from "./models/categoria";
+import { Tarea } from "./models/tarea";
+
+/** Integration fixture for declarative modules; installed only in the disposable project/schema. */
+export default defineModule({
+  id: "ensayo",
+  name: "Ensayo módulos",
+  icon: "flask-conical",
+  models: {
+    tarea: {
+      model: Tarea,
+      kanban: "estado",
+      views: {
+        form: () => import("./views/TareaForm"),
+        list: () => import("./views/TareaList"),
+      },
+    },
+    categoria: Categoria,
+  },
+  menu: {
+    Tareas: "tarea",
+    Configuración: { Categorías: "categoria" },
+  },
+});

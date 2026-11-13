@@ -17,12 +17,12 @@ async function Resolve({ params }: Props) {
   const config = modelClientConfig(found.entry.id);
   const { views } = found.entry;
   if (path.length === 1) {
-    const List = views.list;
-    return List ? <List config={config} /> : <ModelCollection config={config} />;
+    const List = views.list ? (await views.list()).default : ModelCollection;
+    return <List config={config} />;
   }
   const id = path[1] === "nuevo" ? undefined : decodeURIComponent(path[1]);
   if (id !== undefined && (!id.trim() || id.length > 100)) notFound();
-  const Form = views.form ?? ModelForm;
+  const Form = views.form ? (await views.form()).default : ModelForm;
   return <Form key={id ?? "nuevo"} config={config} id={id} />;
 }
 

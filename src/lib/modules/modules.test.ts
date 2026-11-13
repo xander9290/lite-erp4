@@ -38,11 +38,43 @@ test("la política de lista sale de los metadatos y excluye sensibles", () => {
     searchFields: ["name"],
     sortable: ["name", "categoria", "estado", "prioridad", "vence"],
     filterable: ["name", "categoria", "estado", "prioridad", "vence"],
-    groupable: ["categoria", "estado"],
+    groupable: ["categoria", "estado", "prioridad"],
   });
   const definition = defineModule({ id: "prueba", name: "Prueba", icon: "flask-conical", models: { etiqueta: Etiqueta } });
   assert.deepEqual(definition.models[0].list.fields, ["name"]);
   assert.deepEqual(derivedListPolicy(definition.models[0].metadata, { searchFields: [] }).searchFields, []);
+});
+
+test("las opciones del Field deciden lista, búsqueda, orden, filtros y grupos", () => {
+  class Producto extends Model {
+    name = Fields.Text({ required: true, searchable: true });
+    codigo = Fields.Text({ searchable: true, sortable: false });
+    notas = Fields.Text({ list: false });
+    activo = Fields.Boolean({ default: true, groupable: false, filterable: false });
+    stock = Fields.Integer({ groupable: true });
+  }
+  const { list } = defineModule({ id: "prueba", name: "Prueba", icon: "flask-conical", models: { producto: Producto } }).models[0];
+  assert.deepEqual(list, {
+    fields: ["name", "codigo", "activo", "stock"],
+    searchFields: ["name", "codigo"],
+    sortable: ["name", "activo", "stock"],
+    filterable: ["name", "codigo", "stock"],
+    groupable: ["stock"],
+  });
+  assert.deepEqual(defineModule({ id: "prueba", name: "Prueba", icon: "flask-conical", models: { producto: { model: Producto, list: { searchFields: ["name"] } } } }).models[0].list.searchFields, ["name"]);
+  class Oculto extends Model { name = Fields.Text({ list: false, sortable: true }); }
+  assert.throws(() => defineModule({ id: "prueba", name: "Prueba", icon: "flask-conical", models: { oculto: Oculto } }), /fuera de la lista/);
+});
+
+test("las opciones de presentación se validan al declarar el Field", () => {
+  assert.throws(() => Fields.Integer({ searchable: true }), /sólo aplica a campos Text/);
+  assert.throws(() => Fields.Image({ folder: "x", sortable: true }), /no se ordena/);
+  assert.throws(() => Fields.DateTime({ groupable: true }), /no admite imágenes ni fechas/);
+  assert.throws(() => Fields.Text({ sensitive: true, list: true }), /sensible/);
+  assert.throws(() => Fields.Text({ compute: "calc", sortable: true }), /virtual/);
+  assert.throws(() => Fields.Text({ searchable: "si" as never }), /booleano/);
+  assert.equal(Fields.Text({ compute: "calc", list: true }).metadata.list, true);
+  assert.equal(Object.hasOwn(Fields.Text().metadata, "searchable"), false, "sin opción no se añade la clave");
 });
 
 test("defineModule rechaza identificadores, claves y menús inválidos", () => {

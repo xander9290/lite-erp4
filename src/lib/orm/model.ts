@@ -96,6 +96,9 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
   });
 }
 
+/** Form values of a declaration, for typed custom views: `FieldText<FormValues<typeof Tarea>> name="name"`. Type-only; the class stays server-only. */
+export type FormValues<C extends Constructor> = Input<InstanceType<C>> & { id?: string; revision?: string };
+
 type ModelContract = { readonly schema: z.ZodType };
 export type ModelInput<T extends ModelContract> = z.input<T["schema"]>;
 export type ModelValues<T extends ModelContract> = z.output<T["schema"]>;

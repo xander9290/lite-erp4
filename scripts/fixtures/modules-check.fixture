@@ -13,16 +13,16 @@ const admin = await prisma.user.create({ data: { login: "modules-admin", passwor
 const reader = await prisma.user.create({ data: { login: "modules-reader", password, isAdmin: false } });
 const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
 const readerActor = { id: reader.id, sessionVersion: reader.sessionVersion };
-const categorias = modelService("demo.categoria");
-const tareas = modelService("demo.tarea");
+const categorias = modelService("ensayo.categoria");
+const tareas = modelService("ensayo.tarea");
 const ok = <T extends { ok: boolean }>(result: T, label: string) => { assert.equal(result.ok, true, `${label}: ${JSON.stringify(result)}`); return result as Extract<T, { ok: true }>; };
 
 // Registry: only registered ids, serializable client contract.
-for (const invalid of ["demo.nope", "otro.tarea", "../demo.tarea", 42, null]) assert.equal(getModuleModel(invalid), undefined, String(invalid));
-const clientConfig = modelClientConfig("demo.tarea");
+for (const invalid of ["ensayo.nope", "otro.tarea", "../ensayo.tarea", 42, null]) assert.equal(getModuleModel(invalid), undefined, String(invalid));
+const clientConfig = modelClientConfig("ensayo.tarea");
 // structuredClone rejects functions and class instances: only plain data may reach the browser.
 assert.doesNotThrow(() => structuredClone(clientConfig));
-assert.deepEqual(clientConfig.lookups, { categoria: "demo.categoria" });
+assert.deepEqual(clientConfig.lookups, { categoria: "ensayo.categoria" });
 const plain = (value: unknown) => JSON.parse(JSON.stringify(value));
 for (const [name, metadata] of Object.entries(clientConfig.fields)) assert.deepEqual(plain(fieldFromMetadata(metadata).metadata), plain(metadata), name);
 
@@ -31,7 +31,7 @@ const hogar = ok(await categorias.save(prisma, actor, { name: "Hogar", active: t
 const trabajo = ok(await categorias.save(prisma, actor, { name: "Trabajo", active: true }), "crear categoría 2");
 assert.equal(hogar.displayName, "Hogar");
 assert.equal(hogar.audit?.createBy?.login, "modules-admin");
-assert.equal((await prisma.demoCategoria.findUniqueOrThrow({ where: { id: hogar.values.id } })).createBy, admin.id);
+assert.equal((await prisma.ensayoCategoria.findUniqueOrThrow({ where: { id: hogar.values.id } })).createBy, admin.id);
 const base = { categoria: hogar.values.id, estado: "pendiente", prioridad: 3, vence: null };
 const t1 = ok(await tareas.save(prisma, actor, { ...base, name: "  Lavar   ropa " }), "crear tarea");
 assert.equal(t1.values.name, "Lavar ropa", "normalize del modelo");
@@ -42,7 +42,7 @@ ok(await tareas.save(prisma, actor, { ...base, name: "Comprar pan" }), "crear ta
 const rejected = await tareas.save(prisma, actor, { ...base, name: "Urgente", estado: "hecha", prioridad: 5 });
 assert.equal(rejected.ok, false);
 assert.equal(!rejected.ok && rejected.fieldErrors?.prioridad, "Una tarea urgente no puede cerrarse sin revisión.");
-assert.equal(await prisma.demoTarea.count({ where: { name: "Urgente" } }), 0);
+assert.equal(await prisma.ensayoTarea.count({ where: { name: "Urgente" } }), 0);
 assert.equal((await tareas.save(prisma, actor, { ...base, name: "Campo extra", hacker: true })).ok, false, "rechaza campos no declarados");
 
 // Read and concurrency.
@@ -87,7 +87,7 @@ assert.equal(blocked.ok, false, "Restrict impide borrar una categoría usada");
 const all = ok(await withActor(actor, () => tareas.list(prisma, actor, { ...state, pageSize: 50 })), "lista para borrar");
 const selection = all.data.rows.map(row => ({ id: row.id, revision: row.revision! }));
 assert.equal((await tareas.remove(prisma, actor, selection.map((item, index) => index ? item : { ...item, revision: "2000-01-01T00:00:00.000Z" }))).ok, false, "revisión vieja revierte todo el lote");
-assert.equal(await prisma.demoTarea.count(), 3);
+assert.equal(await prisma.ensayoTarea.count(), 3);
 ok(await tareas.remove(prisma, actor, selection), "borrar tareas");
 ok(await categorias.remove(prisma, actor, [{ id: hogar.values.id, revision: categoriaRead.values.revision }]), "borrar categoría libre");
 
@@ -98,6 +98,6 @@ for (const denied of [readerActor, { ...actor, sessionVersion: actor.sessionVers
   assert.equal((await categorias.list(prisma, denied, state)).ok, false);
   assert.equal((await categorias.lookup(prisma, denied, { query: "" })).ok, false);
 }
-assert.equal(await prisma.demoCategoria.count({ where: { name: "No" } }), 0);
+assert.equal(await prisma.ensayoCategoria.count({ where: { name: "No" } }), 0);
 await prisma.$disconnect();
 console.log("modules-check ok");

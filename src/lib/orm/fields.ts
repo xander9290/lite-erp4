@@ -5,7 +5,10 @@ const fieldTag = Symbol("orm.field");
 export const INTEGER_MIN = -2147483648;
 export const INTEGER_MAX = 2147483647;
 type Default<T> = T | (() => T);
-type CommonOptions = { label?: string; required?: boolean; unique?: boolean; tracking?: boolean; sensitive?: boolean };
+/** Collection presentation. The server service still fixes and validates the resulting list policy. */
+type PresentationOptions = { list?: boolean; searchable?: boolean; sortable?: boolean; filterable?: boolean; groupable?: boolean };
+type CommonOptions = { label?: string; required?: boolean; unique?: boolean; tracking?: boolean; sensitive?: boolean } & PresentationOptions;
+const presentationKeys = ["list", "searchable", "sortable", "filterable", "groupable"] as const;
 type NullableOptions<T> = CommonOptions & { default?: Default<T | null> };
 type RequiredValue<T, O> = O extends { required: true } ? T : T | null;
 
@@ -21,6 +24,12 @@ type CommonMetadata = {
   readonly sensitive?: boolean;
   readonly defaultKind: "empty" | "literal" | "factory";
   readonly defaultValue?: string | number | boolean | null;
+  /** Explicit collection presentation; absent keys use the module defaults. */
+  readonly list?: boolean;
+  readonly searchable?: boolean;
+  readonly sortable?: boolean;
+  readonly filterable?: boolean;
+  readonly groupable?: boolean;
 };
 export type SelectionOption = { readonly value: string; readonly label: string };
 export type FieldMetadata = CommonMetadata & (
@@ -49,11 +58,12 @@ export function isField(value: unknown): value is Field {
 
 function checkOptions(options: CommonOptions, extra: readonly string[]) {
   if (!options || typeof options !== "object" || Array.isArray(options)) throw new Error("Las opciones del Field deben ser un objeto.");
-  const allowed = new Set(["label", "required", "unique", "default", "tracking", "sensitive", ...extra]);
+  const allowed = new Set(["label", "required", "unique", "default", "tracking", "sensitive", ...presentationKeys, ...extra]);
   for (const key of Object.keys(options)) if (!allowed.has(key)) throw new Error(`Opción de Field desconocida: ${key}.`);
   if (options.label !== undefined && (typeof options.label !== "string" || !options.label.trim())) throw new Error("El label del Field no puede estar vacío.");
-  for (const key of ["required", "unique", "tracking", "sensitive"] as const) if (options[key] !== undefined && typeof options[key] !== "boolean") throw new Error(`${key} debe ser booleano.`);
+  for (const key of ["required", "unique", "tracking", "sensitive", ...presentationKeys] as const) if (options[key] !== undefined && typeof options[key] !== "boolean") throw new Error(`${key} debe ser booleano.`);
   if (options.sensitive && options.tracking) throw new Error("Un campo sensible no puede habilitar tracking.");
+  if (options.sensitive && presentationKeys.some(key => options[key])) throw new Error("Un campo sensible no se publica en colecciones: sin list, searchable, sortable, filterable ni groupable.");
 }
 
 function checkBounds(min: number | undefined, max: number | undefined, lengths = false) {
@@ -74,6 +84,10 @@ function makeField<I, O>(schema: z.ZodType<O, I>, options: CommonOptions & { def
     if (parts.length < 2 || parts.length > 4 || parts.some(part => !/^[a-z][A-Za-z0-9]*$/.test(part) || ["constructor", "prototype", "__proto__"].includes(part))) throw new Error("related necesita una ruta Many2one de hasta tres saltos.");
     if (options.required || options.unique || options.tracking || options.sensitive || Object.hasOwn(options, "default")) throw new Error("related es de lectura: sin required, unique, tracking, sensitive ni default.");
   }
+  if ((options.related !== undefined || options.compute !== undefined) && (options.searchable || options.sortable || options.filterable || options.groupable)) throw new Error("Un campo virtual sólo admite list: no se busca, ordena, filtra ni agrupa en SQL.");
+  if (options.searchable && details.kind !== "text") throw new Error("searchable sólo aplica a campos Text.");
+  if ((options.sortable || options.filterable) && details.kind === "image") throw new Error("Una imagen no se ordena ni se filtra.");
+  if (options.groupable && (details.kind === "image" || details.kind === "datetime")) throw new Error("groupable no admite imágenes ni fechas (sin agrupación por periodos todavía).");
   const hasDefault = Object.hasOwn(options, "default");
   const configuredDefault = options.default;
   const validateDefault = (value: unknown) => {
@@ -88,6 +102,7 @@ function makeField<I, O>(schema: z.ZodType<O, I>, options: CommonOptions & { def
     ...(options.compute ? { compute: options.compute } : {}),
     defaultKind: !hasDefault ? "empty" : typeof configuredDefault === "function" ? "factory" : "literal",
     ...(hasDefault && typeof configuredDefault !== "function" ? { defaultValue: configuredDefault } : {}),
+    ...Object.fromEntries(presentationKeys.filter(key => options[key] !== undefined).map(key => [key, options[key]])),
   }) as FieldMetadata;
   return Object.freeze({
     [fieldTag]: true as const, metadata, schema, ...(options.related ? { related: options.related } : {}), ...(options.compute ? { compute: options.compute } : {}),

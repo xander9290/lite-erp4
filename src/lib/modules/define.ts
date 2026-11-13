@@ -21,9 +21,15 @@ export type ModuleModelSpec = ModelClass | {
   /** Custom views (eject). Without them the default list/form are used. */
   readonly views?: ModelViews;
 };
+export type ModelFormView = ComponentType<{ config: ModelClientConfig; id?: string }>;
+export type ModelListView = ComponentType<{ config: ModelClientConfig }>;
+/**
+ * Lazy loaders (`() => import("./views/TareaForm")`): views are client components, and a
+ * static import would load React into scripts such as orm:sync that read the manifest.
+ */
 export type ModelViews = {
-  readonly form?: ComponentType<{ config: ModelClientConfig; id?: string }>;
-  readonly list?: ComponentType<{ config: ModelClientConfig }>;
+  readonly form?: () => Promise<{ default: ModelFormView }>;
+  readonly list?: () => Promise<{ default: ModelListView }>;
 };
 /** Menu entries reference model keys; nested objects create one group level. */
 export type ModuleMenu = Readonly<Record<string, string | Readonly<Record<string, string>>>>;
@@ -72,18 +78,27 @@ const key = /^[a-z][a-z0-9]*$/;
 const pascal = (value: string) => value.split("-").map(part => part[0].toUpperCase() + part.slice(1)).join("");
 const scalar = (field: FieldMetadata) => field.kind !== "image";
 
-/** Default list policy from Field metadata. The service still validates and fixes it on the server. */
+/**
+ * List policy from Field options (`list`, `searchable`, `sortable`, `filterable`, `groupable`),
+ * with conventions for undeclared options. A manifest `list` override still wins. The server
+ * service validates and fixes the result; nothing here comes from the browser.
+ */
 export function derivedListPolicy(metadata: Readonly<Record<string, FieldMetadata>>, override: Partial<ModelListPolicy> = {}): ModelListPolicy {
   const visible = Object.entries(metadata).filter(([, field]) => !field.sensitive);
-  const fields = override.fields ?? visible.slice(0, 12).map(([name]) => name);
+  const fields = override.fields ?? visible.filter(([, field]) => field.list ?? true).slice(0, 12).map(([name]) => name);
   const published = (name: string) => fields.includes(name);
+  for (const [name, field] of visible) {
+    if (!published(name) && (field.searchable || field.sortable || field.filterable || field.groupable)) throw new Error(`${name}: un campo fuera de la lista no puede buscarse, ordenarse, filtrarse ni agruparse. Quita list: false o esas opciones.`);
+  }
   const texts = visible.filter(([name, field]) => field.kind === "text" && published(name)).map(([name]) => name);
+  const declaredSearch = visible.some(([, field]) => field.searchable !== undefined);
+  const pick = (test: (field: FieldMetadata) => boolean) => visible.filter(([name, field]) => published(name) && test(field)).map(([name]) => name);
   return {
     fields,
-    searchFields: override.searchFields ?? (texts.includes("name") ? ["name"] : texts.slice(0, 1)),
-    sortable: override.sortable ?? visible.filter(([name, field]) => published(name) && scalar(field)).map(([name]) => name),
-    filterable: override.filterable ?? visible.filter(([name, field]) => published(name) && scalar(field)).map(([name]) => name),
-    groupable: override.groupable ?? visible.filter(([name, field]) => published(name) && ["boolean", "selection", "many2one"].includes(field.kind)).map(([name]) => name),
+    searchFields: override.searchFields ?? (declaredSearch ? pick(field => field.searchable === true) : texts.includes("name") ? ["name"] : texts.slice(0, 1)),
+    sortable: override.sortable ?? pick(field => field.sortable ?? scalar(field)),
+    filterable: override.filterable ?? pick(field => field.filterable ?? scalar(field)),
+    groupable: override.groupable ?? pick(field => field.groupable ?? ["boolean", "selection", "many2one"].includes(field.kind)),
   };
 }
 

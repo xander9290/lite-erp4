@@ -81,8 +81,12 @@ aprobada y fase 2 (prototipo) implementada sin commit: `src/lib/modules`, ruta
 instalado en la BD local (migración `20261113154528_demo_module`) y registrado.
 Verificado con pruebas unitarias, integración PostgreSQL temporal, tsc, ESLint y
 build, y revisado en navegador en `:3000` (crear, reglas, historial, lista,
-agrupación y eliminación; dos correcciones menores aplicadas). Fase 2 completa,
-sin commit. Siguiente: fase 3 (eject + opciones de Field). Detalle en el plan. Plan completo, fases,
+agrupación y eliminación; dos correcciones menores aplicadas). Fase 2 en commit
+`5ea812b`. Fase 3 implementada sin commit: opciones de colección en Fields,
+vistas perezosas, `FormValues`, `eject:view` y guía
+[Módulos declarativos](modulos-declarativos.md); verificada con pruebas,
+integración temporal, build y Chrome. Siguiente: fase 4 (Control de accesos),
+previa aprobación. Detalle en el plan. Plan completo, fases,
 estimaciones y riesgos en [Módulos declarativos](ideas/modulos-declarativos.md).
 
 ### Eliminación desde FormView (2026-11-12)
