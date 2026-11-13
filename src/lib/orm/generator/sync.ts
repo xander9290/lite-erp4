@@ -82,7 +82,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   if (options.plan) {
     const plan = await installModels(root, profile, false, true, options.force);
     const uploadDirectory = join(root, "src/generated/orm/uploads", id);
-    const uploads = await artifactPlan(uploadDirectory, `uploads-${id}`, imageUploadFiles(profile.module));
+    const uploads = await artifactPlan(uploadDirectory, `uploads-${id}`, profile.runtime ? {} : imageUploadFiles(profile.module));
     options.log(`Plan de fuentes de ${id} (sin consultar la base):`);
     for (const change of plan.changes) options.log(relative(root, change.path));
     for (const change of uploads.changes.filter(change => change.action !== "unchanged")) options.log(`${change.action}: ${relative(root, join(uploadDirectory, change.name))}`);
@@ -107,6 +107,8 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   };
   const prisma = (args: string[], codes?: number[]) => run([...args, "--config", join(root, "prisma7.config.ts")], codes);
   const generate = async () => {
+    // Declarative modules build client contracts, uploads and repositories at runtime.
+    if (profile.runtime) return;
     const files = await prepareModuleArtifacts(root, profile.module, profile.externalOwners);
     const directory = join(root, "src/generated/orm/apps", id);
     const uploadDirectory = join(root, "src/generated/orm/uploads", id);
@@ -205,7 +207,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     prisma(["generate"]);
     stage("Sincronizar contratos y compilar adaptadores");
     await generate();
-    await bindRepositories(root, profile, true);
+    if (!profile.runtime) await bindRepositories(root, profile, true);
     stage("Comprobar TypeScript");
     run(["--noEmit"], [0], "typescript/bin/tsc");
     options.log(`\n✓ ${id} sincronizada. Revisa los cambios en Git y reinicia dev si estaba abierto.`);

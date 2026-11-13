@@ -11,6 +11,17 @@
           "text": "\n  // BEGIN lite-erp:flota:User\n  flotaRecordCreatedRecords FlotaRecord[] @relation(\"FlotaRecord_createBy\")\n  flotaFabricanteCreatedRecords FlotaFabricante[] @relation(\"FlotaFabricante_createBy\")\n  flotaModeloCreatedRecords FlotaModelo[] @relation(\"FlotaModelo_createBy\")\n  flotaVehicleCreatedRecords FlotaVehicle[] @relation(\"FlotaVehicle_createBy\")\n  // END lite-erp:flota:User\n"
         }
       ]
+    },
+    "demo": {
+      "file": "orm-demo.prisma",
+      "hash": "e363a1a03b85f3956abaa4e5c107d67701ccd4f5fafc609bd7ba131f3fd285b5",
+      "inverses": [
+        {
+          "file": "user.prisma",
+          "target": "User",
+          "text": "\n  // BEGIN lite-erp:demo:User\n  demoTareaCreatedRecords DemoTarea[] @relation(\"DemoTarea_createBy\")\n  demoCategoriaCreatedRecords DemoCategoria[] @relation(\"DemoCategoria_createBy\")\n  // END lite-erp:demo:User\n"
+        }
+      ]
     }
   }
 }

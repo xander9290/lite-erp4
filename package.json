@@ -38,7 +38,9 @@
     "test:list-grouping": "node --conditions=react-server --import tsx --test src/lib/list/grouping.test.ts src/lib/orm/service.test.ts",
     "update:views": "node --conditions=react-server --import tsx scripts/update-views.ts",
     "test:form-model": "node --import tsx --test src/components/ui/form/modelFields.test.tsx src/components/ui/form/modelReactionEngine.test.ts",
-    "benchmark:reactions": "node --conditions=react-server --import tsx scripts/benchmark-reactions.ts"
+    "benchmark:reactions": "node --conditions=react-server --import tsx scripts/benchmark-reactions.ts",
+    "test:modules": "node --conditions=react-server --import tsx --test src/lib/modules/*.test.ts",
+    "test:modules:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

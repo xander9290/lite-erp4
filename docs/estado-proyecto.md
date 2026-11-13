@@ -74,8 +74,15 @@ Acordado con el usuario el 2026-11-12, sin implementación todavía: reducir el
 código por módulo (ruta comodín, despachador único autorizado, repositorio
 genérico, vistas por defecto con eject, opciones en Field) e incorporar una app
 nativa de Control de accesos tipo Odoo. Flota se adaptará al final como módulo de
-referencia. Al retomar: pedir autorización para commit de lo pendiente, crear
-rama, fase 0 (línea base) y fase 1 (diseño para aprobación). Plan completo, fases,
+referencia. 2026-11-13: pull de `8de98f2`, rama `refactor/modulos-declarativos`,
+fase 0 medida (Fabricante 16 archivos/406 líneas; Vehicle 16/452), fase 1
+aprobada y fase 2 (prototipo) implementada sin commit: `src/lib/modules`, ruta
+`erp/[module]/[[...path]]`, vistas por defecto y módulo desechable `demo`,
+instalado en la BD local (migración `20261113154528_demo_module`) y registrado.
+Verificado con pruebas unitarias, integración PostgreSQL temporal, tsc, ESLint y
+build, y revisado en navegador en `:3000` (crear, reglas, historial, lista,
+agrupación y eliminación; dos correcciones menores aplicadas). Fase 2 completa,
+sin commit. Siguiente: fase 3 (eject + opciones de Field). Detalle en el plan. Plan completo, fases,
 estimaciones y riesgos en [Módulos declarativos](ideas/modulos-declarativos.md).
 
 ### Eliminación desde FormView (2026-11-12)

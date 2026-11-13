@@ -1,0 +1,103 @@
+import assert from "node:assert/strict";
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
+const { prisma } = await import("./src/lib/prisma");
+const { getModuleModel, modelClientConfig, modelService, withActor } = await import("./src/lib/modules/registry");
+const { hashPassword } = await import("./src/lib/auth/password");
+const { fieldFromMetadata } = await import("./src/lib/modules/fields");
+
+// Runs only inside the disposable project/schema created by modules.integration.ts.
+const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 10, filters: [] };
+const password = await hashPassword("modules-test-only");
+const admin = await prisma.user.create({ data: { login: "modules-admin", password, isAdmin: true, partner: { create: { name: "Administrador de prueba" } } } });
+const reader = await prisma.user.create({ data: { login: "modules-reader", password, isAdmin: false } });
+const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
+const readerActor = { id: reader.id, sessionVersion: reader.sessionVersion };
+const categorias = modelService("demo.categoria");
+const tareas = modelService("demo.tarea");
+const ok = <T extends { ok: boolean }>(result: T, label: string) => { assert.equal(result.ok, true, `${label}: ${JSON.stringify(result)}`); return result as Extract<T, { ok: true }>; };
+
+// Registry: only registered ids, serializable client contract.
+for (const invalid of ["demo.nope", "otro.tarea", "../demo.tarea", 42, null]) assert.equal(getModuleModel(invalid), undefined, String(invalid));
+const clientConfig = modelClientConfig("demo.tarea");
+// structuredClone rejects functions and class instances: only plain data may reach the browser.
+assert.doesNotThrow(() => structuredClone(clientConfig));
+assert.deepEqual(clientConfig.lookups, { categoria: "demo.categoria" });
+const plain = (value: unknown) => JSON.parse(JSON.stringify(value));
+for (const [name, metadata] of Object.entries(clientConfig.fields)) assert.deepEqual(plain(fieldFromMetadata(metadata).metadata), plain(metadata), name);
+
+// Create through the runtime repository: createBy, revision and display name.
+const hogar = ok(await categorias.save(prisma, actor, { name: "Hogar", active: true }), "crear categoría");
+const trabajo = ok(await categorias.save(prisma, actor, { name: "Trabajo", active: true }), "crear categoría 2");
+assert.equal(hogar.displayName, "Hogar");
+assert.equal(hogar.audit?.createBy?.login, "modules-admin");
+assert.equal((await prisma.demoCategoria.findUniqueOrThrow({ where: { id: hogar.values.id } })).createBy, admin.id);
+const base = { categoria: hogar.values.id, estado: "pendiente", prioridad: 3, vence: null };
+const t1 = ok(await tareas.save(prisma, actor, { ...base, name: "  Lavar   ropa " }), "crear tarea");
+assert.equal(t1.values.name, "Lavar ropa", "normalize del modelo");
+ok(await tareas.save(prisma, actor, { ...base, name: "Pagar luz", categoria: trabajo.values.id, prioridad: 5, vence: "2026-12-01T15:00:00.000Z" }), "crear tarea 2");
+ok(await tareas.save(prisma, actor, { ...base, name: "Comprar pan" }), "crear tarea 3");
+
+// Business rule from beforeSave returns field errors without writing.
+const rejected = await tareas.save(prisma, actor, { ...base, name: "Urgente", estado: "hecha", prioridad: 5 });
+assert.equal(rejected.ok, false);
+assert.equal(!rejected.ok && rejected.fieldErrors?.prioridad, "Una tarea urgente no puede cerrarse sin revisión.");
+assert.equal(await prisma.demoTarea.count({ where: { name: "Urgente" } }), 0);
+assert.equal((await tareas.save(prisma, actor, { ...base, name: "Campo extra", hacker: true })).ok, false, "rechaza campos no declarados");
+
+// Read and concurrency.
+const read = ok(await tareas.read(prisma, actor, t1.values.id), "leer");
+assert.equal(read.values.vence, null);
+const edited = ok(await tareas.save(prisma, actor, { ...read.values, prioridad: 4 }), "editar");
+assert.notEqual(edited.values.revision, read.values.revision);
+assert.equal((await tareas.save(prisma, actor, { ...read.values, prioridad: 2 })).ok, false, "revisión vieja rechazada");
+
+// Lists: search, filter, order, grouping by Many2one with authorized labels (actor reused by withActor).
+const list = ok(await withActor(actor, () => tareas.list(prisma, actor, state)), "lista");
+assert.equal(list.data.total, 3);
+assert.deepEqual(list.data.rows.map(row => row.name), ["Comprar pan", "Lavar ropa", "Pagar luz"]);
+assert.equal((list.data.rows[2] as { $labels?: Record<string, { label: string }> }).$labels?.categoria.label, "Trabajo");
+assert.equal(list.data.rows[2].vence, "2026-12-01T15:00:00.000Z");
+const search = ok(await withActor(actor, () => tareas.list(prisma, actor, { ...state, query: "pan" })), "búsqueda");
+assert.deepEqual(search.data.rows.map(row => row.name), ["Comprar pan"]);
+const filtered = ok(await withActor(actor, () => tareas.list(prisma, actor, { ...state, filters: [{ field: "prioridad", operator: "gte", value: "4" }] })), "filtro");
+assert.deepEqual(filtered.data.rows.map(row => row.name), ["Lavar ropa", "Pagar luz"]);
+const grouped = ok(await withActor(actor, () => tareas.list(prisma, actor, { ...state, groupBy: ["categoria"] })), "agrupación");
+assert.deepEqual(grouped.data.groups?.map(group => [group.label, group.count]).sort(), [["Hogar", 2], ["Trabajo", 1]]);
+const outside = await tareas.list(prisma, actor, state);
+assert.equal(outside.ok, false, "las etiquetas fallan cerrado sin actor de la operación");
+
+// Lookup, kanban, move, activity and notes.
+const lookup = ok(await categorias.lookup(prisma, actor, { query: "hog" }), "lookup");
+assert.deepEqual(lookup.items.map(item => item.label), ["Hogar"]);
+const column = ok(await withActor(actor, () => tareas.kanban(prisma, actor, { group: "pendiente", state })), "kanban");
+assert.equal(column.data.total, 3);
+const current = ok(await tareas.read(prisma, actor, t1.values.id), "leer para mover");
+ok(await tareas.move(prisma, actor, { id: t1.values.id, revision: current.values.revision, from: "pendiente", to: "curso" }), "mover");
+assert.equal((await tareas.move(prisma, actor, { id: t1.values.id, revision: current.values.revision, from: "pendiente", to: "hecha" })).ok, false, "mover con revisión vieja");
+const activity = ok(await tareas.activity(prisma, actor, { id: t1.values.id }), "actividad");
+assert.ok(activity.data.entries.some(entry => entry.kind === "update" && entry.changes.some(change => change.field === "estado" && change.after === "curso")), JSON.stringify(activity.data.entries));
+assert.ok(activity.data.entries.some(entry => entry.kind === "create"));
+ok(await tareas.addNote(prisma, actor, { id: t1.values.id, body: "Nota de prueba", requestId: "00000000-0000-4000-8000-000000000001" }), "nota");
+
+// Deletion: FK protection, revision check, then success.
+const categoriaRead = ok(await categorias.read(prisma, actor, hogar.values.id), "leer categoría");
+const blocked = await categorias.remove(prisma, actor, [{ id: hogar.values.id, revision: categoriaRead.values.revision }]);
+assert.equal(blocked.ok, false, "Restrict impide borrar una categoría usada");
+const all = ok(await withActor(actor, () => tareas.list(prisma, actor, { ...state, pageSize: 50 })), "lista para borrar");
+const selection = all.data.rows.map(row => ({ id: row.id, revision: row.revision! }));
+assert.equal((await tareas.remove(prisma, actor, selection.map((item, index) => index ? item : { ...item, revision: "2000-01-01T00:00:00.000Z" }))).ok, false, "revisión vieja revierte todo el lote");
+assert.equal(await prisma.demoTarea.count(), 3);
+ok(await tareas.remove(prisma, actor, selection), "borrar tareas");
+ok(await categorias.remove(prisma, actor, [{ id: hogar.values.id, revision: categoriaRead.values.revision }]), "borrar categoría libre");
+
+// Superuser-only baseline (groups come in phase 4): non-admins and stale sessions are rejected.
+for (const denied of [readerActor, { ...actor, sessionVersion: actor.sessionVersion + 1 }]) {
+  assert.equal((await categorias.read(prisma, denied, trabajo.values.id)).ok, false);
+  assert.equal((await categorias.save(prisma, denied, { name: "No", active: true })).ok, false);
+  assert.equal((await categorias.list(prisma, denied, state)).ok, false);
+  assert.equal((await categorias.lookup(prisma, denied, { query: "" })).ok, false);
+}
+assert.equal(await prisma.demoCategoria.count({ where: { name: "No" } }), 0);
+await prisma.$disconnect();
+console.log("modules-check ok");
