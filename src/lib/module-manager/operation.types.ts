@@ -1,0 +1,20 @@
+export type ModuleOperation = "install" | "update" | "uninstall";
+export type DataPolicy = "keep" | "drop";
+export type ModuleOperationPlan = {
+  id: string;
+  module: string;
+  name: string;
+  operation: ModuleOperation;
+  policy: DataPolicy;
+  fingerprint: string;
+  createdAt: string;
+  sql: string;
+  changes: { path: string; action: "create" | "update" | "delete" }[];
+  blockers: string[];
+  warnings: string[];
+  phase: "review" | "running" | "complete" | "failed";
+  message: string;
+  recordCounts?: { table: string; count: string }[];
+  canFinish?: boolean;
+};
+export type OperationResult = { ok: true; plan: ModuleOperationPlan } | { ok: false; error: string };

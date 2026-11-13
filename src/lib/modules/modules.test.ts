@@ -4,7 +4,7 @@ import { Fields, Model } from "../orm";
 import { defineModule, derivedListPolicy } from "./define";
 import { fieldFromMetadata } from "./fields";
 import { modelIdPattern } from "./config";
-import demo from "../../modules/demo/manifest";
+import unit from "./module.fixture";
 import { closeGroups } from "../access/engine";
 
 class Etiqueta extends Model {
@@ -13,25 +13,25 @@ class Etiqueta extends Model {
 }
 
 test("defineModule deriva nombres, tablas, rutas, delegates y perfil desde las claves", () => {
-  const [tarea, categoria] = demo.models;
-  assert.equal(tarea.id, "demo.tarea");
-  assert.equal(tarea.contract.name, "DemoTarea");
-  assert.equal(tarea.contract.table, "demo_tarea");
-  assert.equal(tarea.delegate, "demoTarea");
-  assert.equal(tarea.route, "/erp/demo/tarea");
+  const [tarea, categoria] = unit.models;
+  assert.equal(tarea.id, "unit.tarea");
+  assert.equal(tarea.contract.name, "UnitTarea");
+  assert.equal(tarea.contract.table, "unit_tarea");
+  assert.equal(tarea.delegate, "unitTarea");
+  assert.equal(tarea.route, "/erp/unit/tarea");
   assert.equal(tarea.label, "Tareas");
   assert.equal(categoria.label, "Categorías");
   assert.equal(tarea.kanban, "estado");
-  assert.equal(demo.profile.runtime, true);
-  assert.equal(demo.icon, "flask-conical");
-  assert.deepEqual(demo.profile.module.models.map(model => model.model.name), ["DemoTarea", "DemoCategoria"]);
-  assert.deepEqual(demo.application.models, ["DemoTarea", "DemoCategoria"]);
+  assert.equal(unit.profile.runtime, true);
+  assert.equal(unit.icon, "flask-conical");
+  assert.deepEqual(unit.profile.module.models.map(model => model.model.name), ["UnitTarea", "UnitCategoria"]);
+  assert.deepEqual(unit.application.models, ["UnitTarea", "UnitCategoria"]);
   // With groups, the application and menus are visible to members with read access (presentation only).
-  assert.equal(demo.application.access, "authenticated");
-  assert.deepEqual(demo.application.groups, ["demo.usuario", "demo.responsable"]);
-  assert.deepEqual(demo.application.menus, [
-    { id: "tarea-list", label: "Tareas", href: "/erp/demo/tarea", access: "authenticated", groups: ["demo.usuario", "demo.responsable"] },
-    { id: "configuracion-group", label: "Configuración", access: "authenticated", groups: ["demo.usuario", "demo.responsable"], items: [{ id: "categoria-list", label: "Categorías", href: "/erp/demo/categoria", access: "authenticated", groups: ["demo.usuario", "demo.responsable"] }] },
+  assert.equal(unit.application.access, "authenticated");
+  assert.deepEqual(unit.application.groups, ["unit.usuario", "unit.responsable"]);
+  assert.deepEqual(unit.application.menus, [
+    { id: "tarea-list", label: "Tareas", href: "/erp/unit/tarea", access: "authenticated", groups: ["unit.usuario", "unit.responsable"] },
+    { id: "configuracion-group", label: "Configuración", access: "authenticated", groups: ["unit.usuario", "unit.responsable"], items: [{ id: "categoria-list", label: "Categorías", href: "/erp/unit/categoria", access: "authenticated", groups: ["unit.usuario", "unit.responsable"] }] },
   ]);
   // Without groups a module stays admin-only.
   const plain = defineModule({ id: "prueba", name: "Prueba", icon: "flask-conical", models: { etiqueta: Etiqueta } });
@@ -40,16 +40,16 @@ test("defineModule deriva nombres, tablas, rutas, delegates y perfil desde las c
 });
 
 test("declareAccess normaliza grupos, permisos CRUD y reglas", () => {
-  assert.deepEqual(demo.access.groups.map(group => [group.id, group.implies]), [["demo.usuario", []], ["demo.responsable", ["demo.usuario"]]]);
-  assert.deepEqual(demo.access.grants.map(grant => [grant.group, grant.model, grant.perms]), [
-    ["demo.usuario", "demo.tarea", { read: true, create: true, write: true, unlink: false }],
-    ["demo.usuario", "demo.categoria", { read: true, create: false, write: false, unlink: false }],
-    ["demo.responsable", "demo.tarea", { read: true, create: true, write: true, unlink: true }],
-    ["demo.responsable", "demo.categoria", { read: true, create: true, write: true, unlink: true }],
+  assert.deepEqual(unit.access.groups.map(group => [group.id, group.implies]), [["unit.usuario", []], ["unit.responsable", ["unit.usuario"]]]);
+  assert.deepEqual(unit.access.grants.map(grant => [grant.group, grant.model, grant.perms]), [
+    ["unit.usuario", "unit.tarea", { read: true, create: true, write: true, unlink: false }],
+    ["unit.usuario", "unit.categoria", { read: true, create: false, write: false, unlink: false }],
+    ["unit.responsable", "unit.tarea", { read: true, create: true, write: true, unlink: true }],
+    ["unit.responsable", "unit.categoria", { read: true, create: true, write: true, unlink: true }],
   ]);
-  assert.deepEqual(demo.access.rules.map(rule => [rule.id, rule.models, rule.groups, rule.operations]), [
-    ["demo.tareas-propias", ["demo.tarea"], ["demo.usuario"], ["read", "create", "write", "unlink"]],
-    ["demo.tareas-todas", ["demo.tarea"], ["demo.responsable"], ["read", "create", "write", "unlink"]],
+  assert.deepEqual(unit.access.rules.map(rule => [rule.id, rule.models, rule.groups, rule.operations]), [
+    ["unit.tareas-propias", ["unit.tarea"], ["unit.usuario"], ["read", "create", "write", "unlink"]],
+    ["unit.tareas-todas", ["unit.tarea"], ["unit.responsable"], ["read", "create", "write", "unlink"]],
   ]);
   const base = { id: "prueba", name: "Prueba", icon: "flask-conical", models: { etiqueta: Etiqueta } } as const;
   assert.throws(() => defineModule({ ...base, groups: { "Mal": "x" } }), /clave de grupo inválida/);
@@ -62,13 +62,13 @@ test("declareAccess normaliza grupos, permisos CRUD y reglas", () => {
 });
 
 test("closeGroups resuelve grupos implicados e ignora ids desconocidos", () => {
-  const groups = new Map(demo.access.groups.map(group => [group.id, group]));
-  assert.deepEqual([...closeGroups(["demo.responsable"], groups)].sort(), ["demo.responsable", "demo.usuario"]);
-  assert.deepEqual([...closeGroups(["demo.usuario", "borrado.grupo"], groups)], ["demo.usuario"]);
+  const groups = new Map(unit.access.groups.map(group => [group.id, group]));
+  assert.deepEqual([...closeGroups(["unit.responsable"], groups)].sort(), ["unit.responsable", "unit.usuario"]);
+  assert.deepEqual([...closeGroups(["unit.usuario", "borrado.grupo"], groups)], ["unit.usuario"]);
 });
 
 test("la política de lista sale de los metadatos y excluye sensibles", () => {
-  const [tarea] = demo.models;
+  const [tarea] = unit.models;
   assert.deepEqual(tarea.list, {
     fields: ["name", "categoria", "estado", "prioridad", "vence"],
     searchFields: ["name"],
@@ -126,18 +126,18 @@ test("defineModule rechaza identificadores, claves y menús inválidos", () => {
 });
 
 test("los Fields reconstruidos en el navegador conservan los metadatos del servidor", () => {
-  for (const model of demo.models) {
+  for (const model of unit.models) {
     for (const [name, metadata] of Object.entries(model.metadata)) {
       const serialized = JSON.parse(JSON.stringify(metadata));
       assert.deepEqual(JSON.parse(JSON.stringify(fieldFromMetadata(serialized).metadata)), serialized, `${model.id}.${name}`);
     }
   }
-  const estado = fieldFromMetadata(JSON.parse(JSON.stringify(demo.models[0].metadata.estado)));
+  const estado = fieldFromMetadata(JSON.parse(JSON.stringify(unit.models[0].metadata.estado)));
   assert.equal(estado.createDefault(), "pendiente");
   assert.equal(estado.schema.safeParse("otra").success, false);
 });
 
 test("sólo se aceptan ids de modelo con forma módulo.clave", () => {
-  for (const valid of ["demo.tarea", "flota.fabricante"]) assert.ok(modelIdPattern.test(valid));
-  for (const invalid of ["demo", "demo.", "../demo.tarea", "demo.tarea.x", "Demo.tarea", "demo.tarea;"]) assert.equal(modelIdPattern.test(invalid), false, invalid);
+  for (const valid of ["unit.tarea", "flota.fabricante"]) assert.ok(modelIdPattern.test(valid));
+  for (const invalid of ["unit", "unit.", "../unit.tarea", "unit.tarea.x", "Unit.tarea", "unit.tarea;"]) assert.equal(modelIdPattern.test(invalid), false, invalid);
 });

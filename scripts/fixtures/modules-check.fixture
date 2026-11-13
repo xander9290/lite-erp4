@@ -182,5 +182,18 @@ const detail = (await groupDetail(prisma, root, "ensayo.usuario"))!;
 assert.deepEqual(detail.rules.map(rule => [rule.id, rule.scope, rule.active]), [["ensayo.tareas-propias", "grupo", true]]);
 assert.deepEqual(detail.models.find(model => model.id === "ensayo.tarea")?.perms, flags(true, true, true, false));
 assert.equal(await groupDetail(prisma, root, "otro.grupo"), null);
+
+// Native module manager: the source catalogue is readable only by a fresh admin,
+// checked against this temporary schema (never public), without evaluating manifests.
+const { moduleCatalogue, cataloguePage } = await import("./src/lib/module-manager/service");
+const catalogueContext = { root: process.cwd(), schema: new URL(process.env.DATABASE_URL!).searchParams.get("schema")!, registered: new Set(["ensayo", "contactos", "usuarios", "accesos", "modulos", "citas", "flota"]) };
+const catalogue = await moduleCatalogue(prisma, root, catalogueContext);
+assert.equal(catalogue.find(module => module.id === "ensayo")?.status, "installed");
+assert.equal(catalogue.find(module => module.id === "andamio")?.status, "unregistered");
+assert.equal(catalogue.find(module => module.id === "disponible")?.status, "available");
+assert.equal(catalogue.find(module => module.id === "modulos")?.kind, "manual");
+assert.equal(cataloguePage(catalogue, { ...state, query: "ensayo" }).total, 1);
+await assert.rejects(moduleCatalogue(prisma, ana, catalogueContext), /administrador/);
+await assert.rejects(moduleCatalogue(prisma, { ...root, sessionVersion: root.sessionVersion + 1 }, catalogueContext), /sesión/);
 await prisma.$disconnect();
 console.log("modules-check ok");

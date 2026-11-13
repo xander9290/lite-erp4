@@ -8,7 +8,7 @@ export const listFilterSchema = z.object({
 }).strict();
 
 export const listConfigSchema = z.object({
-  model: z.enum(["partner", "user", "dentalAppointment"]),
+  model: z.enum(["partner", "user"]),
   searchFields: z.array(z.string().min(1).max(60)).min(1).max(6),
   columns: z.array(z.object({
     field: z.string().min(1).max(60), label: z.string().trim().min(1).max(80), sortable: z.boolean().optional(),

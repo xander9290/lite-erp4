@@ -57,6 +57,10 @@ try {
   assert.equal(JSON.stringify(session).includes("password"), false);
   const authenticated = await adminClient.request("/erp/usuarios");
   assert.equal(authenticated.status, 200); await authenticated.text();
+  for (const path of ["/erp/modulos", "/erp/modulos/demo"]) {
+    const page = await adminClient.request(path);
+    assert.equal(page.status, 200); assert.ok((await page.text()).includes("Módulos"));
+  }
 
   const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
   const login = `auth_test_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
@@ -98,6 +102,8 @@ try {
   assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: fixture.id } })).isAdmin, false);
   const forbiddenPage = await regular.request("/erp/usuarios");
   assert.ok((await forbiddenPage.text()).includes("Necesitas permisos de administrador"));
+  const deniedModules = await regular.request("/erp/modulos");
+  assert.ok((await deniedModules.text()).includes("Necesitas permisos de administrador"));
   const denied = await saveUserRecord(prisma, { id: fixture.id, sessionVersion: fixture.sessionVersion }, { ...newUserDefaults, login: `${login}_evil`, name: "No autorizado", password: "test1234", isAdmin: true });
   assert.equal(denied.ok, false);
   const duplicate = await saveUserRecord(prisma, actor, { ...newUserDefaults, login, name: "Duplicado", password: "test1234" });

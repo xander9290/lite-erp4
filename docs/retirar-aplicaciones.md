@@ -5,6 +5,11 @@ Los scripts disponibles crean cascarones, generan contratos, incorporan/evolucio
 modelos y enlazan repositorios. No existen `remove:app`, `delete:app`,
 `orm:uninstall`, ni una opción `--remove` en los comandos actuales.
 
+La [estrategia de desinstalación](ideas/desinstalacion-aplicaciones.md), propuesta
+el 2026-11-13, define un flujo común para módulos declarativos, scaffold anterior
+y aplicaciones manuales, con conservación de datos por defecto y purga explícita.
+Es un diseño pendiente: sus comandos no existen y no autoriza retiradas reales.
+
 ## Operaciones distintas
 
 | Objetivo | Procedimiento actual | Efecto sobre datos |
@@ -101,5 +106,30 @@ genérico de desinstalación ni se amplió orm:sync para eliminar modelos.
   actividad ajena a Flota iguales antes/después. Archivos remotos no modificados.
 
 Las pruebas de related tienen su propio fixture, instalado sólo en el proyecto y
-esquema PostgreSQL desechables. El identificador de aplicación flota queda libre;
-el [nuevo tutorial](tutorial-flota.md) empieza por un dry-run, sin recreación automática.
+esquema PostgreSQL desechables. El ID quedó libre en aquella retirada histórica,
+pero después el usuario recreó la aplicación Flota: actualmente está ocupado y
+se conserva, igual que Demo. El [nuevo tutorial](tutorial-flota.md) propone otro
+ID para practicar en paralelo, sin retirar automáticamente la aplicación actual.
+
+## Retirada de Citas odontológicas y Flota, 2026-11-13
+
+El usuario autorizó retirar ambas aplicaciones (Demo se conserva). Cambio específico,
+sin comando genérico, siguiendo el procedimiento de la retirada anterior:
+
+- Copia local del código, esquemas y registro en `.tutorial-backups/retiro-citas-flota-2026-11-13`
+  (excluida de Git). Datos revisados antes: las seis tablas estaban vacías; sólo había
+  7 entradas de historial de Flota en `record_activities`.
+- Flota: propiedad e inversa de User retiradas con `readInstallationState`/`removeInverse`
+  y el registro reescrito desde ese estado; catálogo regenerado con
+  `scaffoldRegistryFiles([])` y `writeArtifacts`. Artefactos `apps/bindings/uploads/flota`
+  retirados; el ejemplo del generador `src/generated/orm/flota` se conserva.
+- Citas: esquemas manuales y relación inversa en Partner retirados; la fuente
+  `dentalAppointment` sale de la lista genérica (`src/lib/list`) y de las pruebas
+  (`test:appointments*`, su caso en `manifest.test.ts`, su bloque en
+  `framework-check.fixture` y su suite en `test:legacy:integration`).
+  `prisma-connection.test.ts` se conserva con `npm run test:prisma-connection`.
+- Migración `20261113190000_remove_citas_flota`: transacción explícita, borra el
+  historial sólo de esos seis modelos, FKs, seis tablas y el enum de Citas; sin CASCADE.
+  Esta migración elimina datos: en otra base, revisar su alcance antes de aplicarla.
+- El ID `flota` queda libre; el tutorial nuevo propone `flotaensayo` y puede usar `flota`
+  si el usuario lo decide.

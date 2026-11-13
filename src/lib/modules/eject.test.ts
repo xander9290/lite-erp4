@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { formViewSource, listViewSource, manifestModel, registerView } from "./eject";
 import { sourceFile } from "../scaffold/source-edit";
-import demo from "../../modules/demo/manifest";
+import demo from "./module.fixture";
 
 const manifest = (models: string) => `import "server-only";
 import { defineModule } from "@/lib/modules/define";

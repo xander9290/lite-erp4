@@ -71,6 +71,82 @@ se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
+### Retirada de Citas odontológicas y Flota (2026-11-13)
+
+Autorizada por el usuario; Demo y Contactos/Usuarios se conservan. Código, esquema,
+propiedad/catálogo, fuente legacy de lista, pruebas y documentación retirados;
+procedimiento y alcance en [Retirar aplicaciones](retirar-aplicaciones.md#retirada-de-citas-odontológicas-y-flota-2026-11-13).
+Migración `20261113190000_remove_citas_flota` revisada y aprobada por el usuario,
+aplicada a la base local: `migrate diff` sin diferencias; seis tablas y enum eliminados;
+`record_activities` 14 → 7 (sólo Flota); users 2, partners 2, access_user_groups 1 y
+Demo sin cambios. Verificación: tsc sin errores fuera de `.next`, suites unitarias
+(scaffold 12/12 tras corregir `listRecords`), test:modules:integration y
+test:legacy:integration y test:framework:integration completo aprobadas. El trabajo sin commit de la app Módulos (otro agente)
+sigue en el árbol junto con esta retirada. Reiniciar `npm run dev` tras regenerar el
+cliente Prisma: `.next/dev/types` conserva rutas retiradas hasta entonces.
+
+### Aplicación Módulos: catálogo inicial (2026-11-13)
+
+Por solicitud del usuario se inició la app nativa `/erp/modulos`, sólo para
+administradores. Primera etapa implementada: lista con búsqueda/filtros/orden y
+paginación, ficha por ID, tipos declarativo/scaffold/nativo, estados de instalación,
+modelos y dependencias declaradas. Reutiliza ListView y FormViewLoader.
+
+El inventario AST lee manifests disponibles aunque no estén registrados, sin
+ejecutarlos, y contrasta esquema/propiedad con tablas/columnas del schema SQL
+actual. Las consultas revalidan active/isAdmin/sessionVersion en RepeatableRead
+readonly. No añade tablas ni modifica datos de negocio. TypeScript pasa a
+dependencia de ejecución (misma versión) y Next incluye fuentes de catálogo en
+los traces de las nuevas rutas. [Contrato y límites](gestor-modulos.md).
+
+Instalar/actualizar/desinstalar desde UI sigue pendiente: la ficha informa ese
+alcance y no presenta ejecuciones simuladas. El próximo incremento es el plan
+revisable compartido con CLI; después, ejecución controlada. Las dependencias
+mostradas son `depends`, no todo el grafo de relaciones/imports. Tampoco se
+certifican constraints/drift ni cambios de campos presentes sólo en clases TS.
+Flota, Demo y la tutoría se conservan. No se hicieron commit/push/pull.
+
+Verificación de la etapa: test:module-manager 8/8, test:applications 10/10,
+TypeScript y ESLint de afectados aprobados. Integración de módulos aprobada, incluida la corrida ampliada con módulo
+disponible sin instalar, fuera del catálogo, estados y autorización contra schema
+temporal; recursos eliminados. El último ajuste del parser se verificó con sus
+6 pruebas puras (incluido el caso adicional de comentarios/literales); el conjunto
+completo de 8 pruebas había pasado antes del ajuste. No se repitió su ejecución
+con junctions después, al quedar indisponible la revisión automática de permisos. Build temporal y trace de producción aprobados;
+test:legacy:integration aprobado (auth/Contactos/Citas/tema), con las rutas nuevas
+permitidas al admin y denegadas al usuario ordinario. Recursos de esa corrida
+eliminados. No se ejecutó SQL de instalación/retirada sobre la base del ERP.
+
+Revisión visual pendiente: Computer Use se detuvo al no poder determinar con
+confianza la URL de Edge; no se continuó la automatización. Las comprobaciones
+HTTP no equivalen a verificar la presentación e interacción en navegador.
+
+### Estrategia de desinstalación (diseño, 2026-11-13)
+
+Solicitud posterior del usuario: planificar la retirada de aplicaciones, módulos
+declarativos y aplicaciones heredadas. Diseño guardado en
+[Desinstalación](ideas/desinstalacion-aplicaciones.md), sin implementación.
+Revisión inicial: rama `refactor/modulos-declarativos`, commit `beecf84`
+(`Fase final terminada`) y árbol limpio; las herramientas de la tarea anterior
+ya estaban versionadas. Esta tarea no hizo commit/push/pull.
+Propone un planificador común con adaptadores por tipo; `keep` predeterminado
+con esquema/datos/propiedad e identidad reservados, y `drop` con SQL/respaldo y
+aprobación específicos. Dependientes y objetos compartidos bloquean; los modelos
+Partner/User no se consideran purgables por figurar en un manifest de aplicación.
+Incluye catálogos/hashes/inversas, historial/accesos exactos, recuperación por fases
+y mantenimiento coordinado para cortar las acciones legacy. No promete retirada
+en caliente ni rollback global; archivos remotos fuera de alcance.
+
+Siguiente paso de esa propuesta: revisar/priorizar fase 1 (inventario y plan
+de lectura) antes de implementar escrituras. No se han creado comandos de
+desinstalación ni retirado Flota/Demo. El primer paso del tutorial documentado más
+abajo sigue disponible y no se ejecutó durante este diseño.
+
+Verificación: lectura de código, registros y migración histórica; corrección en
+la guía de retirada de la nota obsoleta que decía que el ID flota seguía libre.
+`git diff --check` aprobado. Sin consultas a BD, pruebas de código nuevas,
+migraciones ni modificaciones de los cambios de herramientas de la tarea anterior.
+
 ### Preparación del tutorial con módulos declarativos (2026-11-13)
 
 Alcance autorizado: integraciones, herramientas y documentación, **sin retirar

@@ -5,6 +5,8 @@ import { artifactPlan, assertNoSymlinks, writeArtifacts } from "../orm/generator
 import { appIdentity, scaffoldRegistryFiles, type createAppTemplate } from "./templates";
 import { unboundFiles } from "../orm/generator/bind";
 import { imageUploadFiles } from "../orm/generator/image-uploads";
+import { assertApplicationIdAvailable } from "../module-manager/retirements";
+import { assertNoOtherModuleOperation } from "../module-manager/operation-lock";
 
 type Template = ReturnType<typeof createAppTemplate>;
 async function absent(path: string) {
@@ -15,7 +17,9 @@ async function absent(path: string) {
 
 export async function planApplication(root: string, template: Template, artifacts: Record<string, string>) {
   root = resolve(root);
+  await assertNoOtherModuleOperation(root);
   const expected = appIdentity(template.app.name);
+  await assertApplicationIdAvailable(root, expected.id);
   if (Object.keys(expected).some(key => expected[key as keyof typeof expected] !== template.app[key as keyof typeof expected])) throw new Error("La identidad de la aplicación no coincide con su nombre.");
   const appPath = join(root, "src/app/(auth)/erp", template.app.id);
   const artifactsPath = join(root, "src/generated/orm/apps", template.app.id);

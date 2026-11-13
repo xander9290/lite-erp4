@@ -7,6 +7,7 @@ import { defineModuleObject } from "./eject";
 import { assertNoSymlinks } from "../orm/generator/write";
 import { readSource, writeResource, type SourceChange } from "../scaffold/resource-write";
 import { append, array, literal, object, property, sourceFile, variable } from "../scaffold/source-edit";
+import { assertApplicationIdAvailable } from "../module-manager/retirements";
 
 export function moduleId(id: string) {
   if (!/^[a-z][a-z0-9]*$/.test(id)) throw new Error("Usa un ID de módulo en minúsculas, sin guiones.");
@@ -83,6 +84,7 @@ async function rejectLegacy(root: string, id: string) {
 
 export async function createModule(root: string, id: string, dryRun = false) {
   root = resolve(root); moduleId(id);
+  await assertApplicationIdAvailable(root, id);
   await rejectLegacy(root, id);
   const directory = join(root, "src/modules", id);
   if (await exists(directory)) throw new Error(`El módulo ${id} ya existe; no se sobrescribe.`);

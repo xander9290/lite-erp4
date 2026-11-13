@@ -2,8 +2,10 @@ import "server-only";
 import { lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { assertNoSymlinks } from "../orm/generator/write";
+import { assertNoOtherModuleOperation } from "../module-manager/operation-lock";
 
 export type SourceChange = { path: string; before: string | null; after: string };
+export type ResourceChange = SourceChange | { path: string; before: string; after: null };
 export async function readSource(path: string): Promise<string | null> {
   await assertNoSymlinks(path);
   try {
@@ -11,7 +13,7 @@ export async function readSource(path: string): Promise<string | null> {
     return await readFile(path, "utf8");
   } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
 }
-async function validate(root: string, changes: readonly SourceChange[]) {
+async function validate(root: string, changes: readonly ResourceChange[]) {
   const paths = new Set<string>();
   for (const change of changes) {
     const path = relative(root, change.path);
@@ -35,8 +37,9 @@ async function validate(root: string, changes: readonly SourceChange[]) {
   }
 }
 /** New files are exclusive; shared source edits are checked before writing. No managed hashes touched. */
-export async function writeResource(root: string, changes: readonly SourceChange[], dryRun = false) {
+export async function writeResource(root: string, changes: readonly ResourceChange[], dryRun = false) {
   root = resolve(root);
+  await assertNoOtherModuleOperation(root);
   await validate(root, changes);
   if (dryRun) return;
   const directory = join(root, "src/lib/applications/scaffolded");
@@ -45,7 +48,7 @@ export async function writeResource(root: string, changes: readonly SourceChange
   const lockPath = join(directory, ".create-app.lock");
   await assertNoSymlinks(lockPath);
   const lock = await open(lockPath, "wx");
-  const applied: SourceChange[] = [];
+  const applied: ResourceChange[] = [];
   let stage: string | undefined;
   let preserve = false;
   try {
@@ -53,7 +56,7 @@ export async function writeResource(root: string, changes: readonly SourceChange
     stage = await mkdtemp(join(root, ".create-resource-"));
     for (let i = 0; i < changes.length; i++) {
       const change = changes[i];
-      await writeFile(join(stage, String(i)), change.after);
+      if (change.after !== null) await writeFile(join(stage, String(i)), change.after);
       if (change.before !== null) await writeFile(join(stage, `${i}.before`), change.before);
     }
     for (let i = 0; i < changes.length; i++) {
@@ -61,7 +64,10 @@ export async function writeResource(root: string, changes: readonly SourceChange
       await assertNoSymlinks(change.path);
       if (await readSource(change.path) !== change.before) throw new Error(`El archivo cambió durante la creación: ${change.path}`);
       await mkdir(dirname(change.path), { recursive: true });
-      if (change.before === null) {
+      if (change.after === null) {
+        await rm(change.path);
+        applied.push(change);
+      } else if (change.before === null) {
         const file = await open(change.path, "wx");
         applied.push(change);
         try { await file.writeFile(change.after); } finally { await file.close(); }

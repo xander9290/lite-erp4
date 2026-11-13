@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { ModuleGeneration } from "./generate";
 import { assertNoSymlinks } from "./write";
+import { assertApplicationIdAvailable } from "../../module-manager/retirements";
+import { assertNoOtherModuleOperation } from "../../module-manager/operation-lock";
 
 export type GenerationProfile = {
   module: ModuleGeneration; externalOwners: Readonly<Record<string, string>>;
@@ -13,7 +15,9 @@ export type GenerationProfile = {
 
 /** Trusted development modules only. This function must never be exposed as a Server Action. */
 export async function loadAppGenerationProfile(root: string, id: string): Promise<GenerationProfile | null> {
+  await assertNoOtherModuleOperation(root);
   if (!/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id)) throw new Error("Identificador de aplicación inválido.");
+  await assertApplicationIdAvailable(root, id);
   const path = join(root, "src/app/(auth)/erp", id, "orm.config.ts");
   await assertNoSymlinks(path);
   const manifest = join(root, "src/modules", id, "manifest.ts");

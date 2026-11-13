@@ -289,7 +289,7 @@ permitir seguir editando o descartar el borrador e iniciar un alta vacía.
 4. **Vistas:** lista y formulario de Contactos conectados, con alta, edición,
    consulta, carga, recarga y protección de cambios pendientes.
 5. **Automatización:** generar el cascarón después de validar el flujo completo con
-   Contactos y Citas. La dirección acordada es declarar modelos mediante clases y
+   Contactos. La dirección acordada es declarar modelos mediante clases y
    Fields en TypeScript, derivando Prisma, Zod, tipos y valores iniciales. Las vistas
    se escriben libremente en TSX con nuestros componentes; se pueden generar archivos
    iniciales editables, sin un motor de renderizado automático ni XML. El generador
@@ -312,9 +312,9 @@ Prisma y despliegue, siguiendo los scripts actuales del proyecto.
 
 ## Verificación
 
-La práctica guiada de [Citas odontológicas](citas-odontologicas.md) ya une modelos,
-contratos, operaciones, lista y formulario con tratamientos one2many e historial.
-Reutiliza Contactos como dependencia y documenta cada paso para desarrollar otro módulo.
+La práctica de Citas odontológicas (one2many, historial) se retiró el 2026-11-13 junto
+con sus tablas; su código queda en el historial de Git. Las aplicaciones nuevas siguen
+los [módulos declarativos](modulos-declarativos.md).
 
 ```sh
 npm run test:applications

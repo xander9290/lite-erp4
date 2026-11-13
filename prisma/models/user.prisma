@@ -18,13 +18,6 @@ model User {
 
     @@map("users")
 
-  // BEGIN lite-erp:flota:User
-  flotaRecordCreatedRecords FlotaRecord[] @relation("FlotaRecord_createBy")
-  flotaFabricanteCreatedRecords FlotaFabricante[] @relation("FlotaFabricante_createBy")
-  flotaModeloCreatedRecords FlotaModelo[] @relation("FlotaModelo_createBy")
-  flotaVehicleCreatedRecords FlotaVehicle[] @relation("FlotaVehicle_createBy")
-  // END lite-erp:flota:User
-
   // BEGIN lite-erp:demo:User
   demoTareaCreatedRecords DemoTarea[] @relation("DemoTarea_createBy")
   demoCategoriaCreatedRecords DemoCategoria[] @relation("DemoCategoria_createBy")

@@ -22,7 +22,7 @@ function command(binary: string, args: string[], name: string, expected = 0) {
   const cli = { prisma: "prisma/build/index.js", tsc: "typescript/bin/tsc", next: "next/dist/bin/next" };
   const executable = Object.entries(cli).find(([name]) => binary === name);
   if (executable) { args = [join(root, "node_modules", executable[1]), ...args]; binary = process.execPath; }
-  const result = spawnSync(binary, args, { cwd: root, env: { ...process.env, DATABASE_URL: url.toString() }, encoding: "utf8", timeout: 180000 });
+  const result = spawnSync(binary, args, { cwd: root, env: { ...process.env, DATABASE_URL: url.toString() }, encoding: "utf8", timeout: name === "module lifecycle operations" ? 900000 : 180000 });
   if (result.error) throw result.error;
   assert.equal(result.status, expected, sanitize(`${name}: ${result.stderr}\n${result.stdout}`));
   return result.stdout;
@@ -79,7 +79,12 @@ try {
   console.log("✓ Módulo ensayo instalado: sólo esquema y migración; sin contratos, bindings ni uploads generados.");
 
   await cp(join(project, "scripts/fixtures/modules-check.fixture"), join(root, "modules-check.ts"));
+  await mkdir(join(root, "src/modules/disponible"));
+  await writeFile(join(root, "src/modules/disponible/manifest.ts"), `import "server-only";\nimport { Fields, Model } from "@/lib/orm";\nimport { defineModule } from "@/lib/modules/define";\nclass Item extends Model { name = Fields.Text({required:true}); }\nexport default defineModule({id:"disponible",name:"Disponible",icon:"boxes",models:{item:Item}});\n`);
   tsx(join(root, "modules-check.ts"), [], "modules check");
+  await cp(join(project, "scripts/fixtures/module-operations-check.fixture"), join(root, "module-operations-check.ts"));
+  tsx(join(root, "module-operations-check.ts"), [], "module lifecycle operations");
+  console.log("✓ Gestor de módulos: instalado, disponible sin registrar, fuera de catálogo, permisos admin y sesión revocada; lecturas del esquema temporal.");
   console.log("✓ Repositorio genérico y servicio: crear, normalize, beforeSave, revisión, listas, búsqueda, filtros, agrupación con etiquetas, lookup, kanban, historial, notas y borrado.");
   console.log("✓ Control de accesos: grupos implicados, CRUD por modelo, reglas de registro (AND/OR), overrides y reglas desactivadas en BD, superusuario y administración.");
 

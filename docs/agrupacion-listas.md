@@ -66,7 +66,7 @@ con el mismo nombre siguen siendo grupos distintos. Referencias ausentes muestra
 sus `options` también en encabezados. Esto no habilita agrupación por rutas
 de relaciones (`createByUser.login`), ni fechas/periodos. `null` y cadena vacía son
 grupos distintos; el texto usa igualdad exacta, incluso mayúsculas/minúsculas.
-Los proveedores legacy sin `load` (`partner`, `user`, `dentalAppointment`) no
+Los proveedores legacy sin `load` (`partner`, `user`) no
 habilitan esta función: rechazan peticiones agrupadas en lugar de ignorarlas.
 Los proveedores propios deben implementar el contrato o rechazarlo explícitamente.
 

@@ -6,6 +6,7 @@ import { prepareModuleArtifacts } from "./prepare";
 import { inverseText, optionalSource, readInstallationState, removeInverse, sourceHash, statePath } from "./installation-state";
 import { prismaBlocks } from "./prisma-source";
 import { assertNoSymlinks } from "./write";
+import { assertNoOtherModuleOperation } from "../../module-manager/operation-lock";
 import { assertAdditiveEvolution } from "./evolution";
 
 /** Source installation only. SQL is a review artifact, never executed here. */
@@ -58,11 +59,12 @@ export async function planModelInstallation(root: string, profile: GenerationPro
     const state = { version: 1, modules: { ...snapshot.state.modules, [id]: { file: filename, hash, inverses } } };
     changes.push({ path: statePath(root), before: snapshot.stateText, after: `${JSON.stringify(state, null, 2)}\n` });
   }
-  return { id, changes, sql: artifacts["migration.preview.sql"], snapshot };
+  return { id, changes, sql: artifacts["migration.preview.sql"], snapshot, artifacts };
 }
 
 /** Exclusive installer lock, optimistic source checks and rollback for ordinary write failures. */
 export async function installModels(root: string, profile: GenerationProfile, write = false, update = false, force = false, expectedChanges?: readonly { path: string; before: string | null; after: string }[]) {
+  if (write) await assertNoOtherModuleOperation(root);
   if (!write) return planModelInstallation(root, profile, update, force);
   await assertNoSymlinks(join(root, "prisma"));
   const lock = join(root, "prisma/.orm-install.lock");

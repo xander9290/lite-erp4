@@ -19,9 +19,6 @@
     "test:applications": "node --import tsx --test src/lib/applications/manifest.test.ts",
     "test:contacts": "node --conditions=react-server --import tsx --test \"src/app/(auth)/erp/contactos/schemas/contact.schema.test.ts\" \"src/app/(auth)/erp/contactos/models/partner.test.ts\"",
     "test:contacts:integration": "node --conditions=react-server --import tsx scripts/contacts.integration.ts",
-    "test:appointments": "node --conditions=react-server --import tsx --test \"src/app/(auth)/erp/citas/schemas/*.test.ts\" \"src/app/(auth)/erp/citas/models/*.test.ts\" src/lib/prisma-connection.test.ts",
-    "test:appointments:integration": "node --conditions=react-server --import tsx scripts/appointments.integration.ts",
-    "test:appointments:service": "node --conditions=react-server --import tsx scripts/appointments-service.integration.ts",
     "test:orm": "node --conditions=react-server --import tsx --test src/lib/orm/*.test.ts",
     "test:images": "node --conditions=react-server --import tsx --test src/lib/orm/image.test.ts src/lib/uploads/model-image.test.ts src/components/ui/form/imageProcessing.test.mjs",
     "orm:generate": "node --conditions=react-server --import tsx scripts/orm-generate.ts",
@@ -43,7 +40,10 @@
     "benchmark:reactions": "node --conditions=react-server --import tsx scripts/benchmark-reactions.ts",
     "test:modules": "node --conditions=react-server --import tsx --test src/lib/modules/*.test.ts",
     "test:modules:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts",
-    "eject:view": "node --conditions=react-server --import tsx scripts/eject-view.ts"
+    "eject:view": "node --conditions=react-server --import tsx scripts/eject-view.ts",
+    "test:module-manager": "node --conditions=react-server --import tsx --test src/lib/module-manager/*.test.ts",
+    "module:manage": "node --conditions=react-server --import tsx scripts/module-operation.ts",
+    "test:prisma-connection": "node --conditions=react-server --import tsx --test src/lib/prisma-connection.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -64,7 +64,8 @@
     "react-hot-toast": "^2.6.1",
     "react-image-crop": "^11.1.2",
     "server-only": "^0.0.1",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "typescript": "^5"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -78,8 +79,7 @@
     "eslint-config-next": "16.4.3",
     "prisma": "^7.10.1",
     "tailwindcss": "^4",
-    "tsx": "^4.23.15",
-    "typescript": "^5"
+    "tsx": "^4.23.15"
   },
   "type": "module"
 }

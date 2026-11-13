@@ -90,12 +90,12 @@ la lista, también ante errores de red cuyo commit sea desconocido; no se simula
 eliminación optimista. Si se elimina la última fila de una página, el proveedor
 ajusta la paginación al rango disponible.
 
-Las fuentes incorporadas `partner`, `user` y `dentalAppointment` tienen un proveedor
+Las fuentes incorporadas `partner` y `user` tienen un proveedor
 de borrado explícito. Contactos oculta Crear/Eliminar a cuentas sin escritura. El
 servidor revalida sesión activa, administrador y `sessionVersion` dentro de una
 transacción Serializable. El lote admite de 1 a 50 IDs únicos con sus revisiones;
 un cambio concurrente o una FK restringida revierte todo el lote. No se pueden
-eliminar la cuenta de la sesión ni citas/contactos/usuarios con relaciones que lo
+eliminar la cuenta de la sesión ni contactos/usuarios con relaciones que lo
 impidan. Borrar un usuario conserva su contacto Partner.
 
 Las fuentes propias conectan una Server Action mediante `onDelete`:
@@ -195,7 +195,7 @@ Un día se expresa como `[medianoche local, siguiente medianoche local)`, incluy
 - `format`: `text`, `number`, `currency`, `date`, `datetime` o `boolean`; `currency` y `decimals` ajustan la presentación. El formato no cambia el tipo de dato permitido por el servidor.
 - `pageSize`: valor inicial entre 1 y 50 (25 por defecto). `defaultSort`: columna visible/ordenable y dirección. El ID desempata el orden en el servidor.
 - `className`, `headerActions`, `footer`: presentación opcional. `description` e `icon` siguen aceptándose por compatibilidad, pero no se renderizan en el header compacto.
-- `renderCell(record, column)`: presentación personalizada en un wrapper cliente. Devuelve `undefined` para usar el formato habitual. No se envía como parte de la configuración de consulta; ejemplo en `citas/views/AppointmentList.tsx`.
+- `renderCell(record, column)`: presentación personalizada en un wrapper cliente. Devuelve `undefined` para usar el formato habitual. No se envía como parte de la configuración de consulta.
 - `recordHref`: ruta interna con `{id}` para el futuro FormView. Se agrega `returnTo` con el contexto; el destino debe validarlo antes de redirigir. Sin ruta, abrir una fila muestra una vista rápida de lectura.
 - `paramPrefix`: namespace opcional para varias listas en una misma página.
 
@@ -207,12 +207,11 @@ El buscador general se sustituyó por controles en encabezados; `searchPlacehold
 
 `src/lib/list/registry.ts` define consultas tipadas, selects públicos y órdenes permitidos. `listConfigSchema`, `listStateSchema` y `validateListFilters` validan modelos, campos, operadores, tipos y valores en el servidor; no se aceptan delegates, where, include ni contraseñas arbitrarios. Un enlace con filtros malformados produce un error recuperable, nunca una lectura sin filtros silenciosa.
 
-Al añadir un modelo, registrar sus tipos de campo, nulabilidad, relaciones opcionales, select y ordenamientos reales. No exponer campos privados mediante metadatos. La acción exige sesión activa y administrador para Usuarios/Citas. La consulta clínica de `dentalAppointment` además revalida sesión y permisos en la transacción de su módulo; no heredar el acceso general de Contactos.
+Al añadir un modelo, registrar sus tipos de campo, nulabilidad, relaciones opcionales, select y ordenamientos reales. No exponer campos privados mediante metadatos. La acción exige sesión activa, y administrador para Usuarios.
 
 ## Ejemplos
 
 - `/erp/contactos`: columnas de texto y relación con consultas reales.
-- `/erp/citas`: paciente con avatar, teléfono, fechas, motivo y seguimiento; formulario operativo en `nuevo` y `[id]`.
 - `/sample#list-view`: header con menú, footer propio, filtros de texto y `User.lastLogin` para fechas reales.
 - La misma sección incluye un ejemplo local de controles numéricos/booleanos con datos de demostración. Los modelos actuales no tienen esos campos; el motor de comparación está probado y requiere registrar campos reales antes de consultarlos en Prisma. No se insertan datos ni se modifica el esquema para la demostración.
 

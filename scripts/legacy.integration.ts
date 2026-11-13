@@ -9,7 +9,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { parse } from "dotenv";
 import { Client } from "pg";
 
-// Run the four existing suites unchanged in a disposable project/schema, including
+// Run the existing suites unchanged in a disposable project/schema, including
 // auth's seed/admin assumptions. Never point their HTTP clients at the real ERP.
 const project = process.cwd();
 const variables = parse(await readFile(join(project, ".env.local")));
@@ -71,6 +71,10 @@ try {
   await command([join(root, "node_modules/prisma/build/index.js"), "generate", "--config", "prisma7.config.ts"], "Cliente Prisma temporal");
   await tsx("prisma/seed.ts");
   await command([join(root, "node_modules/next/dist/bin/next"), "build"], "Build del servidor temporal");
+  const trace = JSON.parse(await readFile(join(root, ".next/server/app/(auth)/erp/modulos/page.js.nft.json"), "utf8")) as { files: string[] };
+  for (const suffix of ["src/modules/demo/manifest.ts", "src/app/(auth)/erp/contactos/manifest.ts", "prisma/.orm-installations.json"]) assert.ok(trace.files.some(file => file.replaceAll("\\", "/").endsWith(suffix)), `El trace de Módulos debe incluir ${suffix}`);
+  assert.ok(!trace.files.some(file => /(?:^|\/)\.env[^/]*$|(?:^|\/)\.module-operations\//.test(file.replaceAll("\\", "/"))), "El trace no debe distribuir configuración privada ni respaldos");
+  console.log("✓ Trace de Módulos incluye manifests y propiedad para el catálogo en producción.");
   // Default cookie names are required by auth's tampering test. A random dedicated
   // HTTP port and private cookie jars keep this server separate from browser sessions.
   server = spawn(process.execPath, [join(root, "node_modules/next/dist/bin/next"), "start", "-p", String(address.port), "--hostname", "localhost"], { cwd: root, env: { ...env, NODE_ENV: "production" }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
@@ -83,7 +87,7 @@ try {
     await delay(500);
   }
   assert.ok(ready, sanitize(`El servidor temporal no arrancó: ${serverLog}`));
-  for (const file of ["auth.integration.ts", "contacts.integration.ts", "appointments-service.integration.ts", "theme.integration.ts"]) await tsx(`scripts/${file}`);
+  for (const file of ["auth.integration.ts", "contacts.integration.ts", "theme.integration.ts"]) await tsx(`scripts/${file}`);
 } finally {
   // Terminate only the recorded fixture process tree, including workers on timeout.
   if (server) await stop(server);
@@ -93,4 +97,4 @@ try {
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 500 });
   }
 }
-console.log("✓ Las cuatro integraciones pasaron; proyecto y esquema temporales eliminados.");
+console.log("✓ Integraciones de autenticación, Contactos y tema aprobadas; proyecto y esquema temporales eliminados.");

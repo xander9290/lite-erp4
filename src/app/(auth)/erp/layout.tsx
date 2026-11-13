@@ -9,9 +9,12 @@ import { getCurrentAccessUser } from "@/lib/access/current";
 import ApplicationNavigation from "@/components/ui/ApplicationNavigation";
 import { applications } from "@/lib/applications/registry";
 import { applicationNavigation } from "@/lib/applications/navigation";
+import { isModuleMaintenance, maintenanceOperation } from "@/lib/module-manager/maintenance";
 
 async function ProtectedErp({ children }: { children: ReactNode }) {
   const user = await getCurrentAccessUser();
+  const maintenance = await isModuleMaintenance();
+  const operation = maintenance && user?.isAdmin ? await maintenanceOperation() : null;
   if (!user) redirect("/auth");
   const navigation = applications.forUser(user).flatMap(application => {
     const item = applicationNavigation(application, user);
@@ -30,6 +33,7 @@ async function ProtectedErp({ children }: { children: ReactNode }) {
         </div>
         <UserMenu user={{ login: user.login, name: user.name, image: user.image, isAdmin: user.isAdmin }} />
       </header>
+      {maintenance && <div role="status" className="rounded-md bg-warning/15 px-3 py-2 text-sm">El ERP está en mantenimiento de módulos. {user.isAdmin && <Link href={operation ? `/erp/modulos/${operation.module}/operaciones/${operation.id}` : "/erp/modulos"} className="link">Revisar operaciones y finalizar mantenimiento</Link>}</div>}
       <main className="rounded-md flex-1 flex flex-col min-h-0 min-w-0 bg-base-100">{children}</main>
     </UserTheme>
   );

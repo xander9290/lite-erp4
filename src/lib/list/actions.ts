@@ -14,8 +14,7 @@ import { deleteRegisteredRecords } from "./delete-registry";
 import type { ListDeleteResult, ListDeleteTarget } from "./selection";
 
 export async function listRecords(config: ListConfig, state: ListState): Promise<ListResult> {
-  let actor: Awaited<ReturnType<typeof requireUser>>;
-  try { actor = await requireUser(); if (config?.model === "user" || config?.model === "dentalAppointment") await requireAdmin(); }
+  try { await requireUser(); if (config?.model === "user") await requireAdmin(); }
   catch (error) { return { ok: false, error: error instanceof AccessError ? error.message : "No se pudo verificar tu sesión." }; }
   const parsedConfig = listConfigSchema.safeParse(config);
   const parsedState = listStateSchema.safeParse(state);
@@ -26,14 +25,14 @@ export async function listRecords(config: ListConfig, state: ListState): Promise
   if (filterError) return { ok: false, error: filterError };
   try {
     const query = normalizeListState(parsedConfig.data, parsedState.data);
-    return { ok: true, data: await listRegistry[parsedConfig.data.model](parsedConfig.data, query, actor) };
+    return { ok: true, data: await listRegistry[parsedConfig.data.model](parsedConfig.data, query) };
   } catch {
     return { ok: false, error: "No pudimos cargar los registros. Revisa tu conexión e intenta nuevamente." };
   }
 }
 
 export async function deleteRecords(model: ListConfig["model"], selection: readonly ListDeleteTarget[]): Promise<ListDeleteResult> {
-  const parsed = z.enum(["partner", "user", "dentalAppointment"]).safeParse(model);
+  const parsed = z.enum(["partner", "user"]).safeParse(model);
   if (!parsed.success) return { ok: false, kind: "validation", error: "Esta lista no permite eliminar registros." };
   try {
     const result = await deleteRegisteredRecords(prisma, await requireAdmin(), parsed.data, selection);

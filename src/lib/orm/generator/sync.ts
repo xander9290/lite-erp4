@@ -15,6 +15,7 @@ import { prepareModuleArtifacts } from "./prepare";
 import { bindRepositories } from "./bind";
 import { moduleRegistration } from "../../modules/scaffold";
 import { writeResource } from "../../scaffold/resource-write";
+import { assertNoOtherModuleOperation } from "../../module-manager/operation-lock";
 
 export type MigrationFile = { name: string; sql: string };
 export type AppliedMigration = { migration_name: string; checksum: string; finished_at: unknown; rolled_back_at: unknown };
@@ -36,7 +37,7 @@ export function assertSyncSQL(sql: string, migrationName?: string) {
   if (/\bDROP\s+(TABLE|COLUMN|TYPE|INDEX|CONSTRAINT)\b|\bTRUNCATE\b|\bDELETE\s+FROM\b/i.test(sql)) throw new Error(`La migración${migrationName ? ` ${migrationName}` : ""} contiene retiradas o borrados: requiere el flujo manual de revisión.`);
 }
 
-async function migrationFiles(root: string): Promise<MigrationFile[]> {
+export async function migrationFiles(root: string): Promise<MigrationFile[]> {
   const directory = join(root, "prisma/migrations");
   await assertNoSymlinks(directory);
   const files: MigrationFile[] = [];
@@ -50,7 +51,7 @@ async function migrationFiles(root: string): Promise<MigrationFile[]> {
   return files;
 }
 
-async function readApplied(url: string): Promise<AppliedMigration[]> {
+export async function readApplied(url: string): Promise<AppliedMigration[]> {
   const parsed = new URL(url);
   const schema = parsed.searchParams.get("schema") || "public";
   const table = `"${schema.replaceAll('"', '""')}"."_prisma_migrations"`;
@@ -98,6 +99,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     return;
   }
   const lock = join(root, "prisma/.orm-sync.lock");
+  await assertNoOtherModuleOperation(root);
   await assertNoSymlinks(lock);
   const handle = await open(lock, "wx").catch(error => { throw new Error((error as NodeJS.ErrnoException).code === "EEXIST" ? "Ya hay una sincronización abierta. Si se interrumpió, verifica que terminó antes de retirar prisma/.orm-sync.lock." : "No se pudo reservar la sincronización."); });
   let step = "Inicio", databaseUrl = "";

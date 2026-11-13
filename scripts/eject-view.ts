@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import type { ModuleDefinition } from "../src/lib/modules/define";
 import { formViewSource, listViewSource, manifestModel, registerView, viewName, type EjectKind } from "../src/lib/modules/eject";
 import { assertNoSymlinks } from "../src/lib/orm/generator/write";
+import { assertNoOtherModuleOperation } from "../src/lib/module-manager/operation-lock";
 
 const usage = "Uso: npm run eject:view -- modulo modelo form|list [--dry-run]";
 
@@ -12,6 +13,7 @@ async function main() {
   const [id, key, kind, flag, ...extra] = process.argv.slice(2);
   if (!id || !key || !["form", "list"].includes(kind) || extra.length || (flag && flag !== "--dry-run") || !/^[a-z][a-z0-9]*$/.test(id) || !/^[a-z][a-z0-9]*$/.test(key)) throw new Error(usage);
   const root = process.cwd();
+  await assertNoOtherModuleOperation(root);
   const manifestPath = join(root, "src/modules", id, "manifest.ts");
   const viewPath = join(root, "src/modules", id, "views", `${viewName(key, kind as EjectKind)}.tsx`);
   await assertNoSymlinks(manifestPath);

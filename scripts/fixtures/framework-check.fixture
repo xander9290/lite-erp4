@@ -274,13 +274,6 @@ try {
   assert.equal(await prisma.user.count({ where: { id: disposableUser.id } }), 1); // audit FK rejects entire batch
   assert.deepEqual(await deleteRegisteredRecords(prisma, actor, "user", [userTarget]), { ok: true, deleted: 1 });
   assert.equal(await prisma.partner.count({ where: { id: keptContact.id } }), 1);
-  const freeAppointment = await prisma.dentalAppointment.create({ data: { patientId: partner.id, reason: "Cita eliminable", scheduledAt: new Date("2026-11-08T18:00:00.000Z") } });
-  const protectedAppointment = await prisma.dentalAppointment.create({ data: { patientId: partner.id, reason: "Cita con tratamiento", scheduledAt: new Date("2026-11-08T18:00:00.000Z"), treatments: { create: { performedAt: new Date("2026-11-08T18:00:00.000Z"), procedure: "Tratamiento conservado", position: 0 } } } });
-  const appointmentBatch = [freeAppointment, protectedAppointment].map(row => ({ id: row.id, revision: row.updatedAt.toISOString() }));
-  assert.equal((await deleteRegisteredRecords(prisma, reader, "dentalAppointment", appointmentBatch)).ok, false);
-  assert.equal((await deleteRegisteredRecords(prisma, actor, "dentalAppointment", appointmentBatch)).ok, false);
-  assert.equal(await prisma.dentalAppointment.count({ where: { id: freeAppointment.id } }), 1);
-  assert.deepEqual(await deleteRegisteredRecords(prisma, actor, "dentalAppointment", [appointmentBatch[0]]), { ok: true, deleted: 1 });
   // Default model activity: persisted snapshots, permissions, notes, pagination and rollback.
   const tracked = await service.save(prisma, actor, { ...defaults, name: "Actividad inicial", notes: "VALOR PRIVADO NO AUDITAR" });
   assert.ok(tracked.ok, JSON.stringify(tracked));

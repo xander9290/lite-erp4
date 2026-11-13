@@ -2,21 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { UsersRound } from "lucide-react";
 import { applicationHref, canOpenApplication, createApplicationRegistry, defineApplication, type ApplicationManifest } from "./manifest";
-import { appointmentsManifest } from "@/app/(auth)/erp/citas/manifest";
 import { activeApplication, activeApplicationMenu, applicationNavigation } from "./navigation";
 
 const contacts = defineApplication({ id: "contactos", name: "Contactos", description: "Contactos compartidos.", version: "0.1.0", icon: UsersRound, depends: [], access: "authenticated", models: ["Partner"] });
 const users = defineApplication({ ...contacts, id: "usuarios", name: "Usuarios", access: "admin", depends: ["contactos"], models: ["User"] });
-
-test("dental appointments depend on contacts and are available only to administrators", () => {
-  const registry = createApplicationRegistry([appointmentsManifest, contacts]);
-  assert.deepEqual(registry.all().map(app => app.id), ["contactos", "citas"]);
-  assert.deepEqual(registry.forUser({ isAdmin: false }).map(app => app.id), ["contactos"]);
-  assert.equal(canOpenApplication(appointmentsManifest, null), false);
-  assert.equal(canOpenApplication(appointmentsManifest, { isAdmin: true }), true);
-  assert.deepEqual(appointmentsManifest.models, ["DentalAppointment", "DentalTreatment"]);
-  assert.equal(applicationHref(appointmentsManifest), "/erp/citas");
-});
 
 test("registered dependencies precede consumers and model ownership is explicit", () => {
   const registry = createApplicationRegistry([users, contacts]);

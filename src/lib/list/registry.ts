@@ -5,16 +5,9 @@ import type { Prisma } from "../../generated/prisma/client";
 import { lookupPage, partnerLookupWhere, userLookupWhere } from "../many2one/query";
 import type { ListConfig, ListPage, ListState } from "./types";
 import { compileListFilters } from "./filters";
-import { AccessError } from "../auth/policy";
-import type { ClinicalActor } from "@/app/(auth)/erp/citas/models/access";
-import { listAppointmentRecords } from "@/app/(auth)/erp/citas/models/appointment.list";
 
 // Public DTOs only. The action requires an active session, and an administrator for users.
 export const listRegistry = {
-  dentalAppointment: async (config: ListConfig, state: ListState, actor?: ClinicalActor): Promise<ListPage> => {
-    if (!actor) throw new AccessError("UNAUTHENTICATED");
-    return listAppointmentRecords(prisma, actor, config, state);
-  },
   partner: async (config: ListConfig, state: ListState): Promise<ListPage> => {
     // Dynamic predicates are constrained by the server's field/type registry before compilation.
     const where = { AND: [partnerLookupWhere({ query: state.query, searchFields: [...config.searchFields] }), ...compileListFilters(config, state.filters)] } as Prisma.PartnerWhereInput;

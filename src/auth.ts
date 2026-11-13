@@ -6,6 +6,7 @@ import { prisma } from "./lib/prisma";
 import { loginSchema } from "./schemas/login.schema";
 import { verifyPassword } from "./lib/auth/password";
 import { createLoginLimiter } from "./lib/auth/attempts";
+import { isModuleMaintenance } from "./lib/module-manager/maintenance";
 
 const attempts = createLoginLimiter();
 // A valid fixed-cost hash used for missing/inactive accounts, never an account password.
@@ -17,6 +18,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [Credentials({
     credentials: { login: { label: "Usuario", type: "text" }, password: { label: "Contraseña", type: "password" } },
     async authorize(input) {
+      if (await isModuleMaintenance()) return null;
       const parsed = loginSchema.safeParse(input);
       if (!parsed.success || !attempts.allow(parsed.data.login)) return null;
       const user = await prisma.user.findUnique({ where: { login: parsed.data.login }, select: { ...sessionSelect, password: true } });

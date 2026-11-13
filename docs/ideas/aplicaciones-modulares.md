@@ -2,7 +2,7 @@
 
 Estado: iniciado por fases. Ya existen manifests, registro explícito, dependencias,
 propiedad de modelos, acceso a aplicaciones y el contrato, operaciones y vistas
-de lista/formulario de Contactos y Citas odontológicas. Guía vigente en
+de lista/formulario de Contactos (y de Citas odontológicas, retirada el 2026-11-13). Guía vigente en
 [desarrollo-aplicaciones.md](../desarrollo-aplicaciones.md). El primer contrato
 Model/Fields, validación Zod e inferencia de tipos ya está implementado; guía en
 [modelos-typescript.md](../modelos-typescript.md). La generación de propuestas Prisma,
@@ -75,7 +75,7 @@ No instalan modelos físicos ni generan un CRUD operativo automáticamente.
 - **Personalización:** separar artefactos regenerables de vistas y reglas de negocio
   editables; regenerar no debe sobrescribir personalizaciones del desarrollador.
 
-Introducir abstracciones a partir de lo demostrado por Contactos y Citas, conservando
+Introducir abstracciones a partir de lo demostrado por Contactos y la retirada práctica de Citas, conservando
 el enfoque lite. No se incorporarán Python, Django u Odoo como dependencias del ERP.
 
 ## Experiencia deseada

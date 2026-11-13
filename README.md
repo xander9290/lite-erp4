@@ -64,6 +64,9 @@ declarativos en paralelo: la Flota actual y Demo se conservan.
 | Cambiar vistas, menús, dominios o adaptadores | Casos 4–7 del README de cada módulo. |
 | Retirar una aplicación | [Alcance y procedimiento actuales](docs/retirar-aplicaciones.md). No hay comando de desinstalación. |
 
+La [estrategia propuesta de desinstalación](docs/ideas/desinstalacion-aplicaciones.md)
+cubre módulos declarativos y aplicaciones anteriores; su implementación está pendiente.
+
 `orm:generate`, `orm:install` y `orm:bind` revisan sin escribir cuando omites
 `--write`; no aplican SQL. Para cambios físicos, primero se crea la migración con
 `--create-only`, se revisa su `migration.sql` y después se aplica con `db:migrate`.
@@ -102,6 +105,7 @@ permisos, concurrencia y eliminación con cuentas y un esquema PostgreSQL tempor
 
 ## Otras guías
 
+- [Gestor de Módulos](docs/gestor-modulos.md): catálogo administrativo en `/erp/modulos`, estados y dependencias; operaciones de instalación/desinstalación pendientes.
 - [Estado actual y continuidad entre agentes](docs/estado-proyecto.md). Leer junto con [AGENTS.md](AGENTS.md) al retomar el proyecto.
 - [Módulos declarativos](docs/modulos-declarativos.md) (prototipo: `defineModule`, opciones de Field y `eject:view`).
 - [Aplicaciones y navegación](docs/desarrollo-aplicaciones.md).
