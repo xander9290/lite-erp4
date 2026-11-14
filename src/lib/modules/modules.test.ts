@@ -3,7 +3,12 @@ import { test } from "node:test";
 import { Fields, Model } from "../orm";
 import { defineModule, derivedListPolicy } from "./define";
 import { fieldFromMetadata } from "./fields";
-import { modelIdPattern } from "./config";
+import { collectionFieldMetadata, modelIdPattern } from "./config";
+import { modelColumns } from "../orm/presentation";
+import { createModelService } from "../orm/service";
+import { unboundRepository } from "../orm/repository";
+import type { Field } from "../orm/fields";
+import { fieldExpression } from "../orm/generator/generate";
 import unit from "./module.fixture";
 import { closeGroups } from "../access/engine";
 
@@ -102,7 +107,55 @@ test("las opciones del Field deciden lista, búsqueda, orden, filtros y grupos",
   assert.throws(() => defineModule({ id: "prueba", name: "Prueba", icon: "flask-conical", models: { oculto: Oculto } }), /fuera de la lista/);
 });
 
+test("los related se publican en colecciones sin entrar en formularios ni capacidades SQL", () => {
+  class Fabricante extends Model {
+    name = Fields.Text({ required: true });
+    logo = Fields.Image({ folder: "tests/fabricantes" });
+  }
+  class Vehiculo extends Model {
+    name = Fields.Text({ required: true });
+    modeloId = Fields.Many2one("PruebaFabricante");
+    fabricanteLogo = Fields.Image({ related: "modeloId.logo" });
+    fabricanteNombre = Fields.Text({ related: "modeloId.name" });
+    oculto = Fields.Text({ related: "modeloId.name", list: false });
+  }
+  const base = { id: "prueba", name: "Prueba", icon: "car", models: { fabricante: Fabricante, vehiculo: Vehiculo } };
+  const entry = defineModule(base).models[1];
+  assert.deepEqual(entry.list.fields, ["name", "modeloId", "fabricanteLogo", "fabricanteNombre"]);
+  assert.deepEqual(entry.clientFields, ["name", "modeloId"]);
+  for (const capability of ["searchFields", "sortable", "filterable", "groupable"] as const) {
+    assert.ok(!entry.list[capability]?.some(name => name.startsWith("fabricante")));
+    assert.throws(() => defineModule({ ...base, models: { ...base.models, vehiculo: { model: Vehiculo, list: { [capability]: ["fabricanteNombre"] } } } }), /de lectura/);
+  }
+  assert.doesNotThrow(() => createModelService(entry.contract, unboundRepository<Record<string, unknown>>(), { list: entry.list }));
+  const preview = Object.fromEntries(Object.entries(entry.contract.relatedFields as Readonly<Record<string, Field>>).map(([name, field]) => [name, field.metadata]));
+  const metadata = collectionFieldMetadata({ fields: entry.metadata, preview: { ...preview, calculado: Fields.Text().metadata }, related: Object.keys(preview) });
+  assert.equal(metadata.fabricanteLogo.readOnly, true);
+  assert.equal(Object.hasOwn(metadata, "calculado"), false);
+  const columns = modelColumns(Object.fromEntries(Object.entries(metadata).map(([name, field]) => [name, { metadata: field }])), [{ field: "fabricanteLogo" }]);
+  assert.equal(columns[0].widget, "image");
+  assert.equal(columns[0].sortable, false);
+  assert.equal(columns[0].filterable, false);
+  assert.equal(columns[0].groupable, false);
+  const restricted = defineModule({ ...base, models: { ...base.models, vehiculo: { model: Vehiculo, list: { fields: ["name"] } } } }).models[1];
+  assert.deepEqual(restricted.list.fields, ["name"]);
+});
+
 test("las opciones de presentación se validan al declarar el Field", () => {
+  assert.throws(() => Fields.Text({ invisible: "si" as never }), /invisible debe ser booleano/);
+  assert.equal(Fields.Text({ sensitive: true, invisible: true }).metadata.invisible, true);
+  const invisibleFields = [
+    Fields.Text({ invisible: true }), Fields.Integer({ invisible: true }),
+    Fields.Boolean({ invisible: true }), Fields.Selection([{ value: "draft", label: "Borrador" }], { invisible: true }),
+    Fields.DateTime({ invisible: true }), Fields.Many2one("Other", { invisible: true }),
+    Fields.Image({ folder: "tests/images", invisible: true }),
+  ];
+  for (const field of invisibleFields) {
+    assert.equal(fieldFromMetadata(field.metadata).metadata.invisible, true);
+    assert.match(fieldExpression(field.metadata), /"invisible":true/);
+  }
+  assert.equal(fieldFromMetadata(Fields.Text({ invisible: false }).metadata).metadata.invisible, false);
+  assert.doesNotMatch(fieldExpression(Fields.Text().metadata), /invisible/);
   assert.throws(() => Fields.Integer({ searchable: true }), /sólo aplica a campos Text/);
   assert.throws(() => Fields.Image({ folder: "x", sortable: true }), /no se ordena/);
   assert.throws(() => Fields.DateTime({ groupable: true }), /no admite imágenes ni fechas/);

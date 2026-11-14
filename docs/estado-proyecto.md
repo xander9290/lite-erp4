@@ -8,18 +8,20 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Dirección y funcionalidades
 
-- Metodología para modelos nuevos: create:model → personalizar campos/negocio y
-  clientFields → create:views → orm:sync. Se generan conexiones y vistas TSX
-  editables sin XML/renderizado automático. Lista/formulario por defecto, tarjetas,
-  kanban y modo modal opcionales. Guía en [Modelo y vistas](modelos-y-vistas.md).
+- Para módulos declarativos: create:module → create:model → personalizar la clase
+  → orm:sync; lista/formulario por convención y eject:view para personalizar TSX.
+  Es el flujo vigente de Flota: [Módulos declarativos](modulos-declarativos.md).
+  El scaffold anterior conserva clientFields/create:views como alternativa;
+  no mezclar ambos recorridos. [Modelo y vistas](modelos-y-vistas.md).
 - Framework ERP en TypeScript, Next.js, React, Prisma 7 y PostgreSQL.
   Modelos/Fields declarativos, contratos Zod, vistas TSX editables y herramientas
   para crear aplicaciones, generar contratos, instalar esquemas y enlazar Prisma.
   Procedimiento y límites en [Flujo del framework](flujo-framework.md).
 - Aplicaciones con manifest, dependencias y menús de navegación; servicios con
   autorización, validación, transacciones, concurrencia y hooks de negocio.
-  Contactos y Usuarios son aplicaciones activas; Citas y Flota se retiraron el
-  2026-11-13 mediante otro cambio específico autorizado. Mantienen alcances distintos;
+  Contactos y Usuarios son aplicaciones activas; las versiones anteriores de Citas
+  y Flota se retiraron el 2026-11-13. En esta rama, Flota se recreó como módulo
+  declarativo para la tutoría. Mantienen alcances distintos;
   no asumir que todos usan el mismo adaptador o política de acceso.
 - ListView con selección y eliminación por lote desde «Acciones»; dominios fijos
   de servidor combinados con filtros visibles. Los dominios filtran consultas y
@@ -72,6 +74,51 @@ se preparan ahora desde un fixture propio, sin depender de la nueva tutoría.
 
 ## Siguiente paso concreto
 
+### Prioridad para mañana: Acciones de formulario (2026-11-14)
+
+Implementar antes de continuar Flota: FormHeader para botones y Field de estado,
+y FormButton integrado con RHF/ModelForm. Secuencia predeterminada acordada:
+validar/guardar mediante el ciclo del formulario y, sólo tras éxito, ejecutar la
+acción del botón con la identidad y revisión persistidas. Un bloqueo cubre ambas
+fases; un error del formulario impide la acción. No duplicar hooks ni autorización.
+La acción posterior puede fallar después de un guardado exitoso: conservar ese
+registro/revisión, sin prometer una transacción conjunta. Estos componentes y
+Ventas aún no existen. [Acuerdo, límites y aceptación](ideas/acciones-formulario.md).
+Se registra para la próxima sesión; no es una implementación ni ejecución programada.
+
+### Avances posteriores de Flota y Fields (2026-11-13)
+
+La tutoría continuó en `codex/flota` después de la pausa descrita abajo. `Vehicle`
+ya existe y aparece en el esquema instalado: matrícula única, relación obligatoria
+con Modelo, `normalize` convierte matrícula a mayúsculas y `beforeSave` consulta
+modelo/fabricante en su tx para guardar `[MATRÍCULA] Modelo / Fabricante` en name.
+El usuario confirmó creación, edición, rechazo de duplicados y cambio de modelo.
+También confirmó el logo related `modeloId.fabricanteId.logo`. Formulario y lista
+ya se expulsaron a `views/VehicleForm.tsx` y `VehicleList.tsx`; conservar sus diseños.
+
+Mejoras compartidas durante la tutoría: FieldText `widget="header"` muestra h1 sin
+label; Stack distribuye dos columnas adaptables y fuerza dirección block. Se corrigió
+la publicación de related en políticas de colección y ModelCollection, sin habilitar
+capacidades SQL de campos virtuales. Los contratos están en ui/form y /sample.
+
+`invisible` ya admite booleanos en Fields declarativos y props TSX, herencia del
+modelo y override explícito false. Oculta sin desmontar/limpiar/deshabilitar RHF;
+incluye campos display y ventanas auxiliares. Sólo formularios: columnas usan list.
+Demo `/sample#field-invisible` y contrato `ui/form/FieldVisibility.md`. Verificados
+en navegador envío de valores ocultos, edición/ocultación conservando datos y rechazo
+de un obligatorio vacío oculto; sin operaciones sobre datos reales de Flota.
+Pasaron test:form-model (8), test:modules (21), test:orm (75), TypeScript y ESLint
+de los archivos modificados. No se ejecutó build ni SQL para estas mejoras de UI.
+Continuar con ejercicios pequeños; no editar archivos de aplicación por adelantado.
+
+Pendiente de Flota después de la prioridad: confirmar visualmente la lista tras
+corregir related; practicar opciones de colección/búsqueda; organizar el menú de
+Vehículos y Configuración (Fabricantes/Modelos); declarar y probar grupos/permisos
+y reglas de registros. Los ejemplos de estado/statebar y botones se discutieron
+como diseño futuro: Vehicle todavía no declara estado ni acciones de transición.
+Conservar la maquetación actual con logo/título fuera de FormGroup y Stack para
+matrícula/modelo. Detalle y siguiente ejercicio en [la tutoría](tutorial-flota.md).
+
 ### Tutoría de Flota: pausa para cambiar de máquina (2026-11-13)
 
 Rama `codex/flota`. Fabricante instalado con name/active y logo Image opcional
@@ -89,12 +136,10 @@ Al pausar se verificaron fuentes/esquema instalado, las tres migraciones del
 recorrido y ausencia de marcador de mantenimiento. Sin suites/build nuevos;
 git diff --check de la documentación. Detalle en [la tutoría](tutorial-flota.md).
 
-**Próximo paso pendiente:** vehículos (punto 4 del recorrido). Confirmar nombre
-con el usuario (Vehicle propuesto, no decidido), revisar create:model --dry-run
-y después declarar la relación con Modelo. No se creó ese modelo ni se adelantaron
-campos, relaciones, reglas o vistas. Mantener un ejercicio por vez.
+**Punto de pausa histórico, ya superado:** entonces faltaba crear Vehicle. Ya se
+creó y personalizó en la continuación descrita arriba; no volver a generarlo.
 
-**Cambio de máquina:** hay cambios locales sin commit en docs, src/modules/flota,
+**Cambio de máquina (nota histórica de aquella pausa):** había cambios sin commit en docs, src/modules/flota,
 índice, prisma/models, propiedad y migraciones. Commit/push/pull requieren
 autorización; no se ejecutaron durante este cierre. Para retomar, obtener esa
 rama con sus cambios, preparar dependencias/configuración privada, generar cliente

@@ -4,6 +4,7 @@ import { Fields, type Field, type FieldMetadata } from "../orm/fields";
 export function fieldFromMetadata(field: FieldMetadata): Field {
   const common = { label: field.label, ...(field.kind !== "boolean" ? { required: field.required } : {}), unique: field.unique,
     ...(field.tracking !== undefined ? { tracking: field.tracking } : {}), ...(field.sensitive !== undefined ? { sensitive: field.sensitive } : {}),
+    ...(field.invisible !== undefined ? { invisible: field.invisible } : {}),
     ...(field.defaultKind === "literal" ? { default: field.defaultValue } : {}),
     list: field.list, searchable: field.searchable, sortable: field.sortable, filterable: field.filterable, groupable: field.groupable };
   const defined = <T extends Record<string, unknown>>(value: T) => Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;

@@ -1,3 +1,4 @@
+import { Vehicle } from "./models/vehicle";
 import { Modelo } from "./models/modelo";
 import { Fabricante } from "./models/fabricante";
 import "server-only";
@@ -11,5 +12,7 @@ export default defineModule({
     fabricante: Fabricante,
   
     modelo: Modelo,
+  
+    vehicle: { model: Vehicle, views: { form: () => import("./views/VehicleForm"), list: () => import("./views/VehicleList") } },
   },
 });

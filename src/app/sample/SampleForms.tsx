@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import FieldText from "@/components/ui/form/FieldText";
 import FieldNumber from "@/components/ui/form/FieldNumber";
@@ -10,7 +10,11 @@ import FieldDate from "@/components/ui/form/FieldDate";
 import FieldBoolean from "@/components/ui/form/FieldBoolean";
 import FormLayout from "@/components/ui/form/FormLayout";
 import FormGroup from "@/components/ui/form/FormGroup";
+import Stack from "@/components/ui/form/Stack";
 import {
+  invisibleSampleFields, invisibleSampleSchema, type InvisibleSampleInput, type InvisibleSampleValues,
+  stackSampleSchema, type StackSampleValues,
+  headerSampleSchema, type HeaderSampleValues,
   emailSampleSchema, type EmailSampleValues,
   phoneSampleSchema, type PhoneSampleValues,
   textSampleSchema, textSampleDefaults, textSampleExample, type TextSampleValues,
@@ -65,6 +69,55 @@ function SampleResult({ value, change }: { value: unknown; change?: unknown }) {
   );
 }
 
+function InvisibleSample() {
+  const defaults: InvisibleSampleInput = { showDetails: false, reference: "AUTO-001", notes: "Esta nota se conserva al ocultar el campo." };
+  const methods = useForm<InvisibleSampleInput, unknown, InvisibleSampleValues>({ resolver: zodResolver(invisibleSampleSchema), defaultValues: defaults });
+  const showDetails = useWatch({ control: methods.control, name: "showDetails" });
+  const [submitted, setSubmitted] = useState<InvisibleSampleValues | null>(null);
+  return (
+    <SampleCard id="field-invisible" title="Fields · Invisible" description="Oculta label y control sin borrar su valor ni desactivar la validación. Mostrar campos revela la referencia oculta por metadatos y las observaciones ocultas por una condición React. Envío local sin persistencia.">
+      <FormLayout methods={methods} model={{ fields: invisibleSampleFields }} onSubmit={data => setSubmitted(data)} onInvalid={() => setSubmitted(null)} aria-labelledby="field-invisible-title">
+        <FormGroup legend="Visibilidad" fullWidth>
+          <FieldBoolean<InvisibleSampleInput> name="showDetails" label="Mostrar campos" />
+          <Stack>
+            <FieldText<InvisibleSampleInput> name="reference" invisible={showDetails ? false : undefined} />
+            <FieldText<InvisibleSampleInput> name="notes" invisible={!showDetails} widget="long" />
+          </Stack>
+          <p className="text-xs text-base-content/60">Para comprobar la validación, muestra la referencia, bórrala y vuelve a ocultarla antes de validar.</p>
+        </FormGroup>
+        <SampleActions onReset={() => { methods.reset(defaults); setSubmitted(null); }} onExample={() => { methods.reset({ ...defaults, showDetails: true }); setSubmitted(null); }} />
+      </FormLayout>
+      <SampleResult value={submitted} />
+    </SampleCard>
+  );
+}
+
+function StackSample() {
+  const defaults = { name: "", plate: "", model: "", active: true };
+  const example = { name: "Vehículo de ejemplo", plate: "ABC-123", model: "Corolla / Toyota", active: true };
+  const methods = useForm<StackSampleValues>({ resolver: zodResolver(stackSampleSchema), defaultValues: defaults });
+  const [submitted, setSubmitted] = useState<StackSampleValues | null>(null);
+  function reset(values: StackSampleValues) {
+    methods.reset(values); setSubmitted(null);
+  }
+  return (
+    <SampleCard id="stack" title="Stack dentro de FormGroup" description="Dos columnas cuando el contenedor tiene espacio y una en tamaños estrechos. Stack coloca todos los labels encima de sus controles. Ejemplo local sin persistencia.">
+      <FormLayout methods={methods} onSubmit={data => setSubmitted(data)} onInvalid={() => setSubmitted(null)} aria-labelledby="stack-title">
+        <FormGroup legend="Datos del vehículo de ejemplo" fullWidth>
+          <Stack>
+            <FieldText<StackSampleValues> name="name" label="Nombre" maxLength={120} />
+            <FieldText<StackSampleValues> name="plate" label="Matrícula" maxLength={20} />
+            <FieldText<StackSampleValues> name="model" label="Modelo" maxLength={120} />
+            <FieldBoolean<StackSampleValues> name="active" label="Activo" />
+          </Stack>
+        </FormGroup>
+        <SampleActions onReset={() => reset(defaults)} onExample={() => reset(example)} />
+      </FormLayout>
+      <SampleResult value={submitted} />
+    </SampleCard>
+  );
+}
+
 function TextSample() {
   const methods = useForm<TextSampleValues>({ resolver: zodResolver(textSampleSchema), defaultValues: textSampleDefaults });
   const [submitted, setSubmitted] = useState<TextSampleValues | null>(null);
@@ -86,6 +139,25 @@ function TextSample() {
         <SampleActions onReset={() => reset(textSampleDefaults)} onExample={() => reset(textSampleExample)} />
       </FormLayout>
       <SampleResult value={submitted} change={change} />
+    </SampleCard>
+  );
+}
+
+function HeaderSample() {
+  const example = { name: "[ABC-123] Corolla / Toyota" };
+  const methods = useForm<HeaderSampleValues>({ resolver: zodResolver(headerSampleSchema), defaultValues: example });
+  const [submitted, setSubmitted] = useState<HeaderSampleValues | null>(null);
+  function reset(values: HeaderSampleValues) {
+    methods.reset(values); setSubmitted(null);
+  }
+  return (
+    <SampleCard id="field-text-header" title="FieldText · Encabezado" description={'widget="header": muestra el valor como h1 de sólo lectura, sin label. Edita el nombre de ejemplo para ver cómo se actualiza; validar no guarda datos.'}>
+      <FormLayout methods={methods} onSubmit={data => setSubmitted(data)} onInvalid={() => setSubmitted(null)} aria-labelledby="field-text-header-title">
+        <FieldText<HeaderSampleValues> name="name" label="Nombre" widget="header" direction="inline" />
+        <FieldText<HeaderSampleValues> name="name" label="Editar nombre de ejemplo" maxLength={300} />
+        <SampleActions onReset={() => reset({ name: "" })} onExample={() => reset(example)} />
+      </FormLayout>
+      <SampleResult value={submitted} />
     </SampleCard>
   );
 }
@@ -265,5 +337,5 @@ function BooleanSample() {
 }
 
 export default function SampleForms() {
-  return <><TextSample /><PhoneSample /><EmailSample /><LongTextSample /><NumberSample /><SelectSample /><DateSample /><BooleanSample /></>;
+  return <><InvisibleSample /><StackSample /><TextSample /><HeaderSample /><PhoneSample /><EmailSample /><LongTextSample /><NumberSample /><SelectSample /><DateSample /><BooleanSample /></>;
 }

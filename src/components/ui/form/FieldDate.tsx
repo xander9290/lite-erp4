@@ -3,6 +3,7 @@
 import { useCallback, useId, useMemo, useState, useSyncExternalStore, type ComponentPropsWithoutRef, type FocusEventHandler } from "react";
 import { useController, useFormContext, type FieldError, type FieldValues } from "react-hook-form";
 import { useModelField } from "./modelFields";
+import FieldVisibility from "./FieldVisibility";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { createFieldDateFormat, readFieldDateRange, type FieldDateEndpoint, type FieldDateRange } from "./dateValues";
@@ -33,6 +34,11 @@ const clientHydrated = () => true;
 const serverHydrated = () => false;
 
 export default function FieldDate<TFieldValues extends FieldValues = FieldValues>(props: FieldDateProps<TFieldValues>) {
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={props.name} invisible={invisible}><DateControl {...controlProps} /></FieldVisibility>;
+}
+
+function DateControl<TFieldValues extends FieldValues = FieldValues>(props: FieldDateProps<TFieldValues>) {
   const {
     name, label, type = "date", valueFormat = "date", range,
     startLabel = "Desde", endLabel = "Hasta", min, max, step,

@@ -15,8 +15,24 @@ se retiran la prop `type` y el antiguo nombre `widget="input"`.
 | `long` | Textarea; admite rows. |
 | `phone` | Teléfono mexicano, con formato al salir del campo. |
 | `email` | Input email con teclado de correo; no transforma el texto. |
+| `header` | Valor RHF como `h1` de sólo lectura, sin label ni input. |
 
 Todos mantienen `autoComplete="off"`, RHF, errores y `data-form-field`.
+`header` no crea un control editable: conserva el valor en RHF y sigue sus cambios
+al cargar, resetear o guardar. No necesita `readOnly`; ignora el label visible y
+`direction` para ocupar el ancho disponible. Soporta `className`, `style` y
+`placeholder` (por defecto «Nuevo registro») cuando el valor es vacío o null.
+El placeholder sólo es visual: no sustituye el valor ni evita la validación Zod.
+Los errores conservan `aria-invalid`, `aria-describedby` y el foco programático.
+Se usa para campos persistentes del formulario, sin `mode="display"` (reservado
+a compute/related). No calcula el nombre ni lo actualiza antes del guardado.
+
+```tsx
+<FieldText<Values> name="name" widget="header" />
+```
+
+Demo RHF/Zod en `/sample#field-text-header`: editar, validar y resetear el título.
+
 Para migrar, sustituye `type="password"` por `widget="password"` y
 `widget="input"` por `widget="text"` o elimina widget. `type` queda reservado
 al control HTML interno y no se acepta en la API del componente.

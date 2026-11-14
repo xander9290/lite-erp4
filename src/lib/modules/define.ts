@@ -1,6 +1,6 @@
 import "server-only";
 import type { ComponentType } from "react";
-import type { ModelClientConfig } from "./config";
+import { collectionFieldMetadata, type ModelClientConfig } from "./config";
 import { defineApplication, type ApplicationManifest, type ApplicationMenu, type ApplicationMenuLink } from "../applications/manifest";
 import { defineModel, type Model } from "../orm/model";
 import type { FieldMetadata } from "../orm/fields";
@@ -92,9 +92,12 @@ export function derivedListPolicy(metadata: Readonly<Record<string, FieldMetadat
   for (const [name, field] of visible) {
     if (!published(name) && (field.searchable || field.sortable || field.filterable || field.groupable)) throw new Error(`${name}: un campo fuera de la lista no puede buscarse, ordenarse, filtrarse ni agruparse. Quita list: false o esas opciones.`);
   }
-  const texts = visible.filter(([name, field]) => field.kind === "text" && published(name)).map(([name]) => name);
+  for (const capability of ["searchFields", "sortable", "filterable", "groupable"] as const) {
+    if (override[capability]?.some(name => metadata[name]?.readOnly)) throw new Error(`Los campos related son de lectura: no se permiten en ${capability}.`);
+  }
+  const texts = visible.filter(([name, field]) => field.kind === "text" && !field.readOnly && published(name)).map(([name]) => name);
   const declaredSearch = visible.some(([, field]) => field.searchable !== undefined);
-  const pick = (test: (field: FieldMetadata) => boolean) => visible.filter(([name, field]) => published(name) && test(field)).map(([name]) => name);
+  const pick = (test: (field: FieldMetadata) => boolean) => visible.filter(([name, field]) => published(name) && !field.readOnly && test(field)).map(([name]) => name);
   return {
     fields,
     searchFields: override.searchFields ?? (declaredSearch ? pick(field => field.searchable === true) : texts.includes("name") ? ["name"] : texts.slice(0, 1)),
@@ -123,7 +126,12 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
     const name = `${pascal(id)}${pascal(modelKey)}`;
     const contract = defineModel(options.model, { name, table: options.table ?? `${id}_${modelKey}` });
     const clientFields = Object.keys(contract.metadata);
-    const list = derivedListPolicy(contract.metadata, options.list);
+    const collectionMetadata = collectionFieldMetadata({
+      fields: contract.metadata,
+      preview: Object.fromEntries(Object.entries(contract.relatedFields).map(([name, field]) => [name, field.metadata])),
+      related: Object.keys(contract.relatedFields),
+    });
+    const list = derivedListPolicy(collectionMetadata, options.list);
     const view = options.view ?? "list";
     if (!["list", "card"].includes(view)) throw new Error(`${id}.${modelKey}: vista de lista inválida.`);
     return Object.freeze({

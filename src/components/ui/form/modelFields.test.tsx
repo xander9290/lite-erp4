@@ -7,6 +7,8 @@ import { FormModelContext, useModelField } from "./modelFields";
 import FieldText from "./FieldText";
 import FieldSelect from "./FieldSelect";
 import FieldNumber from "./FieldNumber";
+import FormGroup from "./FormGroup";
+import Stack from "./Stack";
 const fields={name:Fields.Text({label:"Nombre heredado",required:true,maxLength:12}),state:Fields.Selection([{value:"draft",label:"Borrador"}],{label:"Estado",required:true}),ownerId:Fields.Many2one("Owner")};
 const load=async()=>({ok:false as const,error:"sample"});
 function Probe(){const props=useModelField({name:"ownerId"},"many2one") as {load?:unknown};return <span>{props.load===load?"lookup heredado":"sin lookup"}</span>;}
@@ -38,4 +40,67 @@ test("Text and Number display consume readonly metadata without any form provide
   assert.doesNotMatch(html,/<input|<textarea|<script>/);
   assert.match(html,/data-form-field="total"/);
   assert.throws(()=>renderToStaticMarkup(<FormModelContext.Provider value={{fields:{},readFields}}><FieldText mode="display" name="missing" /></FormModelContext.Provider>),/no publicado/);
+});
+
+test("Text header renders the RHF title without its inherited label or an editable control", () => {
+  function HeaderFixture({ name = "<Toyota>" }: { name?: string }) {
+    const methods = useForm({ defaultValues: { name } });
+    return <FormProvider {...methods}><FormModelContext.Provider value={{ fields }}>
+      <FieldText name="name" widget="header" direction="inline" />
+    </FormModelContext.Provider></FormProvider>;
+  }
+  const html = renderToStaticMarkup(<HeaderFixture />);
+  assert.match(html, /<h1[^>]*>&lt;Toyota&gt;<\/h1>/);
+  assert.match(html, /data-form-field="name"/);
+  assert.doesNotMatch(html, /<label|<input|<textarea|Nombre heredado/);
+  assert.match(renderToStaticMarkup(<HeaderFixture name="" />), /Nuevo registro/);
+});
+
+test("Stack forces block direction through custom children and display Fields without affecting siblings", () => {
+  function NestedField() {
+    return <FieldText name="name" direction="inline" />;
+  }
+  function StackFixture() {
+    const methods = useForm({ defaultValues: { name: "Toyota", outside: "Exterior" } });
+    const readFields = { summary: Fields.Text({ label: "Resumen" }) };
+    return <FormProvider {...methods}><FormModelContext.Provider value={{ fields, readFields }}>
+      <FormGroup legend="Distribución">
+        <Stack>
+          <><NestedField /></>
+          <FieldText mode="display" name="summary" direction="inline" />
+        </Stack>
+      </FormGroup>
+      <FieldText name="outside" label="Exterior" direction="inline" />
+    </FormModelContext.Provider></FormProvider>;
+  }
+  const html = renderToStaticMarkup(<StackFixture />);
+  const outside = html.indexOf('data-form-field="outside"');
+  assert.ok(outside > 0);
+  assert.doesNotMatch(html.slice(0, outside), /grid-cols-\[minmax/);
+  assert.match(html.slice(outside), /grid-cols-\[minmax/);
+  assert.match(html, /value="Toyota"/);
+  assert.match(html, /Nombre heredado/);
+  assert.match(html, /autoComplete="off"/i);
+});
+
+test("invisible inherits metadata, permits explicit overrides and keeps registered values mounted", () => {
+  const hidden = Fields.Text({ label: "Código", required: true, invisible: true });
+  function InvisibleFixture({ invisible }: { invisible?: boolean }) {
+    const methods = useForm({ defaultValues: { code: "AUTO-001" }, shouldUnregister: true });
+    return <FormProvider {...methods}><FormModelContext.Provider value={{ fields: { code: hidden } }}>
+      <FieldText name="code" invisible={invisible} />
+    </FormModelContext.Provider></FormProvider>;
+  }
+  const html = renderToStaticMarkup(<InvisibleFixture />);
+  assert.match(html, /hidden="" class="hidden!"/);
+  assert.match(html, /value="AUTO-001"/);
+  assert.match(html, /<label/);
+  assert.doesNotMatch(html, /disabled=""|invisible="/);
+  assert.doesNotMatch(renderToStaticMarkup(<InvisibleFixture invisible={false} />), /hidden=""/);
+  assert.equal(hidden.schema.safeParse("").success, false);
+
+  const display = renderToStaticMarkup(<FormModelContext.Provider value={{ fields: {}, readFields: { code: hidden } }}>
+    <FieldText mode="display" name="code" />
+  </FormModelContext.Provider>);
+  assert.match(display, /hidden="" class="hidden!"/);
 });

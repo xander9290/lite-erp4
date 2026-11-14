@@ -6,6 +6,8 @@ import { useController, useFormContext, type FieldValues } from "react-hook-form
 import ReactCrop from "react-image-crop";
 import { Camera, ImagePlus, Trash2, Upload, UserRound, X } from "lucide-react";
 import { useModelReadField, useModelField } from "./modelFields";
+import { useFieldDirection } from "./fieldDirection";
+import FieldVisibility from "./FieldVisibility";
 import type { BaseFieldProps } from "./field.types";
 import type { ImageOutputType, ImageSelection, ImageSize, ImageUploader } from "./image.types";
 import { IMAGE_ACCEPT, MAX_IMAGE_DIMENSION, exportImage, fitImageSize, imageCropPixels, initialImageCrop, loadImage, publicImageUrl, validateImageFile, validateImageSize } from "./imageProcessing";
@@ -31,6 +33,7 @@ type EditableFieldImageProps<TFieldValues extends FieldValues = FieldValues> = B
     mode?: "edit";
   };
 type DisplayFieldImageProps = {
+  invisible?: boolean;
   mode: "display"; name: string; label?: string; direction?: "inline" | "block";
   widget?: "image" | "avatar"; shape?: "rounded" | "squared"; className?: string;
 };
@@ -47,11 +50,15 @@ const cropLabels = {
 };
 
 export default function FieldImage<TFieldValues extends FieldValues = FieldValues>(props: FieldImageProps<TFieldValues>) {
-  return props.mode === "display" ? <DisplayImage {...props} /> : <EditableImage {...props} />;
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={props.name} invisible={invisible}>
+    {controlProps.mode === "display" ? <DisplayImage {...controlProps} /> : <EditableImage {...controlProps} />}
+  </FieldVisibility>;
 }
 
 /** Read metadata + server result; never registers a virtual value with RHF. */
-function DisplayImage({name, label, direction="block", widget="image", shape, className=""}:DisplayFieldImageProps) {
+function DisplayImage({name, label, direction:requestedDirection="block", widget="image", shape, className=""}:DisplayFieldImageProps) {
+  const direction = useFieldDirection(requestedDirection) ?? "block";
   const {metadata,value,state,retry}=useModelReadField(name,"image");
   const labelId = useId();
   const text = label ?? metadata.label ?? name;

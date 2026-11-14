@@ -2,14 +2,16 @@
 import { useId } from "react";
 import { useModelReadField } from "./modelFields";
 import { fieldDirectionClassName, fieldLabelClassName } from "./field.styles";
+import { useFieldDirection } from "./fieldDirection";
 
-export type ReadFieldProps = {mode:"display";name:string;label?:string;direction?:"inline"|"block";className?:string};
+export type ReadFieldProps = {mode:"display";name:string;label?:string;invisible?:boolean;direction?:"inline"|"block";className?:string};
 
 /** Internal presentation shared by Text/Number. No input, form value or business calculation. */
-export default function ReadFieldValue({name,label,direction="block",className="",kind,format}:{
+export default function ReadFieldValue({name,label,direction:requestedDirection="block",className="",kind,format}:{
   name:string;label?:string;direction?:"inline"|"block";className?:string;kind:"text"|"integer";
   format?:(value:number)=>string;
 }) {
+  const direction = useFieldDirection(requestedDirection) ?? "block";
   const {metadata,value,state,retry}=useModelReadField(name,kind);
   const labelId=useId();
   const text=label??metadata.label??name;

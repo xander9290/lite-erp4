@@ -8,6 +8,8 @@ import { fieldDirectionClassName, fieldLabelClassName } from "./field.styles";
 import { useFormFieldValidation } from "./formValidation";
 import { rowLimits, sameRowData } from "./one2manyValues";
 import { formErrorPaths } from "./notebookErrors";
+import { useFieldDirection } from "./fieldDirection";
+import FieldVisibility from "./FieldVisibility";
 
 export type One2manyRowContext<TValues extends FieldValues, TName extends FieldArrayPath<TValues>> = {
   index: number;
@@ -24,6 +26,7 @@ export type One2manyColumn<TValues extends FieldValues, TName extends FieldArray
   render: (context: One2manyRowContext<TValues, TName>) => ReactNode;
 };
 export type FieldOne2manyProps<TValues extends FieldValues, TName extends FieldArrayPath<TValues> = FieldArrayPath<TValues>> = {
+  invisible?: boolean;
   name: TName;
   label?: string;
   direction?: FieldDirection;
@@ -47,10 +50,11 @@ export type FieldOne2manyProps<TValues extends FieldValues, TName extends FieldA
 const alignments = { left: "text-left", right: "text-right", center: "text-center" };
 
 function One2manyContent<TValues extends FieldValues, TName extends FieldArrayPath<TValues> = FieldArrayPath<TValues>>({
-  name, label, direction = "block", columns, createRow, onChange, minRows = 0, maxRows = 100, required,
+  name, label, direction: requestedDirection = "block", columns, createRow, onChange, minRows = 0, maxRows = 100, required,
   disabled = false, readOnly = false, reorderable = false, addLabel = "Agregar línea", emptyText = "Todavía no hay líneas.", footer,
   id, className = "", "aria-label": ariaLabel,
 }: FieldOne2manyProps<TValues, TName>) {
+  const direction = useFieldDirection(requestedDirection) ?? "block";
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const fieldLabel = label?.trim();
@@ -173,5 +177,6 @@ function One2manyContent<TValues extends FieldValues, TName extends FieldArrayPa
 
 /** RHF generates random row keys; own the Suspense boundary required by Next's prerender. */
 export default function FieldOne2many<TValues extends FieldValues, TName extends FieldArrayPath<TValues> = FieldArrayPath<TValues>>(props: FieldOne2manyProps<TValues, TName>) {
-  return <Suspense fallback={<div role="status" className="col-span-full min-w-0 rounded-xl border border-base-300 bg-base-200/30 p-5 text-sm text-base-content/50">Cargando líneas…</div>}><One2manyContent {...props} /></Suspense>;
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={props.name} invisible={invisible}><Suspense fallback={<div role="status" className="col-span-full min-w-0 rounded-xl border border-base-300 bg-base-200/30 p-5 text-sm text-base-content/50">Cargando líneas…</div>}><One2manyContent {...controlProps} /></Suspense></FieldVisibility>;
 }

@@ -4,6 +4,7 @@ import { useId, useMemo, type HTMLAttributes } from "react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import { ChevronRight } from "lucide-react";
 import { useModelField } from "./modelFields";
+import FieldVisibility from "./FieldVisibility";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldLabelClassName, fieldSelectClassName } from "./field.styles";
 import { prepareSelectOptions, type FieldSelectOption, type FieldSelectValue } from "./selectOptions";
@@ -30,6 +31,11 @@ export default function FieldSelect<
   TFieldValues extends FieldValues = FieldValues,
   TValue extends FieldSelectValue = FieldSelectValue,
 >(props: FieldSelectProps<TFieldValues, TValue>) {
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={props.name} invisible={invisible}><SelectControl {...controlProps} /></FieldVisibility>;
+}
+
+function SelectControl<TFieldValues extends FieldValues = FieldValues, TValue extends FieldSelectValue = FieldSelectValue>(props: FieldSelectProps<TFieldValues, TValue>) {
   const {
   name,
   label,

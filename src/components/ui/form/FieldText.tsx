@@ -5,6 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import { useModelField } from "./modelFields";
 import ReadFieldValue, { type ReadFieldProps } from "./ReadFieldValue";
+import FieldVisibility from "./FieldVisibility";
 import type { BaseFieldProps } from "./field.types";
 import { formatPhone } from "./phone";
 import { fieldDirectionClassName, fieldInputClassName, fieldTextareaClassName, fieldLabelClassName } from "./field.styles";
@@ -12,13 +13,16 @@ import { fieldDirectionClassName, fieldInputClassName, fieldTextareaClassName, f
 type TextControl = HTMLInputElement | HTMLTextAreaElement;
 type ControlledProps<TFieldValues extends FieldValues> = keyof BaseFieldProps<TFieldValues, string> | "type" | "value" | "defaultValue" | "children";
 type EditableFieldTextProps<TFieldValues extends FieldValues = FieldValues> = BaseFieldProps<TFieldValues, string> & {mode?:"edit"} & (
-  | (Omit<InputHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget?: "text" | "password" | "phone" | "email"; type?: never })
+  | (Omit<InputHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget?: "text" | "password" | "phone" | "email" | "header"; type?: never })
   | (Omit<TextareaHTMLAttributes<TextControl>, ControlledProps<TFieldValues>> & { widget: "long"; type?: never })
 );
 export type FieldTextProps<TFieldValues extends FieldValues = FieldValues> = EditableFieldTextProps<TFieldValues> | ReadFieldProps;
 
 export default function FieldText<TFieldValues extends FieldValues = FieldValues>(props: FieldTextProps<TFieldValues>) {
-  return props.mode === "display" ? <ReadFieldValue {...props} kind="text" /> : <EditableText {...props} />;
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={props.name} invisible={invisible}>
+    {controlProps.mode === "display" ? <ReadFieldValue {...controlProps} kind="text" /> : <EditableText {...controlProps} />}
+  </FieldVisibility>;
 }
 
 function EditableText<TFieldValues extends FieldValues = FieldValues>(props:EditableFieldTextProps<TFieldValues>) {
@@ -50,6 +54,26 @@ function EditableText<TFieldValues extends FieldValues = FieldValues>(props:Edit
   const visibilityLabel = passwordVisible ? "Ocultar contraseña" : "Mostrar contraseña";
   const isPassword = widget === "password";
   const inputType = widget === "phone" ? "tel" : isPassword && !passwordVisible ? "password" : widget === "email" ? "email" : "text";
+
+  if (widget === "header") {
+    return (
+      <div data-form-field={name} className="min-w-0 col-span-full" aria-invalid={fieldState.invalid || inputProps["aria-invalid"]}>
+        <h1
+          id={inputId}
+          ref={fieldRef}
+          tabIndex={-1}
+          className={`whitespace-pre-wrap wrap-anywhere text-3xl font-semibold tracking-tight outline-offset-4 ${className}`}
+          style={style}
+          aria-label={inputProps["aria-label"]}
+          aria-labelledby={inputProps["aria-labelledby"]}
+          aria-describedby={[describedBy, fieldState.invalid ? errorId : undefined].filter(Boolean).join(" ") || undefined}
+        >
+          {fieldValue == null || fieldValue === "" ? inputProps.placeholder ?? "Nuevo registro" : String(fieldValue)}
+        </h1>
+        {fieldState.invalid && <span id={errorId} className="sr-only">{errorMessage}</span>}
+      </div>
+    );
+  }
 
   return (
     <div data-form-field={name} className={fieldDirectionClassName(direction, fieldLabel)}>

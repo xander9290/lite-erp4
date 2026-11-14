@@ -4,6 +4,8 @@ import type { FormReactions, ReactionState } from "./useModelReactions";
 import type { PublishedFields } from "@/lib/orm/presentation";
 import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
 import type { ImageUploader } from "./image.types";
+import type { FieldDirection } from "./field.types";
+import { useFieldDirection } from "./fieldDirection";
 
 export type FormModel = { readFields?:PublishedFields; reactions?:FormReactions; reactionState?:ReactionState; retryReaction?:()=>void; fields: PublishedFields; lookups?: Readonly<Record<string, Many2OneLoader>>; uploads?: Readonly<Record<string, ImageUploader>> };
 export const FormModelContext = createContext<FormModel | undefined>(undefined);
@@ -15,9 +17,11 @@ export function useModelReadField(name:string, kind:string) {
   return {metadata:descriptor.metadata,value:model?.reactionState?.preview[name],state:model?.reactionState,retry:model?.retryReaction};
 }
 /** Explicit props (including false/empty labels) override inherited presentation. */
-export function useModelField<P extends { name: string }>(props: P, kind: string): P {
+export function useModelField<P extends { name: string; direction?: FieldDirection }>(props: P, kind: string): P {
   const model = useContext(FormModelContext);
-  if (!model || !Object.hasOwn(model.fields, props.name)) return props;
+  const direction = useFieldDirection(props.direction);
+  const layoutProps = direction === props.direction ? props : { ...props, direction };
+  if (!model || !Object.hasOwn(model.fields, props.name)) return layoutProps;
   const metadata = model.fields[props.name].metadata;
   if (metadata.sensitive || metadata.kind !== kind) throw new Error(`Contrato incompatible: ${props.name} (${kind}).`);
   const defaults: Record<string, unknown> = { label: metadata.label, required: metadata.kind === "boolean" ? undefined : metadata.required };
@@ -26,5 +30,5 @@ export function useModelField<P extends { name: string }>(props: P, kind: string
   if (metadata.kind === "many2one" && !("model" in props && props.model !== undefined)) defaults.load = model.lookups?.[props.name];
   if (metadata.kind === "image") defaults.upload = model.uploads?.[props.name];
   if (metadata.kind === "integer") defaults.allowNegative = (metadata.min ?? -2147483648) < 0;
-  return { ...defaults, ...Object.fromEntries(Object.entries(props).filter(([, value]) => value !== undefined)) } as P;
+  return { ...defaults, ...Object.fromEntries(Object.entries(layoutProps).filter(([, value]) => value !== undefined)) } as P;
 }

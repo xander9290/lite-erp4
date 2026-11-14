@@ -3,12 +3,12 @@
   "modules": {
     "flota": {
       "file": "orm-flota.prisma",
-      "hash": "89a771d8c3e4b3899dd2b2ee5fb6de9699224b3c7ecc56437e08626cf2d77df7",
+      "hash": "dc7adca0e6af2a030c79965cc495040dbfc15104f74f5f4e569ce53cdc10fecb",
       "inverses": [
         {
           "file": "user.prisma",
           "target": "User",
-          "text": "\n  // BEGIN lite-erp:flota:User\n  flotaFabricanteCreatedRecords FlotaFabricante[] @relation(\"FlotaFabricante_createBy\")\n  flotaModeloCreatedRecords FlotaModelo[] @relation(\"FlotaModelo_createBy\")\n  // END lite-erp:flota:User\n"
+          "text": "\n  // BEGIN lite-erp:flota:User\n  flotaFabricanteCreatedRecords FlotaFabricante[] @relation(\"FlotaFabricante_createBy\")\n  flotaModeloCreatedRecords FlotaModelo[] @relation(\"FlotaModelo_createBy\")\n  flotaVehicleCreatedRecords FlotaVehicle[] @relation(\"FlotaVehicle_createBy\")\n  // END lite-erp:flota:User\n"
         }
       ]
     }

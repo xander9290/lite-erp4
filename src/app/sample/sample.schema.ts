@@ -2,6 +2,31 @@ import { z } from "zod";
 import { formatPhone } from "@/components/ui/form/phone";
 import { Fields } from "@/lib/orm/fields";
 
+export const headerSampleSchema = z.object({
+  name: z.string().trim().min(1, "Nombre: escribe el título del registro.").max(300),
+});
+export type HeaderSampleValues = z.infer<typeof headerSampleSchema>;
+
+export const stackSampleSchema = z.object({
+  name: z.string().trim().min(1, "Nombre: campo obligatorio.").max(120),
+  plate: z.string().trim().min(1, "Matrícula: campo obligatorio.").max(20),
+  model: z.string().trim().min(1, "Modelo: campo obligatorio.").max(120),
+  active: z.boolean(),
+});
+export type StackSampleValues = z.infer<typeof stackSampleSchema>;
+
+export const invisibleSampleFields = {
+  reference: Fields.Text({ label: "Referencia", required: true, maxLength: 40, invisible: true }),
+  notes: Fields.Text({ label: "Observaciones", maxLength: 240 }),
+};
+export const invisibleSampleSchema = z.object({
+  showDetails: z.boolean(),
+  reference: invisibleSampleFields.reference.schema,
+  notes: invisibleSampleFields.notes.schema,
+});
+export type InvisibleSampleInput = z.input<typeof invisibleSampleSchema>;
+export type InvisibleSampleValues = z.output<typeof invisibleSampleSchema>;
+
 export const emailSampleSchema = z.object({
   email: z.email({ error: "Correo: escribe una dirección válida." }).max(254),
 });

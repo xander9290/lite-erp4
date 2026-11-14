@@ -3,10 +3,18 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useFieldInvisible } from "./FieldVisibility";
 
-export default function ImageEditorModal({ id, children, onCancel, onAfterClose }: {
+type ImageEditorModalProps = {
   id: string; children: ReactNode; onCancel: () => void; onAfterClose: () => void;
-}) {
+};
+
+export default function ImageEditorModal(props: ImageEditorModalProps) {
+  const invisible = useFieldInvisible();
+  return invisible ? null : <VisibleImageEditorModal {...props} />;
+}
+
+function VisibleImageEditorModal({ id, children, onCancel, onAfterClose }: ImageEditorModalProps) {
   const titleId = useId();
   const hintId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);

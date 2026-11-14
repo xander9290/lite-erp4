@@ -7,12 +7,13 @@ export const INTEGER_MAX = 2147483647;
 type Default<T> = T | (() => T);
 /** Collection presentation. The server service still fixes and validates the resulting list policy. */
 type PresentationOptions = { list?: boolean; searchable?: boolean; sortable?: boolean; filterable?: boolean; groupable?: boolean };
-type CommonOptions = { label?: string; required?: boolean; unique?: boolean; tracking?: boolean; sensitive?: boolean } & PresentationOptions;
+type CommonOptions = { label?: string; required?: boolean; unique?: boolean; tracking?: boolean; sensitive?: boolean; invisible?: boolean } & PresentationOptions;
 const presentationKeys = ["list", "searchable", "sortable", "filterable", "groupable"] as const;
 type NullableOptions<T> = CommonOptions & { default?: Default<T | null> };
 type RequiredValue<T, O> = O extends { required: true } ? T : T | null;
 
 type CommonMetadata = {
+  readonly invisible?: boolean;
   /** Generated presentation capability; not an editable Field option. */
   readonly readOnly?: boolean;
   readonly compute?: string;
@@ -58,10 +59,10 @@ export function isField(value: unknown): value is Field {
 
 function checkOptions(options: CommonOptions, extra: readonly string[]) {
   if (!options || typeof options !== "object" || Array.isArray(options)) throw new Error("Las opciones del Field deben ser un objeto.");
-  const allowed = new Set(["label", "required", "unique", "default", "tracking", "sensitive", ...presentationKeys, ...extra]);
+  const allowed = new Set(["label", "required", "unique", "default", "tracking", "sensitive", "invisible", ...presentationKeys, ...extra]);
   for (const key of Object.keys(options)) if (!allowed.has(key)) throw new Error(`Opción de Field desconocida: ${key}.`);
   if (options.label !== undefined && (typeof options.label !== "string" || !options.label.trim())) throw new Error("El label del Field no puede estar vacío.");
-  for (const key of ["required", "unique", "tracking", "sensitive", ...presentationKeys] as const) if (options[key] !== undefined && typeof options[key] !== "boolean") throw new Error(`${key} debe ser booleano.`);
+  for (const key of ["required", "unique", "tracking", "sensitive", "invisible", ...presentationKeys] as const) if (options[key] !== undefined && typeof options[key] !== "boolean") throw new Error(`${key} debe ser booleano.`);
   if (options.sensitive && options.tracking) throw new Error("Un campo sensible no puede habilitar tracking.");
   if (options.sensitive && presentationKeys.some(key => options[key])) throw new Error("Un campo sensible no se publica en colecciones: sin list, searchable, sortable, filterable ni groupable.");
 }
@@ -98,6 +99,7 @@ function makeField<I, O>(schema: z.ZodType<O, I>, options: CommonOptions & { def
     ...details, label: options.label, required: options.required === true, unique: options.unique === true,
     ...(options.tracking !== undefined ? { tracking: options.tracking } : {}),
     ...(options.sensitive !== undefined ? { sensitive: options.sensitive } : {}),
+    ...(options.invisible !== undefined ? { invisible: options.invisible } : {}),
     ...(options.related ? { related: options.related } : {}),
     ...(options.compute ? { compute: options.compute } : {}),
     defaultKind: !hasDefault ? "empty" : typeof configuredDefault === "function" ? "factory" : "literal",

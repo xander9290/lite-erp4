@@ -30,3 +30,11 @@ export type ModelClientConfig = {
 };
 
 export const modelIdPattern = /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*$/;
+
+/** Collection descriptors include only declared related previews, never arbitrary compute outputs. */
+export function collectionFieldMetadata(config: Pick<ModelClientConfig, "fields" | "preview" | "related">): Readonly<Record<string, FieldMetadata>> {
+  return {
+    ...config.fields,
+    ...Object.fromEntries(config.related.filter(name => Object.hasOwn(config.preview, name)).map(name => [name, { ...config.preview[name], readOnly: true }])),
+  };
+}

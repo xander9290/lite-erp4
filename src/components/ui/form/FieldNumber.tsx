@@ -4,6 +4,7 @@ import { useId, useMemo, useState, type ComponentPropsWithoutRef } from "react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import { useModelField } from "./modelFields";
 import ReadFieldValue, { type ReadFieldProps } from "./ReadFieldValue";
+import FieldVisibility from "./FieldVisibility";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { createNumberFormat, type ParsedNumber } from "./numberFormat";
@@ -28,6 +29,11 @@ export type FieldNumberProps<TFieldValues extends FieldValues = FieldValues> = E
 type EditingNumber = ParsedNumber & { name: string; formatKey: string };
 
 export default function FieldNumber<TFieldValues extends FieldValues = FieldValues>(props: FieldNumberProps<TFieldValues>) {
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={props.name} invisible={invisible}><NumberControl {...controlProps} /></FieldVisibility>;
+}
+
+function NumberControl<TFieldValues extends FieldValues = FieldValues>(props: FieldNumberProps<TFieldValues>) {
   if (props.mode === "display") {
     const formatter=createNumberFormat({type:props.type,decimals:props.decimals,currency:props.currency,locale:props.locale??"es-MX",allowNegative:true});
     return <ReadFieldValue {...props} kind="integer" format={formatter.format} />;

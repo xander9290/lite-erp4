@@ -8,6 +8,7 @@ import { useMany2OneSearch } from "./useMany2OneSearch";
 import { toggleRelationTag } from "./relationTagValues";
 
 import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
+import { useFieldInvisible } from "./FieldVisibility";
 
 export type Many2OneColumn = { field: string; label: string };
 
@@ -25,6 +26,11 @@ type SearchModalProps = {
 );
 
 export default function Many2OneSearchModal(props: SearchModalProps) {
+  const invisible = useFieldInvisible();
+  return invisible ? null : <VisibleSearchModal {...props} />;
+}
+
+function VisibleSearchModal(props: SearchModalProps) {
   const { title, request, initialQuery, columns = [], onClose, onAfterClose } = props;
   const titleId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);

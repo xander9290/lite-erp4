@@ -108,6 +108,19 @@ Un campo con `list: false` no puede ser buscable, ordenable, filtrable ni agrupa
 Los campos `sensitive` nunca se publican. El servicio sigue fijando y validando la
 política en el servidor; las vistas no la amplían.
 
+Los campos `related` también forman parte de la política de colección por defecto
+(salvo `list: false` o una lista explícita en el manifest). Se presentan como columnas
+de lectura en ListView/CardView y en sus vistas personalizadas; por ejemplo,
+`{ field: "fabricanteLogo", widget: "image" }`. No admiten búsqueda, orden, filtros
+ni agrupación, ni se incluyen en los valores editables del formulario. Los campos
+`compute` de preview no se publican automáticamente en las colecciones.
+
+`invisible: true` establece la visibilidad inicial del Field en formularios, sin
+retirarlo del payload ni de la validación. En TSX, `invisible={condición}` controla
+la visibilidad y `invisible={false}` anula el valor del modelo. Es presentación;
+para ocultar una columna usar `list: false`. Contrato y ejemplo RHF/Zod en
+[Invisible](../src/components/ui/form/FieldVisibility.md) y `/sample#field-invisible`.
+
 ## 3. Instalar
 
 ```bash

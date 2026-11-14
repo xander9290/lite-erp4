@@ -1,4 +1,4 @@
-import { Boxes } from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 import { defineApplication } from "@/lib/applications/manifest";
 
 export const modulesManifest = defineApplication({
@@ -6,7 +6,7 @@ export const modulesManifest = defineApplication({
   name: "Módulos",
   description: "Aplicaciones disponibles, instalación y dependencias.",
   version: "0.1.0",
-  icon: Boxes,
+  icon: LayoutGrid,
   depends: [],
   access: "admin",
   models: [],

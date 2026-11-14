@@ -57,6 +57,11 @@ para su identificador, separados por caso. La nueva tutoría de Flota usa módul
 declarativos con el ID `flota`, disponible tras retirar la aplicación anterior.
 [Punto de partida y ritmo](docs/tutorial-flota.md).
 
+Continuidad: [avance actual y siguiente paso](docs/estado-proyecto.md).
+Prioridad acordada para la próxima sesión (2026-11-14):
+[Acciones de formulario: FormHeader y FormButton](docs/ideas/acciones-formulario.md),
+pendientes de implementación.
+
 | Caso | Guía |
 | --- | --- |
 | Crear una aplicación y enlazar su persistencia | [Crear aplicaciones](docs/crear-aplicaciones.md) y [Flujo del framework](docs/flujo-framework.md). |

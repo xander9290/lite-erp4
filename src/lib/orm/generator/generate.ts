@@ -21,6 +21,7 @@ const snake = (value: string) => value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").to
 export function fieldExpression(field: FieldMetadata) {
   const common = { label: field.label, ...(field.kind !== "boolean" ? { required: field.required } : {}), unique: field.unique,
     ...(field.tracking !== undefined ? { tracking: field.tracking } : {}), ...(field.sensitive !== undefined ? { sensitive: field.sensitive } : {}),
+    ...(field.invisible !== undefined ? { invisible: field.invisible } : {}),
     ...(field.defaultKind === "literal" ? { default: field.defaultValue } : {}),
     // Presentation flags only when declared, so existing generated contracts stay byte-identical.
     ...Object.fromEntries((["list", "searchable", "sortable", "filterable", "groupable"] as const).filter(key => field[key] !== undefined).map(key => [key, field[key]])) };

@@ -6,6 +6,8 @@ import { Check, ChevronDown, Search, X } from "lucide-react";
 import { lookupModels, type Many2OneModel, type Many2OneOption, type Many2OneRecord } from "@/lib/many2one/types";
 import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
 import { useModelField } from "./modelFields";
+import { useFieldDirection } from "./fieldDirection";
+import FieldVisibility from "./FieldVisibility";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { useFormFieldValidation } from "./formValidation";
@@ -28,6 +30,7 @@ type EditableProps<TFieldValues extends FieldValues = FieldValues> =
   );
 
 export type FieldMany2OneDisplayProps = {
+  invisible?: boolean;
   mode: "display";
   value: { id: string; label: string; avatarUrl?: string | null } | null;
   label?: string;
@@ -39,7 +42,8 @@ export type FieldMany2OneDisplayProps = {
 };
 export type FieldMany2OneProps<TFieldValues extends FieldValues = FieldValues> = EditableProps<TFieldValues> | FieldMany2OneDisplayProps;
 
-function DisplayRelation({ value, label, direction = "block", emptyText = "Sin información", id, className = "", "aria-label": ariaLabel }: FieldMany2OneDisplayProps) {
+function DisplayRelation({ value, label, direction: requestedDirection = "block", emptyText = "Sin información", id, className = "", "aria-label": ariaLabel }: FieldMany2OneDisplayProps) {
+  const direction = useFieldDirection(requestedDirection) ?? "block";
   const generatedId = useId();
   const labelId = `${id ?? generatedId}-label`;
   const fieldLabel = label?.trim();
@@ -52,7 +56,10 @@ function DisplayRelation({ value, label, direction = "block", emptyText = "Sin i
 }
 
 export default function FieldMany2One<TFieldValues extends FieldValues = FieldValues>(props: FieldMany2OneProps<TFieldValues>) {
-  return props.mode === "display" ? <DisplayRelation {...props} /> : <EditableRelation<TFieldValues> {...props} />;
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={"name" in props ? props.name : undefined} invisible={invisible}>
+    {controlProps.mode === "display" ? <DisplayRelation {...controlProps} /> : <EditableRelation<TFieldValues> {...controlProps} />}
+  </FieldVisibility>;
 }
 
 function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props: EditableProps<TFieldValues>) {

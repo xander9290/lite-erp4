@@ -26,4 +26,21 @@ model FlotaModelo {
   @@index([fabricanteId])
   @@index([createBy])
   @@map("flota_modelo")
+  flotaVehicleModeloIdRecords FlotaVehicle[] @relation("FlotaVehicle_modeloId")
+}
+
+model FlotaVehicle {
+  id String @id @default(cuid())
+  name String? @db.VarChar(300)
+  active Boolean @default(true)
+  plate String @unique @db.VarChar(20)
+  modeloId String @map("modelo_id")
+  modelo FlotaModelo @relation("FlotaVehicle_modeloId", fields: [modeloId], references: [id], onDelete: Restrict)
+  createBy String? @map("create_by")
+  createByUser User? @relation("FlotaVehicle_createBy", fields: [createBy], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([modeloId])
+  @@index([createBy])
+  @@map("flota_vehicle")
 }

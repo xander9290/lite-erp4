@@ -10,6 +10,8 @@ import { useFormFieldValidation } from "./formValidation";
 import { useMany2OneSearch } from "./useMany2OneSearch";
 import Many2OneSearchModal, { type Many2OneColumn } from "./Many2OneSearchModal";
 import { relationTagIds, resolveRelationTags } from "./relationTagValues";
+import { useFieldDirection } from "./fieldDirection";
+import FieldVisibility from "./FieldVisibility";
 
 export type FieldRelationTagProps<TFieldValues extends FieldValues = FieldValues> =
   Omit<BaseFieldProps<TFieldValues>, "onChange"> &
@@ -24,12 +26,18 @@ export type FieldRelationTagProps<TFieldValues extends FieldValues = FieldValues
     onChange?: (ids: string[], records: Many2OneRecord[]) => void;
   };
 
-export default function FieldRelationTag<TFieldValues extends FieldValues = FieldValues>({
-  name, label, direction = "block", model, searchFields = lookupModels[model].searchFields,
+export default function FieldRelationTag<TFieldValues extends FieldValues = FieldValues>(props: FieldRelationTagProps<TFieldValues>) {
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={props.name} invisible={invisible}><RelationTagControl {...controlProps} /></FieldVisibility>;
+}
+
+function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
+  name, label, direction: requestedDirection = "block", model, searchFields = lookupModels[model].searchFields,
   displayName = lookupModels[model].displayName, columns, pageSize = 10, maxSelected = 100, clearable = true,
   onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y agregar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps
 }: FieldRelationTagProps<TFieldValues>) {
+  const direction = useFieldDirection(requestedDirection) ?? "block";
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const listId = `${inputId}-list`, errorId = `${inputId}-error`, statusId = `${inputId}-status`;

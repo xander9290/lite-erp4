@@ -3,6 +3,7 @@
 import { useId, type ComponentPropsWithoutRef } from "react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
 import { useModelField } from "./modelFields";
+import FieldVisibility from "./FieldVisibility";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldLabelClassName } from "./field.styles";
 
@@ -12,6 +13,11 @@ export type FieldBooleanProps<TFieldValues extends FieldValues = FieldValues> = 
   > & { type?: "switch" };
 
 export default function FieldBoolean<TFieldValues extends FieldValues = FieldValues>(props: FieldBooleanProps<TFieldValues>) {
+  const { invisible, ...controlProps } = props;
+  return <FieldVisibility name={props.name} invisible={invisible}><BooleanControl {...controlProps} /></FieldVisibility>;
+}
+
+function BooleanControl<TFieldValues extends FieldValues = FieldValues>(props: FieldBooleanProps<TFieldValues>) {
   const {
   name, label, type = "switch", direction = "block", onChange, onBlur, onClick,
   id, disabled, readOnly, className = "", "aria-describedby": describedBy, ...inputProps

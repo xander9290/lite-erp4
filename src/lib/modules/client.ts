@@ -5,7 +5,7 @@ import { recordIdentityShape, validateRecordIdentity } from "../orm/record";
 import { createSignedCloudinaryImageUploader } from "../uploads/cloudinary";
 import type { ModelLookupRequest } from "../many2one/model-lookup";
 import type { ReactionRequest } from "../orm/reactions.types";
-import type { ModelClientConfig } from "./config";
+import { collectionFieldMetadata, type ModelClientConfig } from "./config";
 import { modelLookup, modelReact, modelSignImage } from "./actions";
 
 const mapValues = <T, R>(source: Readonly<Record<string, T>>, map: (value: T, key: string) => R) =>
@@ -18,8 +18,7 @@ export function buildModelUI(config: ModelClientConfig) {
   const fields = mapValues(config.fields, fieldFromMetadata);
   const readFields = mapValues(config.preview, fieldFromMetadata);
   const schema = z.strictObject(mapValues(fields, field => field.schema)).extend(recordIdentityShape).superRefine(validateRecordIdentity as never);
-  const collectionFields: Record<string, Pick<Field, "metadata">> = { ...fields,
-    ...Object.fromEntries(config.related.filter(name => Object.hasOwn(readFields, name)).map(name => [name, { metadata: { ...readFields[name].metadata, readOnly: true } }])) };
+  const collectionFields: Record<string, Pick<Field, "metadata">> = mapValues(collectionFieldMetadata(config), metadata => ({ metadata }));
   const images = Object.entries(config.fields).filter(([, field]) => field.kind === "image" && !field.sensitive).map(([name]) => name);
   const recordUI = {
     fields, readFields,
