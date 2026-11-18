@@ -1,7 +1,10 @@
 # Partner/User nativos (`core`) y app Ajustes
 
-**Fase 0 (inventario y plan), 2026-11-18.** Prioridad elegida por el usuario tras pausar
-Tickets. Sin código hasta aprobar este plan; rama propuesta `codex/core`.
+**Plan iniciado el 2026-11-18.** Enfoque A aprobado y fases 1–4 implementadas en
+`codex/core` (commit `dae4f6e`); corrección de Usuarios writeOnly en `39e7f6e`.
+La fase 5, Contactos, sigue pendiente de iniciar por indicación del usuario.
+El inventario y el plan iniciales se conservan como contexto; las secciones de
+implementación describen el resultado. Continuidad revisada el 2026-11-18.
 
 ## Decisiones del usuario
 
@@ -224,11 +227,16 @@ vacío y sólo transporta un valor nuevo); el resto de `sensitive` sigue rechaza
   `test:one2many:integration`, `test:extensions:integration`, `test:contacts:integration`.
 - Cajón: Ajustes visible sólo para quien tenga acceso; `core` nunca visible.
 
-## Preguntas abiertas
+## Decisiones provisionales y puntos por revisar
 
-1. Aprobar el enfoque **A (adaptador nativo)** frente a B.
-2. ¿Quién puede buscar/seleccionar personas en un Many2one a User/Partner desde otros
-   módulos? Propuesta: cualquier usuario autenticado ve nombre y avatar de contactos
-   activos; sólo admin ve login y datos de cuenta.
-3. ¿Las altas nuevas de usuario exigen siempre contacto? (hoy `partnerId` es opcional en
-   el esquema; los usuarios existentes ya lo tienen).
+1. Enfoque **A aprobado e implementado**: esquema de User/Partner escrito a mano,
+   contratos y servicios declarativos; no está pendiente elegir A/B.
+2. Actualmente Partner admite lectura de nombre/correo/teléfono/avatar por cuentas
+   activas del grupo implícito Usuario interno; User sólo admite admin. Revisar la
+   política de búsqueda de personas al diseñar Contactos; no ampliar permisos por defecto.
+3. Altas de User crean contacto automáticamente; una cuenta antigua sin contacto lo
+   recibe al guardar. partnerId conserva nulabilidad en SQL por compatibilidad.
+4. Antes de fase 5 revisar concurrencia entre los campos delegados de User y las
+   ediciones directas de Partner: la revisión actual de User no avanza al editar
+   su contacto desde otra vista. No presentar la última escritura ganadora como
+   detección de conflictos entre esas dos entidades.
