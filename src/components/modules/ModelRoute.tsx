@@ -34,13 +34,14 @@ export async function modelRouteMetadata(modelId: string, path: readonly string[
  * `/erp/<module>/<model>` convention and by applications that present native models
  * (Ajustes → Usuarios over core.user).
  */
-export default async function ModelRoute({ modelId, path, searchParams }: { modelId: string; path: readonly string[]; searchParams: Promise<SearchParams> }) {
+export default async function ModelRoute({ modelId, path, searchParams, application }: { modelId: string; path: readonly string[]; searchParams: Promise<SearchParams>; application?: { name: string; href: `/erp/${string}`; label: string } }) {
   const { entry, collection, id } = resolveModelPath(modelId, path);
   const actor = await getCurrentAccessUser();
   if (!actor) redirect("/auth");
   const permissions = actor.modelAccess[entry.id];
   if (!permissions?.read || (!collection && !id && !permissions.create)) return <p role="alert" className="p-6">No tienes permiso para abrir esta vista.</p>;
-  const config = modelClientConfig(entry.id, actor);
+  const baseConfig = modelClientConfig(entry.id, actor);
+  const config = application ? { ...baseConfig, label: application.label, application: { name: application.name, href: application.href } } : baseConfig;
   const { views } = entry;
   if (collection) {
     const query = await searchParams;

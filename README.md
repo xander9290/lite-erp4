@@ -28,12 +28,13 @@ revalida cada operación. El [catálogo y gestor ampliado de Accesos](docs/ideas
 
 ## Aprender desde cero
 
-El siguiente módulo piloto es **Tickets**. La [guía paso a paso](docs/tutorial-tickets.md)
-comienza por el entorno y un modelo sencillo, y recorre formularios, colecciones,
-negocio, folios, relaciones, accesos y extensiones. Incluye comandos, comprobaciones
-y límites actuales. Ejercicios 0–3 completados; ejercicio 4 hasta `requiereVisita`.
-El siguiente paso es `compromisoAt` (DateTime opcional), al retomar la tutoría;
-se avanza un cambio a la vez. [Punto de continuación](docs/estado-proyecto.md#tickets-punto-de-continuación-guardado-2026-11-17).
+La tutoría de **Tickets** está pausada y el módulo se retiró el 2026-11-18.
+Su [guía](docs/tutorial-tickets.md) conserva el recorrido histórico y se retomará
+desde cero cuando el usuario lo indique. La prioridad actual es consolidar
+Partner/User nativos en `core` y la app **Ajustes**; fases 1–4 implementadas.
+Fase 5 en curso: Contactos sobre `core.partner`, con revisiones compartidas
+entre Usuarios y Perfil; pendiente definir los campos propios de su extensión.
+[Estado y siguiente paso](docs/estado-proyecto.md#prioridad-actual-partneruser-nativos-y-app-ajustes-2026-11-18).
 
 ## Comandos del scaffold anterior, en orden
 

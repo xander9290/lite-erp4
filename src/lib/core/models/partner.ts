@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
-import { Fields, Model, ModelValidationError, constraint, type ReactionValues } from "../../orm";
+import { Fields, Model, ModelValidationError, constraint, type ReactionValues, type ModelContext } from "../../orm";
+import { advanceContactUserRevision } from "../contact-revision";
 
 const email = z.email();
 
@@ -22,4 +23,8 @@ export class Partner extends Model {
 
   @constraint("email")
   validEmail(values: ReactionValues) { assertContactEmail(values.email); }
+
+  async afterSave(record: Readonly<Record<string, unknown>>, context: ModelContext) {
+    await advanceContactUserRevision(context.tx, String(record.id), new Date(String(record.revision)));
+  }
 }

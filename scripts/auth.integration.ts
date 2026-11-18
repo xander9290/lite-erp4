@@ -61,6 +61,17 @@ try {
   assert.equal(session.user.id, admin.id); assert.equal(session.user.isAdmin, true);
   assert.equal(JSON.stringify(session).includes("password"), false);
   const authenticated = await adminClient.request("/erp/ajustes/usuarios");
+  for (const path of ["/erp/contactos", "/erp/contactos/nuevo"]) {
+    const contactPage = await adminClient.request(path);
+    const html = await contactPage.text();
+    assert.equal(contactPage.status, 200, path);
+    assert.doesNotMatch(html, /Contrato incompatible|No tienes permiso para abrir/);
+    if (path.endsWith("/nuevo")) {
+      assert.match(html, /name="name"/);
+      assert.match(html, /name="email"/);
+      assert.doesNotMatch(html, /name="password"|name="isAdmin"/);
+    }
+  }
   assert.equal(authenticated.status, 200); await authenticated.text();
   for (const path of ["/erp/ajustes/modulos", "/erp/ajustes/modulos/demo"]) {
     const page = await adminClient.request(path);
@@ -106,6 +117,12 @@ try {
   assert.equal((await saveOwnProfile(prisma, ownActor, partnerSnapshot.values)).ok, false);
   assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: fixture.id } })).isAdmin, false);
   const forbiddenPage = await regular.request("/erp/ajustes/usuarios");
+  const readOnlyContacts = await regular.request("/erp/contactos");
+  assert.equal(readOnlyContacts.status, 200);
+  const forbiddenContactCreate = await regular.request("/erp/contactos/nuevo");
+  const forbiddenContactHtml = await forbiddenContactCreate.text();
+  assert.match(forbiddenContactHtml, /No tienes permiso para abrir/);
+  assert.doesNotMatch(forbiddenContactHtml, /name="name"/);
   assert.ok((await forbiddenPage.text()).includes("Necesitas permisos de administrador"));
   const deniedModules = await regular.request("/erp/ajustes/modulos");
   assert.ok((await deniedModules.text()).includes("Necesitas permisos de administrador"));

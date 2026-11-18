@@ -5,6 +5,7 @@ import type { FormViewResult } from "@/components/ui/form/formView.types";
 import { userSchema, type UserValues } from "@/schemas/user.schema";
 import { hashPassword } from "../auth/password";
 import { AccessError, assertUserChange } from "../auth/policy";
+import { nextRevision } from "../orm/revision";
 
 export const userFormSelect = { id: true, login: true, active: true, isAdmin: true, updatedAt: true, partner: { select: { name: true, email: true, phone: true, avatarUrl: true, updatedAt: true } } } satisfies Prisma.UserSelect;
 type UserFormRecord = Prisma.UserGetPayload<{ select: typeof userFormSelect }>;
@@ -38,10 +39,12 @@ export async function saveUserRecord(prisma: PrismaClient, actor: Actor, input: 
       const violation = assertUserChange(actor.id, current, values, await tx.user.count({ where: { active: true, isAdmin: true } }));
       if (violation) throw new UserValidationError(violation);
       const revoke = Boolean(password || current.login !== values.login || current.active !== values.active || current.isAdmin !== values.isAdmin);
-      return tx.user.update({ where: { id: current.id }, data: {
+      const updatedAt = nextRevision(current.updatedAt, ...(current.partner ? [current.partner.updatedAt] : []));
+      return tx.user.update({ where: { id: current.id, updatedAt: current.updatedAt }, data: {
         login: values.login, ...(password ? { password } : {}), active: values.active, isAdmin: values.isAdmin,
         ...(revoke ? { sessionVersion: { increment: 1 } } : {}),
-        partner: current.partnerId ? { update: partnerData } : { create: partnerData },
+        updatedAt,
+        partner: current.partnerId ? { update: { ...partnerData, updatedAt } } : { create: { ...partnerData, updatedAt } },
       }, select: userFormSelect });
     }, { isolationLevel: "Serializable" });
     return { ok: true, values: userFormValues(result), message: values.id ? "Usuario actualizado." : "Usuario creado." };

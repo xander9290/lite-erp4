@@ -6,7 +6,32 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+Revisión de continuidad (2026-11-18, Windows): rama `codex/core`, HEAD `e7b1223`,
+árbol limpio al comenzar. Contrastados AGENTS, README, este estado, plan core/Ajustes,
+Git, clases nativas, repositorio, registro de módulos, auditoría, rutas y cajón.
+Las fases 1–4 ya están versionadas en `dae4f6e`; la corrección writeOnly de Usuarios
+en `39e7f6e`, y la retirada de la tarjeta ficticia Ventas en `e7b1223`.
+`src/modules/index.ts` está vacío; core se incorpora por registeredModules.
+Contactos conserva todavía su aplicación y servicio manuales. Próximo trabajo:
+fase 5 sólo cuando el usuario indique iniciarla; no restaurar Tickets.
+Esta revisión corrige documentación desactualizada, sin suites, navegador,
+consultas a BD, migraciones ni cambios de código. Las verificaciones anteriores
+siguen siendo históricas para sus alcances; no se comprobó estado remoto ni
+disponibilidad del servidor o PostgreSQL. git diff --check documental aprobado.
+
 ## Prioridad actual: Partner/User nativos y app Ajustes (2026-11-18)
+
+**Fase 5 iniciada por el usuario.** Contactos ya usa core.partner con ModelRoute,
+ModelForm/Collection y permisos efectivos; protección cruzada de revisión con
+Usuarios/Perfil implementada. El usuario eligió añadir campos propios mediante
+extendModel, pero faltan nombres/tipos/obligatoriedad (pregunta pendiente).
+No crear una extensión ni aplicar SQL antes de conocerlos. Detalle y evidencia
+actual en [fase 5](ideas/core-ajustes.md#fase-5-en-curso-contactos-declarativo-2026-11-18).
+30 pruebas focalizadas, 48 de módulos, 11 de aplicaciones, tsc/ESLint e integración
+core temporal aprobados. Build y regresión legacy (auth/Contactos/tema, HTTP
+autenticado admin/lector) aprobados; proyectos/esquemas temporales eliminados.
+Sin inspección visual nueva. git diff --check aprobado; sin SQL ni consultas
+a datos del ERP. Avance actual sin commit; cambios/documentación previos conservados.
 
 Decisión del usuario: pausar Tickets y priorizar un módulo declarativo **nativo**
 `core` con Partner y User, sin icono en el cajón, y una app nueva **«Ajustes»** donde
@@ -24,24 +49,32 @@ cualquier módulo y fase 3 de herencia dependen de que User/Partner sean declara
 - **Fase 0 hecha:** inventario y plan en [Partner/User nativos y Ajustes](ideas/core-ajustes.md).
   Decidido por el usuario: Ajustes con Usuarios, Accesos y Módulos; Contactos después como
   app propia que extiende `core.partner`; contacto creado automáticamente al crear usuario;
-  Perfil en el avatar. Pendiente de aprobación: enfoque A (adaptador nativo, sin DDL) o B,
-  quién puede buscar personas y si toda alta exige contacto. Sin código; rama `codex/core`.
-- **Fase 1 de core implementada** (rama `codex/core`, sin commit): módulo nativo `core`
+  Perfil en el avatar. Enfoque A aprobado (adaptador nativo, sin DDL sobre users/partners).
+  Decisiones provisionales implementadas: lectura de Partner para cuentas activas,
+  User sólo admin y contacto automático en altas. Revisarlas con el caso de Contactos.
+- **Fase 1 de core implementada** (rama `codex/core`, commit `dae4f6e`): módulo nativo `core`
   con `core.partner` sobre `partners`, grupo implícito «Usuario interno» con lectura,
   Many2one y `extendModel` hacia Partner desde cualquier módulo sin `depends`. Sin DDL en
   el ERP. Detalle y verificación en [core-ajustes](ideas/core-ajustes.md#fase-1-implementada-2026-11-18-rama-codexcore).
-- **Fase 2 implementada** (sin commit): `core.user` sobre `users` con contacto delegado
+- **Fase 2 implementada** (commit `dae4f6e`): `core.user` sobre `users` con contacto delegado
   (`inherits`), contraseña `writeOnly` hasheada, revocación de sesión, `beforeRemove` y
   Many2one a User. [Detalle](ideas/core-ajustes.md#fase-2-implementada-2026-11-18-rama-codexcore).
-- **Fase 3 implementada** (sin commit): app Ajustes con Usuarios (`core.user` vía
+- **Fase 3 implementada** (commit `dae4f6e`): app Ajustes con Usuarios (`core.user` vía
   `ModelRoute`), Accesos y Módulos; rutas antiguas redirigen; «Usuario interno» implícito.
   [Detalle](ideas/core-ajustes.md#fase-3-implementada-2026-11-18-rama-codexcore).
-- **Fase 4 implementada** (sin commit): `createBy` «Creado por» con etiqueta, filtro y
+- **Fase 4 implementada** (commit `dae4f6e`): `createBy` «Creado por» con etiqueta, filtro y
   agrupación por creador mediante `creatorLookup`. [Detalle](ideas/core-ajustes.md#fase-4-implementada-2026-11-18-rama-codexcore).
-  Siguiente: fase 5, Contactos sobre `core.partner` (con `extendModel`), cuando el usuario lo indique.
+  Fase 5 iniciada; ver avance y pregunta pendiente arriba.
+- Concurrencia User/Partner corregida durante fase 5: Contactos invalida la revisión
+  de la cuenta vinculada; Usuarios y Perfil avanzan ambas. Verificaciones nuevas
+  en esquema temporal, distintas de las pruebas históricas de fases 1–4.
 - En la Mac, `migrate deploy` de la retirada borrará sus datos de Tickets.
 
 ## Auditoría en ModelCollection: implementada (2026-11-18)
+
+Esta sección describe la primera implementación. La fase 4 de core, arriba,
+la amplió: createBy ya se publica como creador legible, filtrable y agrupable;
+no sigue vigente su rechazo descrito en las notas históricas siguientes.
 
 Implementada a petición del usuario antes de retomar Tickets. Caso real:
 `{field:"createBy"}` en TicketList se rechazaba por no estar publicado.

@@ -10,7 +10,8 @@ export const contactsManifest = defineApplication({
   depends: [],
   access: "authenticated",
   models: ["Partner"],
+  accessModels: ["core.partner"],
   menus: [
-    { id: "contacts", label: "Contactos", href: "/erp/contactos" },
+    { id: "contacts", label: "Contactos", href: "/erp/contactos", model: "core.partner" },
   ],
 });

@@ -97,7 +97,9 @@ try {
   const accountBeforeContact = await prisma.user.findUniqueOrThrow({ where: { id: reader.id } });
   const contactUpdate = await saveContactRecord(prisma, actor, { ...linked.values, name: "Contacto compartido actualizado" });
   assert.ok(contactUpdate.ok);
-  assert.deepEqual(await prisma.user.findUniqueOrThrow({ where: { id: reader.id } }), accountBeforeContact);
+  const accountAfterContact = await prisma.user.findUniqueOrThrow({ where: { id: reader.id } });
+  assert.ok(accountAfterContact.updatedAt.getTime() > accountBeforeContact.updatedAt.getTime());
+  assert.deepEqual({ ...accountAfterContact, updatedAt: accountBeforeContact.updatedAt }, accountBeforeContact, "sólo avanza la revisión; credenciales/permisos/sesión intactos");
   const staleUser = await saveUserRecord(prisma, actor, { ...userSnapshot, name: "Usuario antiguo" });
   const staleProfile = await saveOwnProfile(prisma, readerActor, { ...profileSnapshot.values, name: "Perfil antiguo" });
   assert.equal(staleUser.ok, false); if (!staleUser.ok) assert.equal(staleUser.kind, "validation");

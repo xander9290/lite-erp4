@@ -97,6 +97,37 @@ const accounts = ok(await withActor(actor, () => users.list(prisma, actor, { ...
 assert.ok(accounts.data.rows.every(row => !Object.hasOwn(row, "password") && !Object.hasOwn(row, "sessionVersion")));
 const search = ok(await withActor(actor, () => users.list(prisma, actor, { ...state, query: "editada" })), "buscar por nombre del contacto") as unknown as { data: { total: number } };
 assert.equal(search.data.total, 1);
+// Contactos and Usuarios share data and invalidate each other's stale forms without revoking sessions.
+const accountOpen = ok(await users.read(prisma, actor, nuevo.values.id), "abrir cuenta para concurrencia").values;
+const linkedPartner = ok(await partners.read(prisma, actor, stored.partnerId!), "abrir contacto vinculado").values;
+const versionBeforeContact = (await prisma.user.findUniqueOrThrow({ where: { id: nuevo.values.id } })).sessionVersion;
+const contactEdit = ok(await partners.save(prisma, actor, { ...linkedPartner, name: "Contacto actualizado aparte" }), "editar contacto aparte").values;
+assert.equal((await users.save(prisma, actor, { ...accountOpen, phone: "obsoleto" })).ok, false, "Usuarios detecta cambios hechos desde Contactos");
+assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: nuevo.values.id } })).sessionVersion, versionBeforeContact, "editar contacto no revoca sesiones");
+const accountReload = ok(await users.read(prisma, actor, nuevo.values.id), "recargar cuenta").values;
+assert.equal(accountReload.name, "Contacto actualizado aparte");
+ok(await users.save(prisma, actor, { ...accountReload, phone: "888" }), "editar datos delegados desde Usuarios");
+assert.equal((await partners.save(prisma, actor, { ...contactEdit, phone: "obsoleto" })).ok, false, "Contactos detecta cambios hechos desde Usuarios");
+// Profile remains a separate authorized workflow, with the same cross-view protection.
+const { loadOwnProfile, saveOwnProfile } = await import("./src/lib/auth/profile-service");
+const profileOpen = await loadOwnProfile(prisma, lector);
+const readerContact = ok(await partners.read(prisma, actor, reader.partnerId!), "contacto para perfil").values;
+ok(await partners.save(prisma, actor, { ...readerContact, phone: "999" }), "cambio externo al perfil");
+assert.equal((await saveOwnProfile(prisma, lector, { ...profileOpen.values, phone: "obsoleto" })).ok, false);
+const beforeProfile = ok(await partners.read(prisma, actor, reader.partnerId!), "contacto antes de guardar perfil").values;
+const userBeforeProfile = ok(await users.read(prisma, actor, reader.id), "cuenta antes del perfil").values;
+const profileReload = await loadOwnProfile(prisma, lector);
+ok(await saveOwnProfile(prisma, lector, { ...profileReload.values, phone: "123" }), "guardar perfil");
+assert.equal((await partners.save(prisma, actor, { ...beforeProfile, phone: "obsoleto" })).ok, false);
+assert.equal((await users.save(prisma, actor, { ...userBeforeProfile, phone: "obsoleto" })).ok, false);
+// A simultaneous contact/account edit may commit only once for the shared snapshot.
+const simultaneousContact = ok(await partners.read(prisma, actor, reader.partnerId!), "contacto para carrera").values;
+const simultaneousUser = ok(await users.read(prisma, actor, reader.id), "cuenta para carrera").values;
+const results = await Promise.all([
+  partners.save(prisma, actor, { ...simultaneousContact, phone: "456" }),
+  users.save(prisma, actor, { ...simultaneousUser, phone: "789" }),
+]);
+assert.equal(results.filter(result => result.ok).length, 1, "sólo un guardado concurrente puede confirmar");
 await prisma.$disconnect();
 console.log("✓ core.user: alta con contacto en la misma sentencia, contraseña hasheada y nunca publicada, revocación de sesión, lastLogin de sistema, último admin/propia cuenta y acceso sólo admin.");
 console.log("✓ core.partner: tabla partners sin cambios, servicio declarativo, usuario interno de sólo lectura, Many2one desde otro módulo y extensión CRM en tabla compañera.");

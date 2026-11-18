@@ -49,7 +49,9 @@ export default function ModelCollection({ config, columns, view = config.view, t
     columns: source.columns, queryColumns: source.queryColumns,
     createHref: create && capabilities.create ? `${source.common.createHref}?returnTo=${encodeURIComponent(returnTo)}` : undefined,
     recordHref: open ? source.common.recordHref : undefined,
-    breadcrumbs: [{ label: "Aplicaciones", href: "/erp" }, { label: config.moduleName, href: `/erp/${config.module}` }, { label: title }],
+    breadcrumbs: [{ label: "Aplicaciones", href: "/erp" }, ...(config.application?.href === config.route
+      ? [{ label: config.application.name }]
+      : [{ label: config.application?.name ?? config.moduleName, href: config.application?.href ?? `/erp/${config.module}` }, { label: title }])],
   };
   if (view === "kanban") {
     if (!source.kanban || !source.provider.loadKanban) throw new Error(`${config.id}: configura kanban y su proveedor antes de mostrar el tablero.`);

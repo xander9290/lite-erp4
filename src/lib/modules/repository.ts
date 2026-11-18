@@ -14,6 +14,7 @@ import { relatedProjectionPlan } from "../orm/generator/related";
 import type { ModuleGeneration } from "../orm/generator/generate";
 import type { ModuleModel } from "./define";
 import { extensionWhere, storageProjection } from "./storage";
+import { nextRevision } from "../orm/revision";
 
 type Row = Record<string, unknown> & { id: string; updatedAt: Date };
 /** Minimal delegate surface. The delegate name comes from the trusted module registry, never from a request. */
@@ -125,8 +126,9 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
     return result;
   };
   // Nested writes keep base and companions in one statement, transaction and revision.
-  const nested = (values: T, actorId?: string) => ({ ...Object.fromEntries(many.map(link => [link.source, { ...(actorId ? {} : { deleteMany: {} }), create: (values[link.field] as string[]).map(targetId => ({ targetId })) }])), ...Object.fromEntries(companions.map(companion => {
+  const nested = (values: T, actorId?: string, revision?: Date) => ({ ...Object.fromEntries(many.map(link => [link.source, { ...(actorId ? {} : { deleteMany: {} }), create: (values[link.field] as string[]).map(targetId => ({ targetId })) }])), ...Object.fromEntries(companions.map(companion => {
     const fields = write(companion.fields, values);
+    if (companion.inherits && revision) fields.updatedAt = revision;
     return [companion.relation, actorId ? { create: { ...fields, ...(companion.inherits ? {} : { createBy: actorId }) } } : { upsert: { create: fields, update: fields } }];
   })) });
   const relatedGroup = (field: string) => {
@@ -141,8 +143,13 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
     async audit(tx, id) { const record = await delegateOf(tx, entry.delegate).findUnique({ where: { id }, select: auditSelect }); return record ? auditDto(record) : null; },
     async create(tx, values, actorId) { return dto(await delegateOf(tx, entry.delegate).create({ data: { ...await data(values), ...(creator ? { createBy: actorId } : {}), ...nested(values, actorId) }, select: recordSelect })); },
     async update(tx, id, revision, values) {
-      const updatedAt = new Date(Math.max(Date.now(), Date.parse(revision) + 1));
-      return dto(await delegateOf(tx, entry.delegate).update({ where: { id, updatedAt: new Date(revision) }, data: { ...await data(values), ...nested(values), ...(await options.beforeUpdate?.(tx, id, values) ?? {}), updatedAt }, select: recordSelect }));
+      const inherited = companions.filter(companion => companion.inherits);
+      const related = inherited.length ? await delegateOf(tx, entry.delegate).findUnique({ where: { id }, select: Object.fromEntries(inherited.map(companion => [companion.relation, { select: { updatedAt: true } }])) }) : null;
+      const updatedAt = nextRevision(new Date(revision), ...inherited.flatMap(companion => {
+        const row = related?.[companion.relation] as { updatedAt: Date } | null | undefined;
+        return row ? [row.updatedAt] : [];
+      }));
+      return dto(await delegateOf(tx, entry.delegate).update({ where: { id, updatedAt: new Date(revision) }, data: { ...await data(values), ...nested(values, undefined, updatedAt), ...(await options.beforeUpdate?.(tx, id, values) ?? {}), updatedAt }, select: recordSelect }));
     },
     async remove(tx, id, revision) { await delegateOf(tx, entry.delegate).delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },
     count(tx, where) { return delegateOf(tx, entry.delegate).count({ where: whereOf(where) }); },

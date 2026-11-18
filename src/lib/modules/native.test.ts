@@ -88,7 +88,7 @@ test("core.user delegates contact fields to its Partner and keeps the password w
 
   const calls: [string, Record<string, unknown>][] = [];
   const updatedAt = new Date("2026-11-18T10:00:00.000Z");
-  const stored = { id: "u1", updatedAt, login: "ana", password: "$2b$hash", active: true, isAdmin: false, lastLogin: null, partner: { name: "Ana", email: null, phone: null, avatarUrl: null } };
+  const stored = { id: "u1", updatedAt, login: "ana", password: "$2b$hash", active: true, isAdmin: false, lastLogin: null, partner: { name: "Ana", email: null, phone: null, avatarUrl: null, updatedAt } };
   const tx = { user: {
     findMany: async () => [],
     findUnique: async (args: Record<string, unknown>) => { calls.push(["findUnique", args]); return stored; },
@@ -110,7 +110,9 @@ test("core.user delegates contact fields to its Partner and keeps the password w
   const updated = calls.find(([kind]) => kind === "update")![1].data as Record<string, unknown>;
   assert.equal(Object.hasOwn(updated, "password"), false, "contraseña vacía conserva la guardada");
   assert.deepEqual(updated.sessionVersion, { increment: 1 }, "cambiar el rol revoca las sesiones");
-  assert.deepEqual(updated.partner, { upsert: { create: { name: "Ana", email: null, phone: null, avatarUrl: null }, update: { name: "Ana", email: null, phone: null, avatarUrl: null } } });
+  const contactData = { name: "Ana", email: null, phone: null, avatarUrl: null, updatedAt: updated.updatedAt };
+  assert.deepEqual(updated.partner, { upsert: { create: contactData, update: contactData } });
+  assert.ok((updated.updatedAt as Date).getTime() > stored.partner.updatedAt.getTime());
 });
 
 test("core.user business rules: password on create, last admin and self-protection", async () => {
