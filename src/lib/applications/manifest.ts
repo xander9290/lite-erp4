@@ -73,7 +73,7 @@ export function defineApplication<const T extends ApplicationManifest>(manifest:
   if (!["authenticated", "admin"].includes(manifest.access)) throw new Error(`Acceso inválido en ${manifest.id}.`);
   if (new Set(manifest.depends).size !== manifest.depends.length || manifest.depends.some(id => !identifier.test(id) || id === manifest.id)) throw new Error(`Dependencias inválidas en ${manifest.id}.`);
   if (new Set(manifest.models).size !== manifest.models.length || manifest.models.some(model => !/^[A-Z][A-Za-z0-9]*$/.test(model))) throw new Error(`Modelos inválidos en ${manifest.id}.`);
-  if (manifest.accessModels !== undefined && (!Array.isArray(manifest.accessModels) || new Set(manifest.accessModels).size !== manifest.accessModels.length || manifest.accessModels.some(model => typeof model !== "string" || !model.startsWith(`${manifest.id}.`) || !/^[a-z][a-z0-9-]*\.[a-z][a-z0-9]*$/.test(model)))) throw new Error(`Modelos de acceso inválidos en ${manifest.id}.`);
+  if (manifest.accessModels !== undefined && (!Array.isArray(manifest.accessModels) || new Set(manifest.accessModels).size !== manifest.accessModels.length || manifest.accessModels.some(model => typeof model !== "string" || (!model.startsWith(`${manifest.id}.`) && !/^core\.(partner|user)$/.test(model)) || !/^[a-z][a-z0-9-]*\.[a-z][a-z0-9]*$/.test(model)))) throw new Error(`Modelos de acceso inválidos en ${manifest.id}.`);
   validateMenus(manifest);
   return manifest;
 }
@@ -88,7 +88,7 @@ export function memberOf(user: ApplicationUser, groups: readonly string[] | unde
   return !groups || Boolean(user?.isAdmin) || groups.some(group => user?.groups?.has(group));
 }
 export function canOpenApplication(manifest: ApplicationManifest, user: ApplicationUser): boolean {
-  if (user && manifest.accessModels && user.modelAccess) return manifest.accessModels.some(model => user.modelAccess?.[model]?.read === true);
+  if (manifest.accessModels) return Boolean(user && manifest.accessModels.some(model => user.modelAccess?.[model]?.read === true));
   return user !== null && (manifest.access === "authenticated" || user.isAdmin) && memberOf(user, manifest.groups);
 }
 

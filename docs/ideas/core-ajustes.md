@@ -2,7 +2,9 @@
 
 **Plan iniciado el 2026-11-18.** Enfoque A aprobado y fases 1–4 implementadas en
 `codex/core` (commit `dae4f6e`); corrección de Usuarios writeOnly en `39e7f6e`.
-La fase 5, Contactos, sigue pendiente de iniciar por indicación del usuario.
+La fase 5, Contactos, iniciada por autorización del usuario: adaptación sobre
+core.partner y concurrencia implementadas; pendiente conocer los campos propios
+que el usuario eligió añadir mediante extendModel. No inventar campos ni SQL.
 El inventario y el plan iniciales se conservan como contexto; las secciones de
 implementación describen el resultado. Continuidad revisada el 2026-11-18.
 
@@ -123,8 +125,9 @@ las altas de usuario crearán su contacto (fase 2).
   del nombre del contacto vía lookup autorizado (sólo admin hoy).
 - Autenticación, Perfil, la app Usuarios y su servicio manual siguen sin cambios; la app se
   sustituirá en la fase 3 (Ajustes).
-- Conocido: la revisión es la del usuario; editar el contacto desde Contactos no la avanza,
-  así que entre Ajustes y Contactos gana la última escritura de los campos delegados.
+- Limitación inicial corregida durante fase 5: los guardados declarativos de Partner
+  avanzan también la revisión de su User vinculado, sin revocar sesión. Los guardados
+  delegados y Perfil avanzan ambas revisiones de forma monotónica; ver fase 5.
 - Verificado: test:modules 48 (7 en native.test.ts), test:orm 108/109 (EPERM), tsc y
   test:core:integration en proyecto/esquema temporales (alta con contacto y hash verificado,
   hash nunca publicado, alta sin contraseña y login duplicado rechazados, edición sin
@@ -184,6 +187,41 @@ Al abrir un usuario en Ajustes, el formulario fallaba con «Contrato incompatibl
 vacío y sólo transporta un valor nuevo); el resto de `sensitive` sigue rechazado. Prueba en
 `modelFields.test.tsx` (test:form-model 13). Las pruebas previas no renderizaban el formulario.
 
+## Fase 5 en curso: Contactos declarativo (2026-11-18)
+
+- Autorizada por el usuario. `/erp/contactos`, `/nuevo` y `/<id>` usan ModelRoute
+  sobre core.partner, con ContactForm/ContactList como presentación de ModelForm y
+  ModelCollection. Conserva guard, loader, consulta, revisión, historial, permisos,
+  avatar autorizado y borrado con confirmación/FK. No hay clon de Partner.
+- Los campos compartidos permanecen en core. La app muestra nombre, correo,
+  teléfono y avatar; no publica login ni datos de cuenta a quienes sólo leen contactos.
+  ModelRoute admite la aplicación que presenta un modelo nativo para breadcrumbs/
+  etiquetas, sin modificar identidad, propiedad o permisos. También se conecta Ajustes.
+- Contactos declara accessModels core.partner: cajón/menú/layout siguen su lectura
+  efectiva y deniegan sin snapshot. Esto no sustituye autorización de cada acción.
+- La edición de Partner avanza User.updatedAt vinculado dentro de la transacción,
+  con comparación de revisión y sin sessionVersion. Escrituras delegadas de User y
+  Perfil avanzan las fechas de ambos registros, incluso en el mismo milisegundo.
+  Se conserva la política de secretos, propia cuenta y último administrador.
+- Se retiró la Server Action manual de Contactos; el servicio/esquema antiguos y
+  el servicio manual de Usuarios quedan sólo por consumidores de regresión.
+  Proveedores legacy user/partner todavía tienen consumidores en `/sample` y
+  pruebas, así que no se eliminan todavía ni se presentan como retirados.
+- El usuario eligió añadir campos propios, pero no indicó cuáles. Pregunta pendiente
+  de nombres/tipos/obligatoriedad. No se creó una extensión vacía, tabla ni migración;
+  se integrará extendModel cuando estén definidos. ModelExtensions está conectado.
+- Verificado hasta ahora: 30 pruebas focalizadas (incluyen auth/nativos/servicio),
+  test:modules 48, test:applications 11, tsc y ESLint focalizado aprobados.
+  test:core:integration aprobado en proyecto/esquema temporales: delegación,
+  conflictos Contactos/Usuarios/Perfil, carrera de dos guardados, permisos y
+  extensión CRM sobre Partner. Recursos temporales eliminados. Regresión legacy
+  con build/HTTP autenticado aprobada: lista y alta de Contactos renderizan para
+  admin, el lector ve la lista y se rechaza su alta; auth/Contactos/tema aprobados.
+  La primera pasada detectó una aserción antigua que exigía User.updatedAt intacto
+  al editar Partner; ahora verifica que sólo esa revisión avanza y conserva
+  credenciales, permisos y sessionVersion. Repetición completa aprobada.
+  Sin revisión visual nueva ni SQL en el ERP; git diff --check aprobado.
+
 ## Plan por fases (con A)
 
 1. **Framework para modelos nativos.**
@@ -236,7 +274,6 @@ vacío y sólo transporta un valor nuevo); el resto de `sensitive` sigue rechaza
    política de búsqueda de personas al diseñar Contactos; no ampliar permisos por defecto.
 3. Altas de User crean contacto automáticamente; una cuenta antigua sin contacto lo
    recibe al guardar. partnerId conserva nulabilidad en SQL por compatibilidad.
-4. Antes de fase 5 revisar concurrencia entre los campos delegados de User y las
-   ediciones directas de Partner: la revisión actual de User no avanza al editar
-   su contacto desde otra vista. No presentar la última escritura ganadora como
-   detección de conflictos entre esas dos entidades.
+4. Concurrencia cruzada corregida en fase 5 para servicios de Contactos, Usuarios
+   y Perfil, con regresión en esquema temporal. Las escrituras Prisma/SQL externas
+   que omitan esos flujos deben mantener sus propias garantías; no hay triggers.

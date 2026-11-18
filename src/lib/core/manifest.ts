@@ -14,7 +14,9 @@ const core = defineModule({
   icon: "database",
   native: true,
   models: {
-    partner: { model: Partner, name: "Partner", table: "partners" },
+    partner: { model: Partner, name: "Partner", table: "partners", route: "/erp/contactos",
+      views: { form: () => import("@/app/(auth)/erp/contactos/views/ContactForm"), list: () => import("@/app/(auth)/erp/contactos/views/ContactList") },
+    },
     // Accounts: admin only (no grant). Contact fields are delegated to its Partner.
     user: {
       model: User, name: "User", table: "users", repository: userRepository, route: "/erp/ajustes/usuarios",

@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 async function Users({ params, searchParams }: Props) {
-  return <ModelRoute modelId="core.user" path={(await params).path ?? []} searchParams={searchParams} />;
+  return <ModelRoute modelId="core.user" path={(await params).path ?? []} searchParams={searchParams} application={{ name: "Ajustes", href: "/erp/ajustes", label: "Usuarios" }} />;
 }
 
 export default function UsersPage(props: Props) {

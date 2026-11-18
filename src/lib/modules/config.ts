@@ -37,6 +37,8 @@ export type ModelLineConfig = {
   readonly capabilities: AccessPerms;
 };
 export type ModelClientConfig = {
+  /** Application presenting a native model; ownership and service id remain unchanged. */
+  readonly application?: { readonly name: string; readonly href: `/erp/${string}` };
   readonly many2many?: Readonly<Record<string, Many2manyMetadata>>;
   readonly lines?: Readonly<Record<string, ModelLineConfig>>;
   /** Actor-specific snapshot supplied by the server route, never cached in the model registry. */

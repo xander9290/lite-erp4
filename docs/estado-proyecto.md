@@ -21,6 +21,18 @@ disponibilidad del servidor o PostgreSQL. git diff --check documental aprobado.
 
 ## Prioridad actual: Partner/User nativos y app Ajustes (2026-11-18)
 
+**Fase 5 iniciada por el usuario.** Contactos ya usa core.partner con ModelRoute,
+ModelForm/Collection y permisos efectivos; protección cruzada de revisión con
+Usuarios/Perfil implementada. El usuario eligió añadir campos propios mediante
+extendModel, pero faltan nombres/tipos/obligatoriedad (pregunta pendiente).
+No crear una extensión ni aplicar SQL antes de conocerlos. Detalle y evidencia
+actual en [fase 5](ideas/core-ajustes.md#fase-5-en-curso-contactos-declarativo-2026-11-18).
+30 pruebas focalizadas, 48 de módulos, 11 de aplicaciones, tsc/ESLint e integración
+core temporal aprobados. Build y regresión legacy (auth/Contactos/tema, HTTP
+autenticado admin/lector) aprobados; proyectos/esquemas temporales eliminados.
+Sin inspección visual nueva. git diff --check aprobado; sin SQL ni consultas
+a datos del ERP. Avance actual sin commit; cambios/documentación previos conservados.
+
 Decisión del usuario: pausar Tickets y priorizar un módulo declarativo **nativo**
 `core` con Partner y User, sin icono en el cajón, y una app nueva **«Ajustes»** donde
 Usuarios será un menú. Motivo: `createBy` legible/agrupable, Many2one a personas desde
@@ -52,11 +64,10 @@ cualquier módulo y fase 3 de herencia dependen de que User/Partner sean declara
   [Detalle](ideas/core-ajustes.md#fase-3-implementada-2026-11-18-rama-codexcore).
 - **Fase 4 implementada** (commit `dae4f6e`): `createBy` «Creado por» con etiqueta, filtro y
   agrupación por creador mediante `creatorLookup`. [Detalle](ideas/core-ajustes.md#fase-4-implementada-2026-11-18-rama-codexcore).
-  Siguiente: fase 5, Contactos sobre `core.partner` (con `extendModel`), cuando el usuario lo indique.
-- Limitación que revisar antes de fase 5: la revisión de core.user usa updatedAt
-  de User; una edición de Partner desde Contactos no la avanza. La documentación
-  registra última escritura ganadora en los campos delegados; no dar por resuelta
-  la concurrencia cruzada por las pruebas anteriores.
+  Fase 5 iniciada; ver avance y pregunta pendiente arriba.
+- Concurrencia User/Partner corregida durante fase 5: Contactos invalida la revisión
+  de la cuenta vinculada; Usuarios y Perfil avanzan ambas. Verificaciones nuevas
+  en esquema temporal, distintas de las pruebas históricas de fases 1–4.
 - En la Mac, `migrate deploy` de la retirada borrará sus datos de Tickets.
 
 ## Auditoría en ModelCollection: implementada (2026-11-18)

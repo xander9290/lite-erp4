@@ -7,6 +7,16 @@ import { activeApplication, activeApplicationMenu, applicationNavigation } from 
 const contacts = defineApplication({ id: "contactos", name: "Contactos", description: "Contactos compartidos.", version: "0.1.0", icon: UsersRound, depends: [], access: "authenticated", models: ["Partner"] });
 const users = defineApplication({ ...contacts, id: "usuarios", name: "Usuarios", access: "admin", depends: ["contactos"], models: ["User"] });
 
+test("applications presenting core models follow native read capabilities and fail closed without a snapshot", () => {
+  const app = defineApplication({ ...contacts, accessModels: ["core.partner"], menus: [{ id: "contacts", label: "Contactos", href: "/erp/contactos", model: "core.partner" }] });
+  assert.equal(canOpenApplication(app, { isAdmin: false }), false);
+  const allowed = { isAdmin: false, modelAccess: { "core.partner": { read: true, create: false, write: false, unlink: false } } };
+  assert.equal(canOpenApplication(app, allowed), true);
+  assert.equal(applicationNavigation(app, allowed)?.menus.length, 1);
+  assert.equal(canOpenApplication(app, { ...allowed, modelAccess: {} }), false);
+  assert.throws(() => defineApplication({ ...app, accessModels: ["other.partner"] }), /Modelos de acceso inválidos/);
+});
+
 test("effective model reads control declarative apps/menus, overrides and empty groups; native apps keep their contract", () => {
   const app = defineApplication({ ...contacts, groups: ["contactos.default"], accessModels: ["contactos.item", "contactos.catalog"], menus: [
     { id: "items", label: "Items", href: "/erp/contactos/item", model: "contactos.item", groups: ["contactos.default"] },

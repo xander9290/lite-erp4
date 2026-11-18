@@ -5,6 +5,7 @@ import { changePasswordSchema, emptyPasswordValues, profileSchema, type ChangePa
 import { AccessError } from "./policy";
 import { hashPassword, verifyPassword } from "./password";
 import { createLoginLimiter } from "./attempts";
+import { nextRevision } from "../orm/revision";
 
 type Actor = { id: string; sessionVersion: number };
 const passwordAttempts = createLoginLimiter(5);
@@ -38,8 +39,9 @@ export async function saveOwnProfile(prisma: PrismaClient, actor: Actor, input: 
       const current = profileRecord(user).values;
       if (current.revision !== parsed.data.revision || current.partnerRevision !== parsed.data.partnerRevision) return null;
       const { name, email, phone, avatarUrl } = parsed.data;
-      const contact = { name, email: email || null, phone: phone || null, avatarUrl };
-      return tx.user.update({ where: { id: actor.id }, data: { partner: user.partner ? { update: contact } : { create: contact } }, select: profileSelect });
+      const updatedAt = nextRevision(user.updatedAt, ...(user.partner ? [user.partner.updatedAt] : []));
+      const contact = { name, email: email || null, phone: phone || null, avatarUrl, updatedAt };
+      return tx.user.update({ where: { id: actor.id, updatedAt: user.updatedAt }, data: { updatedAt, partner: user.partner ? { update: contact } : { create: contact } }, select: profileSelect });
     }, { isolationLevel: "Serializable" });
     return result ? { ok: true, values: profileRecord(result).values, message: "Perfil actualizado." }
       : { ok: false, kind: "validation", error: "Tu perfil cambió desde que lo abriste. Recarga los datos antes de guardar." };

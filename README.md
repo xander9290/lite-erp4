@@ -32,7 +32,8 @@ La tutoría de **Tickets** está pausada y el módulo se retiró el 2026-11-18.
 Su [guía](docs/tutorial-tickets.md) conserva el recorrido histórico y se retomará
 desde cero cuando el usuario lo indique. La prioridad actual es consolidar
 Partner/User nativos en `core` y la app **Ajustes**; fases 1–4 implementadas.
-Sigue la fase 5, Contactos sobre `core.partner`, pendiente de iniciar.
+Fase 5 en curso: Contactos sobre `core.partner`, con revisiones compartidas
+entre Usuarios y Perfil; pendiente definir los campos propios de su extensión.
 [Estado y siguiente paso](docs/estado-proyecto.md#prioridad-actual-partneruser-nativos-y-app-ajustes-2026-11-18).
 
 ## Comandos del scaffold anterior, en orden

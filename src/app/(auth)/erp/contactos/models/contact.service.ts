@@ -6,6 +6,7 @@ import type { FormViewResult } from "@/components/ui/form/formView.types";
 import { AccessError } from "@/lib/auth/policy";
 import { contactIdSchema, contactSchema, type ContactValues } from "../schemas/contact.schema";
 import { contactFormSelect, contactFormValues, contactWriteData } from "./partner";
+import { advanceContactUserRevision } from "@/lib/core/contact-revision";
 
 type Actor = { id: string; sessionVersion: number };
 class ContactValidationError extends Error {}
@@ -55,12 +56,14 @@ export async function saveContactRecord(prisma: PrismaClient, actor: Actor, inpu
       const current = await tx.partner.findUnique({ where: { id: values.id }, select: { id: true, updatedAt: true } });
       if (!current) throw new ContactValidationError("Este contacto ya no está disponible.");
       if (current.updatedAt.toISOString() !== values.revision) throw new ContactValidationError(conflictMessage);
-      return tx.partner.update({
+      const saved = await tx.partner.update({
         where: { id: current.id, updatedAt: current.updatedAt },
         // Advance even when two edits arrive in the same millisecond.
         data: { ...data, updatedAt: new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1)) },
         select: contactFormSelect,
       });
+      await advanceContactUserRevision(tx, saved.id, saved.updatedAt);
+      return saved;
     }, { isolationLevel: "Serializable" });
     return { ok: true, values: contactFormValues(record), message: values.id ? "Contacto actualizado." : "Contacto creado." };
   } catch (error) {
