@@ -73,6 +73,15 @@ try {
     }
   }
   assert.equal(authenticated.status, 200); await authenticated.text();
+  const newUserPage = await adminClient.request("/erp/ajustes/usuarios/nuevo");
+  const newUserHtml = await newUserPage.text();
+  assert.equal(newUserPage.status, 200);
+  assert.doesNotMatch(newUserHtml, /Contrato incompatible/);
+  for (const field of ["name", "email", "phone", "login", "password"]) {
+    assert.equal([...newUserHtml.matchAll(new RegExp(`<input[^>]*name="${field}"`, "g"))].length, 1, `un solo control para ${field}`);
+  }
+  assert.match(newUserHtml, /type="password"/);
+  assert.match(newUserHtml, /Datos de contacto|Cuenta de usuario/);
   for (const path of ["/erp/ajustes/modulos", "/erp/ajustes/modulos/demo"]) {
     const page = await adminClient.request(path);
     assert.equal(page.status, 200); assert.ok((await page.text()).includes("Módulos"));

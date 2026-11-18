@@ -427,6 +427,10 @@ del manifest al navegador. `<ModelExtensions />` lo sitúa dentro del grupo del
 extensor y del RHF/FormView del base: comparte validación, modo consulta, bloqueo,
 dirty guard, actividad y guardado. Sin vista propia se conservan los controles
 automáticos. Un formulario expulsado sólo necesita conservar `<ModelExtensions />`.
+Si el formulario ya presenta explícitamente campos delegados (por ejemplo los de
+Partner en User), usar `<ModelExtensions excludeFields={["name", "email", "phone", "avatarUrl"]} />`
+para evitar controles duplicados. Sólo afecta al render automático; los campos
+permanecen en RHF y en el guardado. Las otras extensiones se siguen presentando.
 
 El extensor también puede añadir reglas al modelo que extiende:
 

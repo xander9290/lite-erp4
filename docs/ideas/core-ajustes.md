@@ -3,8 +3,9 @@
 **Plan iniciado el 2026-11-18.** Enfoque A aprobado y fases 1–4 implementadas en
 `codex/core` (commit `dae4f6e`); corrección de Usuarios writeOnly en `39e7f6e`.
 La fase 5, Contactos, iniciada por autorización del usuario: adaptación sobre
-core.partner y concurrencia implementadas; pendiente conocer los campos propios
-que el usuario eligió añadir mediante extendModel. No inventar campos ni SQL.
+core.partner y concurrencia implementadas. El usuario inició contactosextra con
+extendModel y street; siguen sus pruebas y los demás campos básicos de dirección.
+Catálogos geográficos/APIs se abordarán después, por decisión del usuario.
 El inventario y el plan iniciales se conservan como contexto; las secciones de
 implementación describen el resultado. Continuidad revisada el 2026-11-18.
 
@@ -207,9 +208,13 @@ vacío y sólo transporta un valor nuevo); el resto de `sensitive` sigue rechaza
   el servicio manual de Usuarios quedan sólo por consumidores de regresión.
   Proveedores legacy user/partner todavía tienen consumidores en `/sample` y
   pruebas, así que no se eliminan todavía ni se presentan como retirados.
-- El usuario eligió añadir campos propios, pero no indicó cuáles. Pregunta pendiente
-  de nombres/tipos/obligatoriedad. No se creó una extensión vacía, tabla ni migración;
-  se integrará extendModel cuando estén definidos. ModelExtensions está conectado.
+- El usuario eligió dirección (México): street, número exterior, interior y zip;
+  ciudad/estado/país y APIs después. Creó contactosextra/model/partner.ts con
+  extendModel(Partner, ...) y street opcional/maxLength 160/tracking, registrado
+  en extends core.partner. Fuentes, Prisma y migración 20261118225040 revisados:
+  sólo tabla compañera con FKs e índices esperados. ModelExtensions lo presenta.
+  Falta confirmación de guardar/reabrir Calle y vacío antes de añadir otro campo;
+  sin consulta nueva de migrate status ni prueba de navegador del agente.
 - Verificado hasta ahora: 30 pruebas focalizadas (incluyen auth/nativos/servicio),
   test:modules 48, test:applications 11, tsc y ESLint focalizado aprobados.
   test:core:integration aprobado en proyecto/esquema temporales: delegación,
@@ -221,6 +226,64 @@ vacío y sólo transporta un valor nuevo); el resto de `sensitive` sigue rechaza
   al editar Partner; ahora verifica que sólo esa revisión avanza y conserva
   credenciales, permisos y sessionVersion. Repetición completa aprobada.
   Sin revisión visual nueva ni SQL en el ERP; git diff --check aprobado.
+
+## Vistas personalizadas de Usuarios (2026-11-18)
+
+Por petición del usuario, se crearon manualmente UserForm y UserList en
+`src/app/(auth)/erp/ajustes/usuarios/views`, enlazadas mediante loaders diferidos
+de core.user en `src/lib/core/manifest.ts`. No se amplía eject:view a core nativo.
+
+El formulario usa ModelForm con grupos de datos de contacto y cuenta: avatar,
+nombre, correo, teléfono, login, contraseña writeOnly, activo, administrador y
+último acceso readOnly. Texto de ayuda distingue contraseña de alta y edición.
+La lista usa ModelCollection y las siete columnas autorizadas del contrato actual;
+no publica password ni sessionVersion. Se conservan permisos, revisión, historial,
+hooks, protección de propia cuenta/último admin y navegación compartidos.
+
+`ModelExtensions excludeFields` omite del render automático los campos delegados
+que el formulario presenta explícitamente, sin quitarlos de RHF/valores/guardado.
+Las extensiones futuras siguen con su grupo propio. ContactForm modificado por el
+usuario antes de esta tarea se conservó sin cambios.
+
+Comprobaciones: TypeScript, ESLint focalizado y test:form-model 13 aprobados.
+Regresión legacy con build y HTTP autenticado aprobada: alta de Usuarios renderiza
+nombre/correo/teléfono/login/password una sola vez y password como input de
+contraseña; acceso de administrador y rechazo al usuario normal, auth/Contactos/
+tema intactos. Proyecto/esquema temporales eliminados. Sin SQL ni cambios de
+esquema en el ERP, sin revisión visual nueva. git diff --check aprobado.
+
+## Punto de continuación: dirección de Partner (2026-11-18)
+
+Progreso guardado por petición del usuario, en `main` (`7292205`) con cambios
+locales sin commit. El usuario escribe y ejecuta sus ejercicios; el agente revisa
+y explica un paso a la vez. No continuar por adelantado.
+
+Completado: módulo `contactosextra` registrado, extensión PartnerExtra en
+`src/modules/contactosextra/model/partner.ts`, manifest con models vacío y
+extends core.partner. street es Text opcional, máximo 160, tracking true.
+Revisados Prisma y migración 20261118225040_sync_contactosextra: tabla compañera,
+recordId único/Cascade a Partner y auditoría con FK Restrict a User. No se consultó
+estado de migraciones ni se probó persistencia desde el navegador del agente.
+ContactForm conserva ModelExtensions y presenta los campos añadidos automáticamente.
+
+Pendientes al retomar, en orden:
+
+1. Confirmar con el usuario la prueba de Calle: guardar/reabrir con texto y vacía.
+   Aún no hay confirmación de esa prueba; no darla por aprobada por esta pausa.
+2. Añadir sólo `exteriorNumber`, Text opcional para número exterior; admite letras
+   y S/N. Revisar `orm:sync -- contactosextra --plan` antes de aplicar y probar
+   guardar/reabrir. Elegir/documentar longitud al explicar el paso.
+3. Añadir `interiorNumber`, Text opcional, con su plan y prueba de persistencia.
+4. Añadir `zip`, Text que preserve ceros iniciales, con validación de cinco dígitos
+   para México; revisar opcionalidad y longitud antes de implementar.
+5. Después diseñar catálogos seleccionables de país, estado y ciudad/localidad,
+   distinguiendo municipio. Fuentes investigadas: [Correos de México](https://www.correosdemexico.gob.mx/SSLServicios/ConsultaCP/CodigoPostal_Exportar.aspx),
+   [INEGI](https://www.inegi.org.mx/servicios/catalogounico.html) y
+   [GeoNames](https://www.geonames.org/export/). Importación local/Many2one es
+   recomendación propuesta, no implementación ni API ya configurada.
+
+Esta pausa no crea campos, catálogos, SQL ni despliegues. No se hicieron nuevas
+pruebas de código; git diff --check documental aprobado. No se ejecutó commit/push.
 
 ## Plan por fases (con A)
 

@@ -33,7 +33,8 @@ Su [guía](docs/tutorial-tickets.md) conserva el recorrido histórico y se retom
 desde cero cuando el usuario lo indique. La prioridad actual es consolidar
 Partner/User nativos en `core` y la app **Ajustes**; fases 1–4 implementadas.
 Fase 5 en curso: Contactos sobre `core.partner`, con revisiones compartidas
-entre Usuarios y Perfil; pendiente definir los campos propios de su extensión.
+entre Usuarios y Perfil. `contactosextra` ya extiende Partner con Calle; siguen
+sus pruebas y los campos de número exterior, interior y CP, antes de catálogos/APIs.
 [Estado y siguiente paso](docs/estado-proyecto.md#prioridad-actual-partneruser-nativos-y-app-ajustes-2026-11-18).
 
 ## Comandos del scaffold anterior, en orden

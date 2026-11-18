@@ -6,7 +6,30 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-Revisión de continuidad (2026-11-18, Windows): rama `codex/core`, HEAD `e7b1223`,
+## Punto de continuación guardado (2026-11-18)
+
+Guardado por petición del usuario. Rama actual `main`, HEAD `7292205`
+(`Merge branch 'codex/core'`); hay cambios locales y archivos nuevos sin commit,
+incluidas las vistas de Usuarios y contactosextra. No se ejecutó commit/push/pull.
+Conservar las personalizaciones actuales de ContactForm.
+
+Completado en fuentes: core/Ajustes, Contactos declarativo, concurrencia cruzada,
+UserForm/UserList personalizados y módulo contactosextra que extiende core.partner
+con street opcional/maxLength 160/tracking en `model/partner.ts`. Prisma y SQL
+20261118225040_sync_contactosextra revisados; sin nueva consulta de migrate status.
+
+Antes de continuar, confirmar la prueba de Calle (guardar/reabrir texto y vacío),
+que el usuario aún no reportó. **Siguiente campo pendiente: exteriorNumber**, Text
+opcional para número exterior, seguido de interiorNumber y zip, uno por uno.
+Revisar el plan antes de cada sincronización; no añadir campos por el agente.
+Después diseñar ciudad/municipio/estado/país y catálogos/APIs, principalmente México.
+No adelantar esa integración ni restaurar Tickets.
+
+Recorrido y criterios en [punto de continuación de la guía](ideas/core-ajustes.md#punto-de-continuación-dirección-de-partner-2026-11-18).
+Esta nota sólo cambia documentación; git diff --check aprobado. Las pruebas
+de código descritas abajo corresponden a tareas anteriores; no se repitieron.
+
+Revisión histórica inicial (2026-11-18, Windows): rama `codex/core`, HEAD `e7b1223`,
 árbol limpio al comenzar. Contrastados AGENTS, README, este estado, plan core/Ajustes,
 Git, clases nativas, repositorio, registro de módulos, auditoría, rutas y cajón.
 Las fases 1–4 ya están versionadas en `dae4f6e`; la corrección writeOnly de Usuarios
@@ -21,11 +44,46 @@ disponibilidad del servidor o PostgreSQL. git diff --check documental aprobado.
 
 ## Prioridad actual: Partner/User nativos y app Ajustes (2026-11-18)
 
+**Guía de extensión Partner iniciada:** el usuario pidió hacer los pasos él mismo.
+`contactosextra` ya creado por el usuario con models vacío y registrado en
+src/modules/index.ts, verificado en fuentes. Usuario decidió avanzar primero con
+dirección básica y después catálogos/APIs. Paso actual: crear models/partner.ts con
+PartnerExtra = extendModel(Partner, ...), sólo street Text opcional/maxLength 160/
+tracking. Ya creado por el usuario en model/partner.ts (carpeta singular válida),
+registrado en extends core.partner y generado en Prisma. Revisada migración
+20261118225040_sync_contactosextra: tabla compañera con street nullable, recordId
+único/Cascade a Partner, auditoría/FK Restrict a User; sin cambios de columnas en
+partners/users. No se consultó migrate status ni se comprobó la persistencia.
+Sigue probar Calle en Contactos: guardar/reabrir con texto y luego vacío. La vista
+conserva ModelExtensions, así que el campo se presenta automáticamente. Después
+exteriorNumber/interiorNumber/zip uno por uno.
+No ejecutar create:model para duplicar Partner. No se crearon archivos de aplicación por el agente;
+El usuario pidió campos de dirección: calle (street), número, número exterior y
+código postal (zip), más ciudad/estado/país seleccionables. Confirmó alcance
+principalmente México y números interior/exterior separados.
+Investigadas fuentes oficiales: catálogo CP de Correos de México, servicio JSON
+geoestadístico INEGI v2 y GeoNames (API/descarga internacional). Recomendación
+presentada: catálogos locales reutilizables y Many2one, con códigos/números como
+Text; distinguir municipio/localidad si se usa México. Catálogos sin implementación:
+no hay modelos geográficos, importaciones, SQL ni llamadas externas desde UI.
+Revisión documental: diff --check.
+
+**Vistas de Usuarios personalizadas (2026-11-18):** petición posterior a la base
+de fase 5. UserForm/UserList en ajustes/usuarios/views, registrados en core.user;
+no se modifica eject:view. Campos explícitos con ModelForm/ModelCollection,
+password writeOnly, último acceso readOnly y extensiones futuras conservadas.
+ModelExtensions admite excludeFields para no duplicar el contacto delegado que
+UserForm ya presenta. Sin SQL ni cambio de permisos. tsc, ESLint focalizado y 13
+pruebas form-model y build/HTTP de regresión aprobados: campos delegados una sola
+vez, input password y permisos admin; auth/Contactos/tema intactos en su proyecto/
+esquema temporal eliminado. Sin revisión visual nueva; git diff --check aprobado. La edición previa
+del usuario en ContactForm se conserva. Detalle en [core/Ajustes](ideas/core-ajustes.md#vistas-personalizadas-de-usuarios-2026-11-18).
+
 **Fase 5 iniciada por el usuario.** Contactos ya usa core.partner con ModelRoute,
 ModelForm/Collection y permisos efectivos; protección cruzada de revisión con
 Usuarios/Perfil implementada. El usuario eligió añadir campos propios mediante
-extendModel, pero faltan nombres/tipos/obligatoriedad (pregunta pendiente).
-No crear una extensión ni aplicar SQL antes de conocerlos. Detalle y evidencia
+extendModel: dirección básica elegida y street ya declarado en contactosextra.
+Sigue número exterior tras confirmar las pruebas de Calle. Detalle y evidencia
 actual en [fase 5](ideas/core-ajustes.md#fase-5-en-curso-contactos-declarativo-2026-11-18).
 30 pruebas focalizadas, 48 de módulos, 11 de aplicaciones, tsc/ESLint e integración
 core temporal aprobados. Build y regresión legacy (auth/Contactos/tema, HTTP
@@ -64,7 +122,7 @@ cualquier módulo y fase 3 de herencia dependen de que User/Partner sean declara
   [Detalle](ideas/core-ajustes.md#fase-3-implementada-2026-11-18-rama-codexcore).
 - **Fase 4 implementada** (commit `dae4f6e`): `createBy` «Creado por» con etiqueta, filtro y
   agrupación por creador mediante `creatorLookup`. [Detalle](ideas/core-ajustes.md#fase-4-implementada-2026-11-18-rama-codexcore).
-  Fase 5 iniciada; ver avance y pregunta pendiente arriba.
+  Fase 5 iniciada; ver avance y siguiente campo pendiente arriba.
 - Concurrencia User/Partner corregida durante fase 5: Contactos invalida la revisión
   de la cuenta vinculada; Usuarios y Perfil avanzan ambas. Verificaciones nuevas
   en esquema temporal, distintas de las pruebas históricas de fases 1–4.

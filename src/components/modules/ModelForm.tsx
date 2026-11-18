@@ -54,13 +54,18 @@ const ModelUIContext = createContext<ModelUI | null>(null);
  * form includes it; ejected forms place `<ModelExtensions />` where those groups should appear.
  * Without it, extension values are still kept and saved by the form.
  */
-export function ModelExtensions() {
+export function ModelExtensions({ excludeFields = [] }: { excludeFields?: readonly string[] } = {}) {
   const ui = useContext(ModelUIContext);
   const views = useModelExtensionViews();
   if (!ui?.config.extensions?.length) return null;
-  return <>{ui.config.extensions.map(extension => <FormGroup key={extension.module} legend={extension.label}>
-    {views[extension.module] ?? extension.fields.map(name => Object.hasOwn(ui.config.fields, name) ? control(ui, name, ui.config.fields[name]) : Object.hasOwn(ui.config.preview, name) ? display(name, ui.config.preview[name]) : null)}
-  </FormGroup>)}</>;
+  return <>{ui.config.extensions.map(extension => {
+    // Custom forms may lay out inherited fields themselves; keep other extensions automatic.
+    const fields = extension.fields.filter(name => !excludeFields.includes(name));
+    if (!fields.length) return null;
+    return <FormGroup key={extension.module} legend={extension.label}>
+      {views[extension.module] ?? fields.map(name => Object.hasOwn(ui.config.fields, name) ? control(ui, name, ui.config.fields[name]) : Object.hasOwn(ui.config.preview, name) ? display(name, ui.config.preview[name]) : null)}
+    </FormGroup>;
+  })}</>;
 }
 
 /** Controls derived from metadata, used when a view does not provide its own layout. */

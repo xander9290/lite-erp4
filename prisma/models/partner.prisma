@@ -12,4 +12,8 @@ model Partner {
 
     @@index([name])
     @@map("partners")
+
+  // BEGIN lite-erp:contactosextra:Partner
+  contactosextraCorePartnerRecordIdRecords ContactosextraCorePartner? @relation("ContactosextraCorePartner_recordId")
+  // END lite-erp:contactosextra:Partner
 }

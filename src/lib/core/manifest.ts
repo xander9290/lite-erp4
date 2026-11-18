@@ -20,6 +20,7 @@ const core = defineModule({
     // Accounts: admin only (no grant). Contact fields are delegated to its Partner.
     user: {
       model: User, name: "User", table: "users", repository: userRepository, route: "/erp/ajustes/usuarios",
+      views: { form: () => import("@/app/(auth)/erp/ajustes/usuarios/views/UserForm"), list: () => import("@/app/(auth)/erp/ajustes/usuarios/views/UserList") },
       inherits: { relation: "partner", label: "Contacto", fields: ["name", "email", "phone", "avatarUrl"] },
       list: { fields: ["login", "name", "email", "avatarUrl", "active", "isAdmin", "lastLogin"], searchFields: ["login", "name", "email"], sortable: ["login", "name", "active", "isAdmin", "lastLogin"], filterable: ["login", "name", "active", "isAdmin", "lastLogin"], groupable: ["active", "isAdmin"] },
     },

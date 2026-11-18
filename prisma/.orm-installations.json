@@ -1,4 +1,21 @@
 {
   "version": 1,
-  "modules": {}
+  "modules": {
+    "contactosextra": {
+      "file": "orm-contactosextra.prisma",
+      "hash": "690b0b929451ab3f85c9ed1543df2c97047255505f4c2a91f98b05ac2d26982b",
+      "inverses": [
+        {
+          "file": "partner.prisma",
+          "target": "Partner",
+          "text": "\n  // BEGIN lite-erp:contactosextra:Partner\n  contactosextraCorePartnerRecordIdRecords ContactosextraCorePartner? @relation(\"ContactosextraCorePartner_recordId\")\n  // END lite-erp:contactosextra:Partner\n"
+        },
+        {
+          "file": "user.prisma",
+          "target": "User",
+          "text": "\n  // BEGIN lite-erp:contactosextra:User\n  contactosextraCorePartnerCreatedRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_createBy\")\n  // END lite-erp:contactosextra:User\n"
+        }
+      ]
+    }
+  }
 }
