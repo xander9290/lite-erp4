@@ -25,7 +25,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Preferencias de diseño de formularios
 
-- FieldOne2many usa filas compactas en disposición de tabla: padding vertical de 4px por lado en índice, campos y acciones; conservar tamaño de controles y padding lateral. Contrato en src/components/ui/form/FieldOne2many.md.
+- FieldOne2many usa filas compactas en disposición de tabla (2026-11-19): padding vertical de 2px por lado, encabezados de 8px, inputs/selects de 32px con text-sm; conservar padding lateral y la disposición apilada. Nunca usar `table!` (vuelve !important el padding de daisyUI): `@3xl/o2m:[display:table]!`. Los inputs/selects de las celdas no muestran línea inferior en reposo; sí al hover, foco y en rojo con error. Contrato en src/components/ui/form/FieldOne2many.md.
 
 - ModelExtensions inserta vistas personalizadas de extensión mediante Fragment, sin FormGroup ni legend impuestos; la vista elige grupos, Stack, Notebook y demás composición. Sólo las extensiones sin vista personalizada mantienen el FormGroup automático por módulo. Compartir RHF/guardado/locks del padre; no montar otro formulario.
 

@@ -64,9 +64,19 @@ El Field administra `useFieldArray` y usa los mismos defaults del formulario par
 
 `footer` acepta contenido o una función de las filas actuales; úsalo para mostrar totales. Los cálculos de negocio deben repetirse en servidor. En móvil, las filas de la misma tabla se distribuyen verticalmente con encabezados visibles por control; la edición sigue siendo directa, sin abrir otra vista. En escritorio se muestran las columnas horizontales. La distribución usa el ancho del contenedor, por lo que también se adapta dentro de un Notebook o FormGroup estrecho.
 
-Las filas en disposición de tabla usan padding vertical compacto de 4px por lado
-en índice, campos y acciones. Se conserva el tamaño propio de los controles, el
-padding lateral y la disposición apilada en contenedores estrechos.
+Las filas en disposición de tabla son compactas (2026-11-19): padding vertical de 2px
+por lado en índice, campos y acciones, encabezados de 8px, e inputs/selects de 32px con
+texto `text-sm` (≈37px por fila con controles simples; antes ≈64px). Se conservan el
+padding lateral de 12px y la disposición apilada en contenedores estrechos.
+
+Sin bordes en las celdas (2026-11-19, preferencia del usuario): los inputs y selects dentro
+de un One2many ocultan su línea inferior en reposo; aparece al pasar el mouse (30%), con
+foco (color base) y en rojo con error (`aria-invalid`). Aplica en tabla y en disposición
+apilada; los campos fuera de las líneas conservan su línea habitual.
+
+La tabla cambia a `display: table` con `@3xl/o2m:[display:table]!`, no con `table!`: el
+modificador `!` sobre el componente `table` de daisyUI volvía `!important` su padding de
+12px × 16px en todas las celdas y anulaba cualquier padding propio.
 
 ## Errores
 
