@@ -35,8 +35,20 @@ export type ModelLineConfig = {
   readonly fields: Readonly<Record<string, FieldMetadata>>;
   readonly lookups: Readonly<Record<string, string>>;
   readonly capabilities: AccessPerms;
+  /** Sub-lines of this line (nested documents, up to three levels). */
+  readonly lines?: Readonly<Record<string, ModelLineConfig>>;
+};
+/** Read-only relation of a form: children presented as a collection of their own model. */
+export type ModelChildCollectionConfig = {
+  readonly label: string;
+  readonly inverse: string;
+  readonly invisible?: boolean;
+  /** Child model contract (without its own collections), with the actor's capabilities. */
+  readonly config: ModelClientConfig;
 };
 export type ModelClientConfig = {
+  /** Read-only relations shown in the form (children created and edited in their own form). */
+  readonly collections?: Readonly<Record<string, ModelChildCollectionConfig>>;
   /** Application presenting a native model; ownership and service id remain unchanged. */
   readonly application?: { readonly name: string; readonly href: `/erp/${string}` };
   readonly many2many?: Readonly<Record<string, Many2manyMetadata>>;

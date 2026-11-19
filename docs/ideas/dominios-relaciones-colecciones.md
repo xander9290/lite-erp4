@@ -1,4 +1,11 @@
-# Pendiente urgente: dominios de relaciones y colecciones
+# Dominios de relaciones y colecciones
+
+**Implementado el 2026-11-19 por autorización posterior del usuario.** Contrato
+vigente: [motor compartido de dominios](../dominios-modelos.md), con constructor
+`domain: d => d.eq(...)`. Many2one/Many2many y fuentes Lista/Card/Kanban conectadas;
+One2many admite dominios de relaciones de su fila, sin filtrar las líneas mismas.
+El ejercicio País→Estado del usuario sigue sin editar. El resto de este documento
+conserva el alcance y las decisiones pendientes de la propuesta original.
 
 Registrado el 2026-11-18 por petición expresa del usuario como **siguiente pendiente
 urgente**, antes de continuar la guía de dirección. Esta petición autoriza registrar
@@ -75,6 +82,8 @@ o vínculos ocultos. Integraciones con proyecto/esquema temporales; no datos del
 
 ## Estado
 
-**Pendiente, sin implementación ni API final.** La próxima sesión comienza por
-revisar/diseñar esta mejora, no por crear Municipio/Localidad en PartnerExtra.
-Guía pausada y punto exacto en [Catálogos de dirección](../catalogos-direccion.md).
+Motor implementado; ver contrato enlazado al principio y evidencia vigente en
+[estado-proyecto.md](../estado-proyecto.md). Sigue aplicar País→Estado con el
+usuario en la [guía de dirección](../catalogos-direccion.md), sin adelantar
+Municipio/Localidad en PartnerExtra. Inferencia TS entre clases, limpieza automática
+opcional y filtrado visual de líneas siguen fuera del alcance implementado.

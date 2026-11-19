@@ -15,6 +15,6 @@ export function fieldFromMetadata(field: FieldMetadata): Field {
     case "boolean": return Fields.Boolean(defined(common) as never);
     case "selection": return Fields.Selection(field.choices as never, defined(common) as never);
     case "datetime": return Fields.DateTime(defined(common) as never);
-    case "many2one": return Fields.Many2one(field.target, defined({ ...common, onDelete: field.onDelete }) as never);
+    case "many2one": return Fields.Many2one(field.target, defined({ ...common, onDelete: field.onDelete, ...(field.domain ? { domain: () => field.domain! } : {}) }) as never);
   }
 }

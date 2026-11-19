@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { sequenceConfig, type SequenceOptions, type SequenceConfig } from "./sequence";
 import { IMAGE_URL_MAX_LENGTH, imageUrlSchema, validateImageFolder } from "../uploads/image-policy";
+import { declareRelationDomain, type RelationDomain, type DomainExpression } from "./domain-builder";
 
 const many2manyTag = Symbol("orm.many2many");
-export type Many2manyMetadata = { readonly target: string; readonly label?: string; readonly minSelected: number; readonly maxSelected: number; readonly invisible?: boolean };
+export type Many2manyMetadata = { readonly target: string; readonly label?: string; readonly minSelected: number; readonly maxSelected: number; readonly invisible?: boolean; readonly domain?: DomainExpression };
 export type Many2manyField = {
   readonly [many2manyTag]: true;
   readonly many2many: Many2manyMetadata;
@@ -68,7 +69,7 @@ export type FieldMetadata = CommonMetadata & (
   | { readonly kind: "selection"; readonly choices: readonly SelectionOption[] }
   | { readonly kind: "datetime" }
   // Cascade is internal: only the companion link of a model extension uses it (never Fields.Many2one).
-  | { readonly kind: "many2one"; readonly target: string; readonly onDelete: "Restrict" | "SetNull" | "Cascade" }
+  | { readonly kind: "many2one"; readonly target: string; readonly onDelete: "Restrict" | "SetNull" | "Cascade"; readonly domain?: DomainExpression }
 );
 type FieldDetails<T = FieldMetadata> = T extends FieldMetadata ? Omit<T, keyof CommonMetadata> : never;
 
@@ -154,7 +155,37 @@ type TextOptions = NullableOptions<string> & { sequence?: SequenceOptions; minLe
 type ImageOptions = NullableOptions<string> & { maxLength?: number; compute?: string } & ({ folder: string; related?: string } | { related: string; folder?: string } | { compute: string; folder?: string; related?: string });
 type IntegerOptions = NullableOptions<number> & { min?: number; max?: number; compute?: string };
 type BooleanOptions = Omit<CommonOptions, "required"> & { default?: Default<boolean> };
-type Many2oneOptions = NullableOptions<string> & { onDelete?: "Restrict" | "SetNull" };
+type Many2oneOptions = NullableOptions<string> & { onDelete?: "Restrict" | "SetNull"; domain?: RelationDomain };
+
+/**
+ * Read-only relation (`Fields.One2many(target, { inverse, readonly: true })`): children shown as
+ * a paginated, authorized collection in the parent's form. Never part of the document (RHF, Zod,
+ * save, revision); children are created and edited in their own form. No row limit.
+ */
+const collectionTag = Symbol("orm.childCollection");
+export type ChildCollectionMetadata = { readonly target: string; readonly inverse: string; readonly label?: string; readonly invisible?: boolean };
+export type ChildCollectionField = { readonly [collectionTag]: true; readonly collection: ChildCollectionMetadata };
+export function isChildCollection(value: unknown): value is ChildCollectionField {
+  return Boolean(value && typeof value === "object" && collectionTag in value);
+}
+type One2manyOptions = { inverse: string; label?: string; minRows?: number; maxRows?: number; invisible?: boolean; readonly?: false };
+type ChildCollectionOptions = { inverse: string; label?: string; invisible?: boolean; readonly: true };
+function one2many(target: string, options: ChildCollectionOptions): ChildCollectionField;
+function one2many<Row extends One2manyRow = One2manyRow>(target: string, options: One2manyOptions): One2manyField<Row>;
+function one2many<Row extends One2manyRow = One2manyRow>(target: string, input: One2manyOptions | ChildCollectionOptions): One2manyField<Row> | ChildCollectionField {
+  if (input && typeof input === "object" && (input as { readonly?: unknown }).readonly === true) {
+    const keys = ["inverse", "label", "invisible", "readonly"];
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(target) || Object.keys(input).some(key => !keys.includes(key)) || typeof input.inverse !== "string" || !/^[a-z][A-Za-z0-9]*$/.test(input.inverse) || (input.label !== undefined && (typeof input.label !== "string" || !input.label.trim())) || (input.invisible !== undefined && typeof input.invisible !== "boolean")) throw new Error("Una relación de consulta necesita destino, Many2one inverso y label válidos; no admite minRows/maxRows.");
+    return Object.freeze({ [collectionTag]: true as const, collection: Object.freeze({ target, inverse: input.inverse, ...(input.label !== undefined ? { label: input.label } : {}), ...(input.invisible !== undefined ? { invisible: input.invisible } : {}) }) });
+  }
+  if (input && typeof input === "object" && (input as { readonly?: unknown }).readonly !== undefined && (input as { readonly?: unknown }).readonly !== false) throw new Error("readonly sólo admite true o false.");
+  const { readonly: _readonly, ...options } = (input ?? {}) as One2manyOptions;
+  void _readonly;
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(target) || !options || typeof options !== "object" || Array.isArray(options) || typeof options.inverse !== "string" || Object.keys(options).some(key => !["inverse", "label", "minRows", "maxRows", "invisible"].includes(key)) || !/^[a-z][A-Za-z0-9]*$/.test(options.inverse) || ["id", "revision", "createBy", "constructor", "prototype", "__proto__"].includes(options.inverse)) throw new Error("One2many necesita un modelo destino y un Many2one inverso válidos.");
+    const minRows = options.minRows ?? 0, maxRows = options.maxRows ?? 50;
+    if (!Number.isSafeInteger(minRows) || !Number.isSafeInteger(maxRows) || minRows < 0 || maxRows < 1 || maxRows > 100 || minRows > maxRows || (options.label !== undefined && (typeof options.label !== "string" || !options.label.trim())) || (options.invisible !== undefined && typeof options.invisible !== "boolean")) throw new Error("One2many admite entre 0 y 100 líneas, con límites y label válidos.");
+    return Object.freeze({ [one2manyTag]: true as const, one2many: Object.freeze({ target, inverse: options.inverse, minRows, maxRows, ...(options.label !== undefined ? { label: options.label } : {}), ...(options.invisible !== undefined ? { invisible: options.invisible } : {}) }), schema: z.array(z.record(z.string(), z.unknown())).min(minRows).max(maxRows) as z.ZodType<Row[], Row[]>, createDefault: () => [] });
+}
 
 export const Fields = Object.freeze({
   Image<const O extends ImageOptions>(options: O): DeclaredField<string | null, RequiredValue<string, O>, O> {
@@ -231,28 +262,25 @@ export const Fields = Object.freeze({
     return makeField(schema as z.ZodType<RequiredValue<string, O>, string | null>, options, null, { kind: "datetime" });
   },
 
-  Many2many(target: string, options: { label?: string; minSelected?: number; maxSelected?: number; invisible?: boolean } = {}): Many2manyField {
-    if (!/^[A-Z][A-Za-z0-9]*$/.test(target) || !options || typeof options !== "object" || Array.isArray(options) || Object.keys(options).some(key => !["label", "minSelected", "maxSelected", "invisible"].includes(key))) throw new Error("Many2many necesita un modelo destino y opciones válidas.");
+  Many2many(target: string, options: { label?: string; minSelected?: number; maxSelected?: number; invisible?: boolean; domain?: RelationDomain } = {}): Many2manyField {
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(target) || !options || typeof options !== "object" || Array.isArray(options) || Object.keys(options).some(key => !["label", "minSelected", "maxSelected", "invisible", "domain"].includes(key))) throw new Error("Many2many necesita un modelo destino y opciones válidas.");
     const minSelected = options.minSelected ?? 0, maxSelected = options.maxSelected ?? 100;
     if (!Number.isSafeInteger(minSelected) || !Number.isSafeInteger(maxSelected) || minSelected < 0 || maxSelected < 1 || maxSelected > 100 || minSelected > maxSelected || (options.label !== undefined && (typeof options.label !== "string" || !options.label.trim())) || (options.invisible !== undefined && typeof options.invisible !== "boolean")) throw new Error("Many2many admite entre 0 y 100 selecciones, con límites y label válidos.");
     const schema = z.array(z.string().min(1).max(100).refine(id => id.trim() === id, "ID inválido.")).min(minSelected).max(maxSelected).refine(ids => new Set(ids).size === ids.length, "La selección contiene IDs duplicados.");
-    return Object.freeze({ [many2manyTag]: true as const, many2many: Object.freeze({ target, minSelected, maxSelected, ...(options.label !== undefined ? { label: options.label } : {}), ...(options.invisible !== undefined ? { invisible: options.invisible } : {}) }), schema, createDefault: () => [] });
+    const domain = declareRelationDomain(options.domain);
+    return Object.freeze({ [many2manyTag]: true as const, many2many: Object.freeze({ target, minSelected, maxSelected, ...(domain ? { domain } : {}), ...(options.label !== undefined ? { label: options.label } : {}), ...(options.invisible !== undefined ? { invisible: options.invisible } : {}) }), schema, createDefault: () => [] });
   },
 
-  One2many<Row extends One2manyRow = One2manyRow>(target: string, options: { inverse: string; label?: string; minRows?: number; maxRows?: number; invisible?: boolean }): One2manyField<Row> {
-    if (!/^[A-Z][A-Za-z0-9]*$/.test(target) || !options || typeof options !== "object" || Array.isArray(options) || typeof options.inverse !== "string" || Object.keys(options).some(key => !["inverse", "label", "minRows", "maxRows", "invisible"].includes(key)) || !/^[a-z][A-Za-z0-9]*$/.test(options.inverse) || ["id", "revision", "createBy", "constructor", "prototype", "__proto__"].includes(options.inverse)) throw new Error("One2many necesita un modelo destino y un Many2one inverso válidos.");
-    const minRows = options.minRows ?? 0, maxRows = options.maxRows ?? 50;
-    if (!Number.isSafeInteger(minRows) || !Number.isSafeInteger(maxRows) || minRows < 0 || maxRows < 1 || maxRows > 100 || minRows > maxRows || (options.label !== undefined && (typeof options.label !== "string" || !options.label.trim())) || (options.invisible !== undefined && typeof options.invisible !== "boolean")) throw new Error("One2many admite entre 0 y 100 líneas, con límites y label válidos.");
-    return Object.freeze({ [one2manyTag]: true as const, one2many: Object.freeze({ target, inverse: options.inverse, minRows, maxRows, ...(options.label !== undefined ? { label: options.label } : {}), ...(options.invisible !== undefined ? { invisible: options.invisible } : {}) }), schema: z.array(z.record(z.string(), z.unknown())).min(minRows).max(maxRows) as z.ZodType<Row[], Row[]>, createDefault: () => [] });
-  },
+  One2many: one2many,
 
-  Many2one<const O extends Many2oneOptions = Record<never, never>>(target: string, options: O = {} as O): Field<string | null, RequiredValue<string, O>> {
-    checkOptions(options, ["onDelete"]);
+  Many2one<const O extends Many2oneOptions = Record<never, never>>(target: string, options: O & { domain?: RelationDomain } = {} as O): Field<string | null, RequiredValue<string, O>> {
+    checkOptions(options, ["onDelete", "domain"]);
     if (!/^[A-Z][A-Za-z0-9]*$/.test(target)) throw new Error("Many2one necesita el nombre de un modelo, por ejemplo Partner.");
     const onDelete = options.onDelete ?? "Restrict";
     if (!["Restrict", "SetNull"].includes(onDelete) || (options.required && onDelete === "SetNull")) throw new Error("La política de borrado no es compatible con esta relación.");
     const value = z.string({ error: `${options.label ?? target}: selecciona un registro.` }).min(1, `${options.label ?? target}: selecciona un registro.`).max(100);
     const schema = z.string().nullable().transform(id => nullableString(id?.trim() ?? null)).pipe(options.required ? value : value.nullable());
-    return makeField(schema as z.ZodType<RequiredValue<string, O>, string | null>, options, null, { kind: "many2one", target, onDelete });
+    const domain = declareRelationDomain(options.domain);
+    return makeField(schema as z.ZodType<RequiredValue<string, O>, string | null>, options, null, { kind: "many2one", target, onDelete, ...(domain ? { domain } : {}) });
   },
 });

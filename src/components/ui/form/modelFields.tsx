@@ -13,10 +13,37 @@ export type FormLineModel = {
   createRow: () => Record<string, unknown>;
   capabilities: { read: boolean; create: boolean; write: boolean; unlink: boolean };
   lookups?: Readonly<Record<string, Many2OneLoader>>;
+  domainLookups?: Readonly<Record<string, RelationDomainLookup>>;
   uploads?: Readonly<Record<string, ImageUploader>>;
+  /** Sub-lines of this line (nested documents). */
+  lines?: Readonly<Record<string, FormLineModel>>;
 };
-export type FormModel = { many2many?: Readonly<Record<string, import("@/lib/orm/fields").Many2manyField>>; lines?: Readonly<Record<string, FormLineModel>>; readFields?:PublishedFields; reactions?:FormReactions; reactionState?:ReactionState; retryReaction?:()=>void; fields: PublishedFields; lookups?: Readonly<Record<string, Many2OneLoader>>; uploads?: Readonly<Record<string, ImageUploader>> };
+export type RelationDomainLookup = { dependencies: readonly string[]; load: (request: import("@/lib/many2one/model-lookup").ModelLookupRequest, draft: Record<string, unknown>) => ReturnType<Many2OneLoader> };
+export type FormModel = { domainLookups?: Readonly<Record<string, RelationDomainLookup>>; many2many?: Readonly<Record<string, import("@/lib/orm/fields").Many2manyField>>; lines?: Readonly<Record<string, FormLineModel>>; readFields?:PublishedFields; reactions?:FormReactions; reactionState?:ReactionState; retryReaction?:()=>void; fields: PublishedFields; lookups?: Readonly<Record<string, Many2OneLoader>>; uploads?: Readonly<Record<string, ImageUploader>> };
 export const FormModelContext = createContext<FormModel | undefined>(undefined);
+
+/** Line model of a One2many path: "lineas", "lineas.0.entregas" (any depth). */
+export function lineAt(model: FormModel | undefined, path: string): FormLineModel | undefined {
+  const parts = path.split(".");
+  if (parts.length % 2 === 0) return undefined;
+  let line = model?.lines?.[parts[0]];
+  for (let index = 1; index < parts.length && line; index += 2) {
+    if (!/^\d+$/.test(parts[index])) return undefined;
+    line = line.lines?.[parts[index + 1]];
+  }
+  return line;
+}
+
+/**
+ * Owner of a field path inside lines: "lineas.0.cantidad" → line "lineas", key "cantidad",
+ * row "lineas.0"; nested paths resolve through every level. Top-level names have no line.
+ */
+export function lineField(model: FormModel | undefined, name: string): { line?: FormLineModel; key: string; row?: string } {
+  const parts = name.split(".");
+  if (parts.length < 3 || parts.length % 2 === 0 || !/^\d+$/.test(parts[parts.length - 2])) return { key: name };
+  const line = lineAt(model, parts.slice(0, -2).join("."));
+  return line ? { line, key: parts[parts.length - 1], row: parts.slice(0, -1).join(".") } : { key: name };
+}
 /** Shared readonly contract: never register computed/related values with RHF. */
 export function useModelReadField(name:string, kind:string) {
   const model = useContext(FormModelContext);
@@ -33,9 +60,7 @@ export function useModelField<P extends { name: string; direction?: FieldDirecti
     const metadata = model?.many2many?.[props.name]?.many2many;
     return { ...(metadata ? { label: metadata.label, required: metadata.minSelected > 0, invisible: metadata.invisible, maxSelected: metadata.maxSelected, load: model?.lookups?.[props.name] } : {}), ...Object.fromEntries(Object.entries(layoutProps).filter(([, value]) => value !== undefined)) } as P;
   }
-  const indexed = /^([a-z][A-Za-z0-9]*)\.\d+\.([a-z][A-Za-z0-9]*)$/.exec(props.name);
-  const line = indexed ? model?.lines?.[indexed[1]] : undefined;
-  const key = indexed?.[2] ?? props.name;
+  const { line, key } = lineField(model, props.name);
   const fields = line?.fields ?? model?.fields;
   if (!fields || !Object.hasOwn(fields, key)) return layoutProps;
   const metadata = fields[key].metadata;

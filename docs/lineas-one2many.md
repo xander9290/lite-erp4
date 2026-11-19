@@ -121,7 +121,64 @@ Si los hooks del padre vuelven a modificar el hijo, su respuesta se relee para
 entregar la revisión definitiva. Las acciones y Kanban del padre conservan las
 líneas; los botones de formulario mantienen su guardado previo habitual.
 
+## Relaciones de consulta (`readonly`, 2026-11-19)
+
+**Regla:** usa líneas editables sólo para hijos acotados que se editan junto con su
+documento (`maxRows ≤ 100`). Para hijos numerosos o sin tope claro (municipios de un estado,
+comentarios de un pedido) declara una relación de consulta y crea los hijos **desde su
+propio formulario**.
+
+```ts
+class Estado extends Model {
+  municipioIds = Fields.One2many("UbicacionesMunicipio", { inverse: "estadoId", label: "Municipios", readonly: true });
+}
+```
+
+- No forma parte del documento: ni RHF/Zod, ni guardado, ni revisión, ni límite de filas.
+  Enviar la clave al guardar se rechaza como campo no declarado.
+- El formulario del padre muestra la colección del hijo **paginada, con búsqueda, filtros y
+  orden** (`<ModelChildCollections />`; el formulario por defecto la incluye). El servidor fija
+  `<inverse> = registro` (AND con cualquier filtro del navegador), exige leer al padre y
+  aplica permisos y reglas del hijo (`modelChildren` → `childCollectionList`).
+- Cada fila abre el formulario del hijo; «Nuevo» llega con el padre preasignado
+  (`?default_<inverse>=<id>`, validado al guardar como cualquier Many2one) y vuelve al padre.
+- Mismo módulo; el hijo debe tener un Many2one `inverse` hacia el padre (obligatorio o no).
+  Con el registro sin guardar se muestra «Guarda el registro para ver …».
+- Formularios expulsados: coloca `<ModelChildCollections />` (o `name="municipioIds"`) donde
+  deban aparecer; las colecciones ya no usan `<form>` propios, así que caben dentro del
+  formulario del registro sin que Enter lo envíe.
+
 ## Permisos y límites
+
+## Líneas anidadas (2026-11-19)
+
+Una línea puede declarar sus propias líneas: **documento → línea → sublínea**, hasta 3
+niveles, sin ciclos y con un solo dueño por modelo. Ejemplo: Pedido → Partidas → Entregas.
+
+```ts
+class Partida extends Model {
+  pedidoId = Fields.Many2one("VentasPedido", { required: true });
+  entregas = Fields.One2many("VentasEntrega", { inverse: "partidaId", label: "Entregas", maxRows: 10 });
+}
+```
+
+- Se lee y guarda el **árbol completo** en una transacción: cada nivel corre su propio
+  servicio (normalize, hooks, constraints, dominios, historial). Un cambio sólo en una
+  sublínea guarda su línea (avanza su revisión) y deja intactas las hermanas.
+- Límites: `maxRows ≤ 100` por relación y **500 filas en total** por documento, además del
+  tamaño del payload. Una fila no legible en cualquier nivel impide abrir el documento.
+- Quitar una línea quita sus sublíneas de abajo hacia arriba, por sus servicios; borrar una
+  línea suelta desde su propia vista sigue bloqueado por `Restrict` mientras tenga sublíneas.
+- Errores con la ruta completa (`lineas.0.entregas.1.cantidad`); cualquier fallo revierte
+  todo el documento.
+- Una escritura independiente de una sublínea avanza la revisión de su línea y del
+  documento: un borrador abierto queda obsoleto.
+- Formulario: `FieldOne2many` muestra un botón para expandir cada fila con sublíneas; la
+  tabla del nivel siguiente aparece debajo, editable en línea, sin modales. Las filas con
+  errores en sus sublíneas se abren solas; las cerradas siguen montadas (RHF conserva sus
+  valores y validación).
+- No es para catálogos grandes (p. ej. municipios por estado): ver
+  [One2many anidados](ideas/one2many-anidados.md).
 
 Se comprueban permisos/reglas del padre y cada operación del hijo dentro de la
 transacción. Además, el motor de accesos limita automáticamente los registros del
@@ -139,8 +196,9 @@ Nunca se interpretan como bajas las líneas ocultas por permisos. Ediciones del
 padre que dejan sus líneas intactas no necesitan permisos write/unlink del hijo.
 La UI oculta agregar y bloquea filas/bajas según capacidades, sin sustituir al servidor.
 
-No hay paginación de líneas, persistencia de orden manual, anidamiento multinivel,
-Many2many declarativo ni borrado en cascada del padre. La FK Restrict impide borrarlo
+No hay paginación de líneas, persistencia de orden manual, más de 3 niveles,
+Many2many en hijos ni borrado en cascada del padre (sólo las sublíneas de una línea que se
+quita desde su documento). La FK Restrict impide borrarlo
 mientras conserve hijos. Las escrituras Prisma directas y servicios personalizados
 no pasan por este coordinador: deben implementar sus propias reglas, permisos,
 auditoría y avance de revisión del padre.
@@ -152,7 +210,8 @@ El contrato cliente y cada servicio hijo validan los datos reales con Zod.
 
 ## Verificación
 
-`npm run test:orm`, `npm run test:modules`, `npm run test:form-model` verifican contratos
+`npm run test:nested:integration` prueba el árbol de 3 niveles en proyecto/esquema
+temporales. `npm run test:orm`, `npm run test:modules`, `npm run test:form-model` verifican contratos
 y compatibilidad de controles. `npm run test:one2many:integration` crea un proyecto y
 un esquema PostgreSQL temporal, prueba el ciclo padre/hijos, rollback de hooks y
 constraints, permisos/reglas, auditoría, límites, concurrencia, revisiones,

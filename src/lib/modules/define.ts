@@ -14,12 +14,16 @@ import { compileKanbanConfig } from "../kanban/config";
 import type { KanbanConfig, KanbanTransition } from "../kanban/types";
 import { auditCollectionFields, defaultAuditFields } from "../orm/audit";
 import type { NativeRepositoryOptions } from "./repository";
+import { MAX_LINE_DEPTH } from "../orm/one2many";
 import { declaredNames, extensionFields, isModelExtension, type ModelExtension } from "./extend";
 import { relationFieldName } from "../orm/display";
+import type { CollectionDomain } from "../orm/domain";
 
 type ModelClass = new () => Model;
 export type ModuleModelSpec = ModelClass | {
   readonly model: ModelClass;
+  /** Server source shared by list/card/kanban; never changes record access. */
+  readonly domain?: CollectionDomain;
   /** Snake-case table override; defaults to `<module>_<key>`. */
   readonly table?: string;
   /**
@@ -232,6 +236,7 @@ function auditListPolicy(model: string, metadata: Readonly<Record<string, FieldM
  * modules extend the model; collection capabilities still come only from server metadata.
  */
 export function compileModuleModel(id: string, modelKey: string, options: ModuleModelOptions, label: string, extensions: readonly ModelExtensionInfo[] = [], native = false): ModuleModel {
+  if (options.domain !== undefined && typeof options.domain !== "function") throw new Error("domain requiere un constructor de dominio.");
   if (!native && (options.name !== undefined || options.route !== undefined || options.inherits !== undefined || options.repository !== undefined)) throw new Error(`${id}.${modelKey}: name, route, inherits y repository sólo se declaran en módulos nativos.`);
   if (options.name !== undefined && !/^[A-Z][A-Za-z0-9]*$/.test(options.name)) throw new Error(`${id}.${modelKey}: name debe ser un modelo Prisma PascalCase.`);
   if (options.route !== undefined && !/^\/erp(?:\/[a-z][a-z0-9-]*)+$/.test(options.route)) throw new Error(`${id}.${modelKey}: route debe ser /erp/<ruta>.`);
@@ -343,7 +348,7 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
       const { target, inverse } = field.one2many;
       const child = models.find(model => model.contract.name === target);
       const foreign = child?.metadata[inverse];
-      if (!child || child === parent || Object.keys(child.contract.one2manyFields).length || Object.keys(child.contract.many2manyFields).length || foreign?.kind !== "many2one" || foreign.target !== parent.contract.name || !foreign.required || foreign.unique || foreign.onDelete !== "Restrict" || Object.values(child.metadata).some(field => field.sensitive)) throw new Error(`${parent.id}.${name}: One2many requiere un hijo del mismo módulo sin líneas/Many2many/sensitive y un Many2one inverso obligatorio, no único, con Restrict.`);
+      if (!child || child === parent || Object.keys(child.contract.many2manyFields).length || foreign?.kind !== "many2one" || foreign.target !== parent.contract.name || !foreign.required || foreign.unique || foreign.onDelete !== "Restrict" || Object.values(child.metadata).some(field => field.sensitive)) throw new Error(`${parent.id}.${name}: One2many requiere un hijo del mismo módulo sin Many2many/sensitive y un Many2one inverso obligatorio, no único, con Restrict.`);
       const key = `${target}.${inverse}`;
       if (inverses.has(key)) throw new Error(`${key}: una inversa sólo puede pertenecer a una declaración One2many.`);
       inverses.add(key);
@@ -351,7 +356,22 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
       children.add(target);
     }
   }
+  // Read-only relations: children of the same module whose Many2one points to this model.
+  for (const parent of models) for (const [name, collection] of Object.entries(parent.contract.childCollections)) {
+    const child = models.find(model => model.contract.name === collection.target);
+    const inverse = child?.metadata[collection.inverse];
+    if (!child || child === parent || inverse?.kind !== "many2one" || inverse.target !== parent.contract.name || inverse.sensitive) throw new Error(`${parent.id}.${name}: la relación de consulta requiere un modelo del mismo módulo con un Many2one ${collection.inverse} hacia ${parent.contract.name}.`);
+  }
   for (const model of models) if (Object.keys(model.contract.many2manyFields).length > 4) throw new Error(`${model.id}: máximo cuatro relaciones Many2many.`);
+  // Nested lines: document → line → sub-line at most, without cycles (each child has one owner).
+  const childrenOf = (model: ModuleModel) => Object.values(model.contract.one2manyFields).map(field => models.find(candidate => candidate.contract.name === field.one2many.target)!);
+  const depth = (model: ModuleModel, path: readonly string[] = []): number => {
+    if (path.includes(model.id)) throw new Error(`${[...path, model.id].join(" → ")}: las líneas forman un ciclo.`);
+    const nested = childrenOf(model);
+    return 1 + (nested.length ? Math.max(...nested.map(child => depth(child, [...path, model.id]))) : 0);
+  };
+  // depth() runs for every model so a cycle without a root is also rejected.
+  for (const model of models) if (depth(model) > MAX_LINE_DEPTH && !children.has(model.contract.name)) throw new Error(`${model.id}: las líneas admiten hasta ${MAX_LINE_DEPTH} niveles (documento → línea → sublínea).`);
   const byKey = new Map(models.map(model => [model.key, model]));
   const ruleTargets = Object.fromEntries(extensions.map(extension => {
     const metadata = defineModel(extension.extension.apply(extension.extension.base), { name: "ExtensionRules", table: "extension_rules" }).metadata as Readonly<Record<string, FieldMetadata>>;

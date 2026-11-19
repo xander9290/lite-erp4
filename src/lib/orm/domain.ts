@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ModelActor } from "./context";
 import { INTEGER_MAX, INTEGER_MIN, type FieldMetadata } from "./fields";
+import { domainBuilder, snapshotDomain, domainDependencies, resolveDomain, type DomainBuilder, type DomainExpression } from "./domain-builder";
 
 export type DomainValue = string | number | boolean | null;
 export type DomainField<T> = Extract<keyof T, string> | "id" | "createBy" | "createdAt" | "updatedAt";
@@ -16,8 +17,40 @@ export type DomainNode<T> =
 export type ListDomain<T = Record<string, unknown>> = readonly DomainNode<T>[];
 export type ListDomainContext = { readonly actor: Readonly<ModelActor>; readonly tx: Prisma.TransactionClient };
 export type ListActionOptions<T> = {
-  readonly domain?: ListDomain<T> | ((context: ListDomainContext) => ListDomain<T> | Promise<ListDomain<T>>);
+  readonly domain?: ListDomain<T> | ((context: ListDomainContext & DomainBuilder<DomainField<T>>) => DomainExpression<DomainField<T>> | ListDomain<T> | Promise<DomainExpression<DomainField<T>> | ListDomain<T>>);
 };
+export type CollectionDomain = (d: DomainBuilder, context: ListDomainContext) => DomainExpression;
+
+export async function compileCollectionDomain(metadata: Readonly<Record<string, FieldMetadata>>, source: CollectionDomain, context: ListDomainContext) {
+  const expression = snapshotDomain(await source(domainBuilder, context));
+  if (domainDependencies(expression).length) throw new Error("Las colecciones no tienen borrador: usa constantes o contexto del servidor.");
+  return compileListDomain(metadata, [expression]);
+}
+
+/** Validate both sides of references before resolving values; only public persisted scalars. */
+export function validateRelationDomain(expression: DomainExpression, target: Readonly<Record<string, FieldMetadata>>, owner: Readonly<Record<string, FieldMetadata>>) {
+  function walk(node: DomainExpression): void {
+    if ("all" in node) return node.all.forEach(walk);
+    if ("any" in node) return node.any.forEach(walk);
+    if ("not" in node) return walk(node.not);
+    if (node.value && !Array.isArray(node.value) && typeof node.value === "object" && "draft" in node.value) {
+      const dependency = Object.hasOwn(owner, node.value.draft) ? owner[node.value.draft] : undefined;
+      const destination: FieldMetadata | undefined = Object.hasOwn(target, node.field) ? target[node.field] : node.field === "id" ? { kind: "text", required: true, unique: false, trim: true, defaultKind: "empty" } : undefined;
+      const scalarKind = (field: FieldMetadata | undefined) => field?.kind === "many2one" || field?.kind === "selection" ? "text" : field?.kind;
+      if (!dependency || dependency.sensitive || dependency.related || dependency.compute || dependency.kind === "image" || !destination || scalarKind(dependency) !== scalarKind(destination)) throw new Error("Dependencia de dominio inválida o incompatible.");
+      if (dependency.kind === "many2one" && destination.kind === "many2one" && dependency.target !== destination.target) throw new Error("Las dependencias Many2one del dominio deben referirse al mismo modelo.");
+      // Validate operator and destination even when the dependency is empty.
+      const example = destination.kind === "boolean" ? false : destination.kind === "integer" ? 0 : destination.kind === "datetime" ? "2026-01-01T00:00:00.000Z" : destination.kind === "selection" ? destination.choices[0].value : "domain-value";
+      compileListDomain(target, [{ ...node, value: example }]);
+    } else compileListDomain(target, [node]);
+  }
+  walk(snapshotDomain(expression));
+}
+
+export function compileRelationDomain(expression: DomainExpression, target: Readonly<Record<string, FieldMetadata>>, owner: Readonly<Record<string, FieldMetadata>>, values: Readonly<Record<string, unknown>>) {
+  validateRelationDomain(expression, target, owner);
+  return compileListDomain(target, [resolveDomain(expression, values)]);
+}
 
 type Predicate = Record<string, unknown>;
 type Compiled = Predicate | boolean;
@@ -55,6 +88,7 @@ export function compileListDomain(metadata: Readonly<Record<string, FieldMetadat
     const field = Object.hasOwn(metadata, node.field) ? metadata[node.field] : undefined;
     const implicit = ["id", "createBy", "createdAt", "updatedAt"].includes(node.field);
     if (!field && !implicit) throw invalid();
+    if (field && (field.sensitive || field.compute || field.related)) throw invalid();
     const kind = field?.kind ?? (["createdAt", "updatedAt"].includes(node.field) ? "datetime" : "id");
     const nullable = field ? !field.required : node.field === "createBy";
     const allowed = kind === "boolean" ? ["eq", "neq"] : [...equality, ...(["integer", "datetime"].includes(kind) ? comparison : kind === "text" ? textSearch : [])];

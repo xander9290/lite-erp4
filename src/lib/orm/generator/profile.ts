@@ -31,6 +31,7 @@ export async function loadAppGenerationProfile(root: string, id: string): Promis
   if (!profile || profile.module?.id !== id || !Array.isArray(profile.module.models) || !Array.isArray(profile.module.depends) || !profile.externalOwners || typeof profile.externalOwners !== "object" || Array.isArray(profile.externalOwners)) throw new Error("orm.config.ts debe exportar un generationProfile válido para esta aplicación.");
   if (profile.module.models.some(entry => Object.keys((entry.model as { one2manyFields?: object }).one2manyFields ?? {}).length)) throw new Error("One2many declarativo requiere defineModule en src/modules; el scaffold con orm.config.ts no enlaza líneas.");
   if (profile.module.models.some(entry => Object.keys(entry.model.many2manyFields ?? {}).length)) throw new Error("Many2many requiere defineModule en src/modules; no usa bindings legacy.");
+  if (profile.module.models.some(entry => Object.values(entry.model.metadata as Readonly<Record<string, import("../fields").FieldMetadata>>).some(field => field.kind === "many2one" && field.domain))) throw new Error("Los dominios de relaciones requieren defineModule; no usan bindings legacy.");
   if (profile.module.models.some(entry => Object.values(entry.model.metadata).some(field => (field as import("../fields").FieldMetadata).sequence))) throw new Error("sequence requiere defineModule en src/modules; no usa bindings legacy.");
   return profile;
 }

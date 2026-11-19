@@ -13,7 +13,7 @@ import type { ActivityNoteResult, ActivityResult } from "@/lib/orm/activity";
 import type { Many2OneResult } from "@/lib/many2one/types";
 import type { ReactionResult } from "@/lib/orm/reactions.types";
 import type { CloudinaryImageSignatureResult } from "@/lib/uploads/cloudinary-signature";
-import { creatorLookup, getModuleModel, imageSigner, modelService, withActor } from "./registry";
+import { childCollectionList, creatorLookup, getModuleModel, imageSigner, modelService, withActor, relationLookup } from "./registry";
 
 /*
  * Single entry point for declarative module models. Every export is a public endpoint:
@@ -55,6 +55,12 @@ export async function modelSave(model: string, input: unknown): Promise<FormView
   } catch (error) { return { ok: false, kind: "server", error: failure(error, "No se pudo guardar el registro.") }; }
 }
 
+/** Read-only relation of a form: children of one parent record (fixed server domain). */
+export async function modelChildren(model: string, field: string, parentId: unknown, state: unknown): Promise<ListResult> {
+  try { const { entry } = resolve(model); return await childCollectionList(entry.id, field, parentId, await requireUser(), state); }
+  catch (error) { return { ok: false, error: failure(error, "No se pudo consultar la relación.") }; }
+}
+
 export async function modelList(model: string, state: unknown): Promise<ListResult> {
   try { const { service } = resolve(model); const actor = await requireUser(); return await withActor(actor, () => service.list(prisma, actor, state)); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar la lista.") }; }
@@ -72,6 +78,11 @@ export async function modelDelete(model: string, selection: unknown): Promise<Li
 export async function modelLookup(model: string, request: unknown): Promise<Many2OneResult> {
   try { const { service } = resolve(model); return await service.lookup(prisma, await requireUser(), request); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar los registros.") }; }
+}
+
+export async function modelRelationLookup(model: string, field: string, input: unknown): Promise<Many2OneResult> {
+  try { return await relationLookup(model, field, await requireUser(), input); }
+  catch (error) { return { ok: false, error: failure(error, "No se pudo consultar la relación.") }; }
 }
 
 /** «Creado por» filter: creators of readable records of this model (id and contact name). */

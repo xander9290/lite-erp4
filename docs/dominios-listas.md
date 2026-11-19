@@ -1,5 +1,10 @@
 # Acciones de lista con dominio de servidor
 
+Desde 2026-11-19 también se admite el constructor `domain: d => d.eq("active", true)`.
+Los módulos declarativos pueden fijar un dominio común de Lista/Card/Kanban en
+su manifest. [Contrato compartido y dominios de relaciones](dominios-modelos.md).
+Los ejemplos de arrays y callbacks anteriores de esta guía conservan compatibilidad.
+
 Una acción de lista fija un subconjunto de registros sin modificar ListView ni sus
 filtros visibles. Se declara en un archivo `server-only` mediante
 `recordService.defineListAction`. El modelo, repositorio, columnas y permisos siguen

@@ -1,0 +1,42 @@
+import "server-only";
+import { Fields, Model, action, type ModelContext } from "@/lib/orm";
+import { Partner } from "@/lib/core/models/partner";
+import { extendModel } from "@/lib/modules/extend";
+import { defineModule } from "@/lib/modules/define";
+class Pais extends Model { name = Fields.Text({ required: true }); }
+class Estado extends Model {
+  name = Fields.Text({ required: true });
+  paisId = Fields.Many2one("DominiosPais", { required: true });
+  active = Fields.Boolean({ default: true });
+}
+const states = () => Fields.Many2one("DominiosEstado", { domain: d => d.all(d.eq("paisId", d.draft("paisId")), d.any(d.eq("active", true), d.not(d.eq("active", false)))) });
+class Documento extends Model {
+  name = Fields.Text({ required: true });
+  paisId = Fields.Many2one("DominiosPais");
+  estadoId = states();
+  estados = Fields.Many2many("DominiosEstado", { domain: d => d.eq("paisId", d.draft("paisId")) });
+  active = Fields.Boolean({ default: true });
+  status = Fields.Selection([{ value: "draft", label: "Borrador" }, { value: "done", label: "Hecho" }], { required: true, default: "draft" });
+  beforeSave(values: Record<string, unknown>) {
+    return values.name === "forge" ? { ...values, paisId: null } : values;
+  }
+  async afterSave(record: Record<string, unknown>, context: ModelContext) {
+    if (record.name === "late") await context.tx.dominiosDocumento.update({ where: { id: String(record.id) }, data: { paisId: null } });
+  }
+  @action({ label: "Invalidar país" })
+  invalidar() { return { paisId: null }; }
+}
+const PartnerExtra = extendModel(Partner, Base => {
+  class Extra extends Base { paisId = Fields.Many2one("DominiosPais"); estadoId = states(); }
+  return Extra;
+});
+export default defineModule({ id: "dominios", name: "Dominios", icon: "boxes",
+  models: { pais: Pais, estado: Estado, documento: { model: Documento, kanban: "status", views: { list: true, card: true, kanban: true }, domain: d => d.eq("active", true) } },
+  extends: { "core.partner": PartnerExtra },
+  groups: { editor: "Editor" },
+  access: [{ group: "editor", models: "documento", perms: "crud" }, { group: "editor", models: ["pais", "estado"], perms: "r" }],
+  rules: [
+    { id: "own", label: "Propios", models: "documento", groups: ["editor"], domain: ({ actor }) => [{ field: "createBy", operator: "eq", value: actor.id }] },
+    { id: "visible", label: "Visibles", models: "estado", groups: ["editor"], domain: [{ field: "active", operator: "eq", value: true }] },
+  ],
+});

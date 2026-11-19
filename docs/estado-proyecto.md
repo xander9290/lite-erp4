@@ -1,26 +1,167 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-18.
+Última actualización: 2026-11-19.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Punto de continuación guardado (2026-11-18)
+## Relaciones de consulta: fase A implementada (2026-11-19)
 
-El usuario pidió registrar el progreso y continuar después. Rama comprobada:
-`codex/partner`, HEAD `cdb49f4` (punto de partida), cambios locales y archivos nuevos
-sin commit. No se ejecutaron commit/push/pull. Preservar sus vistas, modelos,
-esquemas, migraciones y la personalización de ContactForm.
+Autorizada por el usuario, con la regla: hijos numerosos se crean desde su propio formulario.
+Sin commit.
 
-**Siguiente pendiente urgente:** [dominios de relaciones y colecciones](ideas/dominios-relaciones-colecciones.md).
+- `Fields.One2many(target, { inverse, readonly: true })` devuelve un tipo distinto
+  (`ChildCollectionField`); `defineModel` lo separa en `childCollections`, fuera de
+  documento, defaults, Zod y guardado. `defineModule` exige hijo del mismo módulo con
+  Many2one inverso al padre.
+- Servidor: `childCollectionList` (registry) y la Server Action fija `modelChildren`: lee al
+  padre con su servicio (permisos/reglas), lista el hijo con `defineListAction` y dominio
+  `<inverse> = id`. `ModelClientConfig.collections` publica la config del hijo (un nivel).
+- Cliente: `<ModelChildCollections />` en ModelForm (por defecto en ModelFields);
+  ModelCollection con `embedded` y `createDefaults`; ModelForm aplica `default_<campo>` de
+  Many2one al crear. CollectionToolbar y ColumnFilter ya no usan `<form>` (Enter conserva el
+  comportamiento con onKeyDown).
+- Verificado: test:nested:integration con 2,500 hijos (página, total, búsqueda, filtro
+  manipulado sin efecto, reglas del hijo, lectura del padre exigida, campo no declarado),
+  test:modules 52 (nested.test.ts), tsc y lint (sólo el aviso previo de erp/page.tsx). Regresión:
+  test:orm 114/115 (EPERM), form-model 14, collection-load 4, list-grouping 17, list-selection 8,
+  relation-filter 1 e integraciones one2many, domains, capabilities, core y legacy (con build).
+  Sin navegador: la sección de consulta y el «Nuevo» con padre no se revisaron visualmente.
+- Siguiente del usuario en Ubicaciones: declarar `Estado.municipioIds` con `readonly: true`
+  y crear municipios desde su formulario (o «Nuevo» en la lista del estado).
+
+## One2many anidados: fase B implementada (2026-11-19)
+
+Autorizada por el usuario tras el diseño. Sin commit.
+
+- Servidor: `owned()` carga documentos completos con sus líneas; `validateLines` acepta
+  sublíneas; un cambio de sublínea guarda su línea; `countDocumentRows` ≤ 500 por documento;
+  quitar una línea elimina sus sublíneas con `withLines` (abajo hacia arriba); borrado suelto
+  conserva Restrict. `defineModule` admite hasta 3 niveles y rechaza ciclos.
+- Cliente: `ModelLineConfig.lines` recursivo, esquemas/createRow recursivos, `lineAt`/`lineField`
+  en useModelField, FieldVisibility y dominios de fila; FieldOne2many con sublíneas expandibles.
+- Verificado: test:nested:integration (proyecto/esquema temporales) con árbol de 3 niveles,
+  revisión por rama, rutas de error, rollback de afterSave/constraint, maxRows, IDs/inversas
+  manipulados, concurrencia desde la sublínea, baja de abajo hacia arriba, Restrict suelto y
+  acceso heredado; test:modules + nested.test.ts, test:form-model 14, tsc y lint.
+  Regresión aprobada: test:modules 51, test:orm 114/115 (EPERM de symlink en Windows),
+  integraciones one2many, domains, capabilities, extensions, core y legacy (con build).
+  Lint: sólo queda un aviso previo (ChartColumnBig sin usar en erp/page.tsx, ya en Git).
+  Sin navegador: la UI expandible no se revisó visualmente.
+- Ubicaciones: el guard ya no rechaza `Pais.estadoIds` + `Estado.municipioIds`, pero un estado
+  con más filas que su `maxRows` impedirá abrir el País; para ese catálogo sigue indicada la
+  fase A (consulta paginada). No se modificaron sus modelos.
+
+## Progreso guardado y pendiente urgente: One2many anidados (2026-11-19)
+
+Por petición del usuario, guardar este punto y registrar como urgente el soporte
+de varios niveles de líneas. Rama revisada codex/partner, HEAD 35adbf9; cambios
+locales de dominios, aplicaciones y ajuste visual conservados, sin commit/push/pull.
+Caso real: Pais.estadoIds → Estado.municipioIds → Municipio. Las dos declaraciones
+siguen presentes en fuentes y el manifest queda rechazado por el límite vigente
+de un nivel. No se retiraron campos ni se eliminó el guard para ocultar el problema.
+
+Siguiente pendiente urgente: diseñar y presentar [One2many anidados](ideas/one2many-anidados.md),
+con límites, transacción, permisos, concurrencia de ancestros y UI inline; esta
+anotación no inicia implementación. Distinguirlo de añadir hasta cuatro One2many
+hermanos, capacidad ya disponible. Al retomar, revisar Git y acordar el diseño o
+la variante temporal de un nivel antes de ejecutar sincronizaciones o pruebas
+de la app; no asumir que Ubicaciones abre actualmente.
+
+Avance conservado: filas One2many compactas (4px por lado en tabla), motor de
+dominios implementado y PartnerExtra.estadoId ya declara domain por paisId en
+fuentes, con validarPaisEstado conservado. No se comprobó en navegador la aplicación
+del dominio en Contactos debido al rechazo del manifest; no marcarla verificada.
+Municipio/Localidad en PartnerExtra, lectura/navegación de catálogos e importaciones
+siguen pendientes. Esta tarea sólo actualiza documentación; diff --check aprobado,
+sin suites, BD, SQL ni cambios de código.
+
+## Filas compactas de One2many (2026-11-19)
+
+
+Diagnóstico posterior de Ubicaciones: el usuario añadió Pais.estadoIds y
+Estado.municipioIds como One2many. defineModule rechaza Pais.estadoIds porque
+Estado, su hijo, ahora declara líneas propias. El contrato vigente admite un
+solo nivel de documento; paisId de Estado es required/no único/Restrict correcto.
+Para recuperar esa variante, conservar Pais.estadoIds y retirar municipioIds
+de Estado, manteniendo Municipio.estadoId y su catálogo separado; una navegación
+filtrada es una alternativa a líneas anidadas. Sin cambios en sus modelos ni
+ampliación del motor por este diagnóstico. No eliminar el guard para habilitarlo.
+
+Ajuste visual posterior (2026-11-19): por petición del usuario, FieldOne2many
+reduce de 12px a 4px por lado el padding vertical de las celdas del body en
+disposición de tabla, incluyendo índice y acciones. Controles, encabezados,
+padding lateral y disposición apilada conservados. Cambio compartido; no modifica
+vistas/modelos de Ubicaciones ni el siguiente ejercicio de dominios. Verificación
+focalizada de ESLint y git diff --check; sin pruebas de lógica, BD ni medición
+nueva en navegador para este ajuste CSS.
+
+## Dominios compartidos implementados (2026-11-19)
+
+Autorización posterior del usuario: implementar el constructor acordado
+`domain: d => ...`. [Contrato vigente](dominios-modelos.md). Motor existente
+ampliado con eq/neq/in/notIn/comparaciones/texto y all/any/not; dependencias
+explícitas d.draft en Many2one/Many2many y dominio base de la entrada del modelo
+en manifest para Lista/Card/Kanban. No se envían funciones/where/modelos destino
+desde el navegador. Fuente de relación fija por dueño/campo, sesión y lectura
+revalidadas, scopes combinados con AND. Conteos/páginas/grupos/columnas Kanban
+comparten el dominio del servidor.
+
+Dependencias vacías dejan todo el dominio sin candidatos; false/0 se conservan.
+Las selecciones legibles incompatibles se resuelven por ID con domainValid:false,
+se avisan y se conservan para corregirlas. Sin limpieza automática de IDs ni
+vínculos. Guardado comprueba selecciones finales antes de escribir y después de
+hooks, dentro de la transacción; acciones/movimientos y extensiones comparten
+esa validación. Los parámetros y bindings legacy rechazan dominios de relación.
+Relaciones dentro de One2many usan su propia fila; no se filtran líneas.
+
+Verificaciones en Windows: integración test:domains:integration aprobada en
+proyecto/esquema PostgreSQL temporales, eliminados; cubre candidatos, ID/lote,
+reglas/permisos/sesión, payload manipulado, vacíos, selección antigua, Many2many,
+extensión de core.partner, hooks/acciones con rollback y colecciones/grupos/Kanban.
+TypeScript, ESLint focalizado, 22 pruebas de dominios/servicio, 13 form-model y 48
+de módulos aprobados. test:orm: 114/115; la restante falla por EPERM al crear un
+symlink de archivo en Windows incluso fuera del sandbox. No se omitió ni se
+presenta como aprobada. Build de Next aprobado, con tres avisos de tracing de
+filesystem en inventory/operation-lock existentes; el primer intento quedó sin
+progreso en sandbox y se detuvo. El build permitió corregir el proveedor de
+formulario de la demo antes de la aprobación final.
+
+Demo ficticia RHF/Zod en /sample#domains. No se modificaron modelos, vistas ni
+migraciones de Contactosextra/Ubicaciones; tampoco configuración privada, permisos
+o datos del ERP. Sin commit/push/pull. Siguiente ejercicio: usuario aplica
+País→Estado en PartnerExtra, conservando por ahora validarPaisEstado; después
+seguir Municipio/Localidad, lectura de catálogos y navegación acordada.
+
+Comprobación en navegador de esa demo: cambio México→Canadá ofrece sólo Ontario/
+Quebec, conserva selección/chip mexicanos con aviso, y País vacío produce «Sin
+coincidencias» en Estado. Comboboxes con autocomplete off. No se realizó una nueva
+medición responsive ni una prueba de interacción de relaciones dentro de líneas.
+
+Oportunidad pendiente: inferencia TS de campos/valores entre clases referidas por
+nombre Prisma. Hoy los Fields validan referencias al componer módulos; los
+servicios tipados limitan nombres de campos en defineListAction. Aceptación y
+otros límites en el contrato enlazado, sin abstracciones adicionales anticipadas.
+
+## Punto de continuación anterior (2026-11-18)
+
+El usuario pidió registrar el progreso y continuar después. Revisión de continuidad
+del 2026-11-19: rama `codex/partner`, HEAD `35adbf9` (`primera fase terminada`),
+árbol limpio al comenzar. Ese commit ya incluye los cambios de dirección,
+Ubicaciones, vistas y documentación descritos abajo; las menciones posteriores a
+cambios sin commit corresponden al cierre anterior. Preservar sus personalizaciones.
+Se contrastaron README, AGENTS, las guías de dirección/dominios y las fuentes de
+PartnerExtra, Ubicaciones, ContactForm y ModelExtensions. Sin nuevas pruebas de
+ejecución, inspección de BD, migraciones ni commit/push/pull en esta revisión.
+
+**Pendiente de aquel cierre, ya implementado el 2026-11-19:** [dominios de relaciones y colecciones](ideas/dominios-relaciones-colecciones.md).
 Domain en Many2one/Many2many con dependencias del borrador, AND/OR/NOT mixtos y
 reutilización del motor para fuentes de Lista/Card/Kanban. One2many exige distinguir
 relaciones seleccionables de filtros visuales que no deben borrar líneas ocultas.
 Declaración junto al modelo/fuente, validación y consultas en servidor, conservando
-permisos y paginación. Caso inicial: Estado filtrado por País. API ilustrada aún
-no implementada; al retomar revisar/diseñar contrato antes de implementarlo. Esta
-pausa sólo autoriza documentar, no ejecutar el desarrollo por adelantado.
+permisos y paginación. Caso inicial: Estado filtrado por País. El contrato y
+autorización posteriores sustituyen la propuesta de esta pausa; ver sección actual.
 
 **Guía actual:** [Catálogos de dirección](catalogos-direccion.md). Tickets sigue
 retirado. Core/Ajustes y Contactos ya estaban consolidados en fuentes. El usuario

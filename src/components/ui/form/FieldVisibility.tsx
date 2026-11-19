@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import { FormModelContext } from "./modelFields";
+import { FormModelContext, lineField } from "./modelFields";
 
 const FieldVisibilityContext = createContext(false);
 export const useFieldInvisible = () => useContext(FieldVisibilityContext);
@@ -10,8 +10,8 @@ export const useFieldInvisible = () => useContext(FieldVisibilityContext);
 export default function FieldVisibility({ name, invisible, children }: { name?: string; invisible?: boolean; children: ReactNode }) {
   const model = useContext(FormModelContext);
   const inherited = useFieldInvisible();
-  const indexed = name ? /^([a-z][A-Za-z0-9]*)\.\d+\.([a-z][A-Za-z0-9]*)$/.exec(name) : null;
-  const line = indexed ? model?.lines?.[indexed[1]]?.fields[indexed[2]]?.metadata : undefined;
+  const owner = name ? lineField(model, name) : undefined;
+  const line = owner?.line?.fields[owner.key]?.metadata;
   const metadata = name ? (model?.fields[name] ?? model?.readFields?.[name])?.metadata ?? line : undefined;
   const hidden = inherited || (invisible ?? metadata?.invisible ?? false);
   return <FieldVisibilityContext.Provider value={hidden}>

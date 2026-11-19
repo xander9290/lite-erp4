@@ -2,6 +2,7 @@ import "server-only";
 import { compileModuleModel, nativeModule, type ModuleDefinition, type ModuleExtension, type ModuleModel } from "./define";
 import { extensionFields } from "./extend";
 import { relationFieldName } from "../orm/display";
+import { validateModuleDomains } from "./relation-domains";
 
 /**
  * Compose the extensions declared by registered modules onto their base models:
@@ -38,7 +39,7 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       byTarget.set(extension.target, [...(byTarget.get(extension.target) ?? []), extension]);
     }
   }
-  if (!byTarget.size) return definitions;
+  if (!byTarget.size) return validateModuleDomains(definitions);
   const compose = (entry: ModuleModel): ModuleModel => {
     const extensions = byTarget.get(entry.id);
     if (!extensions) return entry;
@@ -74,8 +75,8 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       ...action, ...(action.groups ? { groups: Object.freeze(action.groups.map(group => group.includes(".") ? group : `${methodOwners.get(action.name) ?? entry.module}.${group}`)) } : {}),
     }))) }) });
   };
-  return Object.freeze(definitions.map(definition => {
+  return validateModuleDomains(Object.freeze(definitions.map(definition => {
     const models = definition.models.map(compose);
     return models.every((model, index) => model === definition.models[index]) ? definition : Object.freeze({ ...definition, models: Object.freeze(models) });
-  }));
+  })));
 }

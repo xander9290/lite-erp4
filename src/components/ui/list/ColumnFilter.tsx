@@ -14,7 +14,7 @@ type FilterProps = { lookup?: Many2OneLoader; field: string; label: string; type
 function FilterPanel({ field, label, type, filter, onApply, options, lookup, onClose }: FilterProps & { onClose: (restore?: boolean) => void }) {
   const titleId = useId();
   const errorId = useId();
-  const root = useRef<HTMLFormElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const temporal = type === "date" || type === "datetime";
   const operators = columnFilterOperators(type, Boolean(options || lookup));
   const [operator, setOperator] = useState<ListFilterOperator>(filter && (operators as readonly string[]).includes(filter.operator) ? filter.operator : operators[0]);
@@ -37,7 +37,8 @@ function FilterPanel({ field, label, type, filter, onApply, options, lookup, onC
     } catch (error) { setError(error instanceof Error ? error.message : "Revisa el filtro."); }
   }
 
-  return <form ref={root} role="dialog" aria-modal="false" aria-labelledby={titleId} autoComplete="off" noValidate className="space-y-3 p-4 text-left text-sm font-normal text-base-content" onSubmit={event => { event.preventDefault(); event.stopPropagation(); apply(); }}>
+  // A div, not a <form> (may live inside a record form): Enter applies the filter, never submits the record.
+  return <div ref={root} role="dialog" aria-modal="false" aria-labelledby={titleId} className="space-y-3 p-4 text-left text-sm font-normal text-base-content" onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) { event.preventDefault(); event.stopPropagation(); apply(); } }}>
     <header className="flex items-center justify-between gap-2"><h3 id={titleId} className="min-w-0 font-semibold wrap-anywhere">Filtrar {label}</h3><button type="button" className="btn btn-circle btn-ghost btn-xs shrink-0" aria-label="Cerrar filtro" onClick={() => onClose()}><X size={15} aria-hidden="true" /></button></header>
     <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Condición</span><select className="select select-sm w-full rounded-lg border-base-300" autoComplete="off" aria-label={`Condición de ${label}`} value={operator} onChange={event => { setOperator(event.currentTarget.value as ListFilterOperator); setError(null); }}>
       {operators.map(op => <option key={op} value={op}>{columnOperatorLabel(type, op)}</option>)}
@@ -49,8 +50,8 @@ function FilterPanel({ field, label, type, filter, onApply, options, lookup, onC
     </>)}
     {temporal && needsValue && <p className="text-xs leading-relaxed text-base-content/50">{precision === "day" ? "Incluye el día completo en la zona horaria de tu navegador." : "La hora del navegador se convierte a UTC al consultar."}</p>}
     {error && <p id={errorId} role="alert" className="text-xs text-error">{error}</p>}
-    <footer className="flex items-center justify-between gap-2 border-t border-base-300 pt-3"><button type="button" className="btn btn-ghost btn-sm" onClick={() => { onApply(null); onClose(); }}>Limpiar</button><button type="submit" className="btn btn-primary btn-sm">Aplicar filtro</button></footer>
-  </form>;
+    <footer className="flex items-center justify-between gap-2 border-t border-base-300 pt-3"><button type="button" className="btn btn-ghost btn-sm" onClick={() => { onApply(null); onClose(); }}>Limpiar</button><button type="button" className="btn btn-primary btn-sm" onClick={apply}>Aplicar filtro</button></footer>
+  </div>;
 }
 
 export default function ColumnFilter(props: FilterProps) {

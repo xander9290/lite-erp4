@@ -7,10 +7,19 @@ import { recordIdentitySchema } from "./record";
 import { planOne2manyChanges } from "../one2many/changes";
 
 export type Document = Record<string, unknown> & { id: string; revision: string };
-export type MutationOptions = { skipOwner?: { model: string; id: string }; previous?: Document };
+/**
+ * `withLines`: the deletion comes from the owner's document (a removed line), so the line's own
+ * lines go with it, bottom-up and through their services. A standalone deletion keeps Restrict.
+ */
+export type MutationOptions = { skipOwner?: { model: string; id: string }; previous?: Document; withLines?: boolean };
+/** Nested documents: document → line → sub-line, and a bounded total for the whole tree. */
+export const MAX_LINE_DEPTH = 3;
+export const MAX_DOCUMENT_ROWS = 500;
 export type TransactionModel = {
   readonly name: string;
   readonly metadata: Readonly<Record<string, FieldMetadata>>;
+  /** One2many relations of this model: its rows are documents with their own lines. */
+  readonly lines: LineRelations;
   snapshot(tx: Prisma.TransactionClient, actor: ModelActor, id: string, operation?: "read" | "write"): Promise<Document | null>;
   owned(tx: Prisma.TransactionClient, actor: ModelActor, inverse: string, id: string, maximum: number): Promise<Document[]>;
   persist(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, label?: string, options?: MutationOptions): Promise<Document>;
@@ -44,7 +53,8 @@ export function validateLines(input: Record<string, unknown>, previous: Document
     if (!Array.isArray(rows) || rows.length < minRows || rows.length > maxRows) throw new ModelValidationError(`Revisa las líneas de ${relation.metadata.label ?? name}.`, { [name]: `Envía la colección completa, entre ${minRows} y ${maxRows} líneas.` });
     const owned = (previous?.[name] ?? []) as Document[];
     for (const [index, row] of rows.entries()) {
-      if (!row || typeof row !== "object" || Array.isArray(row) || Object.keys(row).some(key => key === inverse || (!["id", "revision"].includes(key) && !Object.hasOwn(relation.child().metadata, key)))) throw new ModelValidationError("La línea contiene campos no permitidos.", { [`${name}.${index}`]: "No envíes la relación inversa ni campos no declarados." });
+      const child = relation.child();
+      if (!row || typeof row !== "object" || Array.isArray(row) || Object.keys(row).some(key => key === inverse || (!["id", "revision"].includes(key) && !Object.hasOwn(child.metadata, key) && !Object.hasOwn(child.lines, key)))) throw new ModelValidationError("La línea contiene campos no permitidos.", { [`${name}.${index}`]: "No envíes la relación inversa ni campos no declarados." });
       const identity = recordIdentitySchema.safeParse({ id: row.id, revision: row.revision });
       if (!identity.success) throw new ModelValidationError("La identidad de la línea no es válida.", { [`${name}.${index}`]: "El ID y la revisión deben enviarse juntos." });
       if (row.id && !owned.some(current => current.id === row.id && current.revision === row.revision)) throw new ModelValidationError("Una línea cambió o no pertenece al documento. Recarga antes de guardar.", { [`${name}.${index}`]: "La línea no está disponible con esta revisión." });
@@ -66,14 +76,15 @@ export async function persistLines(tx: Prisma.TransactionClient, actor: ModelAct
     }
     for (const item of changes.update) {
       const old = owned.find(row => row.id === item.id)!;
-      const different = Object.keys(child.metadata).filter(key => key !== inverse).some(key => JSON.stringify(old[key]) !== JSON.stringify(item.values[key]));
+      // Sub-lines count as content: a changed sub-line persists its line (and its revision).
+      const different = [...Object.keys(child.metadata), ...Object.keys(child.lines)].filter(key => key !== inverse).some(key => JSON.stringify(old[key]) !== JSON.stringify(item.values[key]));
       if (!different) continue;
       try { await child.persist(tx, actor, { ...item.values, [inverse]: parent.id }, undefined, options); changed = true; }
       catch (error) { lineFailure(error, `${name}.${item.index}`, inverse); }
     }
     for (const id of changes.deleteIds) {
       const row = owned.find(row => row.id === id)!;
-      try { await child.remove(tx, actor, row.id, row.revision, options); changed = true; }
+      try { await child.remove(tx, actor, row.id, row.revision, { ...options, withLines: true }); changed = true; }
       catch (error) { lineFailure(error, name, inverse); }
     }
   }
@@ -94,4 +105,16 @@ export async function captureOwners(tx: Prisma.TransactionClient, actor: ModelAc
     snapshots.push({ parent, previous: snapshot });
   }
   return snapshots;
+}
+
+/** Rows of a submitted document tree (every level), checked before any write. */
+export function countDocumentRows(input: Record<string, unknown>, relations: LineRelations): number {
+  let total = 0;
+  for (const [name, relation] of Object.entries(relations)) {
+    const rows = input[name];
+    if (!Array.isArray(rows)) continue;
+    total += rows.length;
+    for (const row of rows) if (row && typeof row === "object" && !Array.isArray(row)) total += countDocumentRows(row as Record<string, unknown>, relation.child().lines);
+  }
+  return total;
 }

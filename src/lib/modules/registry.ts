@@ -14,8 +14,12 @@ import type { Many2OneResult } from "../many2one/types";
 import type { FieldMetadata } from "../orm/fields";
 import type { ModelAction } from "../orm/model";
 import { createRepository } from "./repository";
-import { modelIdPattern, type ModelClientConfig } from "./config";
+import { modelIdPattern, type ModelClientConfig, type ModelLineConfig } from "./config";
 import type { ModuleDefinition, ModuleModel } from "./define";
+import { relationDomains, relationDomainWhere } from "./relation-domains";
+import { domainDependencies } from "../orm/domain-builder";
+import { ModelValidationError } from "../orm/context";
+import { z } from "zod";
 
 const modules = registeredModules;
 
@@ -78,6 +82,27 @@ export function withActor<T>(actor: ModelActor, operation: () => Promise<T>) {
   return operationActor.run(actor, operation);
 }
 
+/** The browser names a published owner field, never a target, predicate or dependency list. */
+export async function relationLookup(model: string, field: string, actor: ModelActor, input: unknown): Promise<Many2OneResult> {
+  const found = getModuleModel(model);
+  if (!found || !Object.hasOwn(lookupTargets(found.entry), field)) throw new Error("Relación no publicada.");
+  const relation = relationDomains(found.entry).find(relation => relation.field === field);
+  const envelope = z.strictObject({ request: modelLookupSchema, draft: z.record(z.string(), z.unknown()) }).parse(input);
+  if (!relation) throw new Error("La relación no declara dominio.");
+  const target = byPrismaName.get(relation.target)!;
+  const where = relationDomainWhere(found.entry, target, relation.domain, envelope.draft);
+  return prisma.$transaction(async tx => {
+    await authorizeModel(tx, actor, found.entry.id, "read");
+    const service = modelService(target.id);
+    const candidates = await service.lookupInTransaction(tx, actor, envelope.request, where);
+    if (!envelope.request.id && !envelope.request.ids) return candidates;
+    // Resolving saved selections preserves readable labels even when the domain changed.
+    const selections = await service.lookupInTransaction(tx, actor, envelope.request);
+    const matches = new Set(candidates.items.map(item => item.value));
+    return { ...selections, items: selections.items.map(item => ({ ...item, domainValid: matches.has(item.value) })) };
+  }, { isolationLevel: "RepeatableRead" });
+}
+
 export function modelService(id: string): Service {
   const cached = services.get(id);
   if (cached) return cached;
@@ -108,7 +133,18 @@ export function modelService(id: string): Service {
       return [name, { metadata: field.one2many, child: () => modelService(child.id).transaction }];
     })),
     owners: module.models.flatMap(parent => Object.values(parent.contract.one2manyFields).filter(field => field.one2many.target === entry.contract.name).map(field => ({ inverse: field.one2many.inverse, parent: () => modelService(parent.id).transaction }))),
-    list: entry.list, audit: true, defaultSort: entry.defaultSort,
+    list: entry.list, audit: true, defaultSort: entry.defaultSort, domain: entry.declaration.domain,
+    validateRelations: async (tx, actor, values) => {
+      for (const relation of relationDomains(entry)) {
+        const selected = relation.many ? values[relation.field] as string[] : values[relation.field] ? [String(values[relation.field])] : [];
+        if (!selected.length) continue;
+        const target = byPrismaName.get(relation.target)!;
+        const draft = Object.fromEntries(domainDependencies(relation.domain).map(name => [name, values[name]]));
+        const where = relationDomainWhere(entry, target, relation.domain, draft);
+        const result = await modelService(target.id).lookupInTransaction(tx, actor, { ids: selected }, where);
+        if (result.total !== selected.length) throw new ModelValidationError("Revisa las relaciones seleccionadas.", { [relation.field]: "La selección no cumple el dominio vigente o no está disponible." });
+      }
+    },
     collectionNullable: entry.extensions.flatMap(extension => extension.fields),
     // Group access and record rules, revalidated inside each service transaction.
     authorize: (tx, actor, operation) => authorizeModel(tx, actor, entry.id, operation),
@@ -188,7 +224,38 @@ export function imageSigner(id: string) {
   return signer;
 }
 
-export function modelClientConfig(id: string, access?: CapabilityActor): ModelClientConfig {
+/** Line contracts of a model, recursively (sub-lines of nested documents). Names/metadata only. */
+function lineConfigs(module: ModuleDefinition, owner: ModuleModel, access?: CapabilityActor): Record<string, ModelLineConfig> {
+  return Object.fromEntries(Object.entries(owner.contract.one2manyFields).map(([name, field]) => {
+    const child = module.models.find(model => model.contract.name === field.one2many.target)!;
+    const nested = lineConfigs(module, child, access);
+    return [name, {
+      metadata: field.one2many, model: child.id,
+      fields: Object.fromEntries(Object.entries(child.metadata).filter(([key]) => key !== field.one2many.inverse)),
+      lookups: Object.fromEntries(Object.entries(lookupTargets(child)).filter(([key]) => key !== field.one2many.inverse)),
+      capabilities: access?.modelAccess[child.id] ?? { read: false, create: false, write: false, unlink: false },
+      ...(Object.keys(nested).length ? { lines: nested } : {}),
+    }];
+  }));
+}
+
+/**
+ * Children of a parent record for a read-only relation: the parent must be readable by the
+ * actor, and the child list keeps its own permissions, rules and policy, AND the fixed
+ * `<inverse> = parentId` domain set here (never by the browser). Paginated, no row limit.
+ */
+export async function childCollectionList(parentModel: string, field: string, parentId: unknown, actor: ModelActor, state: unknown) {
+  const found = getModuleModel(parentModel);
+  const collection = found && Object.hasOwn(found.entry.contract.childCollections, field) ? found.entry.contract.childCollections[field] : undefined;
+  if (!found || !collection || typeof parentId !== "string" || !parentId.trim() || parentId.length > 100) throw new Error("MODEL_NOT_FOUND");
+  const parent = await modelService(found.entry.id).read(prisma, actor, parentId);
+  if (!parent.ok) return { ok: false as const, error: parent.error };
+  const child = byPrismaName.get(collection.target)!;
+  const service = modelService(child.id);
+  return withActor(actor, () => service.defineListAction({ domain: [{ field: collection.inverse, operator: "eq", value: parentId }] as never })(prisma, actor, state));
+}
+
+export function modelClientConfig(id: string, access?: CapabilityActor, nested = true): ModelClientConfig {
   const found = getModuleModel(id);
   if (!found) throw new Error("MODEL_NOT_FOUND");
   const { module, entry } = found;
@@ -202,15 +269,7 @@ export function modelClientConfig(id: string, access?: CapabilityActor): ModelCl
     reactionRules: contract.reactionRules ?? [],
     lookups: lookupTargets(entry),
     many2many: Object.fromEntries(Object.entries(contract.many2manyFields).map(([name, field]) => [name, field.many2many])),
-    lines: Object.fromEntries(Object.entries(contract.one2manyFields).map(([name, field]) => {
-      const child = module.models.find(model => model.contract.name === field.one2many.target)!;
-      return [name, {
-        metadata: field.one2many, model: child.id,
-        fields: Object.fromEntries(Object.entries(child.metadata).filter(([key]) => key !== field.one2many.inverse)),
-        lookups: Object.fromEntries(Object.entries(lookupTargets(child)).filter(([key]) => key !== field.one2many.inverse)),
-        capabilities: access?.modelAccess[child.id] ?? { read: false, create: false, write: false, unlink: false },
-      }];
-    })),
+    lines: lineConfigs(module, entry, access),
     // Names and labels only; the server validates the name and re-checks permissions on every call.
     actions: published.map(({ name, label, params }) => ({ name, label, ...(params ? { params, lookups: Object.fromEntries(Object.entries(params).filter(([, field]) => field.kind === "many2one").map(([name, field]) => {
       const target = field.kind === "many2one" && byPrismaName.get(field.target);
@@ -228,5 +287,11 @@ export function modelClientConfig(id: string, access?: CapabilityActor): ModelCl
     // Fields added by other modules, presented in their own group (names only).
     ...(entry.extensions.length ? { extensions: entry.extensions.map(extension => ({ module: extension.module, label: extension.label, fields: [...extension.fields, ...extension.computed] })) } : {}),
   };
-  return access ? projectModelAccess(config, access, published, entry.kanbanTransitions) : config;
+  // One level of read-only relations: each child config omits its own collections (no cycles).
+  const collections = nested ? Object.entries(entry.contract.childCollections).map(([name, collection]) => {
+    const child = byPrismaName.get(collection.target)!;
+    return [name, { label: collection.label ?? child.label, inverse: collection.inverse, ...(collection.invisible !== undefined ? { invisible: collection.invisible } : {}), config: modelClientConfig(child.id, access, false) }] as const;
+  }) : [];
+  const withCollections = collections.length ? { ...config, collections: Object.fromEntries(collections) } : config;
+  return access ? projectModelAccess(withCollections, access, published, entry.kanbanTransitions) : withCollections;
 }

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { compileActionParameters, parseActionParameters, type ActionParameterMetadata, type CompiledActionParameters } from "./action-parameters";
 import type { ActionDeclaration } from "./decorators";
 import { fieldInputSchema } from "./sequence";
-import { isField, isOne2many, isMany2many, type Many2manyField, type One2manyField, type Field, type FieldMetadata } from "./fields";
+import { isField, isOne2many, isMany2many, isChildCollection, type ChildCollectionMetadata, type Many2manyField, type One2manyField, type Field, type FieldMetadata } from "./fields";
 import { ModelValidationError, type ModelActor, type ModelContext, type RemoveContext } from "./context";
 import type { Prisma } from "@/generated/prisma/client";
 import { modelSnapshot } from "./snapshot";
@@ -47,6 +47,8 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
   if (!(instance instanceof Model)) throw new Error("La declaración debe extender Model.");
   const fields: Record<string, Field> = {};
   const one2manyFields: Record<string, One2manyField> = {};
+  // Read-only relations: presented by the form, never part of the document.
+  const childCollections: Record<string, ChildCollectionMetadata> = {};
   const many2manyFields: Record<string, Many2manyField> = {};
   const relatedFields: Record<string, Field> = {};
   const computedFields: Record<string, Field> = {};
@@ -58,6 +60,10 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     if (isMany2many(value)) {
       if (!/^[a-z][A-Za-z0-9]*$/.test(name) || reservedFields.has(name)) throw new Error(`Nombre Many2many inválido: ${name}.`);
       many2manyFields[name] = value; continue;
+    }
+    if (isChildCollection(value)) {
+      if (!/^[a-z][A-Za-z0-9]*$/.test(name) || reservedFields.has(name)) throw new Error(`Nombre de relación de consulta inválido: ${name}.`);
+      childCollections[name] = value.collection; continue;
     }
     if (isOne2many(value)) {
       if (!/^[a-z][A-Za-z0-9]*$/.test(name) || reservedFields.has(name)) throw new Error(`Nombre One2many inválido: ${name}.`);
@@ -86,6 +92,7 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
     fields: Object.freeze(fields) as Readonly<DeclaredFields<InstanceType<C>>>,
     metadata: Object.freeze(metadata) as Readonly<{ [K in keyof DeclaredFields<InstanceType<C>>]: FieldMetadata }>,
     schema, formSchema, many2manyFields: Object.freeze(many2manyFields), one2manyFields: Object.freeze(one2manyFields) as Readonly<Record<string, One2manyField>>,
+    childCollections: Object.freeze(childCollections) as Readonly<Record<string, ChildCollectionMetadata>>,
     displayFields: displayKeys,
     displayRelations:(instance.displayRelations??{}) as InstanceType<C> extends {displayRelations:infer R}?R:Record<never,never>,
     reactionRules: methods.rules,

@@ -5,6 +5,8 @@ export type { ActionParams, ActionParameterFields, ClientModelAction } from "./a
 export { ActionParameterError, ModelValidationError, type ModelContext, type ModelActor } from "./context";
 export { createQueryActions } from "./query-actions";
 export type { ListDomain, DomainNode, ListDomainContext, ListActionOptions } from "./domain";
+export { domainBuilder, type DomainBuilder, type DomainExpression, type RelationDomain } from "./domain-builder";
+export type { CollectionDomain } from "./domain";
 
 export { withDisplayName, type DisplayValues } from "./typed-display";
 

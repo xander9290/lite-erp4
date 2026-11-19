@@ -1,5 +1,9 @@
 # Many2many declarativo
 
+Desde 2026-11-19 admite `domain: d => ...` sobre sus candidatos, con dependencias
+del borrador y validación de todos los IDs al guardar. No descarta selecciones
+incompatibles automáticamente. [Contrato de dominios](dominios-modelos.md).
+
 Implementado el 2026-11-17 para módulos `defineModule` en `src/modules`.
 Relaciona un registro con varios registros existentes, que pueden compartirse con
 otros registros. El formulario envía la colección completa de IDs, no objetos

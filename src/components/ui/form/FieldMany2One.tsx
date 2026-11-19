@@ -14,6 +14,7 @@ import { useFormFieldValidation } from "./formValidation";
 import { useMany2OneSearch } from "./useMany2OneSearch";
 import Many2OneSearchModal, { type Many2OneColumn } from "./Many2OneSearchModal";
 import { PartnerIdentity } from "../PartnerAvatar";
+import { useRelationDomainLoad } from "./useRelationDomainLoad";
 
 export type { Many2OneModel, Many2OneRecord } from "@/lib/many2one/types";
 type EditableProps<TFieldValues extends FieldValues = FieldValues> =
@@ -64,11 +65,12 @@ export default function FieldMany2One<TFieldValues extends FieldValues = FieldVa
 
 function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props: EditableProps<TFieldValues>) {
   const {
-  name, label, direction = "block", model = "partner", load, searchFields = lookupModels[model as Many2OneModel].searchFields,
+  name, label, direction = "block", model = "partner", load: baseLoad, searchFields = lookupModels[model as Many2OneModel].searchFields,
   displayName = lookupModels[model as Many2OneModel].displayName, columns, pageSize = 10, clearable = true,
   onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y seleccionar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps
 } = useModelField(props, "many2one");
+  const load = useRelationDomainLoad(name, baseLoad);
   delete inputProps.mode;
   if (!props.model && !load) throw new Error(`Configura un lookup autorizado para ${name}.`);
   const generatedId = useId();
@@ -125,7 +127,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
     if (typeof current !== "string") return "El valor debe ser el ID de un registro.";
     if (resolution.loading) return "Espera a que termine de cargar la selección.";
     if (resolution.error) return "No se pudo verificar la selección. Reintenta la búsqueda.";
-    return selected ? null : "El registro seleccionado ya no está disponible.";
+    return selected?.domainValid === false ? "La selección no cumple el dominio vigente. Selecciona otro registro o corrige sus dependencias." : selected ? null : "El registro seleccionado ya no está disponible.";
   }, [field.disabled, readOnly, required, resolution.loading, resolution.error, selected]);
   useFormFieldValidation(name, validate, "fieldMany2One");
 
@@ -159,7 +161,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
             aria-expanded={expanded} aria-controls={expanded ? listId : undefined} aria-autocomplete="list" aria-haspopup="listbox"
             aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined}
             aria-required={required} aria-invalid={fieldState.invalid || inputProps["aria-invalid"]}
-            aria-describedby={[describedBy, value && !selected && !resolution.loading ? statusId : undefined, fieldState.invalid ? errorId : undefined].filter(Boolean).join(" ") || undefined}
+            aria-describedby={[describedBy, value && (!selected || selected.domainValid === false) && !resolution.loading ? statusId : undefined, fieldState.invalid ? errorId : undefined].filter(Boolean).join(" ") || undefined}
             onFocus={event => {
               if (skipFocus.current) skipFocus.current = false;
               else if (!locked) { setQuery(""); setActive(0); setOpen(true); }
@@ -205,6 +207,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
         </div>}
 
         {value && !selected && !resolution.loading && <p id={statusId} role="status" className="mt-1 text-xs text-base-content/60">{resolution.error || "El registro ya no está disponible."}{resolution.error && <button type="button" className="ml-2 cursor-pointer underline" onClick={resolution.retry}>Reintentar</button>}</p>}
+        {selected?.domainValid === false && <p id={statusId} role="status" className="mt-1 text-xs text-error">La selección no cumple el filtro actual. Cambia la selección o sus dependencias.</p>}
         {fieldState.invalid && <span id={errorId} className="sr-only">{errorMessage}</span>}
         {modalOpen && !locked && <Many2OneSearchModal load={load} title={fieldLabel || "Registros"} request={{ ...request, pageSize }} initialQuery={query} selectedId={value} columns={columns}
           onSelect={choose} onClose={() => setModalOpen(false)} onAfterClose={restoreFocus} />}

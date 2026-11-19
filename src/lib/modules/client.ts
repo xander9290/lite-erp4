@@ -7,29 +7,36 @@ import { recordIdentityShape, validateRecordIdentity } from "../orm/record";
 import { createSignedCloudinaryImageUploader } from "../uploads/cloudinary";
 import type { ModelLookupRequest } from "../many2one/model-lookup";
 import type { ReactionRequest } from "../orm/reactions.types";
-import { collectionFieldMetadata, type ModelClientConfig } from "./config";
-import { modelLookup, modelReact, modelSignImage } from "./actions";
+import { collectionFieldMetadata, type ModelClientConfig, type ModelLineConfig } from "./config";
+import type { FormLineModel } from "@/components/ui/form/modelFields";
+import { modelLookup, modelRelationLookup, modelReact, modelSignImage } from "./actions";
+import { domainDependencies, type DomainExpression } from "../orm/domain-builder";
 
 const mapValues = <T, R>(source: Readonly<Record<string, T>>, map: (value: T, key: string) => R) =>
   Object.fromEntries(Object.entries(source).map(([key, value]) => [key, map(value, key)])) as Record<string, R>;
 
 export type ModelUI = ReturnType<typeof buildModelUI>;
+type LineUI = FormLineModel & { schema: z.ZodType; model?: string };
 
 /** Everything a form or collection needs on the client, built once per config. */
 export function buildModelUI(config: ModelClientConfig) {
   const fields = mapValues(config.fields, fieldFromMetadata);
-  const many2many = mapValues(config.many2many ?? {}, metadata => Fields.Many2many(metadata.target, Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== "target"))));
+  const many2many = mapValues(config.many2many ?? {}, metadata => Fields.Many2many(metadata.target, { ...Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== "target" && key !== "domain")), ...(metadata.domain ? { domain: () => metadata.domain! } : {}) }));
   const readFields = mapValues(config.preview, fieldFromMetadata);
-  const lines = mapValues(config.lines ?? {}, line => {
+  const buildLine = (line: ModelLineConfig): LineUI => {
     const fields = mapValues(line.fields, fieldFromMetadata);
-    const schema = z.strictObject(mapValues(fields, field => fieldInputSchema(field))).extend(recordIdentityShape).superRefine(validateRecordIdentity as never);
+    const nested = mapValues(line.lines ?? {}, buildLine);
+    const schema = z.strictObject({ ...mapValues(fields, field => fieldInputSchema(field)), ...mapValues(nested, child => z.array(child.schema).min(child.minRows).max(child.maxRows)) }).extend(recordIdentityShape).superRefine(validateRecordIdentity as never);
     return {
       fields, schema, ...line.metadata, capabilities: line.capabilities,
-      createRow: () => mapValues(fields, field => field.createDefault()),
+      ...(Object.keys(nested).length ? { lines: nested } : {}),
+      createRow: () => ({ ...mapValues(fields, field => field.createDefault()), ...mapValues(nested, () => []) }),
       lookups: mapValues(line.lookups, target => (request: ModelLookupRequest) => modelLookup(target, request)),
+      domainLookups: domainLookups(line.model, line.fields, {}),
       uploads: Object.fromEntries(Object.entries(line.fields).filter(([, field]) => field.kind === "image").map(([name]) => [name, createSignedCloudinaryImageUploader(() => modelSignImage(line.model, name))])),
     };
-  });
+  };
+  const lines = mapValues(config.lines ?? {}, buildLine);
   const schema = z.strictObject({ ...mapValues(fields, field => fieldInputSchema(field)), ...mapValues(many2many, field => field.schema), ...mapValues(lines, line => z.array(line.schema).min(line.minRows).max(line.maxRows)) }).extend(recordIdentityShape).superRefine(validateRecordIdentity as never);
   const collectionFields: Record<string, Pick<Field, "metadata">> = mapValues(collectionFieldMetadata(config), metadata => ({ metadata }));
   const images = Object.entries(config.fields).filter(([, field]) => field.kind === "image" && !field.sensitive).map(([name]) => name);
@@ -37,10 +44,19 @@ export function buildModelUI(config: ModelClientConfig) {
     fields, readFields, lines, many2many,
     reactions: { rules: config.reactionRules, load: (request: ReactionRequest) => modelReact(config.id, request) },
     lookups: mapValues(config.lookups, target => (request: ModelLookupRequest) => modelLookup(target, request)),
+    domainLookups: domainLookups(config.id, config.fields, config.many2many ?? {}),
     uploads: Object.fromEntries(images.map(name => [name, createSignedCloudinaryImageUploader(() => modelSignImage(config.id, name))])),
   };
   return {
     config, fields, readFields, collectionFields, schema, recordUI,
     createDefaults: (): Record<string, unknown> => ({ ...mapValues(fields, field => field.createDefault()), ...mapValues(many2many, field => field.createDefault()), ...mapValues(lines, () => []) }),
   };
+}
+
+function domainLookups(model: string, fields: ModelClientConfig["fields"], many: NonNullable<ModelClientConfig["many2many"]>) {
+  const domains: Record<string, DomainExpression> = Object.fromEntries([
+    ...Object.entries(fields).flatMap(([name, field]) => field.kind === "many2one" && field.domain ? [[name, field.domain] as const] : []),
+    ...Object.entries(many).flatMap(([name, field]) => field.domain ? [[name, field.domain] as const] : []),
+  ]);
+  return mapValues(domains, (domain, field) => ({ dependencies: domainDependencies(domain), load: (request: ModelLookupRequest, draft: Record<string, unknown>) => modelRelationLookup(model, field, { request, draft }) }));
 }

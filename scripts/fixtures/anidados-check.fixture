@@ -1,0 +1,96 @@
+import assert from "node:assert/strict";
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
+const { prisma } = await import("./src/lib/prisma");
+const { modelService, modelClientConfig, childCollectionList } = await import("./src/lib/modules/registry");
+const { hashPassword } = await import("./src/lib/auth/password");
+
+// Disposable accounts in the temporary schema only.
+const password = await hashPassword("nested-test-only");
+const root = await prisma.user.create({ data: { login: "nested-root", password, isAdmin: true } });
+const member = await prisma.user.create({ data: { login: "nested-partial", password } });
+await prisma.accessUserGroup.create({ data: { userId: member.id, groupId: "anidados.parcial" } });
+const actor = { id: root.id, sessionVersion: root.sessionVersion }, partial = { id: member.id, sessionVersion: member.sessionVersion };
+type Row = Record<string, unknown> & { id: string; revision: string };
+type Doc = Row & { lineas: (Row & { entregas: Row[] })[] };
+const pedidos = modelService("anidados.pedido"), entregas = modelService("anidados.entrega"), partidas = modelService("anidados.partida");
+const ok = async (promise: Promise<unknown>, step: string) => { const result = await promise as { ok: boolean; values?: Doc }; assert.ok(result.ok, `${step}: ${JSON.stringify(result)}`); return result.values as Doc; };
+const counts = async () => [await prisma.anidadosPedido.count(), await prisma.anidadosPartida.count(), await prisma.anidadosEntrega.count()];
+const fails = async (input: unknown, step: string, who = actor) => {
+  const before = await counts();
+  const result = await pedidos.save(prisma, who, input) as { ok: boolean; fieldErrors?: Record<string, string> };
+  assert.equal(result.ok, false, `${step}: ${JSON.stringify(result)}`);
+  assert.deepEqual(await counts(), before, `${step}: nada se escribe`);
+  return result;
+};
+
+// Client contract: sub-lines travel nested in the line config.
+const contract = modelClientConfig("anidados.pedido");
+assert.deepEqual(Object.keys(contract.lines?.lineas.lines ?? {}), ["entregas"]);
+assert.equal(contract.lines?.lineas.lines?.entregas.metadata.maxRows, 3);
+
+// Create the whole tree in one save; reading returns every level with identity, without inverses.
+let doc = await ok(pedidos.save(prisma, actor, { name: "P-1", lineas: [{ name: "Cable", entregas: [{ cantidad: 2, nota: "a" }, { cantidad: 3, nota: "b" }] }, { name: "Caja", entregas: [] }] }), "crear árbol");
+assert.deepEqual(await counts(), [1, 2, 2]);
+assert.equal(doc.lineas[0].entregas.length, 2);
+assert.ok(doc.lineas[0].entregas.every(row => row.id && row.revision && !Object.hasOwn(row, "partidaId")));
+assert.ok(doc.lineas.every(row => !Object.hasOwn(row, "pedidoId")));
+
+// A change only in a sub-line saves its line (new revision) and leaves siblings untouched.
+const before = doc;
+doc = await ok(pedidos.save(prisma, actor, { ...doc, lineas: [{ ...doc.lineas[0], entregas: [{ ...doc.lineas[0].entregas[0], cantidad: 5 }, doc.lineas[0].entregas[1]] }, doc.lineas[1]] }), "editar sublínea");
+assert.equal(doc.lineas[0].entregas[0].cantidad, 5);
+assert.notEqual(doc.lineas[0].revision, before.lineas[0].revision, "la partida avanza su revisión");
+assert.equal(doc.lineas[1].revision, before.lineas[1].revision, "la partida hermana no cambia");
+assert.notEqual(doc.revision, before.revision);
+
+// Errors carry the full path and roll back the whole document.
+const invalid = await fails({ ...doc, lineas: [{ ...doc.lineas[0], entregas: [{ ...doc.lineas[0].entregas[0], cantidad: 0 }, doc.lineas[0].entregas[1]] }, doc.lineas[1]] }, "cantidad inválida");
+assert.ok(invalid.fieldErrors?.["lineas.0.entregas.0.cantidad"], JSON.stringify(invalid));
+await fails({ ...doc, lineas: [doc.lineas[0], { ...doc.lineas[1], entregas: [{ cantidad: 99, nota: null }] }] }, "afterSave de sublínea revierte todo");
+const duplicated = await fails({ ...doc, lineas: [{ ...doc.lineas[0], entregas: [...doc.lineas[0].entregas, { cantidad: 1, nota: "a" }] }, doc.lineas[1]] }, "constraint de la partida");
+assert.ok(duplicated.fieldErrors?.["lineas.0.entregas"], JSON.stringify(duplicated));
+const tooMany = await fails({ ...doc, lineas: [doc.lineas[0], { ...doc.lineas[1], entregas: [{ cantidad: 1, nota: null }, { cantidad: 1, nota: null }, { cantidad: 1, nota: null }, { cantidad: 1, nota: null }] }] }, "maxRows de la sublínea");
+assert.ok(Object.keys(tooMany.fieldErrors ?? {}).some(key => key.startsWith("lineas.1.entregas")), JSON.stringify(tooMany));
+await fails({ ...doc, lineas: [{ ...doc.lineas[0], entregas: [{ ...doc.lineas[0].entregas[0], id: "ajena" }] }, doc.lineas[1]] }, "ID de sublínea ajeno");
+await fails({ ...doc, lineas: [{ ...doc.lineas[0], entregas: [{ ...doc.lineas[0].entregas[0], partidaId: doc.lineas[1].id }] }, doc.lineas[1]] }, "inversa de sublínea manipulada");
+
+// An independent sub-line write invalidates the whole document draft (ancestors' revisions).
+const entrega = doc.lineas[0].entregas[1];
+await ok(entregas.save(prisma, actor, { ...entrega, partidaId: doc.lineas[0].id, cantidad: 4 }), "escritura independiente de la sublínea");
+await fails({ ...doc, name: "Viejo" }, "borrador obsoleto tras escribir una sublínea");
+doc = await ok(pedidos.read(prisma, actor, doc.id), "releer");
+
+// Removing a line removes its sub-lines bottom-up; a standalone line deletion keeps Restrict.
+assert.equal((await partidas.remove(prisma, actor, [{ id: doc.lineas[0].id, revision: doc.lineas[0].revision }])).ok, false, "borrado suelto con sublíneas bloqueado");
+doc = await ok(pedidos.save(prisma, actor, { ...doc, lineas: [doc.lineas[1]] }), "quitar partida con entregas");
+assert.deepEqual(await counts(), [1, 1, 0]);
+
+// Inherited access: a reader whose rules hide a sub-line cannot open the document.
+doc = await ok(pedidos.save(prisma, actor, { ...doc, lineas: [{ ...doc.lineas[0], entregas: [{ cantidad: 1, nota: null }, { cantidad: 2, nota: null }] }] }), "entregas mixtas");
+assert.equal((await pedidos.read(prisma, partial, doc.id)).ok, false, "una sublínea oculta impide abrir el documento");
+// Read-only relation: thousands of children, paginated, fixed parent domain, child rules.
+const comentariosConfig = modelClientConfig("anidados.pedido").collections?.comentarios;
+assert.equal(comentariosConfig?.config.id, "anidados.comentario");
+assert.equal(comentariosConfig?.inverse, "pedidoId");
+assert.equal(Object.hasOwn(doc, "comentarios"), false, "no forma parte del documento");
+assert.equal((await pedidos.save(prisma, actor, { ...doc, comentarios: [] })).ok, false, "no se guarda con el documento");
+const otro = await ok(pedidos.save(prisma, actor, { name: "P-2", lineas: [] }), "pedido sin líneas");
+await prisma.anidadosComentario.createMany({ data: [...Array.from({ length: 2500 }, (_, index) => ({ texto: `c${index}`, pedidoId: otro.id })), { texto: "oculto", pedidoId: otro.id }, { texto: "ajeno", pedidoId: doc.id }] });
+const state = { query: "", sort: "texto", direction: "asc" as const, page: 2, pageSize: 25, filters: [] };
+const page = await childCollectionList("anidados.pedido", "comentarios", otro.id, actor, state) as { ok: boolean; data: { total: number; rows: Record<string, unknown>[] } };
+assert.ok(page.ok, JSON.stringify(page));
+assert.equal(page.data.total, 2501, "todos los hijos del registro, sin límite de filas");
+assert.equal(page.data.rows.length, 25, "sólo la página pedida");
+assert.ok(page.data.rows.every(row => row.pedidoId === otro.id));
+const searched = await childCollectionList("anidados.pedido", "comentarios", otro.id, actor, { ...state, page: 1, query: "c2499" }) as { ok: boolean; data: { total: number } };
+assert.equal(searched.data.total, 1);
+const forged = await childCollectionList("anidados.pedido", "comentarios", otro.id, actor, { ...state, page: 1, filters: [{ field: "pedidoId", operator: "eq", value: doc.id }] }) as { ok: boolean; data: { total: number } };
+assert.equal(forged.ok ? forged.data.total : 0, 0, "un filtro del navegador no amplía el dominio fijo");
+const reader = await childCollectionList("anidados.pedido", "comentarios", otro.id, partial, state) as { ok: boolean; data: { total: number } };
+assert.ok(reader.ok && reader.data.total === 2500, "las reglas del hijo aplican: " + JSON.stringify(reader));
+assert.equal((await childCollectionList("anidados.pedido", "comentarios", doc.id, partial, state)).ok, false, "sin lectura del padre no se listan sus hijos");
+await assert.rejects(childCollectionList("anidados.pedido", "lineas", otro.id, actor, state), "sólo relaciones de consulta declaradas");
+await prisma.$disconnect();
+console.log("✓ Relación de consulta: 2,500 hijos paginados, dominio fijo al registro, búsqueda, filtro manipulado sin efecto, reglas del hijo y lectura del padre obligatoria.");
+console.log("✓ One2many anidados: árbol de 3 niveles, revisión por rama, rutas de error, rollback de hooks/constraints, límites, IDs/inversas, concurrencia desde la sublínea, baja de abajo hacia arriba y acceso heredado.");

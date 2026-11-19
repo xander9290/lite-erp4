@@ -15,6 +15,7 @@ export function compileActionParameters(fields: ActionParameterFields | undefine
   for (const [name, field] of Object.entries(fields)) {
     if (!/^[a-z][A-Za-z0-9]*$/.test(name) || ["id", "revision", "root", "constructor", "prototype", "__proto__"].includes(name) || !isField(field)) throw new Error(`Parámetro inválido: ${name}. Usa Fields.`);
     const m = field.metadata;
+    if (m.kind === "many2one" && m.domain) throw new Error(`${name}: los dominios de parámetros requieren un contrato de borrador propio; todavía no se admiten.`);
     if (m.kind === "image" || m.sequence || m.compute || m.related || m.sensitive || m.unique || m.tracking || m.defaultKind === "factory") throw new Error(`${name}: params admite Fields escalares/Many2one, sin imágenes, secuencias, virtuales, sensitive, unique, tracking ni defaults de función.`);
   }
   const copy = Object.freeze({ ...fields });

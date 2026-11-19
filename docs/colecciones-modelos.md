@@ -1,5 +1,9 @@
 # Una colección, varias presentaciones
 
+Desde 2026-11-19 el modelo del manifest admite `domain: d => ...` como fuente
+común de Lista/Card/Kanban, aplicada en servidor antes de conteos/páginas/grupos.
+No se declara en columnas TSX. [Contrato de dominios](dominios-modelos.md).
+
 Implementado el 2026-11-14. La aplicación declara su modelo, política y configuración
 Kanban una vez. ModelCollection conecta los proveedores autorizados, campos publicados,
 búsqueda, filtros, orden y navegación; cada vista TSX decide únicamente su presentación.

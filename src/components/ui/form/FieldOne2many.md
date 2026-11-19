@@ -64,6 +64,10 @@ El Field administra `useFieldArray` y usa los mismos defaults del formulario par
 
 `footer` acepta contenido o una función de las filas actuales; úsalo para mostrar totales. Los cálculos de negocio deben repetirse en servidor. En móvil, las filas de la misma tabla se distribuyen verticalmente con encabezados visibles por control; la edición sigue siendo directa, sin abrir otra vista. En escritorio se muestran las columnas horizontales. La distribución usa el ancho del contenedor, por lo que también se adapta dentro de un Notebook o FormGroup estrecho.
 
+Las filas en disposición de tabla usan padding vertical compacto de 4px por lado
+en índice, campos y acciones. Se conserva el tamaño propio de los controles, el
+padding lateral y la disposición apilada en contenedores estrechos.
+
 ## Errores
 
 Zod valida cada línea y sus campos; los errores locales siguen apareciendo en toast. Cada fila indica si tiene errores. Notebook identifica los Fields de cada línea y revela el primero inválido al guardar. Un error agregado del arreglo se muestra en el footer y enfoca el grupo/Agregar línea si está vacío.

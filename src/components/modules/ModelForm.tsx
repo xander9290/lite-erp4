@@ -3,7 +3,7 @@
 import { Fragment, createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formDeleteReturnHref } from "@/components/ui/form/formDeletion";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RefreshCw } from "lucide-react";
 import FormView from "@/components/ui/form/FormView";
@@ -23,7 +23,10 @@ import { useAlerts } from "@/components/ui/alerts/AlertProvider";
 import { buildModelUI, type ModelUI } from "@/lib/modules/client";
 import type { ModelClientConfig } from "@/lib/modules/config";
 import type { FieldMetadata } from "@/lib/orm/fields";
-import { modelAction, modelActivity, modelDelete, modelNote, modelRead, modelSave } from "@/lib/modules/actions";
+import ModelCollection from "./ModelCollection";
+import FieldVisibility from "@/components/ui/form/FieldVisibility";
+import type { ListState } from "@/lib/list/types";
+import { modelChildren, modelLookup, modelAction, modelActivity, modelDelete, modelNote, modelRead, modelSave } from "@/lib/modules/actions";
 import { modelUiCapabilities } from "@/lib/access/capabilities";
 import { useModelExtensionViews } from "./ModelExtensionViews";
 
@@ -48,6 +51,24 @@ function display(name: string, field: FieldMetadata) {
 }
 
 const ModelUIContext = createContext<ModelUI | null>(null);
+
+/**
+ * Read-only relations of the record (children created in their own form): one paginated,
+ * authorized collection per relation, filtered by the server to this record. Ejected forms
+ * place `<ModelChildCollections />` (or `name` for one relation) where they should appear.
+ */
+export function ModelChildCollections({ name }: { name?: string }) {
+  const ui = useContext(ModelUIContext);
+  const recordId = useWatch({ name: "id" }) as string | undefined;
+  const collections = Object.entries(ui?.config.collections ?? {}).filter(([field]) => !name || field === name);
+  if (!ui || !collections.length) return null;
+  return <>{collections.map(([field, collection]) => <FieldVisibility key={field} invisible={collection.invisible}><FormGroup fullWidth legend={collection.label}>
+    {recordId ? <ModelCollection embedded config={collection.config} view="list" title={collection.label} paramPrefix={field}
+      createDefaults={{ [collection.inverse]: recordId }}
+      source={{ load: (state: ListState) => modelChildren(ui.config.id, field, recordId, state), filterLookups: Object.fromEntries(Object.entries(collection.config.lookups).map(([lookup, target]) => [lookup, modelLookup.bind(null, target)])) }} />
+      : <p className="text-sm text-base-content/60">Guarda el registro para ver {collection.label.toLowerCase()}.</p>}
+  </FormGroup></FieldVisibility>)}</>;
+}
 
 /**
  * Fields added by other modules: custom views own their layout; automatic fields use a group
@@ -75,7 +96,7 @@ export function ModelFields({ ui }: { ui: ModelUI }) {
   const extended = new Set(ui.config.extensions?.flatMap(extension => extension.fields) ?? []);
   const controls = Object.entries(ui.config.fields).filter(([name]) => !extended.has(name)).map(([name, field]) => control(ui, name, field));
   const previews = Object.entries(ui.config.preview).filter(([name]) => !extended.has(name)).map(([name, field]) => display(name, field));
-  return <><FormGroup legend="Datos generales">{controls}{previews}{Object.keys(ui.recordUI.many2many).map(name => <FieldRelationTag key={name} name={name} direction="inline" />)}</FormGroup><ModelExtensions />{Object.keys(ui.recordUI.lines).map(name => <FormGroup fullWidth key={name}><FieldOne2many name={name} /></FormGroup>)}</>;
+  return <><FormGroup legend="Datos generales">{controls}{previews}{Object.keys(ui.recordUI.many2many).map(name => <FieldRelationTag key={name} name={name} direction="inline" />)}</FormGroup><ModelExtensions />{Object.keys(ui.recordUI.lines).map(name => <FormGroup fullWidth key={name}><FieldOne2many name={name} /></FormGroup>)}<ModelChildCollections /></>;
 }
 
 function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; record: Values; displayName?: string; onReload?: () => void; children?: ReactNode }) {
@@ -127,6 +148,12 @@ export default function ModelForm({ config, id, children }: { config: ModelClien
   const alerts = useAlerts();
   const [attempt, setAttempt] = useState(0);
   const load = useCallback(() => modelRead(config.id, id!), [config.id, id]);
+  // `default_<field>` proposes a Many2one value for a new record; the server validates it on save.
+  const query = useSearchParams();
+  const proposed = Object.fromEntries(Object.entries(config.fields).flatMap(([name, field]) => {
+    const value = field.kind === "many2one" ? query.get(`default_${name}`) : null;
+    return value && value.length <= 100 ? [[name, value]] : [];
+  }));
   const reload = () => {
     void navigation.run(() => setAttempt(value => value + 1)).catch(() => {
       void alerts.error({ title: "No se pudo recargar el registro", message: "Intenta nuevamente. Tus cambios siguen en el formulario." });
@@ -134,7 +161,7 @@ export default function ModelForm({ config, id, children }: { config: ModelClien
   };
   const capabilities = modelUiCapabilities(config.capabilities);
   if (!capabilities.read || (!id && !capabilities.create)) return <p role="alert" className="p-6">No tienes permiso para abrir este formulario.</p>;
-  if (!id) return <Editor key={router.bfcacheId} ui={ui} record={ui.createDefaults()}>{children}</Editor>;
+  if (!id) return <Editor key={router.bfcacheId} ui={ui} record={{ ...ui.createDefaults(), ...proposed }}>{children}</Editor>;
   return <FormViewLoader key={`${router.bfcacheId}:${id}:${attempt}`} recordKey={id} load={load}>
     {(record, _audit, displayName) => <Editor ui={ui} record={record} displayName={displayName} onReload={reload}>{children}</Editor>}
   </FormViewLoader>;

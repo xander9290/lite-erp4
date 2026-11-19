@@ -14,6 +14,7 @@ import { useModelField } from "./modelFields";
 import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
 import { useFieldDirection } from "./fieldDirection";
 import FieldVisibility from "./FieldVisibility";
+import { useRelationDomainLoad } from "./useRelationDomainLoad";
 
 export type FieldRelationTagProps<TFieldValues extends FieldValues = FieldValues> =
   Omit<BaseFieldProps<TFieldValues>, "onChange"> &
@@ -36,11 +37,12 @@ export default function FieldRelationTag<TFieldValues extends FieldValues = Fiel
 }
 
 function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
-  name, label, direction: requestedDirection = "block", model = "partner", load, searchFields = lookupModels[model].searchFields,
+  name, label, direction: requestedDirection = "block", model = "partner", load: baseLoad, searchFields = lookupModels[model].searchFields,
   displayName = lookupModels[model].displayName, columns, pageSize = 10, maxSelected = 100, clearable = true,
   onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y agregar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps
 }: FieldRelationTagProps<TFieldValues>) {
+  const load = useRelationDomainLoad(name, baseLoad);
   const direction = useFieldDirection(requestedDirection) ?? "block";
   const generatedId = useId();
   const inputId = id ?? generatedId;
@@ -66,6 +68,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
   const byId = new Map(available.map(option => [option.value, option]));
   const selected = resolveRelationTags(ids, available);
   const selectionValid = selected !== null;
+  const domainInvalid = selected?.some(option => option.domainValid === false) ?? false;
   const missing = ids.filter(value => !byId.has(value));
   const locked = Boolean(field.disabled || readOnly);
   const editingBlocked = locked || resolution.loading || missing.length > 0;
@@ -96,7 +99,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
     return () => subscription.unsubscribe();
   }, [watch]);
 
-  const validate = useCallback((current: unknown) => {
+  function validate(current: unknown) {
     if (locked) return null;
     if (!Array.isArray(current) || current.some(value => typeof value !== "string" || !value)) return "El valor debe ser un arreglo de IDs.";
     if (new Set(current).size !== current.length) return "La selección contiene registros duplicados.";
@@ -104,8 +107,9 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
     if (!current.length) return required ? "Selecciona al menos un registro." : null;
     if (resolution.loading) return "Espera a que terminen de cargar los registros.";
     if (resolution.error) return "No se pudo verificar la selección. Reintenta la búsqueda.";
+    if (domainInvalid) return "Hay selecciones que no cumplen el dominio vigente. Revisa sus dependencias o retíralas.";
     return selectionValid ? null : "Hay registros que ya no están disponibles. Revisa la selección.";
-  }, [locked, maximum, required, resolution.loading, resolution.error, selectionValid]);
+  }
   useFormFieldValidation(name, validate, "fieldRelationTag");
 
   function commit(next: readonly Many2OneOption[]) {
@@ -186,7 +190,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
           {resolution.loading ? "Cargando selección…" : resolution.error ? <>{resolution.error}<button type="button" className="cursor-pointer underline" onClick={resolution.retry}>Reintentar</button></> : missing.length ? <>
             {missing.length} registro{missing.length === 1 ? " no disponible" : "s no disponibles"}.
             {!locked && <button type="button" className="cursor-pointer underline" onClick={() => commit(ids.flatMap(value => byId.get(value) ? [byId.get(value)!] : []))}>Quitar no disponibles</button>}
-          </> : ids.length > 0 ? `${ids.length} seleccionado${ids.length === 1 ? "" : "s"}${atLimit ? ` · Máximo ${maximum}` : ""}` : "Puedes seleccionar varios registros"}
+          </> : domainInvalid ? <span className="text-error">Hay selecciones que no cumplen el filtro actual. Puedes retirarlas o corregir sus dependencias.</span> : ids.length > 0 ? `${ids.length} seleccionado${ids.length === 1 ? "" : "s"}${atLimit ? ` · Máximo ${maximum}` : ""}` : "Puedes seleccionar varios registros"}
         </div>
 
         {expanded && <div className="absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-lg">

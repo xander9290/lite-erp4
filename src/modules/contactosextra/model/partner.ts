@@ -1,5 +1,10 @@
 import "server-only";
-import { Fields, constraint, ModelValidationError, type ModelContext } from "@/lib/orm";
+import {
+  Fields,
+  constraint,
+  ModelValidationError,
+  type ModelContext,
+} from "@/lib/orm";
 import { extendModel } from "@/lib/modules/extend";
 import { Partner } from "@/lib/core/models/partner";
 
@@ -39,10 +44,14 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
       label: "Estado",
       onDelete: "Restrict",
       tracking: true,
+      domain: (d) => d.eq("paisId", d.draft("paisId")),
     });
 
     @constraint("paisId", "estadoId")
-    async validarPaisEstado(values: Readonly<Record<string, unknown>>, context: ModelContext) {
+    async validarPaisEstado(
+      values: Readonly<Record<string, unknown>>,
+      context: ModelContext,
+    ) {
       if (!values.estadoId) return;
 
       if (!values.paisId) {
@@ -53,7 +62,12 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
 
       const { authorizeModel } = await import("@/lib/access/engine");
 
-      const scope = await authorizeModel(context.tx, context.actor, "ubicaciones.estado", "read");
+      const scope = await authorizeModel(
+        context.tx,
+        context.actor,
+        "ubicaciones.estado",
+        "read",
+      );
 
       const estado = await context.tx.ubicacionesEstado.findFirst({
         where: {
@@ -84,7 +98,11 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
     validarRFC(values: Readonly<Record<string, unknown>>) {
       const vat = values.vat;
 
-      if (typeof vat === "string" && vat !== "" && !/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(vat)) {
+      if (
+        typeof vat === "string" &&
+        vat !== "" &&
+        !/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(vat)
+      ) {
         throw new ModelValidationError("Revisa el RFC.", {
           vat: "Introduce un RFC de 12 o 13 caracteres en mayúsculas.",
         });

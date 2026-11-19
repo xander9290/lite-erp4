@@ -1,0 +1,63 @@
+import assert from "node:assert/strict";
+import { config } from "dotenv";
+config({ path: ".env.local", quiet: true });
+const { prisma } = await import("./src/lib/prisma");
+const { modelService, relationLookup, modelClientConfig, withActor } = await import("./src/lib/modules/registry");
+const { hashPassword } = await import("./src/lib/auth/password");
+const password = await hashPassword("domains-test-only");
+const adminUser = await prisma.user.create({ data: { login: "domain-admin", password, isAdmin: true } });
+const editorUser = await prisma.user.create({ data: { login: "domain-editor", password } });
+const deniedUser = await prisma.user.create({ data: { login: "domain-denied", password } });
+await prisma.accessUserGroup.create({ data: { userId: editorUser.id, groupId: "dominios.editor" } });
+const admin = { id: adminUser.id, sessionVersion: 0 }, editor = { id: editorUser.id, sessionVersion: 0 }, denied = { id: deniedUser.id, sessionVersion: 0 };
+const mx = await prisma.dominiosPais.create({ data: { name: "México" } }), ca = await prisma.dominiosPais.create({ data: { name: "Canadá" } });
+const jal = await prisma.dominiosEstado.create({ data: { name: "Jalisco", paisId: mx.id } }), ont = await prisma.dominiosEstado.create({ data: { name: "Ontario", paisId: ca.id } });
+const hidden = await prisma.dominiosEstado.create({ data: { name: "Secret", paisId: mx.id, active: false } });
+const service = modelService("dominios.documento");
+const lookup = (field: string, draft: Record<string, unknown>, request: Record<string, unknown> = {}, who = editor) => relationLookup("dominios.documento", field, who, { request, draft });
+const list = async (draft: Record<string, unknown>, who = editor) => { const result = await lookup("estadoId", draft, {}, who); assert.ok(result.ok); return result; };
+assert.deepEqual((await list({ paisId: mx.id })).items.map(item => item.value), [jal.id]);
+assert.deepEqual((await list({ paisId: ca.id })).items.map(item => item.value), [ont.id]);
+assert.equal((await list({ paisId: null })).total, 0);
+assert.equal((await list({})).total, 0);
+const resolved = await lookup("estadoId", { paisId: ca.id }, { id: jal.id });
+assert.ok(resolved.ok); assert.equal(resolved.items[0].label, "Jalisco"); assert.equal(resolved.items[0].domainValid, false);
+const privateResolution = await lookup("estadoId", { paisId: mx.id }, { id: hidden.id }); assert.ok(privateResolution.ok); assert.equal(privateResolution.items.length, 0);
+const chips = await lookup("estados", { paisId: ca.id }, { ids: [jal.id, ont.id] }); assert.ok(chips.ok); assert.equal(chips.items.find(item => item.value === jal.id)?.domainValid, false);
+assert.equal(chips.items.find(item => item.value === ont.id)?.domainValid, true);
+for (const draft of [{ paisId: mx.id, arbitrary: "x" }, { paisId: {} }]) await assert.rejects(lookup("estadoId", draft));
+await assert.rejects(lookup("estadoId", { paisId: mx.id }, { domain: [] }));
+await assert.rejects(lookup("missing", {}));
+await assert.rejects(lookup("estadoId", { paisId: mx.id }, {}, denied));
+await assert.rejects(lookup("estadoId", { paisId: mx.id }, {}, { ...editor, sessionVersion: 999 }));
+const base = { name: "Valid", paisId: mx.id, estadoId: jal.id, estados: [jal.id], active: true, status: "draft" };
+const saved = await service.save(prisma, editor, base); assert.ok(saved.ok, JSON.stringify(saved));
+const before = await prisma.dominiosDocumento.count(), links = await prisma.dominiosDocumentoEstadosLink.count(), activity = await prisma.recordActivity.count();
+for (const patch of [{ paisId: ca.id }, { paisId: null }, { estadoId: ont.id }, { estados: [ont.id] }, { estadoId: hidden.id }, { name: "forge" }, { name: "late" }]) {
+  const result = await service.save(prisma, editor, { ...base, ...patch }); assert.equal(result.ok, false, JSON.stringify({ patch, result }));
+  assert.equal(await prisma.dominiosDocumento.count(), before); assert.equal(await prisma.dominiosDocumentoEstadosLink.count(), links); assert.equal(await prisma.recordActivity.count(), activity);
+}
+const result = await service.action(prisma, editor, { id: saved.values.id, revision: saved.values.revision, action: "invalidar" }); assert.equal(result.ok, false);
+const reopen = await service.read(prisma, editor, saved.values.id); assert.ok(reopen.ok); assert.equal(reopen.values.paisId, mx.id);
+// Existing readable selections survive opening and rejection, never silently removed.
+await prisma.dominiosDocumento.update({ where: { id: saved.values.id }, data: { paisId: ca.id } });
+const old = await service.read(prisma, editor, saved.values.id); assert.ok(old.ok); assert.deepEqual(old.values.estados, [jal.id]);
+assert.equal((await service.save(prisma, editor, old.values)).ok, false);
+assert.equal(await prisma.dominiosDocumentoEstadosLink.count(), links);
+const partnerService = modelService("core.partner");
+const extra = { name: "Extra", email: null, phone: null, avatarUrl: null, paisId: mx.id, estadoId: jal.id };
+const partner = await partnerService.save(prisma, admin, extra); assert.ok(partner.ok, JSON.stringify(partner));
+assert.equal((await partnerService.save(prisma, admin, { ...partner.values, paisId: ca.id })).ok, false);
+assert.ok(modelClientConfig("core.partner").fields.estadoId.kind === "many2one");
+// Shared collection domain precedes totals/pages/groups, with record rules outside OR.
+await service.save(prisma, editor, { ...base, name: "Inactive", active: false });
+await service.save(prisma, admin, { ...base, name: "Other owner" });
+const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 1, filters: [] };
+for (const load of [() => service.list(prisma, editor, state), () => service.kanban(prisma, editor, { group: "draft", state }), () => service.defineListAction({ domain: d => d.any(d.eq("active", true), d.not(d.eq("active", true))) })(prisma, editor, state)]) {
+  const page = await withActor(editor, load); assert.ok(page.ok, JSON.stringify(page)); assert.equal(page.data.total, 1); assert.equal(page.data.rows.length, 1);
+}
+const grouped = await withActor(editor, () => service.list(prisma, editor, { ...state, groupBy: ["status"] })); assert.ok(grouped.ok); assert.equal(grouped.data.total, 1); assert.equal(grouped.data.groups?.[0].count, 1);
+await prisma.user.update({ where: { id: editorUser.id }, data: { active: false } });
+await assert.rejects(lookup("estadoId", { paisId: mx.id }));
+console.log("✓ Domains: authorized candidates/IDs, empty dependencies, tampering, many selections, legacy values, extension storage, hooks/actions rollback and collection totals/groups/kanban verified.");
+await prisma.$disconnect();

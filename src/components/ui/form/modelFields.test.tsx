@@ -178,3 +178,25 @@ test("write-only secrets bind as an empty password input; other sensitive fields
   assert.match(html, /Contraseña/);
   assert.throws(() => renderToStaticMarkup(<SecretFixture field={Fields.Text({ label: "Token", sensitive: true })} />), /Contrato incompatible/);
 });
+
+test("nested lines: paths resolve at any depth and rows render their sub-lines inline", async () => {
+  const { default: FieldOne2many } = await import("./FieldOne2many");
+  const { lineAt, lineField } = await import("./modelFields");
+  const caps = { read: true, create: true, write: true, unlink: true };
+  const entregas = { fields: { cantidad: Fields.Integer({ label: "Cantidad", required: true, min: 1 }) }, minRows: 0, maxRows: 3, label: "Entregas", createRow: () => ({ cantidad: 1 }), capabilities: caps };
+  const model = { fields: {}, lines: { lineas: { fields: { name: Fields.Text({ label: "Producto", required: true }) }, minRows: 0, maxRows: 5, label: "Partidas", createRow: () => ({ name: "", entregas: [] }), capabilities: caps, lines: { entregas } } } };
+  assert.equal(lineAt(model, "lineas.0.entregas"), entregas);
+  assert.equal(lineAt(model, "lineas.x.entregas"), undefined);
+  assert.deepEqual(lineField(model, "lineas.1.entregas.2.cantidad"), { line: entregas, key: "cantidad", row: "lineas.1.entregas.2" });
+  assert.deepEqual(lineField(model, "name"), { key: "name" });
+  function NestedFixture() {
+    const methods = useForm({ defaultValues: { lineas: [{ id: "p1", revision: "2026-11-19T00:00:00.000Z", name: "Cable", entregas: [{ id: "e1", revision: "2026-11-19T00:00:00.000Z", cantidad: 2 }] }] } });
+    return <FormProvider {...methods}><FormModelContext.Provider value={model}><FieldOne2many name="lineas" /></FormModelContext.Provider></FormProvider>;
+  }
+  const html = renderToStaticMarkup(<NestedFixture />);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /Mostrar Entregas \(1\) de la línea 1/);
+  // Collapsed sub-lines stay mounted (registered values), just hidden.
+  assert.match(html, /name="lineas.0.entregas.0.cantidad"/);
+  assert.match(html, /value="2"/);
+});

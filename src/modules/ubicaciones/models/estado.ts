@@ -2,7 +2,12 @@ import "server-only";
 import { Fields, Model, type DisplayRecord } from "@/lib/orm";
 
 export class Estado extends Model {
-  name = Fields.Text({ label: "Nombre", required: true, maxLength: 120, tracking: true });
+  name = Fields.Text({
+    label: "Nombre",
+    required: true,
+    maxLength: 120,
+    tracking: true,
+  });
   paisId = Fields.Many2one("UbicacionesPais", {
     label: "País",
     required: true,
@@ -14,6 +19,11 @@ export class Estado extends Model {
     required: true,
     maxLength: 10,
     tracking: true,
+  });
+  municipioIds = Fields.One2many("UbicacionesMunicipio", {
+    inverse: "estadoId",
+    label: "Municipios",
+    readonly: true,
   });
   active = Fields.Boolean({ label: "Activo", default: true, tracking: true });
   displayName(record: DisplayRecord<Estado, "name">): string {

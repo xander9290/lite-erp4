@@ -23,10 +23,14 @@ export type ModelCollectionProps = Pick<CollectionProps, "renderCard" | "titleFi
   movable?: boolean;
   source?: CollectionSource;
   renderCell?: ListViewProps["renderCell"];
+  /** Inside another form (read-only relation): no breadcrumbs. */
+  embedded?: boolean;
+  /** Values proposed to a new record (`default_<field>` in the URL; the server validates them). */
+  createDefaults?: Readonly<Record<string, string>>;
 };
 
 /** Presentation only: shared publication, navigation and authorized data providers. */
-export default function ModelCollection({ config, columns, view = config.view, title = config.label, create = true, open = true, delete: canDelete = true, movable = true, source: provider, renderCell, pageSize = 25, ...presentation }: ModelCollectionProps) {
+export default function ModelCollection({ config, columns, view = config.view, title = config.label, create = true, open = true, delete: canDelete = true, movable = true, source: provider, renderCell, pageSize = 25, embedded = false, createDefaults, ...presentation }: ModelCollectionProps) {
   const pathname = usePathname();
   const params = useSearchParams().toString();
   const returnTo = `${pathname}${params ? `?${params}` : ""}`;
@@ -47,9 +51,9 @@ export default function ModelCollection({ config, columns, view = config.view, t
   const common = {
     ...source.common, ...presentation, title, pageSize, filterLookups: source.provider.filterLookups,
     columns: source.columns, queryColumns: source.queryColumns,
-    createHref: create && capabilities.create ? `${source.common.createHref}?returnTo=${encodeURIComponent(returnTo)}` : undefined,
+    createHref: create && capabilities.create ? `${source.common.createHref}?${new URLSearchParams({ ...Object.fromEntries(Object.entries(createDefaults ?? {}).map(([field, value]) => [`default_${field}`, value])), returnTo })}` : undefined,
     recordHref: open ? source.common.recordHref : undefined,
-    breadcrumbs: [{ label: "Aplicaciones", href: "/erp" }, ...(config.application?.href === config.route
+    breadcrumbs: embedded ? [] : [{ label: "Aplicaciones", href: "/erp" }, ...(config.application?.href === config.route
       ? [{ label: config.application.name }]
       : [{ label: config.application?.name ?? config.moduleName, href: config.application?.href ?? `/erp/${config.module}` }, { label: title }])],
   };

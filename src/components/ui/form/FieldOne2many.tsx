@@ -1,15 +1,15 @@
 "use client";
 
-import { Children, Fragment, isValidElement, lazy, Suspense, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
+import { Children, Fragment, isValidElement, lazy, Suspense, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useFieldArray, useFormContext, useFormState, useWatch, type FieldArray, type FieldArrayPath, type FieldPath, type FieldValues } from "react-hook-form";
-import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 import type { FieldDirection } from "./field.types";
 import { fieldDirectionClassName, fieldLabelClassName } from "./field.styles";
 import { useFormFieldValidation } from "./formValidation";
 import { rowLimits, sameRowData } from "./one2manyValues";
 import { formErrorPaths } from "./notebookErrors";
 import { useFieldDirection } from "./fieldDirection";
-import { FormModelContext } from "./modelFields";
+import { FormModelContext, lineAt } from "./modelFields";
 import FieldText from "./FieldText";
 import FieldNumber from "./FieldNumber";
 import FieldDate from "./FieldDate";
@@ -59,6 +59,8 @@ export type FieldOne2manyProps<TValues extends FieldValues = FieldValues, TName 
   id?: string;
   className?: string;
   "aria-label"?: string;
+  /** Sub-lines of a row (nested documents): rendered inline under the expanded row. */
+  expand?: { label: (row: FieldArray<TValues, TName>) => string; render: (context: One2manyRowContext<TValues, TName>) => ReactNode };
 };
 
 const alignments = { left: "text-left", right: "text-right", center: "text-center" };
@@ -66,7 +68,7 @@ const alignments = { left: "text-left", right: "text-right", center: "text-cente
 function One2manyContent<TValues extends FieldValues, TName extends FieldArrayPath<TValues> = FieldArrayPath<TValues>>({
   name, label, direction: requestedDirection = "block", columns, createRow, onChange, minRows = 0, maxRows = 100, required,
   canCreate = true, canDelete, rowReadOnly, disabled = false, readOnly = false, reorderable = false, addLabel = "Agregar línea", emptyText = "Todavía no hay líneas.", footer,
-  id, className = "", "aria-label": ariaLabel,
+  id, className = "", "aria-label": ariaLabel, expand,
 }: FieldOne2manyProps<TValues, TName> & { columns: readonly One2manyColumn<TValues,TName>[]; createRow: () => FieldArray<TValues,TName> }) {
   const direction = useFieldDirection(requestedDirection) ?? "block";
   const generatedId = useId();
@@ -124,6 +126,8 @@ function One2manyContent<TValues extends FieldValues, TName extends FieldArrayPa
   const error = methods.getFieldState(path, formState).error;
   const errorMessage = error?.message || (error as typeof error & { root?: { message?: string } })?.root?.message;
   const errorPaths = formErrorPaths(formState.errors);
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = (key: string) => setExpanded(current => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; });
   const footerContent = typeof footer === "function" ? footer(rows) : footer;
 
   function canEdit() { return !locked && !root.current?.closest("fieldset:disabled"); }
@@ -158,19 +162,29 @@ function One2manyContent<TValues extends FieldValues, TName extends FieldArrayPa
               // field.id is only a render key. Business IDs always come from RHF values.
               const row = rows[index] ?? getRows()[index];
               const context: One2manyRowContext<TValues, TName> = { index, row, fieldName: key => `${name}.${index}.${key}` as FieldPath<TValues>, readOnly: readOnly || rowReadOnly?.(row) === true, disabled: disabled || formState.disabled };
-              return <tr key={field.id} role="row" data-one2many-row={index} className="block rounded-xl border border-base-300 bg-base-200/15 p-3 @3xl/o2m:table-row @3xl/o2m:rounded-none @3xl/o2m:border-x-0 @3xl/o2m:border-t-0 @3xl/o2m:bg-transparent @3xl/o2m:p-0 @3xl/o2m:hover:bg-primary/3">
-                <td role="cell" className="mb-2 block px-0 py-1 align-middle text-xs font-semibold text-base-content/40 @3xl/o2m:table-cell @3xl/o2m:px-2 @3xl/o2m:py-3 @3xl/o2m:text-center"><span className="@3xl/o2m:hidden">Línea </span>{index + 1}{errorPaths.some(path => path.startsWith(`${name}.${index}.`) || path === `${name}.${index}`) && <span className="ml-1 text-error" aria-label={`Línea ${index + 1} con errores`}>•</span>}</td>
-                {columns.map(column => <td role="cell" key={column.key} className={`block min-w-0 px-0 py-2 align-middle @3xl/o2m:table-cell @3xl/o2m:px-3 @3xl/o2m:py-3 ${alignments[column.align ?? "left"]}`}>
+              // Rows with errors in their sub-lines open by themselves so the error is visible.
+              const nestedError = Boolean(expand) && errorPaths.some(path => path.startsWith(`${name}.${index}.`) && path.split(".").length > `${name}.${index}.x`.split(".").length);
+              const open = Boolean(expand) && (expanded.has(field.id) || nestedError);
+              const subId = `${inputId}-row-${index}-lines`;
+              return <Fragment key={field.id}><tr role="row" data-one2many-row={index} className="block rounded-xl border border-base-300 bg-base-200/15 p-3 @3xl/o2m:table-row @3xl/o2m:rounded-none @3xl/o2m:border-x-0 @3xl/o2m:border-t-0 @3xl/o2m:bg-transparent @3xl/o2m:p-0 @3xl/o2m:hover:bg-primary/3">
+                <td role="cell" className="mb-2 block px-0 py-1 align-middle text-xs font-semibold text-base-content/40 @3xl/o2m:table-cell @3xl/o2m:px-2 @3xl/o2m:py-1 @3xl/o2m:text-center"><span className="@3xl/o2m:hidden">Línea </span>{index + 1}{errorPaths.some(path => path.startsWith(`${name}.${index}.`) || path === `${name}.${index}`) && <span className="ml-1 text-error" aria-label={`Línea ${index + 1} con errores`}>•</span>}
+                  {expand && <button type="button" className="btn btn-ghost btn-xs ml-1 px-1 text-base-content/60" aria-expanded={open} aria-controls={subId} aria-label={`${open ? "Ocultar" : "Mostrar"} ${expand.label(row)} de la línea ${index + 1}`} onClick={() => toggle(field.id)}>{open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}</button>}</td>
+                {columns.map(column => <td role="cell" key={column.key} className={`block min-w-0 px-0 py-2 align-middle @3xl/o2m:table-cell @3xl/o2m:px-3 @3xl/o2m:py-1 ${alignments[column.align ?? "left"]}`}>
                   <span aria-hidden="true" className="mb-1 block text-left text-xs font-medium text-base-content/55 @3xl/o2m:hidden">{column.label}</span>
                   <fieldset disabled={context.readOnly} className="m-0 min-w-0 border-0 p-0">{column.render(context)}</fieldset>
                 </td>)}
-                {!readOnly && <td role="cell" className="mt-2 block border-t border-base-300 px-0 pt-2 align-middle @3xl/o2m:table-cell @3xl/o2m:border-t-0 @3xl/o2m:px-2 @3xl/o2m:py-3">
+                {!readOnly && <td role="cell" className="mt-2 block border-t border-base-300 px-0 pt-2 align-middle @3xl/o2m:table-cell @3xl/o2m:border-t-0 @3xl/o2m:px-2 @3xl/o2m:py-1">
                   <div className="flex items-center justify-end gap-0.5">
                     {reorderable && <><button type="button" disabled={locked || index === 0} className="btn btn-square btn-ghost btn-xs text-base-content/45" aria-label={`Subir línea ${index + 1}`} onClick={() => moveRow(index, index - 1)}><ArrowUp size={14} aria-hidden="true" /></button><button type="button" disabled={locked || index === fields.length - 1} className="btn btn-square btn-ghost btn-xs text-base-content/45" aria-label={`Bajar línea ${index + 1}`} onClick={() => moveRow(index, index + 1)}><ArrowDown size={14} aria-hidden="true" /></button></>}
                     <button type="button" disabled={locked || canDelete?.(row) === false || fields.length <= limits.minimum} className="btn btn-square btn-ghost btn-xs text-base-content/40 hover:bg-error/10 hover:text-error" aria-label={`Quitar línea ${index + 1}`} onClick={() => deleteRow(index)}><Trash2 size={15} aria-hidden="true" /></button>
                   </div>
                 </td>}
-              </tr>;
+              </tr>
+              {expand && <tr role="row" id={subId} hidden={!open} className={open ? "block @3xl/o2m:table-row" : "hidden!"}>
+                {/* Kept mounted while hidden: RHF values and validation of sub-lines stay registered. */}
+                <td role="cell" colSpan={columns.length + (readOnly ? 1 : 2)} className="block px-0 pb-3 pt-1 @3xl/o2m:table-cell @3xl/o2m:pl-10 @3xl/o2m:pr-3">{expand.render(context)}</td>
+              </tr>}
+              </Fragment>;
             })}
             {!fields.length && <tr role="row" className="block @3xl/o2m:table-row"><td role="cell" colSpan={columns.length + (readOnly ? 1 : 2)} className="block px-4 py-8 text-center text-sm text-base-content/45 @3xl/o2m:table-cell">{emptyText}</td></tr>}
           </tbody>
@@ -215,7 +229,7 @@ function renderField(field: FieldMetadata, column: ColumnDeclaration, context: O
 /** Existing explicit columns/createRow remain supported; declarations use the model contract. */
 function FieldOne2many<TValues extends FieldValues = FieldValues, TName extends FieldArrayPath<TValues> = FieldArrayPath<TValues>>(props: FieldOne2manyProps<TValues, TName>) {
   const model = useContext(FormModelContext);
-  const line = model?.lines?.[props.name];
+  const line = lineAt(model, props.name);
   let columns = props.columns, createRow = props.createRow;
   if (props.children !== undefined || (!columns && line)) {
     if (!line || columns || createRow) throw new Error("One2many.Column requiere una relación publicada; usa children o columns/createRow, no ambos.");
@@ -255,6 +269,10 @@ function FieldOne2many<TValues extends FieldValues = FieldValues, TName extends 
         canDelete={row => (!capabilities || !persisted(row) || capabilities.unlink) && props.canDelete?.(row) !== false}
         rowReadOnly={row => props.rowReadOnly?.(row) === true || Boolean(capabilities && (!capabilities.read || (persisted(row) ? !capabilities.write : !capabilities.create)))}
         columns={columns} createRow={createRow}
+        {...(line?.lines && Object.keys(line.lines).length && !props.expand ? { expand: {
+          label: (row: FieldArray<TValues, TName>) => Object.entries(line.lines!).map(([sub, child]) => `${child.label ?? sub} (${Array.isArray((row as Record<string, unknown>)[sub]) ? ((row as Record<string, unknown>)[sub] as unknown[]).length : 0})`).join(", "),
+          render: (context: One2manyRowContext<TValues, TName>) => <div className="space-y-2">{Object.keys(line.lines!).map(sub => <FieldOne2many key={sub} name={`${props.name}.${context.index}.${sub}` as never} readOnly={context.readOnly || undefined} />)}</div>,
+        } } : {})}
       />
     </Suspense>
   </FieldVisibility>;

@@ -1,0 +1,39 @@
+import "server-only";
+import { Fields, Model, ModelValidationError, constraint } from "@/lib/orm";
+import { defineModule } from "@/lib/modules/define";
+
+/** Three-level document fixture (pedido → partida → entrega); disposable schema only. */
+class Pedido extends Model {
+  name = Fields.Text({ label: "Pedido", required: true, tracking: true });
+  lineas = Fields.One2many("AnidadosPartida", { inverse: "pedidoId", label: "Partidas", maxRows: 5 });
+  // Many children, no row limit: presented as a read-only relation, created in their own form.
+  comentarios = Fields.One2many("AnidadosComentario", { inverse: "pedidoId", label: "Comentarios", readonly: true });
+}
+class Comentario extends Model {
+  texto = Fields.Text({ label: "Texto", required: true, maxLength: 80, searchable: true });
+  pedidoId = Fields.Many2one("AnidadosPedido", { label: "Pedido", required: true });
+}
+class Partida extends Model {
+  name = Fields.Text({ label: "Producto", required: true, tracking: true });
+  pedidoId = Fields.Many2one("AnidadosPedido", { required: true });
+  entregas = Fields.One2many("AnidadosEntrega", { inverse: "partidaId", label: "Entregas", maxRows: 3 });
+  @constraint("entregas")
+  sinDuplicadas(values: Readonly<Record<string, unknown>>) {
+    const notas = (values.entregas as { nota: string | null }[]).map(row => row.nota).filter(Boolean);
+    if (new Set(notas).size !== notas.length) throw new ModelValidationError("Notas de entrega repetidas.", { entregas: "Usa notas distintas." });
+  }
+}
+class Entrega extends Model {
+  cantidad = Fields.Integer({ label: "Cantidad", required: true, min: 1, default: 1, tracking: true });
+  nota = Fields.Text({ label: "Nota", maxLength: 40 });
+  partidaId = Fields.Many2one("AnidadosPartida", { required: true });
+  afterSave(record: Record<string, unknown>) { if (record.cantidad === 99) throw new Error("Fallo posterior de prueba"); }
+}
+
+export default defineModule({
+  id: "anidados", name: "Anidados", icon: "list",
+  models: { pedido: Pedido, partida: Partida, entrega: Entrega, comentario: Comentario },
+  groups: { parcial: "Lectura parcial" },
+  access: [{ group: "parcial", models: ["pedido", "partida", "entrega"], perms: "crud" }, { group: "parcial", models: "comentario", perms: "r" }],
+  rules: [{ id: "comentarios-visibles", label: "Comentarios no ocultos", models: "comentario", groups: ["parcial"], domain: [{ field: "texto", operator: "neq", value: "oculto" }] }, { id: "entregas-chicas", label: "Sólo entregas de 1", models: "entrega", groups: ["parcial"], domain: [{ field: "cantidad", operator: "eq", value: 1 }] }],
+});

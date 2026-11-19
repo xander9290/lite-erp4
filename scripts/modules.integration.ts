@@ -50,7 +50,22 @@ try {
     .replace('"@tailwindcss/turbopack"', `{ loader: "@tailwindcss/turbopack", options: { base: ${JSON.stringify(join(root, "src"))} } }`));
   prisma(["migrate", "deploy"]);
 
-  if (process.argv.includes("--parameters-only")) {
+  if (process.argv.includes("--domains-only")) {
+    const target = join(root, "src/modules/dominios");
+    await mkdir(target, { recursive: true });
+    await cp(join(project, "scripts/fixtures/modules-domains/manifest.fixture"), join(target, "manifest.ts"));
+    tsx(join(root, "scripts/orm-install.ts"), ["dominios", "--write"], "orm:install domains fixture");
+    const sql = command("prisma", ["migrate", "diff", "--from-config-datasource", "--to-schema", join(root, "prisma/models"), "--script", "--config", join(root, "prisma7.config.ts")], "domains migration diff");
+    assert.doesNotMatch(sql, /\bDROP\s+(TABLE|COLUMN|TYPE)\b|\bTRUNCATE\b/i);
+    await mkdir(join(root, "prisma/migrations/20990207000000_domains"));
+    await writeFile(join(root, "prisma/migrations/20990207000000_domains/migration.sql"), sql);
+    prisma(["migrate", "deploy"]); prisma(["generate"]);
+    await writeFile(join(root, "src/modules/index.ts"), `import "server-only";\nimport dominios from "./dominios/manifest";\nexport const modules = [dominios];\n`);
+    await cp(join(project, "scripts/fixtures/domains-check.fixture"), join(root, "domains-check.ts"));
+    console.log(tsx(join(root, "domains-check.ts"), [], "domain service check").trim());
+    command("next", ["typegen"], "Next route types");
+    command("tsc", ["--noEmit", "--incremental", "false"], "domains fixture types");
+  } else if (process.argv.includes("--parameters-only")) {
     const target = join(root, "src/modules/parametros");
     await mkdir(join(target, "models"), { recursive: true });
     await cp(join(project, "scripts/fixtures/modules-parameters/models.fixture"), join(target, "models/ticket.ts"));
@@ -119,6 +134,23 @@ try {
     console.log(tsx(join(root, "one2many-check.ts"), [], "One2many service check").trim());
     command("next", ["typegen"], "Next route types");
     command("tsc", ["--noEmit", "--incremental", "false"], "One2many fixture types");
+  } else if (process.argv.includes("--nested-only")) {
+    // Nested One2many (document → line → sub-line) on an independent fixture module.
+    const target = join(root, "src/modules/anidados");
+    await mkdir(target, { recursive: true });
+    await cp(join(project, "scripts/fixtures/modules-anidados/manifest.fixture"), join(target, "manifest.ts"));
+    tsx(join(root, "scripts/orm-install.ts"), ["anidados", "--write"], "orm:install nested fixture");
+    const sql = command("prisma", ["migrate", "diff", "--from-config-datasource", "--to-schema", join(root, "prisma/models"), "--script", "--config", join(root, "prisma7.config.ts")], "nested migration diff");
+    assert.match(sql, /CREATE TABLE "anidados_entrega"/);
+    assert.doesNotMatch(sql, /\bDROP\s+(TABLE|COLUMN|TYPE)\b|\bTRUNCATE\b/i);
+    await mkdir(join(root, "prisma/migrations/20990205000000_nested"));
+    await writeFile(join(root, "prisma/migrations/20990205000000_nested/migration.sql"), sql);
+    prisma(["migrate", "deploy"]); prisma(["generate"]);
+    await writeFile(join(root, "src/modules/index.ts"), `import "server-only";\nimport type { ModuleDefinition } from "@/lib/modules/define";\nimport anidados from "./anidados/manifest";\nexport const modules: readonly ModuleDefinition[] = [anidados];\n`);
+    command("next", ["typegen"], "Next route types");
+    command("tsc", ["--noEmit", "--incremental", "false"], "nested fixture types");
+    await cp(join(project, "scripts/fixtures/anidados-check.fixture"), join(root, "anidados-check.ts"));
+    console.log(tsx(join(root, "anidados-check.ts"), [], "nested lines check").trim());
   } else if (process.argv.includes("--core-only")) {
     // Native core: modules relate to and extend Partner without touching the partners table.
     const fixture = join(project, "scripts/fixtures/modules-core");

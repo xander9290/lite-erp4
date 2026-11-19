@@ -36,14 +36,18 @@ export function fieldExpression(field: FieldMetadata) {
   if (field.kind === "boolean") return `Fields.Boolean(${quote(common)})`;
   if (field.kind === "selection") return `Fields.Selection(${quote(field.choices)}, ${quote(common)})`;
   if (field.kind === "datetime") return `Fields.DateTime(${quote(common)})`;
-  return `Fields.Many2one(${quote(field.target)}, ${quote({ ...common, onDelete: field.onDelete })})`;
+  const options = quote({ ...common, onDelete: field.onDelete });
+  return `Fields.Many2one(${quote(field.target)}, ${field.domain ? options.slice(0, -1) + `,"domain": () => (${quote(field.domain)})}` : options})`;
 }
 
 function clientSource({ model, clientFields }: GenerationModel) {
   const n = model.name;
   const hasSequence = clientFields.some(name => model.metadata[name].sequence);
   const many = Object.entries(model.many2manyFields ?? {});
-  const relations = many.map(([name, field]) => `  ${name}: Fields.Many2many(${quote(field.many2many.target)}, ${quote(Object.fromEntries(Object.entries(field.many2many).filter(([key]) => key !== "target")))}),`);
+  const relations = many.map(([name, field]) => {
+    const options = quote(Object.fromEntries(Object.entries(field.many2many).filter(([key]) => key !== "target" && key !== "domain")));
+    return `  ${name}: Fields.Many2many(${quote(field.many2many.target)}, ${field.many2many.domain ? options.slice(0, -1) + `,"domain": () => (${quote(field.many2many.domain)})}` : options}),`;
+  });
   return `${header}import { z } from "zod";\nimport { Fields } from "@/lib/orm/fields";\n${hasSequence ? 'import { fieldInputSchema } from "@/lib/orm/sequence";\n' : ""}import { recordIdentityShape, validateRecordIdentity } from "@/lib/orm/record";\n\n` +
     `export const ${n}Fields = {\n${[...clientFields.map(name => `  ${name}: ${fieldExpression(model.metadata[name])},`), ...relations].join("\n")}\n} as const;\n\n` +
     `export const ${n}Schema = z.strictObject({\n${[...clientFields, ...many.map(([name]) => name)].map(name => `  ${name}: ${model.metadata[name]?.sequence ? `fieldInputSchema(${n}Fields.${name})` : `${n}Fields.${name}.schema`},`).join("\n")}\n});\n\n` +

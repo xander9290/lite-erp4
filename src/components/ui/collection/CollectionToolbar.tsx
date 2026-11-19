@@ -10,10 +10,12 @@ import type { CollectionField } from "./types";
 
 function SearchBox({ query, search, disabled }: { query: string; search: (query: string) => void; disabled: boolean }) {
   const [draft, setDraft] = useState(query);
-  return <form role="search" aria-label="Buscar registros" autoComplete="off" className="order-1 flex min-w-0 flex-1 basis-full items-center gap-2 sm:max-w-md sm:basis-0" onSubmit={event => { event.preventDefault(); search(draft.trim()); }}>
-    <label className="input input-sm flex min-w-0 flex-1 items-center gap-2 rounded-xl border-base-300 bg-base-100"><Search size={16} className="shrink-0 text-base-content/45" aria-hidden="true" /><input type="search" className="min-w-0 grow" autoComplete="off" aria-label="Buscar registros" placeholder="Buscar registros…" maxLength={120} value={draft} disabled={disabled} onChange={event => setDraft(event.currentTarget.value)} /></label>
-    <button type="submit" className="btn btn-sm btn-primary" disabled={disabled}>Buscar</button>
-  </form>;
+  // A div, not a <form>: collections can be embedded inside a record form, where a nested
+  // form is invalid HTML and Enter must never submit the record.
+  return <div role="search" aria-label="Buscar registros" className="order-1 flex min-w-0 flex-1 basis-full items-center gap-2 sm:max-w-md sm:basis-0">
+    <label className="input input-sm flex min-w-0 flex-1 items-center gap-2 rounded-xl border-base-300 bg-base-100"><Search size={16} className="shrink-0 text-base-content/45" aria-hidden="true" /><input type="search" className="min-w-0 grow" autoComplete="off" aria-label="Buscar registros" placeholder="Buscar registros…" maxLength={120} value={draft} disabled={disabled} onChange={event => setDraft(event.currentTarget.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); search(draft.trim()); } }} /></label>
+    <button type="button" className="btn btn-sm btn-primary" disabled={disabled} onClick={() => search(draft.trim())}>Buscar</button>
+  </div>;
 }
 
 export default function CollectionToolbar({ filterLookups, columns, state, update, setFilter, clear, disabled = false, leading, actions }: { filterLookups?: Readonly<Record<string, Many2OneLoader>>; columns: readonly CollectionField[]; state: ListState; update: (patch: Partial<ListState>) => void; setFilter: (field: string, filter: ListFilter | null) => void; clear: () => void; disabled?: boolean; leading?: ReactNode; actions?: ReactNode }) {

@@ -14,7 +14,7 @@ export type Many2OneRecord = {
   partner?: { id: string; name: string } | null;
   user?: { id: string; login: string } | null;
 };
-export type Many2OneOption = { value: string; label: string; record: Many2OneRecord };
+export type Many2OneOption = { value: string; label: string; record: Many2OneRecord; domainValid?: boolean };
 export type Many2OneRequest = {
   model: Many2OneModel;
   searchFields: readonly string[];

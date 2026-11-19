@@ -1,6 +1,6 @@
 import "server-only";
 import { modelSnapshot } from "./snapshot";
-import { loadLines, validateLines, persistLines, captureOwners, type LineRelations, type OwnerRelation, type TransactionModel, type Document, type MutationOptions } from "./one2many";
+import { loadLines, validateLines, persistLines, captureOwners, countDocumentRows, MAX_DOCUMENT_ROWS, type LineRelations, type OwnerRelation, type TransactionModel, type Document, type MutationOptions } from "./one2many";
 import { z } from "zod";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import type { FieldPath } from "react-hook-form";
@@ -23,7 +23,8 @@ import { cachedRelationAccess, type RelationAccess } from "./relation-access";
 import type { KanbanMoveResult, KanbanRequest, KanbanConfig } from "../kanban/types";
 import { compileKanbanConfig } from "../kanban/config";
 import { auditAvatarField, auditColumnType } from "./audit";
-import { compileListDomain, type ListActionOptions, type ListDomainContext } from "./domain";
+import { compileListDomain, compileCollectionDomain, type CollectionDomain, type ListActionOptions, type ListDomainContext } from "./domain";
+import { domainBuilderFor } from "./domain-builder";
 import { deleteListSelection } from "../list/delete";
 import type { ListDeleteResult } from "../list/selection";
 import { groupingPlan, groupedPage } from "../list/grouping";
@@ -121,6 +122,8 @@ export type ServiceOperation = "read" | "create" | "write" | "unlink";
  */
 export type ServiceAuthorizer = (tx: Prisma.TransactionClient, actor: ModelActor, operation: ServiceOperation) => Promise<Record<string, unknown> | undefined>;
 type ServicePresentation = {
+  domain?: CollectionDomain;
+  validateRelations?: (tx: Prisma.TransactionClient, actor: ModelActor, values: Readonly<Record<string, unknown>>) => Promise<void>;
   /** Fields whose storage row may be absent (declarative extensions only). */
   collectionNullable?: readonly string[];
   lines?: LineRelations;
@@ -144,6 +147,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   type Values = T & RecordIdentity;
   const lines = presentation.lines ?? {};
   const many = model.many2manyFields ?? {};
+  const hasRelationDomains = Object.values(model.metadata).some(field => field.kind === "many2one" && field.domain) || Object.values(many).some(field => field.many2many.domain);
+  if (hasRelationDomains && !presentation.validateRelations) throw new Error("Los dominios de relaciones requieren el registro declarativo y su validador autorizado.");
   const sequenceFields = Object.fromEntries(Object.entries(model.metadata).filter(([, field]) => field.sequence));
   const hasSequences = Object.keys(sequenceFields).length > 0;
   const formSchema = model.formSchema ?? model.schema;
@@ -153,6 +158,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   const policy = presentation.list;
   const relatedFields=model.relatedFields??{};
   const nullableCollection = new Set(presentation.collectionNullable ?? []);
+  const domainMetadata = Object.fromEntries(Object.entries(model.metadata).map(([name, field]) => [name, nullableCollection.has(name) ? { ...field, required: false } : field]));
   const computedFields=model.computedFields??{};
   const virtualFields={...relatedFields,...computedFields};
   const collectionMetadata:Readonly<Record<string,FieldMetadata>>={...model.metadata,...Object.fromEntries(Object.entries(virtualFields).map(([name,field])=>[name,{...field.metadata,readOnly:true}]))};
@@ -257,6 +263,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     }
     const context: ModelContext<T> = Object.freeze({ tx, actor: Object.freeze({ ...actor }), operation: metadata.id ? "update" : "create", id: metadata.id, previous: current ? modelSnapshot(options?.previous ?? current) as ModelContext<T>["previous"] : null });
     if (JSON.stringify(fields).length > 256000) throw new ModelValidationError("El documento supera el tamaño permitido.");
+    if (!options?.skipOwner && countDocumentRows(fields, lines) > MAX_DOCUMENT_ROWS) throw new ModelValidationError(`El documento supera el máximo de ${MAX_DOCUMENT_ROWS} líneas en total.`);
     validateLines(fields, current as Document | null, lines);
     await validateMany2many(fields, many, relationAccessFor(tx, actor));
     const sequence = hasSequences ? await assignSequences(tx, model.name, sequenceFields, fields, current) : { values: fields, locked: {} };
@@ -267,6 +274,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     assertSequences(values, sequence.locked);
     validateLines(values, current as Document | null, lines);
     await validateMany2many(values, many, relationAccessFor(tx, actor));
+    await presentation.validateRelations?.(tx, actor, values);
     for (const owner of presentation.owners ?? []) if (values[owner.inverse] !== normalized[owner.inverse]) throw new ModelValidationError("La lógica del hijo no puede cambiar su documento padre.");
     if (!Object.keys(lines).length) await model.constrain?.(values, context);
     const scalars = Object.fromEntries([...Object.keys(model.metadata), ...Object.keys(many)].map(name => [name, values[name]])) as T;
@@ -279,6 +287,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (!finalScalar) throw new ModelValidationError("El registro no está disponible después de guardar.");
     const final = await loadDocument(tx, actor, finalScalar) as Values & Document;
     assertSequences(final, sequence.locked);
+    await presentation.validateRelations?.(tx, actor, final);
     if (!await inScope(tx, final.id, scope)) throw new AccessError("DENIED");
     const relationsChanged = current && Object.keys(many).some(name => JSON.stringify([...(current[name] as string[])].sort()) !== JSON.stringify([...(final[name] as string[])].sort()));
     await recordActivity(tx, model.name, actor.id, model.metadata, current, final, activityLabel ?? (aggregate.changed ? "Líneas actualizadas" : relationsChanged ? "Relaciones actualizadas" : undefined));
@@ -287,7 +296,9 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (owners.length) {
       const canonical = await repository.read(tx, final.id);
       if (!canonical || !await inScope(tx, canonical.id, scope)) throw new ModelValidationError("La línea ya no está disponible después de validar su documento.");
-      return await loadDocument(tx, actor, canonical) as Values & Document;
+      const refreshed = await loadDocument(tx, actor, canonical) as Values & Document;
+      await presentation.validateRelations?.(tx, actor, refreshed);
+      return refreshed;
     }
     return final;
   }
@@ -369,6 +380,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         if (computedNames.length) await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         const scope = await authorize(tx, actor, "read");
         const fixedDomain = domain ? await domain({ actor: Object.freeze({ id: actor.id, sessionVersion: actor.sessionVersion }), tx }) : undefined;
+        const baseDomain = presentation.domain ? await compileCollectionDomain(domainMetadata, presentation.domain, { actor: Object.freeze({ ...actor }), tx }) : undefined;
         const parsed = listStateSchema.safeParse(input);
         if (!parsed.success || parsed.data.invalidFilters) throw new ModelValidationError("Revisa los filtros y parámetros de esta lista.");
         if (policy && parsed.data.sort && !(parsed.data.sort === "id" && !policy.sortable?.length) && !policy.sortable?.includes(parsed.data.sort)) throw new ModelValidationError("El orden solicitado no está habilitado.");
@@ -381,6 +393,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const predicates: Record<string, unknown>[] = group ? [{ [group.field]: group.value }] : [];
         predicates.push(...grouping.predicates);
         if (fixedDomain) predicates.push(fixedDomain);
+        if (baseDomain) predicates.push(baseDomain);
         if (scope) predicates.push(scope);
         for (const filter of state.filters) {
           const column = config.columns.find(column => column.field === filter.field && column.filterable !== false);
@@ -464,9 +477,12 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     const source = options.domain;
     const dynamic = typeof source === "function" ? source : undefined;
     // Validate and snapshot static declarations immediately; callbacks run after session revalidation.
-    const queryMetadata = Object.fromEntries(Object.entries(model.metadata).map(([name, field]) => [name, nullableCollection.has(name) ? { ...field, required: false } : field]));
-    const fixed = dynamic ? undefined : compileListDomain(queryMetadata, source === undefined ? [] : source);
-    const resolve = async (context: ListDomainContext) => dynamic ? compileListDomain(queryMetadata, await dynamic(context)) : fixed!;
+    const fixed = dynamic ? undefined : compileListDomain(domainMetadata, source === undefined ? [] : source);
+    const resolve = async (context: ListDomainContext) => {
+      if (!dynamic) return fixed!;
+      const result = await dynamic(Object.assign({}, domainBuilderFor<import("./domain").DomainField<T>>(), context));
+      return compileListDomain(domainMetadata, Array.isArray(result) ? result : [result]);
+    };
     return (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, resolve);
   }
 
@@ -527,7 +543,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   }
 
   /** Server-only nested lookup: keeps authorization and projections in the caller's transaction. */
-  async function lookupInTransaction(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) {
+  async function lookupInTransaction(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, domain?: Record<string, unknown>) {
     const request = modelLookupSchema.parse(input);
     const scope = await authorize(tx, actor, "read");
     if (!repository.lookup) throw new Error("MODEL_NOT_BOUND");
@@ -535,6 +551,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (fields.some(field => field.includes(".") && !repository.lookupPaths?.includes(field))) throw new Error("MODEL_NOT_BOUND");
     const search = config.searchFields.filter(field => model.metadata[field]?.kind === "text" && !model.metadata[field].sensitive);
     const predicates: Record<string, unknown>[] = scope ? [scope] : [];
+    if (domain) predicates.push(domain);
     if (request.id) predicates.push({ id: request.id });
     if (request.ids) predicates.push({ id: { in: request.ids } });
     for (const word of request.query.trim().split(/\s+/).filter(Boolean)) {
@@ -576,7 +593,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   }
 
   const transaction: TransactionModel = {
-    name: model.name, metadata: model.metadata,
+    name: model.name, metadata: model.metadata, lines,
     async snapshot(tx, actor, id, operation = "read") {
       const scope = await authorize(tx, actor, operation);
       const row = await inScope(tx, id, scope) ? await repository.read(tx, id) : null;
@@ -591,7 +608,11 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       if (total > maximum || (scope && await repository.count(tx, { AND: [where, scope] }) !== total)) throw new ModelValidationError("No se puede abrir la colección completa de líneas con tus permisos o su límite actual.");
       const rows = await repository.list(tx, { where: scope ? { AND: [where, scope] } : where, sort: "id", direction: "asc", skip: 0, take: maximum + 1 });
       if (rows.length !== total) throw new ModelValidationError("La colección de líneas cambió. Recarga el documento.");
-      return rows.map(row => projectListRow(row, Object.keys(model.metadata)) as Document);
+      const documents = rows.map(row => projectListRow(row, Object.keys(model.metadata)) as Document);
+      if (!Object.keys(lines).length) return documents;
+      const nested: Document[] = [];
+      for (const row of documents) nested.push(await loadLines(tx, actor, row, lines) as Document);
+      return nested;
     },
     persist: (tx, actor, input, label, options) => persist(tx, actor, input, label, options) as Promise<Document>,
     async remove(tx, actor, id, revision, options) {
@@ -601,6 +622,10 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       const owners = await captureOwners(tx, actor, current, current, presentation.owners ?? [], options);
       if (!repository.remove) throw new Error("MODEL_NOT_BOUND");
       await model.beforeRemove?.(current as Readonly<Record<string, unknown>>, { tx, actor, id });
+      if (options?.withLines && Object.keys(lines).length) {
+        const document = await loadLines(tx, actor, current as Document, lines);
+        for (const [name, relation] of Object.entries(lines)) for (const row of document[name] as Document[]) await relation.child().remove(tx, actor, row.id, row.revision, { skipOwner: { model: model.name, id }, withLines: true });
+      }
       await repository.remove(tx, id, revision);
       for (const owner of owners) await owner.parent.refresh(tx, actor, owner.previous);
     },
