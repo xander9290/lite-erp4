@@ -254,9 +254,11 @@ esquema en el ERP, sin revisión visual nueva. git diff --check aprobado.
 
 ## Punto de continuación: dirección de Partner (2026-11-18)
 
-Progreso guardado por petición del usuario, en `main` (`7292205`) con cambios
-locales sin commit. El usuario escribe y ejecuta sus ejercicios; el agente revisa
-y explica un paso a la vez. No continuar por adelantado.
+Progreso revisado el 2026-11-18 en `main` (`21e18cc`, extra contactos fase 1),
+árbol limpio al iniciar: extensión, vistas y documentación ya versionadas.
+El usuario escribe y ejecuta sus ejercicios; el agente revisa y explica un paso
+a la vez. No continuar por adelantado. La revisión no consultó la BD ni repitió
+pruebas de persistencia.
 
 Completado: módulo `contactosextra` registrado, extensión PartnerExtra en
 `src/modules/contactosextra/model/partner.ts`, manifest con models vacío y

@@ -8,9 +8,12 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Punto de continuación guardado (2026-11-18)
 
-Guardado por petición del usuario. Rama actual `main`, HEAD `7292205`
-(`Merge branch 'codex/core'`); hay cambios locales y archivos nuevos sin commit,
-incluidas las vistas de Usuarios y contactosextra. No se ejecutó commit/push/pull.
+Revisión de continuidad (2026-11-18): rama `main`, HEAD `21e18cc`
+(`extra contactos fase 1`), árbol limpio al iniciar. Las vistas de Usuarios y
+contactosextra ya están versionadas en ese commit. Contrastados AGENTS, README,
+guía core/Ajustes, registro, extensión street, vistas y Prisma/SQL. No se ejecutaron
+suites, navegador ni consultas a la BD; la prueba de Calle sigue pendiente de
+confirmación del usuario. Esta revisión no ejecutó commit/push/pull.
 Conservar las personalizaciones actuales de ContactForm.
 
 Completado en fuentes: core/Ajustes, Contactos declarativo, concurrencia cruzada,
@@ -26,7 +29,7 @@ Después diseñar ciudad/municipio/estado/país y catálogos/APIs, principalment
 No adelantar esa integración ni restaurar Tickets.
 
 Recorrido y criterios en [punto de continuación de la guía](ideas/core-ajustes.md#punto-de-continuación-dirección-de-partner-2026-11-18).
-Esta nota sólo cambia documentación; git diff --check aprobado. Las pruebas
+Esta revisión sólo actualiza documentación; git diff --check aprobado. Las pruebas
 de código descritas abajo corresponden a tareas anteriores; no se repitieron.
 
 Revisión histórica inicial (2026-11-18, Windows): rama `codex/core`, HEAD `e7b1223`,
