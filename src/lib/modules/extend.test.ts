@@ -70,7 +70,7 @@ test("the registry composes extension fields, super hooks, decorators and collec
   assert.equal(composed, soporte);
   const equipo = composeModules([base, soporte])[0].models[0];
   assert.deepEqual(Object.keys(equipo.metadata), ["name", "estado", "responsable", "nivel"]);
-  assert.deepEqual(equipo.extensions, [{ module: "soporte", label: "Soporte", fields: ["responsable", "nivel"], computed: ["etiqueta"], relation: "soporteBasexEquipoRecordIdRecords", delegate: "soporteBasexEquipo" }]);
+  assert.deepEqual(equipo.extensions, [{ module: "soporte", label: "Soporte", fields: ["responsable", "nivel"], computed: ["etiqueta"], depends: ["basex"], relation: "soporteBasexEquipoRecordIdRecords", delegate: "soporteBasexEquipo" }]);
   assert.deepEqual(equipo.list.fields, ["name", "estado", "responsable", "nivel", "etiqueta"]);
   assert.deepEqual(equipo.contract.actions.map(item => item.name), ["escalar"]);
   assert.equal((equipo.contract.createDefaults() as Record<string, unknown>).nivel, 1);
@@ -136,4 +136,23 @@ test("the repository reads and writes companion fields in the same statement and
   assert.deepEqual(update.data.soporteBasexEquipoRecordIdRecords, { upsert: { create: { responsable: "Luis", nivel: 3 }, update: { responsable: "Luis", nivel: 3 } } });
   assert.equal(update.data.name, "VIEJO");
   assert.ok(update.data.updatedAt instanceof Date);
+});
+
+test("insertions: deferred loaders per view, form exclusive with views.form, transitive depends published", () => {
+  const loader = async () => ({ default: () => null });
+  const Extra = extendModel(Equipo, Base => class extends Base { serie = Fields.Text({ label: "Serie" }); });
+  const declare = (spec: Record<string, unknown>) => defineModule({ id: "inserta", name: "Inserta", icon: "eye", depends: ["soporte", "basex"], models: {}, extends: { "basex.equipo": { model: Extra, ...spec } as never } });
+  assert.throws(() => declare({ insertions: { pivot: loader } }), /insertions sólo registra form, list, card o kanban/);
+  assert.throws(() => declare({ insertions: { list: "./views/Lista" } }), /loader diferido/);
+  // Collection insertions are compatible with a whole-block views.form.
+  assert.equal(declare({ insertions: { list: loader, kanban: loader }, views: { form: loader } }).extensions[0].insertions?.list, loader);
+  assert.throws(() => declare({ insertions: {} }), /insertions sólo registra form/);
+  assert.throws(() => declare({ insertions: { form: loader }, views: { form: loader } }), /usa sólo uno/);
+  const inserta = declare({ insertions: { form: loader } });
+  assert.equal(inserta.extensions[0].insertions?.form, loader);
+  const equipo = composeModules([inserta, soporte, base])[2].models[0];
+  const info = equipo.extensions.find(extension => extension.module === "inserta");
+  assert.equal(info?.insertions?.form, loader);
+  assert.deepEqual(info?.depends, ["basex", "soporte"]);
+  assert.deepEqual(equipo.extensions.find(extension => extension.module === "soporte")?.depends, ["basex"]);
 });

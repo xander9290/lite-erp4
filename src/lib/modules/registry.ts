@@ -15,7 +15,7 @@ import type { FieldMetadata } from "../orm/fields";
 import type { ModelAction } from "../orm/model";
 import { createRepository } from "./repository";
 import { modelIdPattern, type ModelClientConfig, type ModelLineConfig } from "./config";
-import type { ModuleDefinition, ModuleModel } from "./define";
+import type { InsertionViewKind, ModuleDefinition, ModuleModel } from "./define";
 import { relationDomains, relationDomainWhere } from "./relation-domains";
 import { domainDependencies } from "../orm/domain-builder";
 import { ModelValidationError } from "../orm/context";
@@ -285,7 +285,7 @@ export function modelClientConfig(id: string, access?: CapabilityActor, nested =
     ...(entry.defaultSort ? { defaultSort: entry.defaultSort } : {}),
     ...(entry.declaration.audit ? { audit: true as const } : {}),
     // Fields added by other modules, presented in their own group (names only).
-    ...(entry.extensions.length ? { extensions: entry.extensions.map(extension => ({ module: extension.module, label: extension.label, fields: [...extension.fields, ...extension.computed] })) } : {}),
+    ...(entry.extensions.length ? { extensions: entry.extensions.map(extension => ({ module: extension.module, label: extension.label, fields: [...extension.fields, ...extension.computed], depends: [...(extension.depends ?? [])], ...(extension.insertions ? { insertions: Object.keys(extension.insertions) as InsertionViewKind[] } : {}) })) } : {}),
   };
   // One level of read-only relations: each child config omits its own collections (no cycles).
   const collections = nested ? Object.entries(entry.contract.childCollections).map(([name, collection]) => {

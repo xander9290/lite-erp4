@@ -6,11 +6,65 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Progreso guardado (2026-11-19, cierre de sesión)
+## Progreso guardado (2026-11-19, inserciones y Contactos)
 
-Rama `codex/partner`, HEAD `ae16fd4` («Ajuste en la aparciencia de la tabla de los one2many»),
-árbol limpio: el usuario ya hizo commit de todo lo de esta sesión (`80173dc` y `ae16fd4`).
+Rama `codex/partner`, HEAD `07949eb`. **Nada de esta parte tiene commit**: el usuario lo hará.
+Incluye en el árbol de trabajo:
+
+- **Del usuario (guía de dirección):** `PartnerExtra.municipioId` y `localidadId` con
+  dominios Estado → Municipio → Localidad, y sus migraciones `20261119205510` y
+  `20261119210420` (nullable, índice, FK Restrict), con esquemas e instalaciones.
+- **Framework, inserciones en vistas extendidas** ([contrato](inserciones-vistas.md),
+  [diseño](ideas/inserciones-vistas.md)):
+  - formularios: `insertions.form` + `<Inserter target position>` con destinos `field:`,
+    `group:`, `stack:`, `notebook:` y `page:` (contenedores sólo con `id`);
+  - colecciones: `insertions.list|card|kanban` + `<Column field>` con `column:<campo>`,
+    `columns:end` y `card:title|body|footer`; sólo campos publicados de la extensión o de
+    sus dependencias, máximo 12 columnas;
+  - orden por dependencias, `replace` único (gana el dependiente), avisos claros en
+    desarrollo y fallback para que nada se pierda. Demos `/sample#insertions` y
+    `/sample#collection-insertions`.
+- **Contactos con inserciones (escrito por el usuario, guiado):** ContactForm publica
+  `group:contacto`, `stack:identidad` y `stack:medios`; contactosextra declara
+  `PartnerInsertions.tsx` (RFC tras el nombre, grupo `direccion` tras Datos de contacto) y
+  `PartnerListInsertions.tsx` (RFC y Estado tras el correo). Confirmado por el usuario en el
+  navegador: valores, dominios, guardado/recarga, lista y sin avisos.
+
+**Verificado por el agente:** `test:form-model` 22, `test:modules` 58, `test:collection-load`
+4, `test:extensions:integration` y `test:core:integration` (proyecto/esquema temporales,
+con build Next), `tsc`, ESLint completo (sólo el aviso previo de `erp/page.tsx`) y demos en
+navegador. No abrió Contactos real (requiere sesión); eso lo confirmó el usuario.
+
+**Pendientes inmediatos del usuario:**
+1. Borrar `src/modules/contactosextra/views/PartnerExtraForm.tsx` (sin referencias).
+2. Commit de todo lo anterior en `codex/partner`.
+
+**Siguiente en la guía de dirección** ([guía](catalogos-direccion.md), paso 5 del recorrido):
+permisos de lectura de los catálogos para usuarios no administradores. Hoy el manifest de
+Ubicaciones no declara `groups` ni `access`, así que sólo los admin leen países, estados,
+municipios y localidades, y un usuario sin admin no podría elegirlos en un contacto. A
+decidir con el usuario antes de escribir: quién lee (todo usuario interno o un grupo
+propio), quién administra los catálogos y si el acceso de lectura se concede desde
+Ubicaciones o desde Contactos. Después: navegación a los catálogos desde la configuración de
+Contactos y, al final, la importación de fuentes oficiales (licencia, claves, volumen,
+idempotencia) antes de escribir un importador. Recordatorio: la lista de Contactos sólo
+publica 12 campos (Localidad queda fuera) hasta declarar `list.fields` explícitos.
+
+**Siguen vigentes** los pendientes 3–6 de la sección siguiente (ventas/facturación, residuo
+de Tickets, limpieza legacy, pendientes previos).
+
+## Progreso guardado (2026-11-19, cierre de sesión anterior)
+
+Rama `codex/partner`; revisión de continuidad posterior: HEAD `07949eb`
+(incluye el cierre documental), árbol limpio al comenzar. El código de la sesión
+está guardado en `80173dc` y `ae16fd4`.
 Sin push/pull comprobado en esta revisión.
+
+Revisión de contexto del 2026-11-19: contrastados AGENTS, README, este estado,
+Git, PartnerExtra, Ubicaciones y los puntos de entrada del motor de líneas y
+colecciones hijas. Corregida la guía de catálogos, que aún presentaba anidados y
+domain País→Estado como pendientes. Sólo documentación y `git diff --check`;
+sin nuevas suites, navegador, consultas de BD, generación ni migraciones.
 
 **Hecho en la sesión (detalle en las secciones siguientes):**
 - One2many anidados (fase B): documento → línea → sublínea, árbol en una transacción,
@@ -27,14 +81,37 @@ Sin push/pull comprobado en esta revisión.
 
 **Verificado por el agente:** suites e integraciones listadas en las secciones de fase A/B y
 filas compactas (incluido build en proyecto temporal); medición en navegador sólo sobre
-`/sample`. **No verificado:** Ubicaciones/Contactos reales en navegador (sección de
-municipios, «Nuevo» con estado preasignado, dominio País→Estado en Contactos).
+`/sample`. **Confirmado por el usuario el 2026-11-19:** lista/búsqueda de municipios
+desde Estado, «Nuevo» con estado preasignado, creación y regreso; dominio País→Estado
+en Contactos, aviso al cambiar país, corrección/guardado/reapertura y búsqueda sin
+candidatos con País vacío. El agente no repitió estas pruebas en navegador.
 
-**Pendientes, en orden sugerido:**
-1. Usuario: comprobar en navegador el formulario de Estado (lista de municipios, búsqueda,
-   «Nuevo» con estado asignado y regreso) y el dominio País→Estado en Contactos.
-2. Ejercicio de dirección: relacionar Municipio y Localidad en PartnerExtra (con dominios
-   Estado→Municipio→Localidad), lectura de catálogos para no administradores y navegación
+**Inserciones de vistas extendidas implementadas el 2026-11-19** ([contrato](inserciones-vistas.md)).
+**Colecciones (2026-11-19, autorizado con 4 decisiones):** `insertions.list|card|kanban` con `<Column>`; destinos `column:<campo>` (before/after/replace), `columns:end` (inside) y `card:title|body|footer`; sólo campos publicados de la extensión o de sus dependencias; 12 columnas máx. (se omiten las de los últimos módulos); lista sin `columns` no aplica inserciones; ancho/alineación del `<Column>`. Contexto de extensiones ahora con id de modelo y tipo de vista. Verificado: test:modules 58 (collection-insertions.test.ts), test:form-model 22, test:collection-load 4, test:extensions:integration (build Next en temporal), tsc, eslint completo (sólo aviso previo de erp/page.tsx); navegador en `/sample#collection-insertions` (lista, error/omitidos, tarjetas y kanban sin duplicados, sin issues de Next). Aplicado a Contactos (guiado, escrito por el usuario): `PartnerListInsertions.tsx` inserta RFC y Estado después de `column:email`; manifest con `insertions.list`. El usuario confirmó la lista en el navegador. La política derivada de core.partner publica 12 campos: `localidadId` queda fuera de la colección.
+
+Contactosextra ya migró a inserciones (guiado, escrito por el usuario): ContactForm publica
+`group:contacto`, `stack:identidad` y `stack:medios`; `PartnerInsertions.tsx` coloca el RFC
+después de `field:name` y el grupo `direccion` después de `group:contacto`; el manifest usa
+`insertions.form`. El usuario confirmó en el navegador valores guardados, cadena de dominios,
+guardado/recarga y ausencia de avisos. `PartnerExtraForm.tsx` queda sin referencias, pendiente
+de que el usuario lo borre. Siguiente: se
+retoma la guía de dirección (permisos de catálogos, navegación, importación).
+
+**Avance de dirección y pendientes posteriores:**
+1. `PartnerExtra.municipioId` opcional ya añadido por el usuario y revisado en fuentes:
+   destino UbicacionesMunicipio, Restrict, tracking y dominio por `estadoId` correctos.
+   El usuario indicó terminado el paso de sincronización. Migración
+   `20261119205510_sync_contactosextra` revisada: columna municipio_id nullable,
+   índice y FK Restrict correctos; esquema Prisma actualizado y selector ya conectado
+   en PartnerExtraForm. Sin consulta propia de migrate status ni nueva prueba de
+   ejecución del agente. Usuario confirmó filtro Estado→Municipio, aviso al cambiar
+   Estado, corrección/guardado/reapertura y ausencia de candidatos sin Estado.
+   Localidad también añadida por el usuario: declaración opcional/Restrict/tracking,
+   dominio por municipioId y selector revisados. Migración
+   `20261119210420_sync_contactosextra` correcta (nullable, índice y FK Restrict).
+   Usuario informa sincronización y funcionamiento correctos; sin repetición propia
+   de pruebas de navegador/BD ni confirmación desglosada de casos de Localidad.
+2. Ejercicio de dirección: lectura de catálogos para no administradores y navegación
    desde Configuración de Contactos; importación oficial después.
 3. Para ventas/facturación (cuando se inicie ese módulo): tipo `Decimal`/dinero,
    compute/onchange dentro de filas de One2many, Many2many en hijos de líneas (impuestos) y
@@ -47,6 +124,50 @@ municipios, «Nuevo» con estado preasignado, dominio País→Estado en Contacto
 6. Pendientes previos sin cambios: extensión de User probada (`extendModel(User)`), related
    a través de Partner/User, sincronización de `core`, permisos por campo, compute
    persistido, distribución de módulos, estrategia de entornos y Tickets (pausado).
+
+## Pendiente prioritario: inserciones en vistas extendidas (2026-11-19)
+
+Petición del usuario: registrar este trabajo como siguiente pendiente, antes de
+retomar permisos/navegación de la guía de dirección. Sólo propuesta acordada;
+no implementada y esta anotación no autoriza cambios de código.
+
+Motivo: distribuir campos y composición de una extensión entre elementos del
+formulario base sin editarlo ni limitarse al bloque actual de ModelExtensions.
+
+Semántica acordada:
+
+- El manifest registra un único archivo de inserciones por extensión/formulario
+  mediante `insertions: { form: () => import("./views/PartnerInsertions") }`, dentro
+  de la entrada `extends` del modelo base.
+- El archivo exporta un componente con `<Inserter target="field:email"
+  position="after">...</Inserter>`; sus hijos pueden ser Fields, grupos o notebooks.
+- Sólo posiciones `before`, `after`, `inside` y `replace`.
+- Un Inserter por combinación destino + posición dentro del archivo; puede contener
+  varios elementos. Esto no impide que varios módulos extiendan el mismo modelo.
+- `inside` sólo para contenedores identificados; un único `replace` por destino.
+- Destinos inexistentes y conflictos entre extensiones deben producir errores
+  claros, con reglas deterministas de resolución.
+- Destinos explícitos y estables (por ejemplo `field:email`, `group:contacto`),
+  resueltos por el framework; no XPath arbitrario sobre el DOM.
+
+**Implementado el 2026-11-19** con autorización del usuario y sus tres decisiones (fallback en producción, gana el dependiente en replace, sólo formularios). Contrato [inserciones-vistas](inserciones-vistas.md), diseño [ideas/inserciones-vistas](ideas/inserciones-vistas.md). Anclas en FieldVisibility (todo Field* de primer nivel), FormGroup/Stack con `id`, Notebook/NotebookPage con `id` y `group:general` en ModelFields; registro durante el render y re-registro en efecto de layout (StrictMode); manifest `insertions.form` exclusivo con `views.form`; `config.extensions` publica `depends`/`insertions`. Verificado: test:form-model 22 (incluye insertions.test.tsx: orden, replace por dependencia/conflicto, inside sobre reemplazado, publicador, ausentes/duplicados, render SSR con RHF y Notebook), test:modules 53, test:extensions:integration y test:core:integration (proyecto/esquema temporales, con build Next; fixture extension-check actualizado por `depends`), tsc y eslint (sólo los 2 avisos previos); navegador en `/sample#insertions` (orden, error en página insertada revela su pestaña con contador, envío con valores insertados, escenario de conflicto con avisos y fallback). Contactos real comprobado por el usuario tras migrar contactosextra (el agente no lo abrió: requiere sesión).
+
+Siguiente paso al retomarlo: revisar ModelExtensions, composición de ModelForm y
+Fields/contenedores; presentar un diseño concreto para destinos, orden/conflictos
+entre módulos y compatibilidad con vistas personalizadas/condicionales antes de
+implementar. No asumir que React puede reubicar componentes sólo por su nombre.
+
+Criterios de aceptación: inserción declarada en TSX sin edición del formulario base,
+un solo contexto RHF/formulario/guardado, locks y dirty guard conservados, errores
+revelables en grupos/notebooks, autorización y validación de servidor intactas.
+`replace` cambia presentación, sin eliminar obligaciones del modelo. Conservar las
+vistas personalizadas existentes y definir convivencia con `views.form` y el fallback
+de ModelExtensions, sin migrarlas automáticamente. Añadir demo ficticia en `/sample`
+y comprobaciones de posiciones, destinos ausentes, duplicados/conflictos y contexto.
+
+Verificación de esta anotación: `git diff --check`; sin implementación, suites,
+navegador, SQL ni cambios en aplicaciones. Los cambios actuales del usuario en
+ContactForm y PartnerExtraForm se conservan.
 
 ## Relaciones de consulta: fase A implementada (2026-11-19)
 

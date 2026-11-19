@@ -28,7 +28,8 @@ import FieldVisibility from "@/components/ui/form/FieldVisibility";
 import type { ListState } from "@/lib/list/types";
 import { modelChildren, modelLookup, modelAction, modelActivity, modelDelete, modelNote, modelRead, modelSave } from "@/lib/modules/actions";
 import { modelUiCapabilities } from "@/lib/access/capabilities";
-import { useModelExtensionViews } from "./ModelExtensionViews";
+import { useModelExtensionInsertions, useModelExtensionViews } from "./ModelExtensionViews";
+import { InsertionProvider, useInsertionFallback } from "@/components/ui/form/insertions/Insertions";
 
 type Values = Record<string, unknown>;
 
@@ -70,9 +71,16 @@ export function ModelChildCollections({ name }: { name?: string }) {
   </FormGroup></FieldVisibility>)}</>;
 }
 
+/** Content of an insertion file whose target is missing or rejected (never lost). */
+function InsertionFallback({ module, label }: { module: string; label: string }) {
+  const content = useInsertionFallback(module);
+  return content ? <FormGroup legend={label}>{content}</FormGroup> : null;
+}
+
 /**
  * Fields added by other modules: custom views own their layout; automatic fields use a group
- * per extending module. Ejected forms place `<ModelExtensions />` at the insertion point.
+ * per extending module; modules with `insertions` place their own fields (here only what
+ * could not be placed). Ejected forms place `<ModelExtensions />` at the insertion point.
  * Without it, extension values are still kept and saved by the form.
  */
 export function ModelExtensions({ excludeFields = [] }: { excludeFields?: readonly string[] } = {}) {
@@ -80,6 +88,7 @@ export function ModelExtensions({ excludeFields = [] }: { excludeFields?: readon
   const views = useModelExtensionViews();
   if (!ui?.config.extensions?.length) return null;
   return <>{ui.config.extensions.map(extension => {
+    if (extension.insertions?.includes("form")) return <InsertionFallback key={extension.module} module={extension.module} label={extension.label} />;
     // Custom forms may lay out inherited fields themselves; keep other extensions automatic.
     const fields = extension.fields.filter(name => !excludeFields.includes(name));
     if (!fields.length) return null;
@@ -96,7 +105,7 @@ export function ModelFields({ ui }: { ui: ModelUI }) {
   const extended = new Set(ui.config.extensions?.flatMap(extension => extension.fields) ?? []);
   const controls = Object.entries(ui.config.fields).filter(([name]) => !extended.has(name)).map(([name, field]) => control(ui, name, field));
   const previews = Object.entries(ui.config.preview).filter(([name]) => !extended.has(name)).map(([name, field]) => display(name, field));
-  return <><FormGroup legend="Datos generales">{controls}{previews}{Object.keys(ui.recordUI.many2many).map(name => <FieldRelationTag key={name} name={name} direction="inline" />)}</FormGroup><ModelExtensions />{Object.keys(ui.recordUI.lines).map(name => <FormGroup fullWidth key={name}><FieldOne2many name={name} /></FormGroup>)}<ModelChildCollections /></>;
+  return <><FormGroup id="general" legend="Datos generales">{controls}{previews}{Object.keys(ui.recordUI.many2many).map(name => <FieldRelationTag key={name} name={name} direction="inline" />)}</FormGroup><ModelExtensions />{Object.keys(ui.recordUI.lines).map(name => <FormGroup fullWidth key={name}><FieldOne2many name={name} /></FormGroup>)}<ModelChildCollections /></>;
 }
 
 function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; record: Values; displayName?: string; onReload?: () => void; children?: ReactNode }) {
@@ -109,6 +118,8 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
   const [savedId, setSavedId] = useState(record.id as string | undefined);
   const [savedName, setSavedName] = useState(displayName);
   const methods = useForm<Values>({ resolver: zodResolver(ui.schema as never), defaultValues: record });
+  const insertions = useModelExtensionInsertions("form", config.id);
+  const insertionModules = useMemo(() => (config.extensions ?? []).map(extension => ({ module: extension.module, depends: extension.depends ?? [] })), [config.extensions]);
   return <ModelUIContext.Provider value={ui}><FormView
     layout="page"
     breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: config.label, href: returnHref }, { label: savedId ? savedName || "Registro" : "Nuevo registro" }]}
@@ -133,7 +144,7 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
     menuActions={onReload ? [{ id: "reload", label: "Recargar registro", icon: <RefreshCw size={16} />, onSelect: onReload }] : undefined}
     footer={<p className="text-xs text-base-content/55">Los cambios se guardan al presionar Guardar.</p>}
   >
-    {children ?? <ModelFields ui={ui} />}
+    <InsertionProvider modules={insertionModules} collectors={insertions}>{children ?? <ModelFields ui={ui} />}</InsertionProvider>
   </FormView></ModelUIContext.Provider>;
 }
 

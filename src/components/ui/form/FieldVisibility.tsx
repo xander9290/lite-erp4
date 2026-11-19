@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { FormModelContext, lineField } from "./modelFields";
+import { InsertionAnchor } from "./insertions/Insertions";
 
 const FieldVisibilityContext = createContext(false);
 export const useFieldInvisible = () => useContext(FieldVisibilityContext);
@@ -14,7 +15,10 @@ export default function FieldVisibility({ name, invisible, children }: { name?: 
   const line = owner?.line?.fields[owner.key]?.metadata;
   const metadata = name ? (model?.fields[name] ?? model?.readFields?.[name])?.metadata ?? line : undefined;
   const hidden = inherited || (invisible ?? metadata?.invisible ?? false);
-  return <FieldVisibilityContext.Provider value={hidden}>
-    <div hidden={hidden} className={hidden ? "hidden!" : "contents"}>{children}</div>
-  </FieldVisibilityContext.Provider>;
+  // Top-level fields are insertion anchors (`field:<name>`); line cells (dotted names) are not.
+  return <InsertionAnchor target={name && !name.includes(".") ? `field:${name}` : undefined}>
+    <FieldVisibilityContext.Provider value={hidden}>
+      <div hidden={hidden} className={hidden ? "hidden!" : "contents"}>{children}</div>
+    </FieldVisibilityContext.Provider>
+  </InsertionAnchor>;
 }

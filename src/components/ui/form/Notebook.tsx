@@ -1,9 +1,11 @@
 "use client";
 
-import { Children, Fragment, isValidElement, useCallback, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { Children, Fragment, cloneElement, isValidElement, useCallback, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { CircleAlert } from "lucide-react";
 import NotebookPage, { type NotebookPageProps } from "./NotebookPage";
 import { NotebookContext, notebookPageId, notebookTabId } from "./notebookContext";
+import { renderInsertions, useInsertionAnchors } from "./insertions/Insertions";
+import type { InsertionEntry, InsertionSlot } from "./insertions/resolve";
 
 export type NotebookProps = {
   children: ReactNode;
@@ -23,10 +25,41 @@ function pagesFrom(children: ReactNode): ReactElement<NotebookPageProps>[] {
   });
 }
 
+type Scope = Parameters<typeof renderInsertions>[1];
+
+/** Pages contributed by extensions (`notebook:<id>` inside, `page:<id>/<name>` before/after/inside/replace). */
+function withInsertedPages(own: ReactElement<NotebookPageProps>[], slots: Readonly<Record<string, InsertionSlot<ReactNode>>>, scope: Scope, id: string | undefined) {
+  if (!id || !Object.keys(slots).length) return own;
+  const inserted = (entries: readonly InsertionEntry<ReactNode>[], replaced?: string) => entries.flatMap(entry => {
+    let pages: ReactElement<NotebookPageProps>[];
+    try { pages = pagesFrom(entry.content); } catch { console.error(`[inserciones] ${entry.module}: ${entry.target} (${entry.position}) sólo admite NotebookPage.`); return []; }
+    return pages.map(page => cloneElement(page, { children: renderInsertions([{ ...entry, content: page.props.children }], scope, replaced) }));
+  });
+  const merged = own.flatMap(page => {
+    const target = `page:${id}/${page.props.name}`;
+    const slot = slots[target];
+    if (!slot) return [page];
+    const self = slot.inside.length ? cloneElement(page, { children: <>{page.props.children}{renderInsertions(slot.inside, scope)}</> }) : page;
+    return [...inserted(slot.before), ...(slot.replace ? inserted([slot.replace], target) : [self]), ...inserted(slot.after)];
+  });
+  const all = [...merged, ...inserted(slots[`notebook:${id}`]?.inside ?? [])];
+  const seen = new Set<string>();
+  return all.filter(page => {
+    if (!seen.has(page.props.name)) { seen.add(page.props.name); return true; }
+    console.error(`[inserciones] La página ${page.props.name} ya existe en el notebook ${id}; se omite la repetida.`);
+    return false;
+  });
+}
+
 export default function Notebook({ children, label = "Secciones del formulario", id: providedId, defaultPage, activePage, onPageChange, className = "" }: NotebookProps) {
   const generatedId = useId();
   const id = providedId ?? generatedId;
-  const pages = useMemo(() => pagesFrom(children), [children]);
+  const own = useMemo(() => pagesFrom(children), [children]);
+  // With `id`, the notebook and its pages are insertion anchors for extensions.
+  const anchorTargets = useMemo(() => providedId ? [`notebook:${providedId}`, ...own.map(page => `page:${providedId}/${page.props.name}`)] : [], [providedId, own]);
+  const { slots, scope } = useInsertionAnchors(anchorTargets);
+  const pages = useMemo(() => withInsertedPages(own, slots, scope, providedId), [own, slots, scope, providedId]);
+  const around = providedId ? slots[`notebook:${providedId}`] : undefined;
   const names = pages.map(page => page.props.name);
   if (names.some(name => !name.trim()) || new Set(names).size !== names.length) throw new Error("Cada NotebookPage necesita un name único y no vacío.");
   const enabled = useMemo(() => pages.filter(page => !page.props.disabled).map(page => page.props.name), [pages]);
@@ -51,7 +84,7 @@ export default function Notebook({ children, label = "Secciones del formulario",
     tabs.current.get(name)?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
-  return <NotebookContext.Provider value={context}>
+  return <>{around && renderInsertions(around.before, scope)}<NotebookContext.Provider value={context}>
     <section id={id} aria-label={label} className={`col-span-full min-w-0 scroll-mt-6 rounded-xl border border-base-300 bg-base-100 ${className}`}>
       <div className="min-w-0 overflow-x-auto rounded-t-xl border-b border-base-300 bg-base-200/40 px-2 pt-1">
         <div role="tablist" aria-label={label} aria-orientation="horizontal" className="tabs tabs-border w-max min-w-full flex-nowrap">
@@ -80,5 +113,5 @@ export default function Notebook({ children, label = "Secciones del formulario",
       {pages.map(page => <Fragment key={page.props.name}>{page}</Fragment>)}
       {!active && <p className="p-5 text-sm text-base-content/60">No hay secciones disponibles.</p>}
     </section>
-  </NotebookContext.Provider>;
+  </NotebookContext.Provider>{around && renderInsertions(around.after, scope)}</>;
 }

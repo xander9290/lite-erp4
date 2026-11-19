@@ -17,6 +17,8 @@ export default function PartnerExtraForm() {
         <FieldText name="vat" />
         <FieldMany2One name="paisId" />
         <FieldMany2One name="estadoId" />
+        <FieldMany2One name="municipioId" />
+        <FieldMany2One name="localidadId" />
       </Stack>
     </FormGroup>
   );

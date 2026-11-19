@@ -89,7 +89,7 @@ assert.equal((await equipos.save(prisma, lector, { ...read.values, responsable: 
 
 // Client contract and server-resolved lazy view: no loaders/functions in browser config.
 const client = modelClientConfig("taller.equipo");
-assert.deepEqual(client.extensions, [{ module: "soporte", label: "Soporte", fields: ["responsable", "nivel", "logo", "codigo", "equipoId", "etiqueta", "nombreEquipo", "responsableEquipo", "imagenEquipo"] }]);
+assert.deepEqual(client.extensions, [{ module: "soporte", label: "Soporte", fields: ["responsable", "nivel", "logo", "codigo", "equipoId", "etiqueta", "nombreEquipo", "responsableEquipo", "imagenEquipo"], depends: ["taller"] }]);
 assert.ok(client.fields.responsable && client.preview.etiqueta);
 assert.ok(client.list.fields.includes("responsable") && client.list.fields.includes("nombreEquipo"));
 assert.equal(typeof getModuleModel("taller.equipo")!.entry.extensions[0].views?.form, "function");

@@ -1,5 +1,7 @@
 import ModelFieldsSample from "./ModelFieldsSample";
 import DomainSample from "./DomainSample";
+import InsertionsSample from "./InsertionsSample";
+import CollectionInsertionsSample from "./CollectionInsertionsSample";
 import FormDeletionSample from "./FormDeletionSample";
 import FormActionsSample from "./FormActionsSample";
 import RelatedImageSample from "./RelatedImageSample";
@@ -45,6 +47,8 @@ export default function PageSample() {
             <p className="max-w-2xl text-sm text-base-content/65">Ejemplos con React Hook Form y Zod. Prueba los campos vacíos para ver los errores en toast o carga un ejemplo válido para consultar el resultado. Validar muestra los datos localmente; FormView demuestra acciones de servidor sin persistencia y FieldImage sube a Cloudinary al confirmar su edición.</p>
           </div>
           <nav aria-label="Ejemplos de Fields" className="flex flex-wrap gap-2">
+            <a className="btn btn-sm btn-outline" href="#insertions">Inserciones</a>
+            <a className="btn btn-sm btn-outline" href="#collection-insertions">Inserciones en colecciones</a>
             <a className="btn btn-sm btn-outline" href="#domains">Dominios</a>
             <a className="btn btn-sm btn-outline" href="#model-reactions">Reacciones de modelo</a>
             <a className="btn btn-sm btn-outline" href="#related-image">Imagen relacionada</a>
@@ -90,6 +94,8 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#field-image-avatar">Avatar</a>
           </nav>
         </header>
+        <InsertionsSample />
+        <Suspense fallback={<p role="status">Cargando inserciones en colecciones…</p>}><CollectionInsertionsSample /></Suspense>
         <DomainSample />
         <ModelReactionsSample rules={sampleReactionModel.reactionRules} />
         <RelatedImageSample rules={relatedImageModel.reactionRules} />

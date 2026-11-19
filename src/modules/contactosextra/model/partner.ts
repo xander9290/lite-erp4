@@ -46,6 +46,18 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
       tracking: true,
       domain: (d) => d.eq("paisId", d.draft("paisId")),
     });
+    municipioId = Fields.Many2one("UbicacionesMunicipio", {
+      label: "Municipio",
+      onDelete: "Restrict",
+      tracking: true,
+      domain: (d) => d.eq("estadoId", d.draft("estadoId")),
+    });
+    localidadId = Fields.Many2one("UbicacionesLocalidad", {
+      label: "Localidad",
+      onDelete: "Restrict",
+      tracking: true,
+      domain: (d) => d.eq("municipioId", d.draft("municipioId")),
+    });
 
     @constraint("paisId", "estadoId")
     async validarPaisEstado(

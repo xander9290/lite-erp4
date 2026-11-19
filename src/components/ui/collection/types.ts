@@ -4,6 +4,9 @@ import type { ListColumn, ListRecord, ListResult, ListState, ListViewConfig } fr
 import type { ListBreadcrumb } from "../list/ListBreadcrumbs";
 
 export type CollectionField = ListColumn;
+/** Extension rows of the default card, by zone (`card:title|body|footer`), already projected. */
+export type CardZone = { readonly before: readonly CollectionField[]; readonly inside: readonly CollectionField[]; readonly after: readonly CollectionField[] };
+export type CardInsertions = Readonly<Partial<Record<"title" | "body" | "footer", CardZone>>>;
 export type CollectionProps = {
   filterLookups?: Readonly<Record<string, Many2OneLoader>>;
   model: string; title: string; description?: string; icon?: ReactNode;
@@ -14,5 +17,7 @@ export type CollectionProps = {
   headerActions?: ReactNode; footer?: ReactNode; className?: string;
   breadcrumbs?: readonly ListBreadcrumb[];
   renderCard?: (record: ListRecord) => ReactNode;
+  /** Rows inserted by extensions (ModelCollection); with renderCard they go after its content. */
+  cardInsertions?: CardInsertions;
 };
 export type CardViewProps = CollectionProps & { load: (state: ListState) => Promise<ListResult> };

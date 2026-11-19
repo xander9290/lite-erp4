@@ -1,4 +1,7 @@
+"use client";
+
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { useInsertionAnchor } from "./insertions/Insertions";
 
 export type FormGroupProps = Omit<ComponentPropsWithoutRef<"fieldset">, "children"> & {
   children: ReactNode;
@@ -13,13 +16,16 @@ export default function FormGroup({
   className = "",
   ...fieldsetProps
 }: FormGroupProps) {
-  return (
+  // With `id`, the group is an insertion anchor (`group:<id>`) for extensions.
+  const anchor = useInsertionAnchor(fieldsetProps.id ? `group:${fieldsetProps.id}` : undefined);
+  return anchor.wrap(
     <fieldset
       {...fieldsetProps}
       className={`m-0 flex min-w-0 flex-col gap-4 rounded-box border border-base-300 bg-base-200/40 p-4 shadow-xs ${fullWidth ? "col-span-full" : ""} ${className}`}
     >
       {legend != null && <legend className="px-2 text-sm font-semibold text-base-content">{legend}</legend>}
       {children}
+      {anchor.inside}
     </fieldset>
   );
 }

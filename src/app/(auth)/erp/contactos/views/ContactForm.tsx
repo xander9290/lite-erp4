@@ -12,15 +12,26 @@ import Stack from "@/components/ui/form/Stack";
 type Values = FormValues<typeof Partner>;
 
 /** Presentation only: permissions, validation, history, revision and navigation belong to ModelForm. */
-export default function ContactForm({ config, id }: { config: ModelClientConfig; id?: string }) {
+export default function ContactForm({
+  config,
+  id,
+}: {
+  config: ModelClientConfig;
+  id?: string;
+}) {
   return (
     <ModelForm config={config} id={id}>
-      <FormGroup legend="Datos de contacto">
-        <Stack>
-          <FieldImage<Values> name="avatarUrl" widget="avatar" label="" />
+      <FormGroup legend="Datos de contacto" id="contacto">
+        <Stack id="identidad">
+          <FieldImage<Values>
+            name="avatarUrl"
+            widget="avatar"
+            label=""
+            shape="squared"
+          />
           <FieldText<Values> name="name" label="Nombre" />
         </Stack>
-        <Stack>
+        <Stack id="medios">
           <FieldText<Values> name="phone" inputMode="tel" widget="phone" />
           <FieldText<Values> name="email" widget="email" />
         </Stack>

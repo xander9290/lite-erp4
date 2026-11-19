@@ -6,16 +6,16 @@ y revisa un paso a la vez. Este documento no crea módulos, modelos ni datos.
 
 ## Estructura de trabajo
 
-**Punto guardado el 2026-11-19:** pendiente urgente [One2many anidados](ideas/one2many-anidados.md).
-País tiene estadoIds y Estado tiene municipioIds; esta combinación está en fuentes
-y hace que el manifest se rechace porque el motor sólo admite un nivel de líneas.
-No está implementado el guardado multinivel. Retomar su diseño antes de continuar
-ese caso; no eliminar el guard ni ejecutar orm:sync como intento de resolverlo.
-El usuario sólo pidió registrar el pendiente, sin implementar todavía.
+**Punto vigente revisado el 2026-11-19:** [One2many anidados](ideas/one2many-anidados.md)
+y relaciones de consulta ya implementados. País conserva `estadoIds` editable
+(`maxRows: 50`); Estado declara `municipioIds` con `readonly: true`, como colección
+paginada fuera del documento. Los municipios se crean desde su propio formulario
+o desde «Nuevo» en esa colección. Detalle y verificaciones históricas en
+[el estado del proyecto](estado-proyecto.md#progreso-guardado-2026-11-19-cierre-de-sesión).
 
 El motor de dominios ya fue implementado y PartnerExtra.estadoId declara el filtro
-por paisId, con la constraint conservada. Falta confirmación de su funcionamiento
-en la app; las notas posteriores sobre dominios pendientes son históricas.
+por paisId, con la constraint conservada. El usuario confirmó su funcionamiento
+en la app el 2026-11-19; las notas posteriores sobre dominios pendientes son históricas.
 
 Usar un módulo declarativo compartido `ubicaciones`, independiente de Contactos.
 Así otras aplicaciones podrán reutilizar los mismos registros geográficos.
@@ -63,12 +63,36 @@ una dirección única sólo a partir del código postal sin revisar la fuente po
 
 ## Estado y siguiente paso
 
+**Siguiente paso (2026-11-19):** paso 5 del recorrido, permisos de lectura de catálogos para
+no administradores. Municipio y Localidad ya están en el contacto con dominios encadenados;
+Contactos ya usa inserciones de formulario y lista. Detalle y decisiones pendientes en
+[estado del proyecto](estado-proyecto.md#progreso-guardado-2026-11-19-inserciones-y-contactos).
+
+**Prioridad previa acordada (2026-11-19):** resolver el diseño de
+[`insertions` e Inserter para vistas extendidas](estado-proyecto.md#pendiente-prioritario-inserciones-en-vistas-extendidas-2026-11-19)
+antes de continuar esta guía. Implementado el 2026-11-19 ([contrato](inserciones-vistas.md)).
+Después se retoman permisos de catálogos, navegación e importaciones.
+
 **Actualización 2026-11-19:** motor de dominios implementado y comprobado en proyecto/
-esquema temporales. [Contrato](dominios-modelos.md). La guía sigue a ritmo del usuario:
-aplicar ahora `domain: d => d.eq("paisId", d.draft("paisId"))` en estadoId al retomar
-el ejercicio, conservando su constraint. No se editaron PartnerExtra ni su vista
-como parte de la implementación del framework. El resumen posterior describe el
-cierre histórico del 18, anterior a esta autorización.
+esquema temporales. [Contrato](dominios-modelos.md). PartnerExtra.estadoId ya declara
+`domain: d => d.eq("paisId", d.draft("paisId"))`, conservando `validarPaisEstado`.
+El usuario confirmó las comprobaciones de Estado (municipios, búsqueda, «Nuevo» con
+estado preasignado, creación y regreso) y Contactos (dominio País→Estado, aviso de
+incompatibilidad, corrección/guardado/reapertura y País vacío sin candidatos).
+El agente no las repitió. `municipioId` opcional ya añadido por el usuario y revisado
+en fuentes, con Restrict/tracking y dominio por `estadoId`. El usuario indicó
+terminada la sincronización; migración `20261119205510_sync_contactosextra` revisada
+(columna nullable, índice y FK Restrict), esquema y selector personalizado presentes.
+Sin consulta propia de migrate status. El usuario confirmó Estado→Municipio, aviso
+de incompatibilidad al cambiar Estado, corrección/guardado/reapertura y ausencia de
+candidatos sin Estado. Localidad ya añadida por el usuario: campo opcional con
+Restrict/tracking, dominio por municipioId, selector y migración
+`20261119210420_sync_contactosextra` revisados (nullable, índice y FK Restrict).
+El usuario informa sincronización y funcionamiento correctos, sin detalle de casos;
+el agente no repitió navegador/BD. Siguen permisos de lectura para consumidores
+no administradores, navegación e importaciones.
+
+### Cierre histórico del 2026-11-18
 
 **Guía pausada a petición del usuario (2026-11-18).** Rama revisada codex/partner,
 con cambios locales sin commit. No seguir creando campos durante la pausa.
@@ -90,7 +114,7 @@ vacíos se permiten. El agente no repitió pruebas en navegador/BD. Esquemas/SQL
 revisados; última migración 20261119041214_sync_contactosextra (estado_id nullable,
 índice y FK Restrict). TypeScript y ESLint de PartnerExtra aprobados.
 
-**Próxima prioridad urgente:** [dominios de relaciones y colecciones](ideas/dominios-relaciones-colecciones.md).
+**Prioridad de aquel cierre, ya resuelta el 2026-11-19:** [dominios de relaciones y colecciones](ideas/dominios-relaciones-colecciones.md).
 Diseñar motor compartido con AND/OR/NOT y referencias a otros campos del borrador;
 primer caso: estadoId sólo muestra estados del paisId seleccionado. Hoy el selector
 muestra todos los estados legibles y la constraint rechaza combinaciones inválidas

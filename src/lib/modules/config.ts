@@ -86,7 +86,15 @@ export type ModelClientConfig = {
   /** Audit columns published by the server list policy (`audit: true` in the manifest). */
   readonly audit?: true;
   /** Fields added by modules that extend this model, grouped by extending module. */
-  readonly extensions?: readonly { readonly module: string; readonly label: string; readonly fields: readonly string[] }[];
+  readonly extensions?: readonly {
+    readonly module: string;
+    readonly label: string;
+    readonly fields: readonly string[];
+    /** Transitive dependencies of the extending module (insertion order and published targets). */
+    readonly depends?: readonly string[];
+    /** Views where the module places its fields with `<Inserter>` (with "form": no automatic group). */
+    readonly insertions?: readonly ("form" | "list" | "card" | "kanban")[];
+  }[];
 };
 
 export const modelIdPattern = /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*$/;

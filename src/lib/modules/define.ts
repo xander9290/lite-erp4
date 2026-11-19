@@ -57,9 +57,18 @@ export type ModuleModelSpec = ModelClass | {
 export type ModuleModelOptions = Exclude<ModuleModelSpec, ModelClass>;
 export type ModelFormView = ComponentType<{ config: ModelClientConfig; id?: string }>;
 export type ModelListView = ComponentType<{ config: ModelClientConfig }>;
+/** Insertion files of an extension, one per view of the base model (`<Inserter>`). */
+export const insertionViewKinds = ["form", "list", "card", "kanban"] as const;
+export type InsertionViewKind = (typeof insertionViewKinds)[number];
+export type ModelInsertions = { readonly [K in InsertionViewKind]?: () => Promise<{ default: ModelListView }> };
 export type ModuleExtensionSpec = ModelExtension | {
   readonly model: ModelExtension;
   readonly views?: { readonly form?: () => Promise<{ default: ModelListView }> };
+  /**
+   * Insertions into the base form (`<Inserter target position>`), instead of a whole block.
+   * Exclusive with `views.form`. Design: docs/ideas/inserciones-vistas.md.
+   */
+  readonly insertions?: ModelInsertions;
 };
 /**
  * Lazy loaders (`() => import("./views/TareaForm")`): views are client components, and a
@@ -102,6 +111,9 @@ export type ModelExtensionInfo = {
   /** Virtual compute/related fields declared by the extension. */
   readonly computed: readonly string[];
   readonly views?: { readonly form?: () => Promise<{ default: ModelListView }> };
+  readonly insertions?: ModelInsertions;
+  /** Transitive dependencies of the extending module (insertion order and published targets). */
+  readonly depends?: readonly string[];
   /** Prisma relation (on the base model) to the companion row; absent without persistent fields. */
   readonly relation?: string;
   /** Delegated storage of a native model (no creator column; the foreign key is on the base). */
@@ -119,6 +131,7 @@ export type ModuleExtension = {
   readonly fields: readonly string[];
   readonly computed: readonly string[];
   readonly views?: { readonly form?: () => Promise<{ default: ModelListView }> };
+  readonly insertions?: ModelInsertions;
   readonly companion?: { readonly name: string; readonly table: string; readonly relation: string };
 };
 
@@ -287,7 +300,10 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
   for (const [target, declaration] of Object.entries(spec.extends ?? {})) {
     const extension = isModelExtension(declaration) ? declaration : declaration?.model;
     const views = isModelExtension(declaration) ? undefined : declaration?.views;
+    const insertions = isModelExtension(declaration) ? undefined : declaration?.insertions;
     if (views && Object.entries(views).some(([kind, loader]) => kind !== "form" || typeof loader !== "function")) throw new Error(`${id}: la extensión sólo registra views.form con un loader diferido.`);
+    if (insertions && (!Object.keys(insertions).length || Object.entries(insertions).some(([kind, loader]) => !(insertionViewKinds as readonly string[]).includes(kind) || typeof loader !== "function"))) throw new Error(`${id}: insertions sólo registra form, list, card o kanban con un loader diferido (() => import("./views/...")).`);
+    if (insertions?.form && views?.form) throw new Error(`${id}: ${target} declara views.form e insertions.form; usa sólo uno.`);
     if (!modelIdPattern.test(target)) throw new Error(`${id}: extends usa identificadores <módulo>.<modelo>: ${target}.`);
     const [baseModule, baseKey] = target.split(".");
     if (baseModule === id) throw new Error(`${id}: un módulo no extiende sus propios modelos; decláralos directamente.`);
@@ -321,7 +337,7 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
       companions.push({ model: contract, clientFields: Object.keys(contract.metadata) });
       companion = Object.freeze({ name, table, relation: `${lowerFirst(name)}${pascal(companionLink)}Records` });
     }
-    extensions.push(Object.freeze({ target, module: id, label: spec.name, extension, fields: Object.freeze(persistent), computed: Object.freeze(computed), ...(views ? { views } : {}), ...(companion ? { companion } : {}) }));
+    extensions.push(Object.freeze({ target, module: id, label: spec.name, extension, fields: Object.freeze(persistent), computed: Object.freeze(computed), ...(views ? { views } : {}), ...(insertions ? { insertions } : {}), ...(companion ? { companion } : {}) }));
   }
   return { extensions, companions };
 }

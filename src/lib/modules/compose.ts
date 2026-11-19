@@ -16,6 +16,10 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
     const depends = byId.get(id)?.application.depends ?? [];
     return depends.length ? 1 + Math.max(...depends.map(next => depth(next, [...seen, id]))) : 0;
   };
+  const closure = (id: string, seen = new Set<string>()): Set<string> => {
+    for (const next of byId.get(id)?.application.depends ?? []) if (!seen.has(next)) { seen.add(next); closure(next, seen); }
+    return seen;
+  };
   const registeredModels = new Map(definitions.flatMap(definition => definition.models.map(model => [model.contract.name, model] as const)));
   for (const definition of definitions) for (const model of definition.models) for (const [field, descriptor] of Object.entries(model.contract.many2manyFields)) {
     const target = registeredModels.get(descriptor.many2many.target);
@@ -62,6 +66,8 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
     const compiled = compileModuleModel(entry.module, entry.key, { ...entry.declaration, model }, entry.label, ordered.map(extension => Object.freeze({
       module: extension.module, label: extension.label, fields: extension.fields, computed: extension.computed,
       ...(extension.views ? { views: extension.views } : {}),
+      ...(extension.insertions ? { insertions: extension.insertions } : {}),
+      depends: Object.freeze([...closure(extension.module)].sort()),
       ...(extension.companion ? { relation: extension.companion.relation, delegate: extension.companion.name[0].toLowerCase() + extension.companion.name.slice(1) } : {}),
     })), byId.get(entry.module)?.native === true);
     for (const action of compiled.contract.actions) for (const [name, field] of Object.entries(action.params ?? {})) {

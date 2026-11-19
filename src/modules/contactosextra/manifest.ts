@@ -11,8 +11,9 @@ export default defineModule({
   extends: {
     "core.partner": {
       model: PartnerExtra,
-      views: {
-        form: () => import("./views/PartnerExtraForm"),
+      insertions: {
+        form: () => import("./views/PartnerInsertions"),
+        list: () => import("./views/PartnerListInsertions"),
       },
     },
   },

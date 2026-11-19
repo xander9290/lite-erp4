@@ -4,7 +4,8 @@ import ModelCollection from "@/components/modules/ModelCollection";
 import ModelForm from "@/components/modules/ModelForm";
 import ModelExtensionViews from "@/components/modules/ModelExtensionViews";
 import CollectionViews from "@/components/modules/CollectionViews";
-import { selectedCollectionView } from "@/lib/modules/config";
+import { selectedCollectionView, type ModelClientConfig } from "@/lib/modules/config";
+import type { InsertionViewKind, ModuleModel } from "@/lib/modules/define";
 import { getModuleModel, modelClientConfig } from "@/lib/modules/registry";
 import { modelRead } from "@/lib/modules/actions";
 import { getCurrentAccessUser } from "@/lib/access/current";
@@ -29,6 +30,14 @@ export async function modelRouteMetadata(modelId: string, path: readonly string[
   return { title: record.ok && record.displayName ? record.displayName : "Registro" };
 }
 
+/** Insertion files of the extensions for one view, resolved on the server as React slots. */
+async function insertionSlots(extensions: ModuleModel["extensions"], kind: InsertionViewKind, config: ModelClientConfig) {
+  return Object.fromEntries(await Promise.all(extensions.filter(extension => extension.insertions?.[kind]).map(async extension => {
+    const View = (await extension.insertions![kind]!()).default;
+    return [extension.module, <View key={extension.module} config={config} />] as const;
+  })));
+}
+
 /**
  * Collection or form of one module model, with the actor's capabilities. Used by the
  * `/erp/<module>/<model>` convention and by applications that present native models
@@ -48,12 +57,15 @@ export default async function ModelRoute({ modelId, path, searchParams, applicat
     const selected = selectedCollectionView(query.view, entry.collectionViews, entry.view);
     const loader = views[selected];
     const Presentation = typeof loader === "function" ? (await loader()).default : ModelCollection;
-    return <CollectionViews views={entry.collectionViews} selected={selected}><Presentation config={{ ...config, view: selected }} /></CollectionViews>;
+    const viewConfig = { ...config, view: selected };
+    const collectionInsertions = await insertionSlots(entry.extensions, selected, viewConfig);
+    return <CollectionViews views={entry.collectionViews} selected={selected}><ModelExtensionViews model={entry.id} insertions={{ [selected]: collectionInsertions }}><Presentation config={viewConfig} /></ModelExtensionViews></CollectionViews>;
   }
   const Form = views.form ? (await views.form()).default : ModelForm;
   const extensionViews = Object.fromEntries(await Promise.all(entry.extensions.filter(extension => extension.views?.form).map(async extension => {
     const View = (await extension.views!.form!()).default;
     return [extension.module, <View key={extension.module} config={config} />];
   })));
-  return <ModelExtensionViews views={extensionViews}><Form key={id ?? "nuevo"} config={config} id={id} /></ModelExtensionViews>;
+  const insertionViews = await insertionSlots(entry.extensions, "form", config);
+  return <ModelExtensionViews model={entry.id} views={extensionViews} insertions={{ form: insertionViews }}><Form key={id ?? "nuevo"} config={config} id={id} /></ModelExtensionViews>;
 }
