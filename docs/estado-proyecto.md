@@ -6,6 +6,48 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Progreso guardado (2026-11-19, cierre de sesión)
+
+Rama `codex/partner`, HEAD `ae16fd4` («Ajuste en la aparciencia de la tabla de los one2many»),
+árbol limpio: el usuario ya hizo commit de todo lo de esta sesión (`80173dc` y `ae16fd4`).
+Sin push/pull comprobado en esta revisión.
+
+**Hecho en la sesión (detalle en las secciones siguientes):**
+- One2many anidados (fase B): documento → línea → sublínea, árbol en una transacción,
+  límites 100 por relación/500 por documento, sublíneas expandibles en FieldOne2many.
+- Relaciones de consulta (fase A): `Fields.One2many(..., { readonly: true })`, colección
+  paginada del hijo en el formulario del padre, «Nuevo» con padre preasignado. Regla del
+  usuario: hijos numerosos se crean desde su propio formulario.
+- Colecciones sin `<form>` propios (búsqueda y filtro de columna) para poder embeberse.
+- Filas de One2many compactas (corregido el `table!` que hacía !important el padding de
+  daisyUI) y celdas sin línea inferior en reposo (visible en hover, foco y error).
+- Ubicaciones (usuario): `Estado.municipioIds` ya es relación de consulta; `Pais.estadoIds`
+  sigue como líneas editables (`maxRows: 50`). Contactosextra: `estadoId` ya declara
+  `domain: d => d.eq("paisId", d.draft("paisId"))`, conservando `validarPaisEstado`.
+
+**Verificado por el agente:** suites e integraciones listadas en las secciones de fase A/B y
+filas compactas (incluido build en proyecto temporal); medición en navegador sólo sobre
+`/sample`. **No verificado:** Ubicaciones/Contactos reales en navegador (sección de
+municipios, «Nuevo» con estado preasignado, dominio País→Estado en Contactos).
+
+**Pendientes, en orden sugerido:**
+1. Usuario: comprobar en navegador el formulario de Estado (lista de municipios, búsqueda,
+   «Nuevo» con estado asignado y regreso) y el dominio País→Estado en Contactos.
+2. Ejercicio de dirección: relacionar Municipio y Localidad en PartnerExtra (con dominios
+   Estado→Municipio→Localidad), lectura de catálogos para no administradores y navegación
+   desde Configuración de Contactos; importación oficial después.
+3. Para ventas/facturación (cuando se inicie ese módulo): tipo `Decimal`/dinero,
+   compute/onchange dentro de filas de One2many, Many2many en hijos de líneas (impuestos) y
+   revisar el límite de 100 conceptos por relación.
+4. Residuo de Tickets: fila `TicketsTicket.name` en `model_sequences` y corrección de
+   `cleanupSQL` para limpiar contadores al retirar módulos (ambas pendientes de aprobación).
+5. Limpieza: retirar `lib/users/service.ts`, `user.schema` y proveedores legacy
+   `user`/`partner` cuando dejen de usarse en pruebas y `/sample`; aviso de lint previo
+   (`ChartColumnBig` sin usar en `erp/page.tsx`).
+6. Pendientes previos sin cambios: extensión de User probada (`extendModel(User)`), related
+   a través de Partner/User, sincronización de `core`, permisos por campo, compute
+   persistido, distribución de módulos, estrategia de entornos y Tickets (pausado).
+
 ## Relaciones de consulta: fase A implementada (2026-11-19)
 
 Autorizada por el usuario, con la regla: hijos numerosos se crean desde su propio formulario.
@@ -53,7 +95,10 @@ Autorizada por el usuario tras el diseño. Sin commit.
   con más filas que su `maxRows` impedirá abrir el País; para ese catálogo sigue indicada la
   fase A (consulta paginada). No se modificaron sus modelos.
 
-## Progreso guardado y pendiente urgente: One2many anidados (2026-11-19)
+## Progreso guardado y pendiente urgente: One2many anidados (2026-11-19) — resuelto
+
+> Resuelto el mismo día con las fases B (anidados) y A (relaciones de consulta); se
+> conserva como historial.
 
 Por petición del usuario, guardar este punto y registrar como urgente el soporte
 de varios niveles de líneas. Rama revisada codex/partner, HEAD 35adbf9; cambios
