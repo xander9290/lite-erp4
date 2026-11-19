@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { Fragment, createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formDeleteReturnHref } from "@/components/ui/form/formDeletion";
 import { useForm } from "react-hook-form";
@@ -50,8 +50,8 @@ function display(name: string, field: FieldMetadata) {
 const ModelUIContext = createContext<ModelUI | null>(null);
 
 /**
- * Fields added by other modules (model extensions), one group per extending module. The default
- * form includes it; ejected forms place `<ModelExtensions />` where those groups should appear.
+ * Fields added by other modules: custom views own their layout; automatic fields use a group
+ * per extending module. Ejected forms place `<ModelExtensions />` at the insertion point.
  * Without it, extension values are still kept and saved by the form.
  */
 export function ModelExtensions({ excludeFields = [] }: { excludeFields?: readonly string[] } = {}) {
@@ -62,8 +62,10 @@ export function ModelExtensions({ excludeFields = [] }: { excludeFields?: readon
     // Custom forms may lay out inherited fields themselves; keep other extensions automatic.
     const fields = extension.fields.filter(name => !excludeFields.includes(name));
     if (!fields.length) return null;
+    const customView = views[extension.module];
+    if (customView != null) return <Fragment key={extension.module}>{customView}</Fragment>;
     return <FormGroup key={extension.module} legend={extension.label}>
-      {views[extension.module] ?? fields.map(name => Object.hasOwn(ui.config.fields, name) ? control(ui, name, ui.config.fields[name]) : Object.hasOwn(ui.config.preview, name) ? display(name, ui.config.preview[name]) : null)}
+      {fields.map(name => Object.hasOwn(ui.config.fields, name) ? control(ui, name, ui.config.fields[name]) : Object.hasOwn(ui.config.preview, name) ? display(name, ui.config.preview[name]) : null)}
     </FormGroup>;
   })}</>;
 }

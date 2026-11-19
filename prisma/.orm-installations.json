@@ -3,7 +3,7 @@
   "modules": {
     "contactosextra": {
       "file": "orm-contactosextra.prisma",
-      "hash": "690b0b929451ab3f85c9ed1543df2c97047255505f4c2a91f98b05ac2d26982b",
+      "hash": "473e58ca803f31ba450ecdb1dd468a6f1aa0bf398d5989ba4abea7ceff371e25",
       "inverses": [
         {
           "file": "partner.prisma",
@@ -11,9 +11,30 @@
           "text": "\n  // BEGIN lite-erp:contactosextra:Partner\n  contactosextraCorePartnerRecordIdRecords ContactosextraCorePartner? @relation(\"ContactosextraCorePartner_recordId\")\n  // END lite-erp:contactosextra:Partner\n"
         },
         {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesPais",
+          "text": "\n  // BEGIN lite-erp:contactosextra:UbicacionesPais\n  contactosextraCorePartnerPaisIdRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_paisId\")\n  // END lite-erp:contactosextra:UbicacionesPais\n"
+        },
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesEstado",
+          "text": "\n  // BEGIN lite-erp:contactosextra:UbicacionesEstado\n  contactosextraCorePartnerEstadoIdRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_estadoId\")\n  // END lite-erp:contactosextra:UbicacionesEstado\n"
+        },
+        {
           "file": "user.prisma",
           "target": "User",
           "text": "\n  // BEGIN lite-erp:contactosextra:User\n  contactosextraCorePartnerCreatedRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_createBy\")\n  // END lite-erp:contactosextra:User\n"
+        }
+      ]
+    },
+    "ubicaciones": {
+      "file": "orm-ubicaciones.prisma",
+      "hash": "d6de2d18a673027d3ef7e99cba7387d2038f153a9dc8c0dcb43721d398c2b8ea",
+      "inverses": [
+        {
+          "file": "user.prisma",
+          "target": "User",
+          "text": "\n  // BEGIN lite-erp:ubicaciones:User\n  ubicacionesPaisCreatedRecords UbicacionesPais[] @relation(\"UbicacionesPais_createBy\")\n  ubicacionesEstadoCreatedRecords UbicacionesEstado[] @relation(\"UbicacionesEstado_createBy\")\n  ubicacionesMunicipioCreatedRecords UbicacionesMunicipio[] @relation(\"UbicacionesMunicipio_createBy\")\n  ubicacionesLocalidadCreatedRecords UbicacionesLocalidad[] @relation(\"UbicacionesLocalidad_createBy\")\n  // END lite-erp:ubicaciones:User\n"
         }
       ]
     }

@@ -8,42 +8,65 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Punto de continuación guardado (2026-11-18)
 
-Revisión de continuidad (2026-11-18): rama `main`, HEAD `21e18cc`
-(`extra contactos fase 1`), árbol limpio al iniciar. Las vistas de Usuarios y
-contactosextra ya están versionadas en ese commit. Contrastados AGENTS, README,
-guía core/Ajustes, registro, extensión street, vistas y Prisma/SQL. No se ejecutaron
-suites, navegador ni consultas a la BD; la prueba de Calle sigue pendiente de
-confirmación del usuario. Esta revisión no ejecutó commit/push/pull.
-Conservar las personalizaciones actuales de ContactForm.
+El usuario pidió registrar el progreso y continuar después. Rama comprobada:
+`codex/partner`, HEAD `cdb49f4` (punto de partida), cambios locales y archivos nuevos
+sin commit. No se ejecutaron commit/push/pull. Preservar sus vistas, modelos,
+esquemas, migraciones y la personalización de ContactForm.
 
-Completado en fuentes: core/Ajustes, Contactos declarativo, concurrencia cruzada,
-UserForm/UserList personalizados y módulo contactosextra que extiende core.partner
-con street opcional/maxLength 160/tracking en `model/partner.ts`. Prisma y SQL
-20261118225040_sync_contactosextra revisados; sin nueva consulta de migrate status.
+**Siguiente pendiente urgente:** [dominios de relaciones y colecciones](ideas/dominios-relaciones-colecciones.md).
+Domain en Many2one/Many2many con dependencias del borrador, AND/OR/NOT mixtos y
+reutilización del motor para fuentes de Lista/Card/Kanban. One2many exige distinguir
+relaciones seleccionables de filtros visuales que no deben borrar líneas ocultas.
+Declaración junto al modelo/fuente, validación y consultas en servidor, conservando
+permisos y paginación. Caso inicial: Estado filtrado por País. API ilustrada aún
+no implementada; al retomar revisar/diseñar contrato antes de implementarlo. Esta
+pausa sólo autoriza documentar, no ejecutar el desarrollo por adelantado.
 
-Antes de continuar, confirmar la prueba de Calle (guardar/reabrir texto y vacío),
-que el usuario aún no reportó. **Siguiente campo pendiente: exteriorNumber**, Text
-opcional para número exterior, seguido de interiorNumber y zip, uno por uno.
-Revisar el plan antes de cada sincronización; no añadir campos por el agente.
-Después diseñar ciudad/municipio/estado/país y catálogos/APIs, principalmente México.
-No adelantar esa integración ni restaurar Tickets.
+**Guía actual:** [Catálogos de dirección](catalogos-direccion.md). Tickets sigue
+retirado. Core/Ajustes y Contactos ya estaban consolidados en fuentes. El usuario
+extendió core.partner desde contactosextra con street, exteriorNumber,
+interiorNumber, zip y vat; validaciones de CP y formato básico de RFC, sin consulta
+SAT/validación de fecha/checksum. PartnerExtraForm personalizado y registrado.
+ModelExtensions se ajustó por petición del usuario: vista propia en Fragment sin
+FormGroup/legend automáticos; fallback automático conserva FormGroup.
 
-Recorrido y criterios en [punto de continuación de la guía](ideas/core-ajustes.md#punto-de-continuación-dirección-de-partner-2026-11-18).
-Esta revisión sólo actualiza documentación; git diff --check aprobado. Las pruebas
-de código descritas abajo corresponden a tareas anteriores; no se repitieron.
+Ubicaciones creado con Pais, Estado, Municipio y Localidad, jerarquía de Many2one
+obligatorias/Restrict; claves Text conservan ceros. País tiene código único de dos
+letras, normalize trim/mayúsculas y constraint de formato; claves de los demás
+modelos no son globalmente únicas. Usuario confirmó sincronizaciones y pruebas
+propuestas; agente revisó clases/esquemas/SQL, sin repetir pruebas en navegador.
+Se conserva Ubicaciones como módulo compartido. Navegación futura desde
+Configuración de Contactos acordada, todavía no implementada.
 
-Revisión histórica inicial (2026-11-18, Windows): rama `codex/core`, HEAD `e7b1223`,
-árbol limpio al comenzar. Contrastados AGENTS, README, este estado, plan core/Ajustes,
-Git, clases nativas, repositorio, registro de módulos, auditoría, rutas y cajón.
-Las fases 1–4 ya están versionadas en `dae4f6e`; la corrección writeOnly de Usuarios
-en `39e7f6e`, y la retirada de la tarjeta ficticia Ventas en `e7b1223`.
-`src/modules/index.ts` está vacío; core se incorpora por registeredModules.
-Contactos conserva todavía su aplicación y servicio manuales. Próximo trabajo:
-fase 5 sólo cuando el usuario indique iniciarla; no restaurar Tickets.
-Esta revisión corrige documentación desactualizada, sin suites, navegador,
-consultas a BD, migraciones ni cambios de código. Las verificaciones anteriores
-siguen siendo históricas para sus alcances; no se comprobó estado remoto ni
-disponibilidad del servidor o PostgreSQL. git diff --check documental aprobado.
+Contactosextra declara depends ubicaciones. PaisId y estadoId opcionales/Restrict/
+tracking ya añadidos y sincronizados por el usuario. Ambos FieldMany2One verificados
+en su vista. Constraint validarPaisEstado comprobada: exige País si hay Estado y
+consulta select paisId bajo scope de lectura autorizado, usando context.tx/actor
+con import dinámico de access/engine. El usuario confirmó la prueba propuesta de
+selección/guardado/reapertura, rechazo sin País y ambos vacíos. No hay domains de
+lookup ni limpieza automática al cambiar País. Municipio/Localidad aún no están
+relacionados con PartnerExtra.
+
+Migraciones revisadas de esta práctica (confirmación de aplicación por el usuario;
+no se consultó nuevamente migrate status en esta sesión):
+
+- contactosextra: 20261119023507 exterior_number, 023729 interior_number,
+  023945 zip, 030718 vat, 040019 pais_id y 041214 estado_id.
+- ubicaciones: 20261119032428 País, 033221 Estado, 034226 Municipio y 035126 Localidad.
+
+Verificaciones propias realizadas durante la sesión: tsc --noEmit y ESLint de
+ModelForm tras el cambio de layout, después tsc y ESLint de PartnerExtra con su
+constraint. Sin nueva verificación visual ni SQL ejecutado por el agente.
+Verificación de este cierre: fuentes del selector Estado y notas contrastadas,
+enlaces documentales nuevos y git diff --check limitado a documentación.
+
+Después de resolver domains: aplicar País→Estado en el ejercicio, continuar
+relaciones a Municipio/Localidad y coherencia de dirección; revisar lectura de
+catálogos para no administradores (ahora admin por defecto), navegación acordada,
+e importación oficial más adelante. Condicionar reglas mexicanas CP/RFC antes de
+aceptar países extranjeros. Carta Porte/traslado requiere homologación explícita
+SAT; no asumir equivalencia de codigo con claves INEGI/SAT. Sin integración fiscal,
+catálogos externos, importadores, ni despliegues implementados por esta sesión.
 
 ## Prioridad actual: Partner/User nativos y app Ajustes (2026-11-18)
 

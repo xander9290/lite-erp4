@@ -1,3 +1,4 @@
+import ubicacionesModule from "./ubicaciones/manifest";
 import contactosextraModule from "./contactosextra/manifest";
 
 
@@ -12,4 +13,6 @@ import type { ModuleDefinition } from "@/lib/modules/define";
  */
 export const modules: readonly ModuleDefinition[] = [
     contactosextraModule,
+  
+    ubicacionesModule,
   ];

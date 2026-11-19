@@ -423,10 +423,13 @@ extends: {
 El componente es cliente, recibe `{config: ModelClientConfig}` y devuelve los Fields
 de la extensión. No monta otro ModelForm, FormView ni FormProvider. Se resuelve
 desde la ruta servidor y se entrega como contenido React, nunca pasando loaders
-del manifest al navegador. `<ModelExtensions />` lo sitúa dentro del grupo del
-extensor y del RHF/FormView del base: comparte validación, modo consulta, bloqueo,
-dirty guard, actividad y guardado. Sin vista propia se conservan los controles
-automáticos. Un formulario expulsado sólo necesita conservar `<ModelExtensions />`.
+del manifest al navegador. `<ModelExtensions />` inserta la vista personalizada
+mediante un Fragment, sin FormGroup ni legend automáticos. La vista decide su
+composición con FormGroup, Stack, Notebook u otros componentes dentro del RHF/FormView
+del base: comparte validación, modo consulta, bloqueo, dirty guard, actividad y
+guardado. Sin vista propia se conservan los controles automáticos dentro de un
+FormGroup con el nombre del extensor. Un formulario expulsado sólo necesita
+conservar `<ModelExtensions />`.
 Si el formulario ya presenta explícitamente campos delegados (por ejemplo los de
 Partner en User), usar `<ModelExtensions excludeFields={["name", "email", "phone", "avatarUrl"]} />`
 para evitar controles duplicados. Sólo afecta al render automático; los campos

@@ -6,8 +6,14 @@ export default defineModule({
   id: "contactosextra",
   name: "Contactosextra",
   icon: "boxes",
+  depends: ["ubicaciones"],
   models: {},
   extends: {
-    "core.partner": PartnerExtra,
+    "core.partner": {
+      model: PartnerExtra,
+      views: {
+        form: () => import("./views/PartnerExtraForm"),
+      },
+    },
   },
 });

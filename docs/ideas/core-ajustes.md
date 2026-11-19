@@ -254,6 +254,14 @@ esquema en el ERP, sin revisión visual nueva. git diff --check aprobado.
 
 ## Punto de continuación: dirección de Partner (2026-11-18)
 
+**Cierre posterior vigente:** campos básicos/CP/RFC, cuatro catálogos de Ubicaciones,
+País/Estado del contacto y constraint ya completados con confirmaciones del usuario.
+La guía está pausada: siguiente pendiente urgente,
+[dominios de relaciones y colecciones](dominios-relaciones-colecciones.md). Seguir el
+[punto exacto de Catálogos de dirección](../catalogos-direccion.md#estado-y-siguiente-paso)
+antes de ejecutar las instrucciones históricas siguientes. No añadir campos ni
+implementar domains durante la pausa.
+
 Progreso revisado el 2026-11-18 en `main` (`21e18cc`, extra contactos fase 1),
 árbol limpio al iniciar: extensión, vistas y documentación ya versionadas.
 El usuario escribe y ejecuta sus ejercicios; el agente revisa y explica un paso
@@ -270,16 +278,28 @@ ContactForm conserva ModelExtensions y presenta los campos añadidos automática
 
 Pendientes al retomar, en orden:
 
-1. Confirmar con el usuario la prueba de Calle: guardar/reabrir con texto y vacía.
-   Aún no hay confirmación de esa prueba; no darla por aprobada por esta pausa.
-2. Añadir sólo `exteriorNumber`, Text opcional para número exterior; admite letras
-   y S/N. Revisar `orm:sync -- contactosextra --plan` antes de aplicar y probar
-   guardar/reabrir. Elegir/documentar longitud al explicar el paso.
-3. Añadir `interiorNumber`, Text opcional, con su plan y prueba de persistencia.
-4. Añadir `zip`, Text que preserve ceros iniciales, con validación de cinco dígitos
-   para México; revisar opcionalidad y longitud antes de implementar.
-5. Después diseñar catálogos seleccionables de país, estado y ciudad/localidad,
-   distinguiendo municipio. Fuentes investigadas: [Correos de México](https://www.correosdemexico.gob.mx/SSLServicios/ConsultaCP/CodigoPostal_Exportar.aspx),
+1. Calle completada: el usuario confirmó guardar/reabrir con texto y vacía.
+2. exteriorNumber completado: Text opcional/maxLength 20/tracking, clase y Prisma
+   verificados. SQL 20261119023507_sync_contactosextra revisado: sólo ADD COLUMN
+   exterior_number VARCHAR(20). Usuario confirmó sincronización y prueba propuesta
+   de 12-A y vacío; sin comprobación independiente del agente en navegador/BD.
+3. interiorNumber completado: Text opcional/maxLength 20/tracking, clase/Prisma
+   y SQL 20261119023729_sync_contactosextra verificados (sólo columna nullable).
+   Usuario confirmó sincronización y prueba de 4-B/vacío; sin prueba independiente.
+4. zip añadido: Text opcional/minLength 5/maxLength 5/tracking, clase/Prisma y SQL
+   20261119023945_sync_contactosextra verificados (VARCHAR(5) nullable). Usuario
+   confirmó sincronización/prueba de 01234, vacío y rechazo de cuatro caracteres.
+   Constraint implementada y revisada: @constraint("zip"), cinco dígitos ASCII o
+   vacío, ModelValidationError asociado a zip. Usuario confirmó prueba propuesta
+   de rechazo 12A34 y aceptación 01234; sin prueba independiente en navegador/BD.
+   Nombre escrito validarCodigoPostar: funciona por el decorador; corregir a
+   validarCodigoPostal sólo por claridad, sin migración.
+5. RFC añadido y constraint básica revisada; usuario confirmó prueba propuesta y
+   pidió continuar con catálogos. Recorrido vigente en
+   [Catálogos de dirección](../catalogos-direccion.md): módulo compartido ubicaciones,
+   primero dry-run del módulo; después Pais/Estado/Municipio/Localidad uno a uno.
+   Sin creación/importación por adelantado. Fuentes previamente investigadas:
+   [Correos de México](https://www.correosdemexico.gob.mx/SSLServicios/ConsultaCP/CodigoPostal_Exportar.aspx),
    [INEGI](https://www.inegi.org.mx/servicios/catalogounico.html) y
    [GeoNames](https://www.geonames.org/export/). Importación local/Many2one es
    recomendación propuesta, no implementación ni API ya configurada.
