@@ -22,6 +22,8 @@ model AccessModelOverride {
   create    Boolean
   write     Boolean
   unlink    Boolean
+  canImport Boolean @default(false) @map("can_import")
+  canExport Boolean @default(false) @map("can_export")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@id([groupId, model])

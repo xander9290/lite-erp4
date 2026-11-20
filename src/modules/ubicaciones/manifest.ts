@@ -10,11 +10,33 @@ export default defineModule({
   name: "Ubicaciones",
   icon: "globe",
   models: {
-    pais: Pais,
+    pais: {
+      model: Pais,
+      transfer: { key: "codigo", fields: ["codigo", "name", "active"] },
+    },
 
-    estado: Estado,
+    estado: {
+      model: Estado,
+      transfer: {
+        key: ["paisId", "codigo"],
+        fields: ["paisId", "codigo", "name", "active"],
+        relations: { paisId: { key: "codigo" } },
+      },
+    },
 
-    municipio: Municipio,
+    municipio: {
+      model: Municipio,
+      transfer: {
+        key: ["estadoId", "codigo"],
+        fields: ["estadoId", "codigo", "name", "active"],
+        relations: {
+          estadoId: {
+            key: ["paisId", "codigo"],
+            relations: { paisId: { key: "codigo" } },
+          },
+        },
+      },
+    },
 
     localidad: Localidad,
   },

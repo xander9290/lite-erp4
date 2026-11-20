@@ -4,14 +4,15 @@ import type { FieldMetadata } from "../orm/fields";
 
 export type AccessOperation = "read" | "create" | "write" | "unlink";
 export const accessOperations: readonly AccessOperation[] = ["read", "create", "write", "unlink"];
-export type AccessPerms = Readonly<Record<AccessOperation, boolean>>;
+export type AccessPerms = Readonly<Record<AccessOperation, boolean>> & { readonly import?: boolean; readonly export?: boolean };
+export const accessPermissionKeys = [...accessOperations, "import", "export"] as const;
 
 /** Manifest declarations (like Odoo's res.groups, ir.model.access and ir.rule). */
 export type AccessSpec = {
   /** Local key → label, or `{ label, implies }`; implies takes local keys or `<module>.<group>` ids. */
   readonly groups?: Readonly<Record<string, string | { readonly label: string; readonly implies?: readonly string[] }>>;
   /** Grants per group and model; `perms` is a subset of "crud" (create, read, update=write, delete=unlink). */
-  readonly access?: readonly { readonly group: string; readonly models: string | readonly string[]; readonly perms: string }[];
+  readonly access?: readonly { readonly group: string; readonly models: string | readonly string[]; readonly perms: string; readonly import?: boolean; readonly export?: boolean }[];
   /**
    * Record rules. Without `groups` they apply to everyone (combined with AND);
    * with `groups`, the rules of the user's groups are combined with OR.
@@ -56,9 +57,10 @@ export function declareAccess(module: string, spec: AccessSpec, models: Readonly
     return id;
   };
   for (const group of groups) for (const implied of group.implies) known(implied);
-  const merged = new Map<string, Record<AccessOperation, boolean>>();
+  const merged = new Map<string, Record<AccessOperation, boolean> & { import?: boolean; export?: boolean }>();
   for (const grant of spec.access ?? []) {
     const group = known(groupId(module, grant.group));
+    for (const permission of ["import", "export"] as const) if (grant[permission] !== undefined && typeof grant[permission] !== "boolean") throw new Error(`${module}: ${permission} debe ser booleano.`);
     if (typeof grant.perms !== "string" || !/^[crud]*$/.test(grant.perms) || new Set(grant.perms).size !== grant.perms.length) throw new Error(`${module}: perms usa letras de "crud" sin repetir.`);
     for (const model of list(grant.models).map(modelId)) {
       const current = merged.get(`${group}|${model}`) ?? { read: false, create: false, write: false, unlink: false };
@@ -66,6 +68,7 @@ export function declareAccess(module: string, spec: AccessSpec, models: Readonly
       if (grant.perms.includes("r")) current.read = true;
       if (grant.perms.includes("u")) current.write = true;
       if (grant.perms.includes("d")) current.unlink = true;
+      for (const permission of ["import", "export"] as const) if (grant[permission]) current[permission] = true;
       merged.set(`${group}|${model}`, current);
     }
   }

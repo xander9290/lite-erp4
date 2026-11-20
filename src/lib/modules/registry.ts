@@ -20,6 +20,7 @@ import { relationDomains, relationDomainWhere } from "./relation-domains";
 import { domainDependencies } from "../orm/domain-builder";
 import { ModelValidationError } from "../orm/context";
 import { z } from "zod";
+import { transferHeaders } from "../list/transfer-contract";
 
 const modules = registeredModules;
 
@@ -293,6 +294,10 @@ export function modelClientConfig(id: string, access?: CapabilityActor, nested =
   const { contract } = entry;
   const published = (entry.contract.actions ?? []) as readonly ModelAction[];
   const config: ModelClientConfig = {
+    ...(entry.declaration.transfer ? { transfer: { key: entry.declaration.transfer.key, fields: transferHeaders(entry.declaration.transfer),
+      canImport: Boolean(access?.isAdmin || (access?.modelAccess[id]?.read && access.modelAccess[id]?.import && (access.modelAccess[id]?.create || access.modelAccess[id]?.write))),
+      canExport: Boolean(access?.isAdmin || (access?.modelAccess[id]?.read && access.modelAccess[id]?.export)),
+    } } : {}),
     id: entry.id, module: module.id, moduleName: module.application.name, key: entry.key, name: contract.name, label: entry.label, route: entry.route,
     fields: Object.fromEntries(entry.clientFields.map(name => [name, entry.metadata[name]])),
     preview: Object.fromEntries(Object.entries((contract.previewFields ?? {}) as Readonly<Record<string, { metadata: FieldMetadata }>>).map(([name, field]) => [name, field.metadata])),

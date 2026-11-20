@@ -4,6 +4,7 @@ import { extensionFields, extensionMany2many } from "./extend";
 import { many2manyStorage } from "../orm/many2many";
 import { relationFieldName } from "../orm/display";
 import { validateModuleDomains } from "./relation-domains";
+import { validateModuleTransfers } from "../list/transfer-contract";
 
 /**
  * Compose the extensions declared by registered modules onto their base models:
@@ -52,7 +53,7 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       byTarget.set(extension.target, [...(byTarget.get(extension.target) ?? []), extension]);
     }
   }
-  if (!byTarget.size) return validateQuickCreate(validateModuleDomains(definitions));
+  if (!byTarget.size) return validateModuleTransfers(validateQuickCreate(validateModuleDomains(definitions)));
   const compose = (entry: ModuleModel): ModuleModel => {
     const extensions = byTarget.get(entry.id);
     if (!extensions) return entry;
@@ -92,10 +93,10 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       ...action, ...(action.groups ? { groups: Object.freeze(action.groups.map(group => group.includes(".") ? group : `${methodOwners.get(action.name) ?? entry.module}.${group}`)) } : {}),
     }))) }) });
   };
-  return validateQuickCreate(validateModuleDomains(Object.freeze(definitions.map(definition => {
+  return validateModuleTransfers(validateQuickCreate(validateModuleDomains(Object.freeze(definitions.map(definition => {
     const models = definition.models.map(compose);
     return models.every((model, index) => model === definition.models[index]) ? definition : Object.freeze({ ...definition, models: Object.freeze(models) });
-  }))));
+  })))));
 }
 
 /**

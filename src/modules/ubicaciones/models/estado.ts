@@ -2,6 +2,7 @@ import "server-only";
 import { Fields, Model, type DisplayRecord } from "@/lib/orm";
 
 export class Estado extends Model {
+  readonly uniqueTogether = [["paisId", "codigo"]] as const;
   name = Fields.Text({
     label: "Nombre",
     required: true,

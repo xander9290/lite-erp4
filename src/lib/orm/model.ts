@@ -22,6 +22,8 @@ export abstract class Model {
   readonly preview?: Readonly<Record<string,Field>>;
   readonly displayRelations?:Readonly<Record<string,{name:string;fields:Readonly<Record<string,Field>>;metadata:Readonly<Record<string,FieldMetadata>>;schema:z.ZodType}>>;
   readonly displayFields?: readonly string[];
+  /** Required persistent fields forming a database-enforced compound identity. */
+  readonly uniqueTogether?: readonly (readonly string[])[];
   displayName?(record: Readonly<Record<string, unknown>>): string;
   normalize?(values: Readonly<Record<string, unknown>>): Record<string, unknown>;
   beforeSave?(values: Record<string, unknown>, context: ModelContext): Record<string, unknown> | Promise<Record<string, unknown>>;
@@ -55,7 +57,7 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
   const metadata: Record<string, FieldMetadata> = {};
   const shape: Record<string, z.ZodType> = {};
   for (const [name, value] of Object.entries(instance)) {
-    if (["displayFields","onchange","constraints","preview","displayRelations"].includes(name)) continue;
+    if (["displayFields","onchange","constraints","preview","displayRelations","uniqueTogether"].includes(name)) continue;
     if (typeof value === "function") continue;
     if (isMany2many(value)) {
       if (!/^[a-z][A-Za-z0-9]*$/.test(name) || reservedFields.has(name)) throw new Error(`Nombre Many2many inválido: ${name}.`);
@@ -79,6 +81,12 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
   }
   if (Object.entries(metadata).some(([name, field]) => field.sequence && `${options.name}.${name}`.length > 200)) throw new Error("La clave de secuencia supera 200 caracteres.");
   if (!Object.keys(fields).length) throw new Error("El modelo debe declarar al menos un Field.");
+  if (instance.uniqueTogether !== undefined && !Array.isArray(instance.uniqueTogether)) throw new Error("uniqueTogether debe ser una lista de claves compuestas.");
+  const uniqueTogether = (instance.uniqueTogether ?? []).map(keys => {
+    if (!Array.isArray(keys) || keys.length < 2 || keys.length > 4 || new Set(keys).size !== keys.length || keys.some(name => !metadata[name]?.required || metadata[name].sensitive || metadata[name].sequence || !["text", "integer", "selection", "many2one"].includes(metadata[name].kind) || (metadata[name].kind === "text" && metadata[name].writeOnly))) throw new Error("uniqueTogether requiere entre 2 y 4 campos persistentes obligatorios, públicos y sin repetir.");
+    return Object.freeze([...keys]);
+  });
+  if (uniqueTogether.length > 4 || new Set(uniqueTogether.map(keys => [...keys].sort().join("|"))).size !== uniqueTogether.length) throw new Error("uniqueTogether admite hasta cuatro claves compuestas distintas.");
   for(const [alias,target] of Object.entries(instance.displayRelations??{})) if(displayRelation(metadata,alias)[1].target!==target.name) throw new Error(`Destino inválido: ${alias}.`);
   const methods=compileModelMethods(instance,fields,relatedFields,computedFields,Object.keys({ ...one2manyFields, ...many2manyFields }));
   if(methods.display && instance.displayFields) throw new Error("Usa displayFields o @displayName, no ambos.");
@@ -89,6 +97,7 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
   const formSchema = z.strictObject({ ...Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, fieldInputSchema(field)])), ...Object.fromEntries(Object.entries({ ...one2manyFields, ...many2manyFields }).map(([name, field]) => [name, field.schema])) } as Shape<InstanceType<C>> & RelationShape<InstanceType<C>>);
   return Object.freeze({
     name: options.name, table: options.table,
+    uniqueTogether: Object.freeze(uniqueTogether),
     fields: Object.freeze(fields) as Readonly<DeclaredFields<InstanceType<C>>>,
     metadata: Object.freeze(metadata) as Readonly<{ [K in keyof DeclaredFields<InstanceType<C>>]: FieldMetadata }>,
     schema, formSchema, many2manyFields: Object.freeze(many2manyFields), one2manyFields: Object.freeze(one2manyFields) as Readonly<Record<string, One2manyField>>,

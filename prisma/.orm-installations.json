@@ -39,7 +39,7 @@
     },
     "ubicaciones": {
       "file": "orm-ubicaciones.prisma",
-      "hash": "d6de2d18a673027d3ef7e99cba7387d2038f153a9dc8c0dcb43721d398c2b8ea",
+      "hash": "319ba2d3fa57c7f9f967f7a59401f3f0eb3fae802a5b794842e512f957ad9dd4",
       "inverses": [
         {
           "file": "user.prisma",

@@ -4,12 +4,12 @@ import Breadcrumbs from "@/components/ui/Breadcrumbs";
 import { requireAdmin } from "@/lib/auth/access";
 import { prisma } from "@/lib/prisma";
 import { groupDetail } from "@/lib/access/admin";
-import { accessOperations } from "@/lib/access/declare";
+import { accessPermissionKeys } from "@/lib/access/declare";
 import ActionForm from "../../ActionForm";
 import { saveMembers, saveModelAccess, saveRules } from "../../actions";
 
 type Props = { params: Promise<{ id: string }> };
-const operationLabels = { read: "Leer", create: "Crear", write: "Editar", unlink: "Eliminar" } as const;
+const operationLabels = { read: "Leer", create: "Crear", write: "Editar", unlink: "Eliminar", import: "Importar", export: "Exportar" } as const;
 
 async function Group({ params }: Props) {
   const { id } = await params;
@@ -47,11 +47,11 @@ async function Group({ params }: Props) {
         <input type="hidden" name="group" value={group.id} />
         <div className="overflow-x-auto">
           <table className="table table-sm">
-            <thead><tr><th>Modelo</th>{accessOperations.map(operation => <th key={operation} className="text-center">{operationLabels[operation]}</th>)}<th /></tr></thead>
+            <thead><tr><th>Modelo</th>{accessPermissionKeys.map(operation => <th key={operation} className="text-center">{operationLabels[operation]}</th>)}<th /></tr></thead>
             <tbody>
               {models.map(model => <tr key={model.id}>
                 <td className="wrap-anywhere">{model.label}<input type="hidden" name="model" value={model.id} /></td>
-                {accessOperations.map(operation => <td key={operation} className="text-center">
+                {accessPermissionKeys.map(operation => <td key={operation} className="text-center">
                   <input type="checkbox" className="checkbox checkbox-sm" name={`${model.id}|${operation}`} defaultChecked={model.perms[operation]} aria-label={`${operationLabels[operation]} ${model.label}`} />
                 </td>)}
                 <td>{model.overridden && <span className="badge badge-warning badge-sm">ajustado</span>}</td>

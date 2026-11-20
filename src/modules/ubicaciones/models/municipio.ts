@@ -2,7 +2,13 @@ import "server-only";
 import { Fields, Model, type DisplayRecord } from "@/lib/orm";
 
 export class Municipio extends Model {
-  name = Fields.Text({ label: "Nombre", required: true, maxLength: 120, tracking: true });
+  readonly uniqueTogether = [["estadoId", "codigo"]] as const;
+  name = Fields.Text({
+    label: "Nombre",
+    required: true,
+    maxLength: 120,
+    tracking: true,
+  });
   estadoId = Fields.Many2one("UbicacionesEstado", {
     label: "Estado",
     required: true,

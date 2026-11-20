@@ -21,6 +21,31 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Cajón de aplicaciones
 
+- Importación/exportación de datos (2026-11-20): interfaz sólo en ListView estándar,
+  opt-in `transfer: {key,fields}` por modelo; piloto ubicaciones.pais con codigo/name/active.
+  Permisos `import`/`export` por grupo/modelo (false/omitido no concede, OR entre grupos,
+  overrides y bypass admin), además de CRUD y reglas de registro en servidor. Revisar
+  archivo sin confirmar escrituras y aplicar sólo tras confirmar un plan vigente;
+  servicios del modelo, transacción y concurrencia intactos. Fase 1 escalares y fase 2
+  Many2one por clave Text única pública: Estado identifica por [paisId,codigo] y usa
+  paisId.codigo en archivos, sin IDs ni creación implícita de destinos. uniqueTogether
+  declara unicidad compuesta en el modelo dueño, genera @@unique y no es Field ni
+  propiedad editable/de extensión. Estado conserva escritura/revisión del País por
+  acceso heredado. Fase 3 (2026-11-20): referencias con clave compuesta del
+  destino y saltos anidados (máx. 2), Municipio habilitado por el usuario con
+  estadoId.paisId.codigo + estadoId.codigo. orm:sync prepara por sí mismo los diffs
+  que sólo agregan índices únicos (comprobando duplicados) porque Prisma no responde
+  su aviso sin terminal. No habilitar más modelos por anticipación. Migración
+  aditiva de permisos aplicada en desarrollo Windows con aprobación el 2026-11-20;
+  no asumir aplicación en otras máquinas. Contrato y límites en
+  [Importar/exportar listas](docs/importar-exportar-listas.md).
+
+- País.estadoIds conserva One2many editable; el usuario aumentó maxRows de 50 a
+  100 y confirmó la importación (2026-11-20). No convertirlo
+  en consulta paginada ni elevar el máximo por anticipación. El importador revisa
+  filas y simula después el lote completo con rollback para detectar límites
+  acumulados antes de confirmar, preservando acceso heredado y revisión del País.
+
 - `drawer: false` (2026-11-20) en defineModule o ApplicationManifest oculta sólo la tarjeta del cajón (`applications.drawerFor`); rutas, navegación (`forUser`), enlaces desde otras apps, permisos y gestor no cambian. Por defecto true. Para catálogos administrados desde otra aplicación (p. ej. etiquetas de contactosextra). Contrato en docs/modulos-declarativos.md.
 
 - Menús a catálogos de dependencias (2026-11-19): un enlace con model de una dependencia directa y href exacto /erp/<dependencia>/<clave> es válido. El registro comprueba el modelo publicado por el destino; no añadirlo a accessModels de la app consumidora ni ampliar permisos para mostrar el menú. Visibilidad por lectura efectiva y cierre sin snapshot. Abre la aplicación propietaria; no es ruta incrustada ni oculta su tarjeta. Contrato en docs/desarrollo-aplicaciones.md.

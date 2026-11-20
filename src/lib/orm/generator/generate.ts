@@ -8,7 +8,7 @@ import { relationFieldName } from "../display";
 import { relatedProjectionPlan } from "./related";
 
 export type GenerationModel = {
-  model: { readonly name: string; readonly table: string; readonly many2manyFields?: Readonly<Record<string, Many2manyField>>; readonly fields: Readonly<Record<string, Field>>; readonly metadata: Readonly<Record<string, FieldMetadata>>; readonly relatedFields?: Readonly<Record<string,Field>>; readonly computedFields?: Readonly<Record<string,Field>>; readonly reactionRules?: readonly import("../reactions.types").ReactionRule[]; readonly previewFields?: Readonly<Record<string,Field>>; readonly displayFields?: readonly string[] };
+  model: { readonly name: string; readonly table: string; readonly uniqueTogether?: readonly (readonly string[])[]; readonly many2manyFields?: Readonly<Record<string, Many2manyField>>; readonly fields: Readonly<Record<string, Field>>; readonly metadata: Readonly<Record<string, FieldMetadata>>; readonly relatedFields?: Readonly<Record<string,Field>>; readonly computedFields?: Readonly<Record<string,Field>>; readonly reactionRules?: readonly import("../reactions.types").ReactionRule[]; readonly previewFields?: Readonly<Record<string,Field>>; readonly displayFields?: readonly string[] };
   /** Explicit publication boundary. Adding a private field must not publish it to the browser. */
   clientFields: readonly string[];
 };
@@ -180,6 +180,7 @@ export function generateModule(module: ModuleGeneration, context: GenerationCont
       add(target, link.target, "target", owner);
       junctions.push(`model ${link.name} {\n  // lite-erp:many2many\n  sourceId String @map("source_id")\n  targetId String @map("target_id")\n  source ${model.name} @relation(${quote(`${link.name}_source`)}, fields: [sourceId], references: [id], onDelete: Cascade)\n  target ${target} @relation(${quote(`${link.name}_target`)}, fields: [targetId], references: [id], onDelete: Restrict)\n  @@id([sourceId, targetId])\n  @@index([targetId])\n  @@map(${quote(link.table)})\n}`);
     }
+    for (const keys of model.uniqueTogether ?? []) indexes.push(`  @@unique([${keys.join(", ")}])`);
     const auditRelation = `${model.name}_createBy`, auditInverse = `${lowerFirst(model.name)}CreatedRecords`;
     const inverseLines = additions.get("User") ?? [];
     if (new RegExp(`\\b${auditInverse}\\b`).test(auditUser.maskedBody) || inverseLines.some(line => line.startsWith(`  ${auditInverse} `))) throw new Error(`Relación de auditoría en conflicto: User.${auditInverse}.`);

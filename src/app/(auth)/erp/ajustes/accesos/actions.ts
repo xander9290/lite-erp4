@@ -5,7 +5,7 @@ import { requireAdmin } from "@/lib/auth/access";
 import { AccessError } from "@/lib/auth/policy";
 import { prisma } from "@/lib/prisma";
 import { setGroupMembers, setModelAccess, setRulesActive } from "@/lib/access/admin";
-import { accessOperations, type AccessPerms } from "@/lib/access/declare";
+import { accessPermissionKeys, type AccessPerms } from "@/lib/access/declare";
 
 export type AccessActionState = { ok: boolean; message: string } | null;
 const failure = (error: unknown, fallback: string): AccessActionState => ({ ok: false, message: error instanceof AccessError ? error.message : fallback });
@@ -26,7 +26,7 @@ export async function saveModelAccess(_state: AccessActionState, form: FormData)
   try {
     const models = form.getAll("model").map(text);
     if (models.length > 500) throw new Error("Selección inválida.");
-    const changes = new Map<string, AccessPerms>(models.map(model => [model, Object.fromEntries(accessOperations.map(operation => [operation, form.get(`${model}|${operation}`) === "on"])) as AccessPerms]));
+    const changes = new Map<string, AccessPerms>(models.map(model => [model, Object.fromEntries(accessPermissionKeys.map(operation => [operation, form.get(`${model}|${operation}`) === "on"])) as AccessPerms]));
     await setModelAccess(prisma, await requireAdmin(), text(form.get("group")), changes);
     return done("Permisos guardados.");
   } catch (error) { return failure(error, "No se pudieron guardar los permisos."); }

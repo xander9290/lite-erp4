@@ -25,7 +25,7 @@ export class Pais extends Model {
   estadoIds = Fields.One2many("UbicacionesEstado", {
     label: "Estados",
     inverse: "paisId",
-    maxRows: 50,
+    maxRows: 100,
   });
   active = Fields.Boolean({ label: "Activo", default: true, tracking: true });
   displayName(record: DisplayRecord<Pais, "name">): string {

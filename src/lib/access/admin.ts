@@ -4,7 +4,7 @@ import { registeredModules as modules } from "../modules/installed";
 import { AccessError } from "../auth/policy";
 import type { ModelActor } from "../orm/context";
 import { accessCatalog, internalGroup } from "./engine";
-import { accessOperations, type AccessPerms } from "./declare";
+import { accessOperations, accessPermissionKeys, type AccessPerms } from "./declare";
 
 /** Administration of access control. Every function revalidates an active superuser inside its transaction. */
 async function assertAdmin(tx: Prisma.TransactionClient, actor: ModelActor) {
@@ -13,7 +13,7 @@ async function assertAdmin(tx: Prisma.TransactionClient, actor: ModelActor) {
   if (!user.isAdmin) throw new AccessError("FORBIDDEN");
 }
 const none: AccessPerms = { read: false, create: false, write: false, unlink: false };
-const same = (a: AccessPerms, b: AccessPerms) => accessOperations.every(operation => a[operation] === b[operation]);
+const same = (a: AccessPerms, b: AccessPerms) => accessPermissionKeys.every(operation => Boolean(a[operation]) === Boolean(b[operation]));
 
 export function knownGroup(groupId: unknown) {
   return typeof groupId === "string" ? accessCatalog().groups.get(groupId) : undefined;
@@ -53,7 +53,7 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
     const models = modules.flatMap(definition => definition.models.map(model => {
       const defaults = catalog.grants.get(model.id)?.find(grant => grant.group === groupId)?.perms ?? none;
       const override = overrides.find(row => row.model === model.id);
-      const perms = override ? { read: override.read, create: override.create, write: override.write, unlink: override.unlink } : defaults;
+      const perms = override ? { read: override.read, create: override.create, write: override.write, unlink: override.unlink, import: override.canImport, export: override.canExport } : defaults;
       return { id: model.id, label: `${definition.application.name} · ${model.label}`, defaults, perms, overridden: Boolean(override) };
     }));
     // Rules of this group, plus global rules of the models it can access.
@@ -91,7 +91,10 @@ export async function setModelAccess(prisma: PrismaClient, actor: ModelActor, gr
     for (const [model, perms] of changes) {
       const defaults = catalog.grants.get(model)?.find(grant => grant.group === groupId)?.perms ?? none;
       if (same(perms, defaults)) await tx.accessModelOverride.deleteMany({ where: { groupId, model } });
-      else await tx.accessModelOverride.upsert({ where: { groupId_model: { groupId, model } }, create: { groupId, model, ...perms }, update: perms });
+      else {
+        const data = { read: perms.read, create: perms.create, write: perms.write, unlink: perms.unlink, canImport: Boolean(perms.import), canExport: Boolean(perms.export) };
+        await tx.accessModelOverride.upsert({ where: { groupId_model: { groupId, model } }, create: { groupId, model, ...data }, update: data });
+      }
     }
   }, { isolationLevel: "Serializable" });
 }

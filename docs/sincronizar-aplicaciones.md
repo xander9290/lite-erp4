@@ -22,6 +22,14 @@ vistas ni acciones nuevas en aplicaciones existentes.
    proyecto, incluidas las de otras aplicaciones. Indica la base y el schema.
 4. Pide escribir `aplicar` antes de ejecutar ese SQL. Si hace falta otra migración,
    la prepara con migrate dev --create-only y vuelve a mostrarla para aprobación.
+   Excepción (2026-11-20): si la diferencia consiste **sólo** en índices únicos
+   nuevos (`unique: true` o `uniqueTogether`), Prisma se detendría en su aviso de
+   duplicados porque orm:sync nunca responde sus prompts. En ese caso orm:sync toma
+   el SQL de `migrate diff --script`, comprueba con consultas de lectura que no
+   haya grupos completos duplicados (NULL no colisiona), escribe
+   `<fecha>_<nombre>/migration.sql` y lo muestra para aprobación como cualquier otra.
+   Con duplicados se detiene sin crear el archivo ni modificar datos. Cualquier
+   otra mezcla de cambios sigue por migrate dev.
 5. Comprueba que la base y el esquema coincidan.
 6. Genera Prisma Client, sincroniza contratos y genera/compila los adaptadores.
 7. Comprueba TypeScript y recuerda reiniciar dev si estaba abierto.

@@ -127,6 +127,12 @@ El inicio de dev no sustituye las migraciones ni la generación del acceso a dat
 
 ## Comprobaciones
 
+País y Estado permiten importar/exportar Excel/CSV desde Acciones de ListView, con plantilla,
+revisión antes de confirmar y permisos por grupo/modelo. Requiere aplicar primero
+las migraciones correspondientes: permisos y unicidad País+código de Estado ya
+aplicados con aprobación en desarrollo Windows; no asumirlo en otras máquinas.
+[Contrato, claves externas y límites](docs/importar-exportar-listas.md).
+
 Carga inicial de estados de México: `npm run ubicaciones:import -- TU_LOGIN`
 revisa el plan; añadir `--aplicar` permite confirmarlo desde una terminal.
 [Uso, fuente y pruebas](docs/importar-estados.md). No requiere migración.
@@ -137,6 +143,7 @@ npm run test:orm:install
 npm run test:scaffold
 npm run test:applications
 npm run test:list-selection
+npm run test:list-transfer
 npx tsc --noEmit
 npm run lint
 ```

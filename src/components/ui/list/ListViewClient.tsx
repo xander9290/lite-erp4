@@ -21,6 +21,8 @@ import { emptyListSelection, selectedPageIds, togglePageRecord, toggleWholePage 
 import SelectionCheckbox from "./SelectionCheckbox";
 import { useListDeletion } from "./useListDeletion";
 import ListViewActionMenu from "./ListViewActionMenu";
+import ListTransferDialog from "./ListTransferDialog";
+import type { ListTransfer } from "@/lib/list/transfer-types";
 
 export type ListViewProps = ({ model: ListModel; load?: never } | { model: string; load: (state: ListState) => Promise<ListResult> }) & {
   filterLookups?: Readonly<Record<string, Many2OneLoader>>;
@@ -40,6 +42,7 @@ export type ListViewProps = ({ model: ListModel; load?: never } | { model: strin
   create?: boolean;
   delete?: boolean;
   onDelete?: (selection: readonly ListDeleteTarget[]) => Promise<ListDeleteResult>;
+  transfer?: ListTransfer;
   createLabel?: string;
   recordHref?: string;
   headerActions?: ReactNode;
@@ -55,13 +58,14 @@ const alignmentClasses = { left: "text-left", center: "text-center", right: "tex
 export default function ListViewClient({
   model, load, filterLookups, title, columns, queryColumns, searchFields = Object.hasOwn(listModels, model) ? listModels[model as ListModel].searchFields : [],
   pageSize = 25, defaultSort, paramPrefix = "",
-  createHref, create = true, delete: deleteEnabled = true, onDelete, createLabel = "Nuevo", recordHref, breadcrumbs, headerActions, footer, className = "", renderCell,
+  createHref, create = true, delete: deleteEnabled = true, onDelete, transfer, createLabel = "Nuevo", recordHref, breadcrumbs, headerActions, footer, className = "", renderCell,
 }: ListViewProps) {
   const titleId = useId();
   const config = { model, columns: queryColumns ?? columns, searchFields, defaultSort };
   const list = useListView(config, pageSize, paramPrefix, load);
   const { state, data, loading, error } = list;
   const [selection, setSelection] = useState(emptyListSelection);
+  const [transferMode, setTransferMode] = useState<"import" | "export" | null>(null);
   const selectedIds = selectedPageIds(selection, data);
   const selectedRows = data?.rows.filter(row => selectedIds.includes(row.id)) ?? [];
   const parsedSelection = listDeleteSelectionSchema.safeParse(selectedRows.map(row => ({ id: row.id, revision: row.revision })));
@@ -95,7 +99,10 @@ export default function ListViewClient({
         {filterCount > 0 && <button type="button" className="btn btn-ghost btn-sm gap-1.5 text-primary" onClick={list.clearFilters} aria-label="Limpiar filtros"><X size={14} aria-hidden="true" />{filterCount} filtro{filterCount === 1 ? "" : "s"}</button>}
         {(load || !!state.groupBy?.length) && <ListGroupingControls columns={load ? columns : []} fields={state.groupBy ?? []} onChange={groupBy => list.update({ groupBy })} />}
         {headerActions}
-        {deleteEnabled && selectedIds.length > 0 && <ListViewActionMenu disabled={loading || deletion.busy}
+        {((deleteEnabled && selectedIds.length > 0) || transfer?.canImport || transfer?.canExport) && <ListViewActionMenu disabled={loading || deletion.busy}
+          showDelete={deleteEnabled && selectedIds.length > 0}
+          onImport={transfer?.canImport ? () => setTransferMode("import") : undefined}
+          onExport={transfer?.canExport ? () => setTransferMode("export") : undefined}
           deleteDisabled={!deleteAction || !parsedSelection.success} deleteUnavailable={!deleteAction}
           onDelete={() => { if (deleteAction && parsedSelection.success) void deletion.run(parsedSelection.data, deleteAction, list.refresh); }} />}
         <button type="button" className="btn btn-ghost btn-sm gap-2" disabled={loading || deletion.busy} onClick={list.refresh} aria-label={`Actualizar ${title}`}><RefreshCw size={15} className={loading ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" /><span>Actualizar</span></button>
@@ -103,6 +110,7 @@ export default function ListViewClient({
       </div>
     </header>
 
+    {transfer && transferMode && <ListTransferDialog key={`${model}:${transferMode}`} mode={transferMode} transfer={transfer} state={state} selected={selectedIds} onClose={() => setTransferMode(null)} onApplied={list.refresh} />}
     <div data-slot="body" className="flex min-h-0 min-w-0 flex-1 flex-col p-0">
       <div role="region" aria-label={`Tabla de ${title}`} tabIndex={0} aria-busy={loading} className="@container/list-table min-h-0 min-w-0 flex-1 overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
         <table className="table table-sm w-full min-w-[30rem]">

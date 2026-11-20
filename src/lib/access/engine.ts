@@ -66,14 +66,16 @@ export async function modelPerms(tx: Prisma.TransactionClient, groups: ReadonlyS
   const catalog = accessCatalog();
   const defaults = catalog.grants.get(model) ?? [];
   const overrides = groups.size ? await tx.accessModelOverride.findMany({ where: { model, groupId: { in: [...groups] } } }) : [];
-  return mergePermissions(groups, defaults, overrides);
+  return mergePermissions(groups, defaults, overrides.map(row => ({ ...row, import: row.canImport, export: row.canExport })));
 }
 
 function mergePermissions(groups: ReadonlySet<string>, defaults: readonly AccessGrant[], overrides: readonly (AccessPerms & { groupId: string })[]): AccessPerms {
-  const result = { read: false, create: false, write: false, unlink: false };
+  const result: Record<AccessOperation, boolean> & { import?: boolean; export?: boolean } = { read: false, create: false, write: false, unlink: false };
   for (const group of groups) {
     const perms = overrides.find(row => row.groupId === group) ?? defaults.find(grant => grant.group === group)?.perms;
     if (perms) for (const operation of accessOperations) result[operation] ||= perms[operation];
+    if (perms?.import) result.import = true;
+    if (perms?.export) result.export = true;
   }
   return result;
 }
@@ -88,8 +90,8 @@ export async function readAccessCapabilities(tx: Prisma.TransactionClient, actor
   const byModel = new Map<string, typeof overrides>();
   for (const row of overrides) byModel.set(row.model, [...(byModel.get(row.model) ?? []), row]);
   const permissions = new Map(models.map(model => [model, user.isAdmin
-    ? { read: true, create: true, write: true, unlink: true }
-    : mergePermissions(groups, catalog.grants.get(model) ?? [], byModel.get(model) ?? [])]));
+    ? { read: true, create: true, write: true, unlink: true, import: true, export: true }
+    : mergePermissions(groups, catalog.grants.get(model) ?? [], (byModel.get(model) ?? []).map(row => ({ ...row, import: row.canImport, export: row.canExport })))]));
   // Hints only: a line also needs read access to its owner. The server repeats this check.
   if (!user.isAdmin) for (const [child, owner] of catalog.owners ?? []) {
     if (!permissions.get(owner.model)?.read) permissions.set(child, { read: false, create: false, write: false, unlink: false });

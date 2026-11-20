@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { forceChecks, forcedMigrationSQL, validateForceData } from "./force";
+import { assertNoUniqueDuplicates, uniqueIndexMigration, uniqueIndexMigrationSQL } from "./unique-indexes";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import { Client } from "pg";
@@ -114,6 +115,27 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     return result.status;
   };
   const prisma = (args: string[], codes?: number[]) => run([...args, "--config", join(root, "prisma7.config.ts")], codes);
+  /** Same Prisma CLI, returning stdout (SQL) instead of logging it as progress. */
+  const prismaOutput = (args: string[]) => {
+    const result = spawnSync(process.execPath, [join(root, "node_modules/prisma/build/index.js"), ...args, "--config", join(root, "prisma7.config.ts")], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 120000 });
+    if (result.error) throw result.error;
+    if (result.signal || result.status !== 0) { if (result.stderr) options.log(redact(result.stderr.trimEnd())); throw new Error(`El comando terminó con ${result.signal ?? result.status}. No se ejecutarán los pasos siguientes.`); }
+    return result.stdout;
+  };
+  /** Next timestamp after the newest migration, so prepared files always sort last. */
+  const newMigrationDirectory = async (suffix: string) => {
+    const files = await migrationFiles(root);
+    const last = files.map(file => file.name.slice(0,14)).filter(name => /^\d{14}$/.test(name)).sort().at(-1);
+    let now = new Date();
+    if (last) {
+      const previous = new Date(`${last.slice(0,4)}-${last.slice(4,6)}-${last.slice(6,8)}T${last.slice(8,10)}:${last.slice(10,12)}:${last.slice(12,14)}Z`);
+      if (previous >= now) now = new Date(previous.getTime()+1000);
+    }
+    const stamp = now.toISOString().replace(/[-:T]/g, "").slice(0,14);
+    const directory = join(root, "prisma/migrations", `${stamp}_${options.name ?? `sync_${id.replaceAll("-", "_")}`}${suffix}`);
+    await assertNoSymlinks(directory);
+    return directory;
+  };
   const generate = async () => {
     // Declarative modules build client contracts, uploads and repositories at runtime.
     if (profile.runtime) return;
@@ -170,16 +192,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
       try {
         if (proposal.changes.length && !/^(?:\s|--[^\n]*(?:\n|$))*$/.test(proposal.sql)) {
           stage("Preparar migración --force sin aplicar");
-          const files = await migrationFiles(root);
-          const last = files.map(file => file.name.slice(0,14)).filter(name => /^\d{14}$/.test(name)).sort().at(-1);
-          let now = new Date();
-          if (last) {
-            const previous = new Date(`${last.slice(0,4)}-${last.slice(4,6)}-${last.slice(6,8)}T${last.slice(8,10)}:${last.slice(10,12)}:${last.slice(12,14)}Z`);
-            if (previous >= now) now = new Date(previous.getTime()+1000);
-          }
-          const stamp = now.toISOString().replace(/[-:T]/g, "").slice(0,14);
-          const directory = join(root, "prisma/migrations", `${stamp}_${options.name ?? `sync_${id.replaceAll("-", "_")}`}_force`);
-          await assertNoSymlinks(directory);
+          const directory = await newMigrationDirectory("_force");
           await mkdir(directory);
           prepared = directory;
           preparedSQL = forcedMigrationSQL(proposal.sql, checks);
@@ -204,8 +217,22 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     if (prisma(["migrate", "diff", "--from-config-datasource", "--to-schema", join(root, "prisma/models"), "--exit-code"], [0, 2]) === 2) {
       if (options.force) throw new Error("Quedan diferencias después de aplicar la migración revisada. Revisa el drift; --force no prepara cambios ajenos a su propuesta.");
       stage("Preparar nueva migración sin aplicar");
-      // Closed stdin: Prisma must fail rather than accept a reset or a data-loss prompt.
-      prisma(["migrate", "dev", "--name", options.name ?? `sync_${id.replaceAll("-", "_")}`, "--create-only"]);
+      const script = prismaOutput(["migrate", "diff", "--from-config-datasource", "--to-schema", join(root, "prisma/models"), "--script"]);
+      const indexes = uniqueIndexMigration(script);
+      if (indexes) {
+        // Prisma would stop on its duplicate warning (no terminal): check and prepare it here.
+        stage("Comprobar duplicados de los índices únicos nuevos");
+        const client = new Client({ connectionString: databaseUrl, connectionTimeoutMillis: 10000 });
+        try { await client.connect(); await assertNoUniqueDuplicates(client, target.searchParams.get("schema") || "public", indexes); }
+        finally { await client.end(); }
+        const directory = await newMigrationDirectory("");
+        await mkdir(directory);
+        await writeFile(join(directory, "migration.sql"), uniqueIndexMigrationSQL(script, indexes), { flag: "wx" });
+        options.log(relative(root, join(directory, "migration.sql")));
+      } else {
+        // Closed stdin: Prisma must fail rather than accept a reset or a data-loss prompt.
+        prisma(["migrate", "dev", "--name", options.name ?? `sync_${id.replaceAll("-", "_")}`, "--create-only"]);
+      }
       if (!(await pending()).length) throw new Error("No se creó una migración pendiente. Revisa el estado manualmente.");
       await applyPending();
     }

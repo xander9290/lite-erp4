@@ -1,5 +1,10 @@
 # ListView · Card con filtros por columna
 
+Importación/exportación Excel/CSV opcional en Acciones, incluso sin selección.
+ModelCollection sólo conecta `transfer` en ListView estándar de modelos que lo
+declaran; no en Card/Kanban, fuentes personalizadas o colecciones embebidas.
+Permisos y ejecución se revalidan en servidor. [Contrato y piloto País](../../../../docs/importar-exportar-listas.md).
+
 Los servicios declarativos publican `$displayName` por registro, separado de sus
 escalares. Las columnas name/id de texto lo presentan por defecto y los controles
 accesibles lo usan como nombre del registro. `displayName: false` conserva el valor

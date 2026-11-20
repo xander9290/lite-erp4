@@ -19,7 +19,7 @@ const catalog: AccessCatalog = {
     ["unit.catalog", [{ group: "unit.reader", model: "unit.catalog", perms: read }]],
   ]), rules: new Map(), models: new Map([["unit.item", {}], ["unit.catalog", {}], ["unit.empty", {}]]),
 };
-type Override = AccessPerms & { groupId: string; model: string };
+type Override = AccessPerms & { groupId: string; model: string; canImport?: boolean; canExport?: boolean };
 function fixture({ groups = ["unit.writer"], overrides = [] as Override[], active = true, admin = false, version = 1 } = {}) {
   const queries: string[] = [];
   const tx = {
@@ -65,7 +65,7 @@ test("capabilities revalidate active/session before permissions; actual administ
   const f = fixture({ admin: true });
   const value = await readAccessCapabilities(f.tx, { id: "a", sessionVersion: 1 }, catalog);
   assert.deepEqual(f.queries, ["user"]);
-  assert.deepEqual(value.modelAccess["unit.empty"], { read: true, create: true, write: true, unlink: true });
+  assert.deepEqual(value.modelAccess["unit.empty"], { read: true, create: true, write: true, unlink: true, import: true, export: true });
 });
 
 test("UI capabilities fail closed and cannot turn a read denial into writable navigation", () => {
@@ -79,6 +79,24 @@ test("UI capabilities fail closed and cannot turn a read denial into writable na
   assert.equal(allowsActionGroups({ ...actor, isAdmin: true }, "unit", ["writer"]), true);
 });
 
+test("transfer permissions default closed, combine grants across groups and honor per-group overrides", async () => {
+  const transfers: AccessCatalog = { ...catalog, grants: new Map(catalog.grants) };
+  transfers.grants.set("unit.item", [
+    { group: "unit.reader", model: "unit.item", perms: { ...read, import: true } },
+    { group: "unit.writer", model: "unit.item", perms: { ...write, export: true } },
+  ]);
+  const f = fixture();
+  const granted = (await readAccessCapabilities(f.tx, { id: "a", sessionVersion: 1 }, transfers)).modelAccess["unit.item"];
+  assert.equal(granted.import, true); assert.equal(granted.export, true);
+  const denied = fixture({ overrides: [{ ...write, groupId: "unit.writer", model: "unit.item", canImport: false, canExport: false }] });
+  const overridden = (await readAccessCapabilities(denied.tx, { id: "a", sessionVersion: 1 }, transfers)).modelAccess["unit.item"];
+  assert.equal(overridden.import, true, "another inherited group can still grant import");
+  assert.equal(Boolean(overridden.export), false);
+  const db = fixture({ overrides: [{ ...read, groupId: "unit.reader", model: "unit.catalog", canImport: true, canExport: true }] });
+  const saved = (await readAccessCapabilities(db.tx, { id: "a", sessionVersion: 1 }, catalog)).modelAccess["unit.catalog"];
+  assert.equal(saved.import, true); assert.equal(saved.export, true);
+});
+
 
 test("One2many hints require owner read permission without granting child permissions", async () => {
   const owned: AccessCatalog = { ...catalog, owners: new Map([["unit.item", { model: "unit.catalog", relation: "catalog" }]]) };
@@ -90,5 +108,5 @@ test("One2many hints require owner read permission without granting child permis
   const childDenied = fixture({ overrides: [{ ...denied, model: "unit.item", groupId: "unit.writer" }, { ...denied, model: "unit.item", groupId: "unit.reader" }] });
   assert.deepEqual((await readAccessCapabilities(childDenied.tx, actor, owned)).modelAccess["unit.item"], denied);
   const admin = fixture({ admin: true });
-  assert.deepEqual((await readAccessCapabilities(admin.tx, actor, owned)).modelAccess["unit.item"], { read: true, create: true, write: true, unlink: true });
+  assert.deepEqual((await readAccessCapabilities(admin.tx, actor, owned)).modelAccess["unit.item"], { read: true, create: true, write: true, unlink: true, import: true, export: true });
 });

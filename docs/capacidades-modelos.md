@@ -1,5 +1,11 @@
 # Capacidades efectivas por modelo
 
+Importar/exportar (2026-11-20): concesiones independientes por grupo/modelo,
+sin ampliar CRUD. `false`/omitido no concede; otro grupo puede conceder, con
+overrides por pareja grupo/modelo. Sólo ListView ofrece estas acciones en modelos
+con contrato `transfer`. Servidor exige además read y create/write según la fila.
+[Contrato, migración y límites](importar-exportar-listas.md).
+
 Implementado el 2026-11-14 para módulos declarativos, incluida Flota.
 La ruta compartida entrega a las vistas `config.capabilities`: `read`, `create`,
 `write`, `unlink` y `move`. Las vistas TSX mantienen su diseño y no necesitan

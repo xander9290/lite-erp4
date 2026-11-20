@@ -39,6 +39,9 @@ export function extensionFields(extension: ModelExtension): Readonly<Record<stri
   if (typeof Extended !== "function" || !(Extended.prototype instanceof Probe)) throw new Error("La extensión debe devolver una subclase: Base => class extends Base {...}.");
   const fields: Record<string, Field> = {};
   for (const [name, value] of Object.entries(new Extended())) {
+    if (name === "uniqueTogether" && value !== undefined) {
+      throw new Error("uniqueTogether debe declararse en el modelo dueño, no en una extensión.");
+    }
     if (value === undefined || typeof value === "function") continue;
     // Many2many of an extension are stored through its companion row (extensionMany2many).
     if (isMany2many(value)) continue;

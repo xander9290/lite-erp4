@@ -14,6 +14,10 @@ import type { Many2OneResult } from "@/lib/many2one/types";
 import type { ReactionResult } from "@/lib/orm/reactions.types";
 import type { CloudinaryImageSignatureResult } from "@/lib/uploads/cloudinary-signature";
 import { childCollectionList, creatorLookup, getModuleModel, imageSigner, modelService, withActor, relationLookup, relationQuickCreate, type QuickCreateResult } from "./registry";
+import { applyTransfer, exportTransfer, reviewTransfer } from "../list/transfer";
+import { MAX_IMPORT_BYTES, TransferInputError } from "../list/transfer-file";
+import type { TransferFile, TransferPlan, TransferResult } from "../list/transfer-types";
+import { ModelValidationError } from "../orm/context";
 
 /*
  * Single entry point for declarative module models. Every export is a public endpoint:
@@ -29,6 +33,30 @@ function resolve(id: unknown) {
   const found = getModuleModel(id);
   if (!found) throw new Error(unknownModel);
   return { entry: found.entry, service: modelService(found.entry.id) };
+}
+
+export async function modelTransferReview(model: string, form: FormData): Promise<TransferResult<TransferPlan>> {
+  try {
+    const actor = await requireUser();
+    const file = form.get("file");
+    if (!(file instanceof File) || file.size > MAX_IMPORT_BYTES) throw new Error("Archivo inválido.");
+    const data = await reviewTransfer(prisma, actor, model, file.name, Buffer.from(await file.arrayBuffer()));
+    return { ok: true, data };
+  } catch (error) { return { ok: false, error: error instanceof AccessError || error instanceof ModelValidationError || error instanceof TransferInputError ? error.message : "No se pudo revisar el archivo. Comprueba formato, tamaño, encabezados y permisos." }; }
+}
+
+export async function modelTransferApply(model: string, token: string): Promise<TransferResult<{ created: number; updated: number; unchanged: number }>> {
+  try {
+    const data = await applyTransfer(prisma, await requireUser(), model, token);
+    const { entry } = resolve(model);
+    revalidatePath(entry.route);
+    return { ok: true, data };
+  } catch (error) { return { ok: false, error: error instanceof AccessError || error instanceof ModelValidationError ? error.message : "No se pudo aplicar el plan. Vuelve a revisar el archivo antes de intentar otra vez." }; }
+}
+
+export async function modelTransferExport(model: string, input: unknown): Promise<TransferResult<TransferFile>> {
+  try { return { ok: true, data: await exportTransfer(prisma, await requireUser(), model, input) }; }
+  catch (error) { return { ok: false, error: error instanceof AccessError || error instanceof ModelValidationError ? error.message : "No se pudo generar el archivo. Revisa los filtros y permisos." }; }
 }
 
 export async function modelRead(model: string, id: unknown): Promise<FormViewLoadResult<Values>> {

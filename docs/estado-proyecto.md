@@ -8,6 +8,192 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Progreso guardado (2026-11-20, punto de continuación)
 
+### Cierre vigente: País, Estado y Municipio operativos (2026-11-20)
+
+Rama `codex/importexport`, HEAD `d48aef1` (Merge branch codex/partner). Todo lo de
+importación/exportación, Municipio y el arreglo de orm:sync sigue **sin commit**
+(~50 rutas), incluidas tres migraciones nuevas: `20261120210000_list_transfer_permissions`,
+`20261120223000_estado_country_code_unique` y `20261120223001_sync_ubicaciones`.
+Las tres están aplicadas en desarrollo Windows (`migrate status` al día); no asumirlas
+en otra máquina. Commit/push los hace el usuario. El maxRows 100 de País es suyo.
+
+**Completado:**
+
+- ListView estándar: plantillas, importación/exportación Excel/CSV, permisos
+  import/export por grupo/modelo, revisión por fila + simulación del lote con
+  rollback, plan firmado y aplicación atómica.
+- País (`codigo`) y Estado (País+código, `paisId.codigo`): confirmados por el usuario.
+- Municipio (fase 3): referencias Many2one con clave compuesta del destino y saltos
+  anidados (máx. 2): columnas `estadoId.paisId.codigo` + `estadoId.codigo`. El usuario
+  declaró `uniqueTogether` y `transfer`; índice único aplicado; integración temporal
+  completa («✓ Municipio») y probado por el usuario en la ListView. Contrato en
+  [transferencias](importar-exportar-listas.md#municipio-referencia-con-clave-compuesta-fase-3).
+- orm:sync: un diff que sólo agrega índices únicos (simples o `uniqueTogether`) ya no
+  se bloquea en el aviso de Prisma; se prepara desde `migrate diff --script` tras
+  comprobar duplicados por grupo y se aprueba con «aplicar». Usado por el usuario
+  para `20261120223001_sync_ubicaciones`. [Guía](sincronizar-aplicaciones.md).
+- Etiquetas en Contactos: ver «Etiquetas en Contactos» más abajo.
+
+**Verificaciones vigentes:** `test:list-transfer` 8/8, `test:list-transfer:integration`
+completo, `test:modules` 62, unique-indexes + sync.test 5/5, `test:orm:install` 15/21
+(6 fallos = EPERM previo de symlinks en Windows), `tsc` y ESLint de lo tocado.
+
+**Pendientes, en orden propuesto:**
+
+1. Commit del usuario de todo lo anterior (con las tres migraciones juntas).
+2. Carga inicial de Municipios INEGI (~2.470; Oaxaca ~570): por CLI como Estados,
+   porque la ListView admite 200 filas por archivo y 2.000 por exportación. Diseñar
+   y presentar el importador antes de escribirlo; no ejecutar cargas reales por el
+   agente. Antes, confirmar que repetir el de Estados sin `--aplicar` da 32 sin cambios.
+3. Localidad: misma receta (identidad Municipio+código, `uniqueTogether`, `transfer`
+   con tres saltos). Hoy el límite es 2 saltos: Localidad→Municipio→Estado→País
+   necesita 3; decidir ampliarlo o una clave distinta antes de tocar Localidad.
+   Volumen (~300 mil) exige CLI/lotes. No editar Localidad todavía.
+4. Comprobaciones reales del usuario: repetición sin cambios y exportar→reimportar
+   de País/Estado/Municipio con filtros/selección y una cuenta no admin.
+5. Prueba de integración para el error «columnas juntas» (referencia fuera de la
+   clave); hoy sólo la cubre el código.
+6. Siguientes capacidades del importador: Many2many (agregar frente a reemplazar),
+   One2many, Date/DateTime, mapeo de encabezados y lotes grandes con idempotencia.
+7. Planes firmados para varias instancias (hoy efímeros por proceso, 15 min); no
+   habilitar multiworker sin contrato compartido. Estrategia de producción pendiente.
+8. Contactos: enlace «Etiquetas» en Configuración, `drawer: false` en Ubicaciones y
+   Notebook opcional (detalle en su sección).
+9. Portabilidad de pruebas: EPERM de symlinks en `test:orm`/`test:orm:install`; no
+   omitir protecciones ni presentar esas suites como aprobadas por completo.
+
+**Oportunidad de simplificación:** revisión por fila + simulación del lote repite
+trabajo deliberadamente para conservar errores localizados y detectar efectos
+acumulados. Evaluar una revisión única por lote sólo si el volumen lo justifica;
+aceptación: mismas validaciones/hooks/permisos, errores por fila, rollback completo,
+límites y concurrencia, sin confirmar escrituras durante la revisión.
+
+Este cierre sólo actualiza documentación y verifica `git diff --check`; no repite
+suites, consultas de BD, importaciones ni migraciones. Las verificaciones de código
+registradas abajo corresponden a sus respectivos alcances ya ejecutados.
+
+### Límite acumulado al importar Estados: revisión corregida (2026-11-20)
+
+Usuario recibió rechazo al confirmar en fila 154. Causa en código: País.estadoIds
+es One2many editable con maxRows=50; varias filas del mismo País podían validar
+individualmente y exceder el total al aplicarse juntas. No se relajó el guardado.
+Corregido el importador: después de revisar filas simula el lote completo con el
+mismo flujo de aplicación, en Serializable con rollback obligatorio; un rechazo
+acumulado marca la fila y no entrega token de confirmación. Sin mutar modelos,
+permisos o límites. El error de límite ahora indica el máximo y se distingue de
+lectura parcial; primero se verifica acceso a la colección, sin filtrar conteos
+de registros restringidos.
+
+El usuario eligió explícitamente **conservar líneas editables** frente a convertir
+a consulta paginada; después aumentó maxRows de 50 a 100 en Pais y confirmó que
+la importación funcionó (2026-11-20). Cambio contrastado con el código; éxito de
+la carga real confirmado por el usuario, sin comprobación independiente del agente.
+Mantener maxRows=100, acceso heredado, escritura y revisión del País.
+Archivos separados no permiten superar 100 Estados
+totales por País. El importador rechazará cualquier lote que exceda ese contrato.
+No cambiar a readonly ni aumentar el máximo sin una decisión posterior.
+
+Reproducción histórica con maxRows=50 en esquema temporal: 51 Estados del mismo País validan por separado,
+pero la revisión completa marca la fila 52, sin confirmar Estados, revisión del
+padre ni historial. Integración de País/Estado aprobada y esquema eliminado;
+TypeScript y ESLint focalizado aprobados. Sin nuevas migraciones ni escrituras
+en registros del ERP. Contrato en [importar/exportar](importar-exportar-listas.md).
+Regresión final: list-grouping 17 y build aprobados, con los mismos tres avisos
+de tracing del gestor; sin nueva revisión visual en navegador.
+Tras el aumento del usuario a 100: la prueba de límite usa el maxRows declarado;
+integración temporal aprobada con 101 Estados y rechazo en revisión de la fila 102,
+sin filas/revisiones/historial confirmados. Esquema eliminado; ESLint del script
+y git diff --check aprobados. El modelo fue editado por el usuario.
+
+### Estado: fase 2 de transferencias implementada e índice único aplicado
+
+Autorizada por el usuario tras el plan; rama codex/importexport, conservados todos
+los cambios sin commit de fase 1. Estado publica key [paisId,codigo] y campos
+paisId/codigo/name/active, con relations.paisId.key=codigo. Plantillas/exportaciones
+usan paisId.codigo; se normaliza/resuelve País con lectura/reglas, sin crear
+relacionados, aceptar IDs ni buscar por nombres. La identidad compuesta permite
+repetir un código en países distintos. Municipios no se modificó ni habilitó.
+
+Framework: uniqueTogether en la clase de modelo (sólo campos persistentes públicos
+obligatorios, sin extensiones), propagado al contrato/generador como @@unique.
+Validación de contratos de transferencia al componer módulos. El servicio busca
+claves simples/compuestas bajo autorización; resolver País sólo lee sus escalares,
+sin cargar todas sus líneas. Las referencias se firman y revalidan antes de todas
+las escrituras; la revisión del padre avanzada por hermanos del mismo lote no
+invalida falsamente el plan. Resultado y dominios finales se revalidan; la caché
+de referencias de exportación es sólo del snapshot readonly de esa petición.
+Contrato y límites en [importar/exportar](importar-exportar-listas.md).
+
+`orm:install -- ubicaciones --update --write` generó esquema/registro gestionados
+(incluido reordenamiento de inversas User, sin cambio funcional); Prisma Client
+regenerado. Migración `20261120223000_estado_country_code_unique` aplicada el
+2026-11-20 en desarrollo Windows con aprobación explícita del usuario:
+CREATE UNIQUE INDEX ubicaciones_estado_pais_id_codigo_key en pais_id,codigo.
+Preflight: era la única pendiente, sin migraciones fallidas y 0 grupos duplicados.
+`migrate deploy` terminó correctamente. Verificados historial finalizado e índice
+único válido sobre pais_id,codigo en pg_index; ninguna migración pendiente.
+No se importaron ni editaron registros del ERP para probar esta fase. No asumir
+esta aplicación en otras máquinas.
+
+Verificación: test:list-transfer 7, integración temporal de País y Estado aprobada,
+incluidos tres Estados de dos países, hermanos en un lote, revisión del padre,
+noops, unicidad de BD fuera del importador, Excel/CSV→reimportación, referencias
+faltantes/IDs/duplicados, renombrar y reasignar código del País, permisos heredados,
+revocación, dominio y exportación histórica legible, fallo tardío de afterSave con
+rollback de Estados/padres/historial. Esquema temporal eliminado. TypeScript,
+ESLint focalizado, modules 62, list-grouping 17 y build aprobados (tres avisos de
+tracing previos del gestor). test:orm 115/116: EPERM previo al crear symlink de
+archivo; test:orm:install también limitado por EPERM de symlinks en fixtures de
+Windows, no presentarlo como aprobado. Sin revisión visual nueva.
+
+Continuación de esta fase: el usuario ya confirmó la importación de Estado tras
+aumentar maxRows a 100; no repetirla como efecto de ponerse en contexto.
+Destinos Many2one con clave compuesta y
+referencias de varios saltos, necesarios para Municipio, siguen pendientes;
+no adelantar su aplicación ni eliminar el importador específico INEGI.
+
+### Importar/exportar ListView: fase 1 implementada y migración aplicada en desarrollo
+
+Rama `codex/importexport`, árbol limpio al iniciar. Opt-in `transfer` en el manifest;
+País publica codigo/name/active, con codigo único. Aunque declara estadoIds, sus
+líneas no se transfieren y se conservan al actualizar. Menú Acciones sólo en la
+ListView estándar: plantillas Excel/CSV, revisión por filas, confirmación firmada,
+altas/cambios/sin cambios, exportación de seleccionados o todos los filtrados.
+Permisos import/export en grupos y Ajustes → Accesos, además de CRUD y reglas.
+Detalle, límites, semántica de vacíos y siguientes fases en
+[el contrato](importar-exportar-listas.md).
+
+La revisión prueba el servicio completo por fila en una transacción que siempre
+se revierte; la aplicación revalida el plan y guarda el lote en Serializable,
+sin reintentos automáticos. Se comprueban documento/revisión, permisos y resultado
+aprobado; fallo tardío revierte filas e historial. Plan efímero por proceso,
+15 minutos, sin persistir archivos ni nuevas credenciales. Date/relaciones,
+mapeo alternativo de columnas y trabajos grandes siguen pendientes.
+
+Migración `20261120210000_list_transfer_permissions` aplicada el 2026-11-20 a
+desarrollo local Windows con aprobación explícita del usuario: sólo agrega
+can_import/can_export NOT NULL DEFAULT false a access_model_overrides. Prisma
+Client generado previamente. Preflight confirmó que era la única pendiente y
+que no había migraciones fallidas; `migrate deploy` terminó correctamente.
+Verificados historial con finished_at y ambas columnas Boolean NOT NULL DEFAULT
+false en information_schema. No se importaron países ni se cambiaron permisos
+o datos de negocio. No asumir esta aplicación en otras máquinas.
+
+Verificaciones actuales: test:list-transfer 5 (formatos/límites/contratos), integración PostgreSQL en
+esquema list_transfer_test_<aleatorio> eliminado (crear/cambiar/noop, autor/historial,
+conservación de Estados, rechazo de duplicados/errores, rollback tardío, planes
+alterados/repetidos/obsoletos y revocación de permisos; exportación por filtros y
+selección en ambos formatos, afterSave rechazado y sesión desactivada); access 6, modules 62, list-selection 8,
+list-grouping 17, lifecycle 2, TypeScript y ESLint focalizado aprobados. Build
+aprobado fuera del sandbox con tres avisos de tracing en el gestor de módulos;
+la ejecución en sandbox se detuvo tras quedar sin progreso. Modules pasó fuera
+del sandbox tras EPERM en fixtures temporales dentro de él. Sin revisión visual
+nueva del diálogo en navegador. `git diff --check` aprobado. Los siguientes pasos enumerados más abajo son
+históricos de Contactos y no sustituyen esta prioridad.
+
+Siguiente: reiniciar dev si seguía abierto y comprobar Acciones de País con plantilla, revisión/cancelación,
+confirmación y exportación. No aplicar migraciones ajenas automáticamente.
+
 Revisión posterior de contexto (2026-11-20): rama `codex/partner`, HEAD `c7e14da`
 (Implementación de etiquetas). El framework descrito abajo ya está en Git. Cambios
 locales al retomar: este documento y PartnerInsertions (Notebook `extras` insertado
@@ -27,31 +213,35 @@ Verificación del enlace: `test:applications` (14), ESLint del manifest y
 Revisión de fuentes/Git únicamente, sin pruebas, consultas de BD ni migraciones;
 `git diff --check` aprobado para esta actualización documental.
 
-Framework terminado y verificado en esta jornada (detalle en las secciones de abajo): inserciones
-en formularios y colecciones, Many2many en extensiones, `drawer: false`, `create: true` en
-Many2many, FieldRelationTag sin textos de ayuda bajo el control (sólo estados excepcionales:
-carga, error, no disponibles, dominio) y Many2many en colecciones. Cambios pendientes de commit
-del usuario desde `1fe51cf` (create, helper de FieldRelationTag, etiquetas en colecciones y
-estas notas).
+### Etiquetas en Contactos (revisado 2026-11-20)
 
-Siguiente del usuario en Contactos, en este orden y a su ritmo (él escribe el código):
+Framework de esta línea terminado y ya en commits del usuario (`c7e14da`, `161d61c`, merge
+`d48aef1`): inserciones en formularios y colecciones, Many2many en extensiones,
+`drawer: false`, `create: true` en Many2many, FieldRelationTag sin textos de ayuda (sólo
+estados excepcionales) y Many2many en colecciones. Detalle en las secciones de abajo.
 
-1. Decidir si renombra `PartnerTags` a singular antes de crear la tabla de vínculos.
-2. `npm run orm:sync -- contactosextra`: debe proponer sólo CREATE/FK de
-   `contactosextra_core_partner_tag_ids_rel`; reiniciar el dev server.
-3. `<FieldRelationTag name="tagIds" />` en `PartnerInsertions` y, opcional, `create: true` en
-   `tagIds` (sin sync).
-4. `<Column field="tagIds" label="Etiquetas" />` en `PartnerListInsertions`.
-5. Enlace «Etiquetas» en Configuración de Contactos (`/erp/contactosextra/partnertags`, model
-   `contactosextra.partnertags`, contactosextra en `depends`); decidir `drawer: false` en
-   Ubicaciones.
-6. Pestañas (opcional): Notebook con `id` estable en `ContactForm` (recomendado `id="extra"` si
+Hecho por el usuario (comprobado en el código; `prisma migrate status` al día, `tsc` limpio;
+sin revisión en navegador por el agente):
+
+- Tabla `contactosextra_core_partner_tag_ids_rel` creada por sync (`20261120201830`).
+  `PartnerTags` conserva el nombre plural: renombrarlo ya implicaría migración.
+- `tagIds` con `create: true` y `maxSelected: 20`; `FieldRelationTag name="tagIds"` en
+  `PartnerInsertions`; `<Column field="tagIds" label="Etiquetas" />` en
+  `PartnerListInsertions`.
+- `drawer: false` en contactosextra; Contactos ya tiene `contactosextra` en `depends`.
+
+Pendiente del usuario, a su ritmo:
+
+1. Enlace «Etiquetas» en Configuración de Contactos (`/erp/contactosextra/partnertags`, model
+   `contactosextra.partnertags`): aún no está en el manifest de Contactos.
+2. Decidir `drawer: false` en Ubicaciones.
+3. Pestañas (opcional): Notebook con `id` estable en `ContactForm` (recomendado `id="extra"` si
    varios módulos agregarán páginas) o insertado por la extensión tras `group:contacto`.
    Destinos `notebook:<id>` (inside sólo NotebookPage) y `page:<id>/<name>`; las páginas
    insertadas no son destino. Contrato en [inserciones](inserciones-vistas.md).
 
-Después se retoma la guía de dirección: comprobar la repetición de la importación de estados
-sin `--aplicar` (32 sin cambios) y luego los importadores de Municipios y Localidades.
+La guía de dirección continúa con el cierre de importación/exportación de arriba (Municipio
+como siguiente piloto).
 
 ## Many2many en colecciones: columnas y filtros (2026-11-20)
 
@@ -166,10 +356,12 @@ en modelos propios. Registrar este pendiente no inicia su implementación.
   modelFields (incluido contexto/dirección de Stack) y `git diff --check`
   aprobados. Sin nueva revisión visual en navegador.
 
-## Pendiente: importación y exportación desde ListView
+## Importación y exportación desde ListView: alcance de fases siguientes
 
-Solicitado por el usuario el 2026-11-19. Pendiente de diseño e implementación;
-este registro no inicia su desarrollo ni sustituye la guía en curso.
+Solicitado por el usuario el 2026-11-19. Fase 1 de campos simples implementada el
+2026-11-20, con activación en la BD del ERP pendiente (ver arriba). El alcance
+original de abajo conserva las capacidades previstas para fases posteriores;
+no implica que relaciones, mapeo interactivo o trabajos grandes ya existan.
 
 - Integrar en Acciones de ListView la exportación Excel/CSV de seleccionados o
   de todos los registros que coincidan con los filtros, respetando permisos de

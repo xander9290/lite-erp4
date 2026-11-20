@@ -18,10 +18,13 @@ import { MAX_LINE_DEPTH } from "../orm/one2many";
 import { declaredNames, extensionFields, extensionMany2many, isModelExtension, type ModelExtension } from "./extend";
 import { relationFieldName } from "../orm/display";
 import type { CollectionDomain } from "../orm/domain";
+import { validateTransferSpec, type TransferSpec } from "../list/transfer-contract";
 
 type ModelClass = new () => Model;
 export type ModuleModelSpec = ModelClass | {
   readonly model: ModelClass;
+  /** Explicit scalar transfer contract; only exposed by the standard ListView. */
+  readonly transfer?: TransferSpec;
   /** Server source shared by list/card/kanban; never changes record access. */
   readonly domain?: CollectionDomain;
   /** Snake-case table override; defaults to `<module>_<key>`. */
@@ -278,6 +281,7 @@ export function compileModuleModel(id: string, modelKey: string, options: Module
     related: Object.keys(contract.relatedFields),
   });
   const list = auditListPolicy(`${id}.${modelKey}`, collectionMetadata, options);
+  if (options.transfer) validateTransferSpec(options.transfer, contract.metadata, clientFields, list.fields, Boolean(options.repository), contract.uniqueTogether);
   validateCollectionComputed(contract, list.fields.filter(field => Object.hasOwn(contract.computedFields, field)), list.fields);
   const kanban = compileKanbanConfig(options.kanban, contract.metadata, contract.actions, list.fields);
   const view = options.view ?? "list";

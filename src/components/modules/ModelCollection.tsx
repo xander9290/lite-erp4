@@ -6,7 +6,7 @@ import ListView, { type ListViewProps } from "@/components/ui/list/ListView";
 import CardView from "@/components/ui/card/CardView";
 import KanbanView from "@/components/ui/kanban/KanbanView";
 import type { CollectionProps } from "@/components/ui/collection/types";
-import { modelCreators, modelLookup, modelDelete, modelKanban, modelList, modelMove } from "@/lib/modules/actions";
+import { modelCreators, modelLookup, modelDelete, modelKanban, modelList, modelMove, modelTransferReview, modelTransferApply, modelTransferExport } from "@/lib/modules/actions";
 import type { CollectionView, ModelClientConfig } from "@/lib/modules/config";
 import { modelCollection, type CollectionSource, type ModelColumn } from "@/lib/modules/collection";
 import { modelUiCapabilities } from "@/lib/access/capabilities";
@@ -122,5 +122,11 @@ function CollectionBody({ config, columns: declared, view = config.view, title =
     return <KanbanView {...common} {...source.kanban} load={source.provider.loadKanban} onMove={movable && capabilities.move ? source.provider.move : undefined} />;
   }
   if (view === "card") return <CardView {...common} load={source.provider.load} />;
-  return <ListView {...common} load={source.provider.load} delete={canDelete && capabilities.unlink} onDelete={source.provider.remove} renderCell={renderCell} />;
+  const transfer = config.transfer && !embedded && !provider ? {
+    ...config.transfer,
+    review: modelTransferReview.bind(null, config.id),
+    apply: modelTransferApply.bind(null, config.id),
+    download: (format: import("@/lib/list/transfer-types").TransferFormat, state: unknown, selection: readonly string[], template: boolean) => modelTransferExport(config.id, { format, state, selection, template }),
+  } : undefined;
+  return <ListView {...common} transfer={transfer} load={source.provider.load} delete={canDelete && capabilities.unlink} onDelete={source.provider.remove} renderCell={renderCell} />;
 }

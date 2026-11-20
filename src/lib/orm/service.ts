@@ -48,6 +48,7 @@ import { validateMany2many } from "./many2many";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = CollectionComputed & {
+  readonly uniqueTogether?: readonly (readonly string[])[];
   readonly computedFields?:Readonly<Record<string,Field>>;
   readonly many2manyFields?: Readonly<Record<string, import("./fields").Many2manyField>>;
   readonly one2manyFields?: Readonly<Record<string, import("./fields").One2manyField>>;
@@ -404,10 +405,10 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     return rows.map(row => ({ ...row, ...Object.fromEntries(linked.map(([field, byRow, readable]) => [field, (byRow.get(row.id) ?? []).filter(id => readable.has(id))])) }));
   }
 
-  async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>): Promise<ListResult> {
+  async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>, transaction?: Prisma.TransactionClient): Promise<ListResult> {
     try {
-      const data = await prisma.$transaction(async tx => {
-        if (computedNames.length) await tx.$executeRaw`SET TRANSACTION READ ONLY`;
+      const query = async (tx: Prisma.TransactionClient) => {
+        if (computedNames.length && !transaction) await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         const scope = await authorize(tx, actor, "read");
         const fixedDomain = domain ? await domain({ actor: Object.freeze({ id: actor.id, sessionVersion: actor.sessionVersion }), tx }) : undefined;
         const baseDomain = presentation.domain ? await compileCollectionDomain(domainMetadata, presentation.domain, { actor: Object.freeze({ ...actor }), tx }) : undefined;
@@ -469,10 +470,11 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const publishedRows = policy ? rows.map(row => projectListRow(row, [...policy.fields, ...policy.fields.flatMap(name => auditAvatarField(name) ? [auditAvatarField(name)!] : [])])) : rows;
         const linkedRows = await withMany2manyIds(tx, publishedRows, access);
         return { rows: linkedRows.map(row => ({ ...row, $displayName: names.get(row.id)! })), total, page, pageSize: state.pageSize };
-      }, { isolationLevel: "RepeatableRead" });
+      };
+      const data = transaction ? await query(transaction) : await prisma.$transaction(query, { isolationLevel: "RepeatableRead" });
       // Labels use independently authorized lookups after the list snapshot; no cross-request cache.
       // They are presentation, never predicates, ordering keys or authorization inputs.
-      return presentation.relations ? resolveListLabels({ ok: true, data }, presentation.relations) : { ok: true, data };
+      return !transaction && presentation.relations ? resolveListLabels({ ok: true, data }, presentation.relations) : { ok: true, data };
     } catch (error) { return { ok: false, error: messageFor(error) }; }
   }
 
@@ -638,7 +640,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       const scope = await authorize(tx, actor, "read");
       const where = { [inverse]: id };
       const total = await repository.count(tx, where);
-      if (total > maximum || (scope && await repository.count(tx, { AND: [where, scope] }) !== total)) throw new ModelValidationError("No se puede abrir la colección completa de líneas con tus permisos o su límite actual.");
+      if (scope && await repository.count(tx, { AND: [where, scope] }) !== total) throw new ModelValidationError("No se puede abrir la colección completa de líneas con tus permisos.");
+      if (total > maximum) throw new ModelValidationError(`La colección supera el límite de ${maximum} líneas editables del registro padre.`);
       const rows = await repository.list(tx, { where: scope ? { AND: [where, scope] } : where, sort: "id", direction: "asc", skip: 0, take: maximum + 1 });
       if (rows.length !== total) throw new ModelValidationError("La colección de líneas cambió. Recarga el documento.");
       const documents = rows.map(row => projectListRow(row, Object.keys(model.metadata)) as Document);
@@ -668,5 +671,16 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       await persist(tx, actor, current, "Líneas actualizadas", { previous });
     },
   };
-  return { transaction, react, read, save, action, actions: model.actions ?? [], remove, activity, addNote, lookup, lookupInTransaction, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
+  async function findUniqueInTransaction(tx: Prisma.TransactionClient, actor: ModelActor, field: string | readonly string[], value: unknown, scalar = false) {
+    const keys = typeof field === "string" ? [field] : field;
+    const unique = keys.length === 1 ? keys[0] === "id" || model.metadata[keys[0]]?.unique : model.uniqueTogether?.some(group => group.length === keys.length && group.every(key => keys.includes(key)));
+    if (!unique || !repository.lookup || keys.some(key => key !== "id" && (!model.metadata[key] || model.metadata[key].sensitive))) throw new ModelValidationError("La clave de importación no está habilitada.");
+    const values = typeof field === "string" ? { [field]: value } : value as Record<string, unknown>;
+    if (!values || typeof values !== "object" || Object.keys(values).length !== keys.length || keys.some(key => !Object.hasOwn(values, key) || values[key] === null || values[key] === undefined || values[key] === "")) throw new ModelValidationError("La clave de importación está incompleta.");
+    const scope = await authorize(tx, actor, "read");
+    const rows = await repository.lookup(tx, { fields: ["id"], where: { AND: [values, ...(scope ? [scope] : [])] }, skip: 0, take: 2 });
+    if (rows.length > 1) throw new ModelValidationError("La clave de importación no es única.");
+    return rows[0] ? scalar ? repository.read(tx, String(rows[0].id)) : transaction.snapshot(tx, actor, String(rows[0].id)) : null;
+  }
+  return { transaction, findUniqueInTransaction, listInTransaction: (prisma: PrismaClient, tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, undefined, tx), react, read, save, action, actions: model.actions ?? [], remove, activity, addNote, lookup, lookupInTransaction, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
 }

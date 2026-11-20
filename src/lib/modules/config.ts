@@ -47,6 +47,7 @@ export type ModelChildCollectionConfig = {
   readonly config: ModelClientConfig;
 };
 export type ModelClientConfig = {
+  readonly transfer?: { readonly fields: readonly string[]; readonly key: string | readonly string[]; readonly canImport: boolean; readonly canExport: boolean };
   /** Read-only relations shown in the form (children created and edited in their own form). */
   readonly collections?: Readonly<Record<string, ModelChildCollectionConfig>>;
   /** Application presenting a native model; ownership and service id remain unchanged. */
