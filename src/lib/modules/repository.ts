@@ -162,6 +162,31 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
       }));
       return dto(await delegateOf(tx, entry.delegate).update({ where: { id, updatedAt: new Date(revision) }, data: { ...await data(values), ...nested(values, undefined, updatedAt), ...(await options.beforeUpdate?.(tx, id, values) ?? {}), updatedAt }, select: recordSelect }));
     },
+    many2manyWhere(field, operator, ids) {
+      const own = many.find(link => link.field === field);
+      const companion = own ? undefined : companions.find(item => item.many2many?.some(link => link.field === field));
+      const link = own ?? companion?.many2many?.find(item => item.field === field);
+      if (!link) throw new ModelValidationError("La relación del filtro no está publicada.");
+      // Own links hang from this model; extension links hang from its companion row.
+      const through = (predicate: Record<string, unknown>) => own ? { [link.source]: predicate } : { [companion!.relation]: { is: { [link.source]: predicate } } };
+      if (operator === "any") return through({ some: { targetId: { in: [...ids] } } });
+      if (operator === "all") return { AND: ids.map(id => through({ some: { targetId: id } })) };
+      if (operator === "notEmpty") return through({ some: {} });
+      return own ? through({ none: {} }) : { OR: [{ [companion!.relation]: { is: null } }, through({ none: {} })] };
+    },
+    async many2manyIds(tx, field, ids) {
+      const own = many.find(link => link.field === field);
+      const companion = own ? undefined : companions.find(item => item.many2many?.some(link => link.field === field));
+      const link = own ?? companion?.many2many?.find(item => item.field === field);
+      if (!link || !ids.length) return new Map();
+      const links = { [link.source]: { select: { targetId: true }, orderBy: { targetId: "asc" } } };
+      const rows = await delegateOf(tx, entry.delegate).findMany({ where: { id: { in: [...ids] } }, select: { id: true, ...(own ? links : { [companion!.relation]: { select: links } }) } }) as Record<string, unknown>[];
+      return new Map(rows.map(row => {
+        const holder = own ? row : row[companion!.relation] as Record<string, unknown> | null;
+        const linked = (holder?.[link.source] as { targetId: string }[] | undefined) ?? [];
+        return [row.id as string, linked.map(item => item.targetId)];
+      }));
+    },
     async remove(tx, id, revision) { await delegateOf(tx, entry.delegate).delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },
     count(tx, where) { return delegateOf(tx, entry.delegate).count({ where: whereOf(where) }); },
     ...(display.paths.length ? { lookupPaths: display.paths } : {}),

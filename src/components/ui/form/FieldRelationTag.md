@@ -50,3 +50,5 @@ El componente no decide qué relación se guarda ni escribe en la base. En una r
 Ejemplo Zod/RHF con usuarios y contactos reales: `/sample#field-relation-tag`. La carga de registros no inserta datos.
 
 En módulos declarativos, `Fields.Many2many` conecta el selector, lookup y persistencia por convención: [contrato y límites](../../../../docs/relaciones-many2many.md). Demo ficticia con botón Cargar ejemplo en `/sample#many2many-model`.
+
+`onCreate` (o `create: true` en el Many2many declarativo, que lo conecta solo) ofrece «Crear "texto"» cuando la búsqueda no encuentra ese nombre; recibe el texto y devuelve la opción creada o un error que se muestra en el desplegable. Contrato en [Crear desde el selector](../../../../docs/relaciones-many2many.md#crear-desde-el-selector-create-true); demo en `/sample#many2many-model`.

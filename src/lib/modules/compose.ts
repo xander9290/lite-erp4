@@ -52,7 +52,7 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       byTarget.set(extension.target, [...(byTarget.get(extension.target) ?? []), extension]);
     }
   }
-  if (!byTarget.size) return validateModuleDomains(definitions);
+  if (!byTarget.size) return validateQuickCreate(validateModuleDomains(definitions));
   const compose = (entry: ModuleModel): ModuleModel => {
     const extensions = byTarget.get(entry.id);
     if (!extensions) return entry;
@@ -92,8 +92,29 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       ...action, ...(action.groups ? { groups: Object.freeze(action.groups.map(group => group.includes(".") ? group : `${methodOwners.get(action.name) ?? entry.module}.${group}`)) } : {}),
     }))) }) });
   };
-  return validateModuleDomains(Object.freeze(definitions.map(definition => {
+  return validateQuickCreate(validateModuleDomains(Object.freeze(definitions.map(definition => {
     const models = definition.models.map(compose);
     return models.every((model, index) => model === definition.models[index]) ? definition : Object.freeze({ ...definition, models: Object.freeze(models) });
-  })));
+  }))));
+}
+
+/**
+ * Many2many with `create: true` creates target records from the selector text: the target must
+ * be a declarative model with a public Text `name` and no other required value without a
+ * default. Native targets (core.partner/user) keep their own creation flows.
+ */
+function validateQuickCreate(definitions: readonly ModuleDefinition[]): readonly ModuleDefinition[] {
+  const byName = new Map(definitions.flatMap(definition => definition.models.map(model => [model.contract.name, model] as const)));
+  for (const definition of definitions) for (const model of definition.models) for (const [field, descriptor] of Object.entries(model.contract.many2manyFields)) {
+    if (!descriptor.many2many.create) continue;
+    const target = byName.get(descriptor.many2many.target);
+    const where = `${model.id}.${field}`;
+    if (!target || target.module === nativeModule) throw new Error(`${where}: create requiere un destino declarativo (no Partner/User).`);
+    const metadata = target.metadata;
+    const name = Object.hasOwn(metadata, "name") ? metadata.name : undefined;
+    if (!name || name.kind !== "text" || name.sensitive || name.readOnly || name.compute || name.related || name.sequence) throw new Error(`${where}: create requiere que ${target.id} tenga un campo Text «name» editable.`);
+    const missing = Object.entries(metadata).filter(([key, field]) => key !== "name" && field.required && field.defaultKind !== "literal" && !field.sequence && !field.compute && !field.related).map(([key]) => key);
+    if (missing.length) throw new Error(`${where}: create sólo escribe el nombre; ${target.id} tiene obligatorios sin default: ${missing.join(", ")}.`);
+  }
+  return definitions;
 }

@@ -62,6 +62,11 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
       tracking: true,
       domain: (d) => d.eq("municipioId", d.draft("municipioId")),
     });
+    tagIds = Fields.Many2many("ContactosextraPartnertags", {
+      label: "Etiquetas",
+      maxSelected: 20,
+      create: true,
+    });
 
     normalize(values: Readonly<Record<string, unknown>>) {
       const normalized = super.normalize?.(values) ?? values;

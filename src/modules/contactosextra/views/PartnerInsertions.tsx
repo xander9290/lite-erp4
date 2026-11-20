@@ -5,6 +5,7 @@ import FormGroup from "@/components/ui/form/FormGroup";
 import Stack from "@/components/ui/form/Stack";
 import FieldText from "@/components/ui/form/FieldText";
 import FieldMany2One from "@/components/ui/form/FieldMany2One";
+import FieldRelationTag from "@/components/ui/form/FieldRelationTag";
 
 export default function PartnerInsertions() {
   return (
@@ -29,6 +30,9 @@ export default function PartnerInsertions() {
             <FieldMany2One name="localidadId" />
           </Stack>
         </FormGroup>
+      </Inserter>
+      <Inserter target="group:contacto" position="inside">
+        <FieldRelationTag name="tagIds" direction="inline" />
       </Inserter>
     </>
   );

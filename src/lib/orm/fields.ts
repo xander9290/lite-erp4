@@ -4,7 +4,11 @@ import { IMAGE_URL_MAX_LENGTH, imageUrlSchema, validateImageFolder } from "../up
 import { declareRelationDomain, type RelationDomain, type DomainExpression } from "./domain-builder";
 
 const many2manyTag = Symbol("orm.many2many");
-export type Many2manyMetadata = { readonly target: string; readonly label?: string; readonly minSelected: number; readonly maxSelected: number; readonly invisible?: boolean; readonly domain?: DomainExpression };
+export type Many2manyMetadata = {
+  readonly target: string; readonly label?: string; readonly minSelected: number; readonly maxSelected: number; readonly invisible?: boolean; readonly domain?: DomainExpression;
+  /** Offer to create a target record from the selector text (name only; needs create on the target). */
+  readonly create?: boolean;
+};
 export type Many2manyField = {
   readonly [many2manyTag]: true;
   readonly many2many: Many2manyMetadata;
@@ -262,13 +266,16 @@ export const Fields = Object.freeze({
     return makeField(schema as z.ZodType<RequiredValue<string, O>, string | null>, options, null, { kind: "datetime" });
   },
 
-  Many2many(target: string, options: { label?: string; minSelected?: number; maxSelected?: number; invisible?: boolean; domain?: RelationDomain } = {}): Many2manyField {
-    if (!/^[A-Z][A-Za-z0-9]*$/.test(target) || !options || typeof options !== "object" || Array.isArray(options) || Object.keys(options).some(key => !["label", "minSelected", "maxSelected", "invisible", "domain"].includes(key))) throw new Error("Many2many necesita un modelo destino y opciones válidas.");
+  Many2many(target: string, options: { label?: string; minSelected?: number; maxSelected?: number; invisible?: boolean; domain?: RelationDomain; create?: boolean } = {}): Many2manyField {
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(target) || !options || typeof options !== "object" || Array.isArray(options) || Object.keys(options).some(key => !["label", "minSelected", "maxSelected", "invisible", "domain", "create"].includes(key))) throw new Error("Many2many necesita un modelo destino y opciones válidas.");
+    if (options.create !== undefined && typeof options.create !== "boolean") throw new Error("Many2many: create debe ser true o false.");
+    // A created record could fall outside the domain right after being written: not combined for now.
+    if (options.create && options.domain) throw new Error("Many2many: create todavía no se combina con domain.");
     const minSelected = options.minSelected ?? 0, maxSelected = options.maxSelected ?? 100;
     if (!Number.isSafeInteger(minSelected) || !Number.isSafeInteger(maxSelected) || minSelected < 0 || maxSelected < 1 || maxSelected > 100 || minSelected > maxSelected || (options.label !== undefined && (typeof options.label !== "string" || !options.label.trim())) || (options.invisible !== undefined && typeof options.invisible !== "boolean")) throw new Error("Many2many admite entre 0 y 100 selecciones, con límites y label válidos.");
     const schema = z.array(z.string().min(1).max(100).refine(id => id.trim() === id, "ID inválido.")).min(minSelected).max(maxSelected).refine(ids => new Set(ids).size === ids.length, "La selección contiene IDs duplicados.");
     const domain = declareRelationDomain(options.domain);
-    return Object.freeze({ [many2manyTag]: true as const, many2many: Object.freeze({ target, minSelected, maxSelected, ...(domain ? { domain } : {}), ...(options.label !== undefined ? { label: options.label } : {}), ...(options.invisible !== undefined ? { invisible: options.invisible } : {}) }), schema, createDefault: () => [] });
+    return Object.freeze({ [many2manyTag]: true as const, many2many: Object.freeze({ target, minSelected, maxSelected, ...(domain ? { domain } : {}), ...(options.label !== undefined ? { label: options.label } : {}), ...(options.invisible !== undefined ? { invisible: options.invisible } : {}), ...(options.create ? { create: true } : {}) }), schema, createDefault: () => [] });
   },
 
   One2many: one2many,

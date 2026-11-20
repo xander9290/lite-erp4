@@ -6,6 +6,33 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Many2many en colecciones: columnas y filtros (2026-11-20)
+
+Pedido por el usuario («poder filtrar por etiquetas»), sin orden ni agrupación (acordado).
+Widget `tags` en columnas, filtro alguna/todas/sin/con (1–10 IDs legibles), IDs legibles y
+nombres por fila. Repositorio declarativo: `many2manyWhere`/`many2manyIds` (propios y vía fila
+compañera). Inserciones de lista aceptan Many2many. Verificado: `test:modules` 62, `test:orm`
+115/116 (EPERM previo), list-grouping/relation-filter/collection-load/list-selection y filtros
+de lista, `test:extensions:integration` completo en temporal, `tsc`, ESLint (aviso previo) y
+demo `/sample#tag-collections` en navegador (chips, filtro «tiene todas» con nombres en la
+cabecera y en la URL sólo IDs). Contrato en
+[Many2many](relaciones-many2many.md#many2many-en-colecciones-etiquetas). Siguiente del usuario:
+`<Column field="tagIds" />` en `PartnerListInsertions` tras el `orm:sync` pendiente.
+
+## Crear desde el selector de Many2many (2026-11-20)
+
+Pedido por el usuario, sólo Many2many. `Fields.Many2many(target, { create: true })` ofrece
+«Crear "texto"» en FieldRelationTag; `modelQuickCreate`/`relationQuickCreate` reutiliza un
+nombre existente o crea con sólo `name` por el servicio del destino; la opción sólo se publica
+a quien puede crear en el destino. Al componer exige destino declarativo con Text `name` y sin
+otros obligatorios sin default. Cambio respecto a la propuesta: `create` no se combina con
+`domain` (rechazado al declarar) en lugar de validar el dominio al crear. Verificado:
+`test:orm` 115/116 (EPERM previo), `test:modules` 60, `test:form-model` 25,
+`test:extensions:integration` completo en temporal, `tsc`, ESLint (aviso previo) y demo
+`/sample#many2many-model` en navegador. Contrato en
+[Many2many](relaciones-many2many.md#crear-desde-el-selector-create-true). Siguiente del usuario:
+`create: true` en `PartnerExtra.tagIds` (no requiere orm:sync: no cambia el esquema).
+
 ## Opción `drawer` del cajón de aplicaciones (2026-11-20)
 
 Pedido por el usuario: contactosextra apareció en el cajón al añadir su catálogo

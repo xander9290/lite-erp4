@@ -13,7 +13,7 @@ import type { ActivityNoteResult, ActivityResult } from "@/lib/orm/activity";
 import type { Many2OneResult } from "@/lib/many2one/types";
 import type { ReactionResult } from "@/lib/orm/reactions.types";
 import type { CloudinaryImageSignatureResult } from "@/lib/uploads/cloudinary-signature";
-import { childCollectionList, creatorLookup, getModuleModel, imageSigner, modelService, withActor, relationLookup } from "./registry";
+import { childCollectionList, creatorLookup, getModuleModel, imageSigner, modelService, withActor, relationLookup, relationQuickCreate, type QuickCreateResult } from "./registry";
 
 /*
  * Single entry point for declarative module models. Every export is a public endpoint:
@@ -78,6 +78,12 @@ export async function modelDelete(model: string, selection: unknown): Promise<Li
 export async function modelLookup(model: string, request: unknown): Promise<Many2OneResult> {
   try { const { service } = resolve(model); return await service.lookup(prisma, await requireUser(), request); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar los registros.") }; }
+}
+
+/** «Crear "texto"» of a Many2many with `create: true` (target fixed by the server). */
+export async function modelQuickCreate(model: string, field: string, text: unknown): Promise<QuickCreateResult> {
+  try { const { entry } = resolve(model); return await relationQuickCreate(entry.id, field, await requireUser(), text); }
+  catch (error) { return { ok: false, error: failure(error, "No se pudo crear el registro.") }; }
 }
 
 export async function modelRelationLookup(model: string, field: string, input: unknown): Promise<Many2OneResult> {

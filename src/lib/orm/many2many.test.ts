@@ -87,3 +87,26 @@ test("Many2many handles self relations, external ownership and alias collisions 
   const bad = defineModule({ id: "demo", name: "Demo", icon: "tags", models: { task: Conflict, tag: Tag } });
   assert.throws(() => generateModule(bad.profile.module, { schema, owners: {} }), /conflicto/);
 });
+
+test("Many2many create: option metadata, composition rules for the target and per-actor projection", async () => {
+  const declared = Fields.Many2many("DemoTag", { label: "Etiquetas", create: true });
+  assert.equal(declared.many2many.create, true);
+  assert.equal(Fields.Many2many("DemoTag").many2many.create, undefined);
+  assert.throws(() => Fields.Many2many("DemoTag", { create: "si" as never }), /create debe ser true o false/);
+  assert.throws(() => Fields.Many2many("DemoTag", { create: true, domain: d => d.eq("name", "x") }), /no se combina con domain/);
+
+  class Note extends Model { name = Fields.Text({ required: true }); tags = Fields.Many2many("QuickTag", { create: true }); }
+  class Tag extends Model { name = Fields.Text({ required: true, maxLength: 40 }); active = Fields.Boolean({ default: true }); }
+  assert.doesNotThrow(() => composeModules([defineModule({ id: "quick", name: "Quick", icon: "tags", models: { note: Note, tag: Tag } })]));
+  class Coded extends Model { name = Fields.Text({ required: true }); code = Fields.Text({ required: true }); }
+  assert.throws(() => composeModules([defineModule({ id: "quick", name: "Quick", icon: "tags", models: { note: Note, tag: Coded } })]), /obligatorios sin default: code/);
+  class Unnamed extends Model { title = Fields.Text({ required: true }); }
+  assert.throws(() => composeModules([defineModule({ id: "quick", name: "Quick", icon: "tags", models: { note: Note, tag: Unnamed } })]), /campo Text «name» editable/);
+
+  // Projection: «Crear» reaches the browser only for actors who may create the target.
+  const { projectModelAccess } = await import("../modules/access");
+  const config = { id: "quick.note", lookups: { tags: "quick.tag" }, many2many: { tags: { target: "QuickTag", minSelected: 0, maxSelected: 100, create: true } } } as never;
+  const access = (create: boolean) => ({ isAdmin: false, groups: new Set<string>(), modelAccess: { "quick.note": { read: true, write: true, create: true, unlink: false }, "quick.tag": { read: true, write: false, create, unlink: false } } });
+  assert.equal((projectModelAccess(config, access(true), []) as { many2many: Record<string, { create?: boolean }> }).many2many.tags.create, true);
+  assert.equal((projectModelAccess(config, access(false), []) as { many2many: Record<string, { create?: boolean }> }).many2many.tags.create, undefined);
+});

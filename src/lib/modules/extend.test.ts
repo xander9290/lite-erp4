@@ -229,3 +229,24 @@ test("drawer option of a module reaches its application manifest", () => {
   assert.equal(hidden.application.drawer, false);
   assert.equal(defineModule({ id: "visible", name: "Visible", icon: "tag", models: { etiqueta: Etiqueta } }).application.drawer, undefined);
 });
+
+test("Many2many collection predicates and page IDs: own links and links through the companion row", async () => {
+  class Marca extends Model { name = Fields.Text({ label: "Nombre", required: true }); }
+  const ExtraTags = extendModel(Equipo, Base => class extends Base { marcas = Fields.Many2many("EtiquetasMarca", { label: "Marcas", maxSelected: 3 }); });
+  const etiquetas = defineModule({ id: "etiquetas", name: "Etiquetas", icon: "tag", depends: ["basex"], models: { marca: Marca }, extends: { "basex.equipo": ExtraTags } });
+  const equipo = composeModules([base, etiquetas])[0].models[0];
+  const repository = createRepository(equipo, base.profile.module);
+  const via = (predicate: unknown) => ({ etiquetasBasexEquipoRecordIdRecords: { is: { etiquetasBasexEquipoMarcasLinkSourceRecords: predicate } } });
+  assert.deepEqual(repository.many2manyWhere!("marcas", "any", ["m1", "m2"]), via({ some: { targetId: { in: ["m1", "m2"] } } }));
+  assert.deepEqual(repository.many2manyWhere!("marcas", "all", ["m1", "m2"]), { AND: [via({ some: { targetId: "m1" } }), via({ some: { targetId: "m2" } })] });
+  assert.deepEqual(repository.many2manyWhere!("marcas", "notEmpty", []), via({ some: {} }));
+  // A record without a companion row has no links: it counts as empty.
+  assert.deepEqual(repository.many2manyWhere!("marcas", "empty", []), { OR: [{ etiquetasBasexEquipoRecordIdRecords: { is: null } }, via({ none: {} })] });
+  assert.throws(() => repository.many2manyWhere!("name", "any", ["x"]), /no está publicada/);
+  const tx = { basexEquipo: { findMany: async (args: Record<string, unknown>) => {
+    assert.deepEqual(args, { where: { id: { in: ["e1", "e2"] } }, select: { id: true, etiquetasBasexEquipoRecordIdRecords: { select: { etiquetasBasexEquipoMarcasLinkSourceRecords: { select: { targetId: true }, orderBy: { targetId: "asc" } } } } } });
+    return [{ id: "e1", etiquetasBasexEquipoRecordIdRecords: { etiquetasBasexEquipoMarcasLinkSourceRecords: [{ targetId: "m1" }] } }, { id: "e2", etiquetasBasexEquipoRecordIdRecords: null }];
+  } } } as never;
+  const ids = await repository.many2manyIds!(tx, "marcas", ["e1", "e2"]);
+  assert.deepEqual([...ids], [["e1", ["m1"]], ["e2", []]]);
+});

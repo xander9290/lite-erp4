@@ -23,7 +23,11 @@ export function modelCollection(config: ModelClientConfig, declared?: readonly M
   const fields = Object.fromEntries(Object.entries(metadata).map(([name, metadata]) => [name, { metadata }]));
   // Audit columns have fixed descriptors (readable creator and dates), never a User field chosen here.
   const audit: Readonly<Record<string, ListColumn>> = config.audit ? Object.fromEntries(auditCollectionColumns.map(column => [column.field, column])) : {};
+  // Many2many (tags): IDs and labels come from the server; filter by membership, never sort/group.
+  const many = config.many2many ?? {};
+  const tagColumn = (column: ModelColumn): ListColumn => ({ ...column, field: column.field, label: column.label ?? many[column.field].label ?? column.field, widget: "tags", type: "text", sortable: false, groupable: false, filterable: column.filterable !== false });
   const project = (columns: readonly ModelColumn[]) => columns.map(column => {
+    if (Object.hasOwn(many, column.field)) return tagColumn(column);
     const isAudit = Object.hasOwn(audit, column.field);
     if (!config.list.fields.includes(column.field) || (!Object.hasOwn(fields, column.field) && !isAudit)) throw new Error(`${config.id}: la columna ${column.field} no está publicada en la política de lista del servidor.`);
     const capabilities = {
@@ -36,11 +40,13 @@ export function modelCollection(config: ModelClientConfig, declared?: readonly M
     if ((column.widget !== undefined && column.widget !== fixed.widget) || (column.avatarField !== undefined && column.avatarField !== fixed.avatarField) || (column.type !== undefined && column.type !== fixed.type)) throw new Error(`${config.id}: la columna de auditoría ${column.field} sólo admite cambiar label, ancho y orden.`);
     return { ...fixed, ...column, widget: fixed.widget, avatarField: fixed.avatarField, type: fixed.type, ...capabilities } as ListColumn;
   });
-  const publishedColumns = project(config.list.fields.map(field => ({ field })));
+  const scalarColumns = project(config.list.fields.map(field => ({ field })));
+  // Without declared columns, Many2many columns follow the published ones (12 columns at most).
+  const publishedColumns = [...scalarColumns, ...project(Object.keys(many).map(field => ({ field }))).slice(0, Math.max(0, 12 - scalarColumns.length))];
   const columns = declared ? project(declared) : publishedColumns;
   // Keep query support for omitted fields, while honoring explicit presentation restrictions.
   const overrides = new Map(columns.map(column => [column.field, column]));
-  const queryColumns = publishedColumns.map(column => overrides.get(column.field) ?? column);
+  const queryColumns = [...publishedColumns.map(column => overrides.get(column.field) ?? column), ...columns.filter(column => !publishedColumns.some(published => published.field === column.field))];
   const kanbanField = config.kanban ? metadata[config.kanban] : undefined;
   if (config.kanban && (kanbanField?.kind !== "selection" || !config.list.fields.includes(config.kanban))) throw new Error(`${config.id}: el tablero necesita un Selection publicado.`);
   return {

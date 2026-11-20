@@ -118,8 +118,10 @@ quitarEtiquetas() {
 - Es un conjunto sin orden persistido. La lectura ordena por ID.
 - Cada declaración posee su relación. No hay `inverse` editable: declarar otro
   Many2many en el destino crea otra relación independiente, no la inversa de ésta.
-- Sin creación/edición de destinos desde la selección ni comandos Odoo/XML.
-- Sin columnas de Many2many, filtros/domains/orden/grupos por sus miembros,
+- Sin edición de destinos desde la selección ni comandos Odoo/XML. Crear sí, con `create: true`
+  ([Crear desde el selector](#crear-desde-el-selector-create-true)).
+- Columnas y filtros de Many2many en colecciones sí ([ver abajo](#many2many-en-colecciones-etiquetas));
+  sin domains de colección, orden ni grupos por sus miembros,
   `@onchange`/`@depends` sobre el arreglo ni rutas que lo atraviesen todavía.
 - Sin Many2many en hijos One2many. Un modelo dueño sí puede declarar ambos tipos de
   colección. Desde `extendModel` sí (2026-11-20): ver [Many2many en extensiones](#many2many-en-extensiones). El scaffold legacy con orm.config.ts
@@ -127,6 +129,63 @@ quitarEtiquetas() {
 - El gestor reconoce las tablas intermedias desde el esquema instalado con hashes
   verificados, sin evaluar manifests para el catálogo. Sus planes de retirada
   incluyen ese almacenamiento. No se aplican migraciones destructivas por defecto.
+
+## Many2many en colecciones (etiquetas)
+
+Implementado el 2026-11-20 a petición del usuario. Sin orden ni agrupación por estas columnas
+(acordado).
+
+- **Columna:** `{ field: "tagIds" }` en `columns` de ModelCollection (o `<Column field="tagIds" />`
+  en una inserción de lista) usa el widget `tags`: hasta 3 chips y «+N». Sin `columns` declaradas,
+  los Many2many siguen a las columnas publicadas mientras haya lugar (12 como máximo). En Card y
+  Kanban se ven como filas de detalle.
+- **Filtro:** «Tiene alguna de», «Tiene todas» (de 1 a 10 registros, elegidos con el lookup
+  autorizado del destino), «Sin registros» y «Con registros». La URL guarda sólo IDs; los chips
+  del filtro muestran los nombres.
+- **Servidor:** el servicio valida operador, cantidad y que cada ID sea legible por el actor;
+  el repositorio lo traduce a `some`/`every`/`none` sobre la tabla de vínculos (a través de la
+  fila compañera para Many2many de extensiones; sin fila compañera cuenta como vacío). Se
+  combina con AND con búsqueda, filtros, dominio y reglas, en la misma transacción.
+- **Filas:** cada fila de la página recibe los IDs vinculados **legibles** (ordenados) y sus
+  nombres en `$labels`, resueltos por lotes con el lookup del destino; nunca IDs de destinos
+  que el actor no puede leer.
+- Repositorios propios necesitan `many2manyWhere`/`many2manyIds` (opcionales en `ModelRepository`);
+  sin ellos el filtro se rechaza con un mensaje claro.
+
+Verificado: `test:modules` (predicados propios y de extensión, IDs por página, columnas `tags`),
+`relation-labels.test.ts` (nombres de arreglos), `test:extensions:integration` en temporal
+(alguna/todas/vacío/con valor, IDs y nombres por fila, operador inválido, más de 10 IDs, ID
+inexistente o ilegible) y demo `/sample#tag-collections` en navegador.
+
+## Crear desde el selector (`create: true`)
+
+Implementado el 2026-11-20 a petición del usuario, sólo para Many2many (no Many2one).
+
+```ts
+tagIds = Fields.Many2many("ContactosextraPartnertags", { label: "Etiquetas", create: true });
+```
+
+- Si la búsqueda termina sin una opción con ese nombre exacto (sin distinguir mayúsculas ni
+  espacios repetidos), FieldRelationTag ofrece «Crear "texto"» antes de «Buscar más…»; funciona
+  con el ratón y con el teclado (Enter). Al crear, el registro queda seleccionado como chip.
+- La acción fija `modelQuickCreate(modelo, campo, texto)` recibe sólo el modelo dueño, el campo y
+  el texto: el destino lo fija la declaración. Si ya existe un registro legible con ese nombre,
+  lo devuelve en vez de crear otro; si no, lo crea con **sólo `name`** a través del servicio del
+  destino (permiso de crear revalidado, normalize, hooks, defaults, auditoría e historial).
+- La opción sólo llega al navegador si el usuario puede crear en el destino
+  (`projectModelAccess`); sin ese permiso no se muestra, y el servidor lo rechaza igualmente.
+- Al componer se exige un destino declarativo (no Partner/User) con un Text `name` editable y
+  ningún otro obligatorio sin default.
+- Es una escritura independiente: si después no se guarda el registro dueño, el creado se queda
+  en su catálogo, sin vínculo.
+- **Límite actual:** `create` no se combina con `domain` (un registro creado podría quedar fuera
+  del dominio); se rechaza al declarar el campo.
+
+Verificado: `many2many.test.ts` (opción, reglas del destino, proyección por permiso),
+`test:extensions:integration` en temporal (alta sólo con nombre, reutilización sin distinguir
+mayúsculas, texto vacío, usuario sin permiso, campo no declarado) y demo `/sample#many2many-model`
+en navegador (crear con Enter, nombre existente sin «Crear», rechazo visible conservando la
+selección).
 
 ## Many2many en extensiones
 

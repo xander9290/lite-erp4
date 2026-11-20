@@ -2,6 +2,7 @@ import ModelFieldsSample from "./ModelFieldsSample";
 import DomainSample from "./DomainSample";
 import InsertionsSample from "./InsertionsSample";
 import CollectionInsertionsSample from "./CollectionInsertionsSample";
+import TagCollectionSample from "./TagCollectionSample";
 import FormDeletionSample from "./FormDeletionSample";
 import FormActionsSample from "./FormActionsSample";
 import RelatedImageSample from "./RelatedImageSample";
@@ -50,6 +51,7 @@ export default function PageSample() {
           <nav aria-label="Ejemplos de Fields" className="flex flex-wrap gap-2">
             <a className="btn btn-sm btn-outline" href="#insertions">Inserciones</a>
             <a className="btn btn-sm btn-outline" href="#collection-insertions">Inserciones en colecciones</a>
+            <a className="btn btn-sm btn-outline" href="#tag-collections">Etiquetas en colecciones</a>
             <a className="btn btn-sm btn-outline" href="#domains">Dominios</a>
             <a className="btn btn-sm btn-outline" href="#model-reactions">Reacciones de modelo</a>
             <a className="btn btn-sm btn-outline" href="#related-image">Imagen relacionada</a>
@@ -98,6 +100,7 @@ export default function PageSample() {
         </header>
         <InsertionsSample />
         <Suspense fallback={<p role="status">Cargando inserciones en colecciones…</p>}><CollectionInsertionsSample /></Suspense>
+        <Suspense fallback={<p role="status">Cargando etiquetas en colecciones…</p>}><TagCollectionSample /></Suspense>
         <DomainSample />
         <ModelReactionsSample rules={sampleReactionModel.reactionRules} />
         <RelatedImageSample rules={relatedImageModel.reactionRules} />

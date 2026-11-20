@@ -10,7 +10,7 @@ import { allowsActionGroups, type CapabilityActor } from "../access/capabilities
 import { projectModelAccess } from "./access";
 import { createModelImageSigner } from "../uploads/model-image.server";
 import { modelLookupSchema, type Many2OneLoader } from "../many2one/model-lookup";
-import type { Many2OneResult } from "../many2one/types";
+import type { Many2OneOption, Many2OneResult } from "../many2one/types";
 import type { FieldMetadata } from "../orm/fields";
 import type { ModelAction } from "../orm/model";
 import { createRepository } from "./repository";
@@ -83,6 +83,36 @@ export function withActor<T>(actor: ModelActor, operation: () => Promise<T>) {
 }
 
 /** The browser names a published owner field, never a target, predicate or dependency list. */
+/** Result of creating a related record from a Many2many selector. */
+export type QuickCreateResult = { ok: true; item: Many2OneOption; created: boolean } | { ok: false; error: string };
+
+/**
+ * «Crear "texto"» of a Many2many declared with `create: true`. The browser only names the
+ * owner model and field: the target comes from the declaration. An existing readable record
+ * with the same name (case-insensitive) is reused; otherwise the target service creates it
+ * with only `name` (its permissions, normalize, hooks, defaults, audit and history apply).
+ * It is an independent write: it stays even if the owner record is never saved.
+ */
+export async function relationQuickCreate(model: string, field: string, actor: ModelActor, input: unknown): Promise<QuickCreateResult> {
+  const found = getModuleModel(model);
+  const descriptor = found && Object.hasOwn(found.entry.contract.many2manyFields, field) ? found.entry.contract.many2manyFields[field] : undefined;
+  if (!found || !descriptor?.many2many.create) throw new Error("Relación no publicada.");
+  const target = byPrismaName.get(descriptor.many2many.target);
+  if (!target) throw new Error("Relación no publicada.");
+  const name = typeof input === "string" ? input.trim().replace(/\s+/g, " ") : "";
+  const maxLength = target.metadata.name?.kind === "text" ? target.metadata.name.maxLength ?? 120 : 120;
+  if (!name || name.length > Math.min(120, maxLength)) return { ok: false, error: `Escribe un nombre de 1 a ${Math.min(120, maxLength)} caracteres.` };
+  const service = modelService(target.id);
+  const same = (label: string) => label.trim().replace(/\s+/g, " ").toLocaleLowerCase("es-MX") === name.toLocaleLowerCase("es-MX");
+  const existing = await withActor(actor, () => service.lookup(prisma, actor, { query: name, pageSize: 25 }));
+  if (existing.ok) { const match = existing.items.find(item => same(item.label)); if (match) return { ok: true, item: match, created: false }; }
+  const saved = await service.save(prisma, actor, { ...target.contract.createDefaults(), name });
+  if (!saved.ok) return { ok: false, error: "fieldErrors" in saved && saved.fieldErrors?.name ? String(saved.fieldErrors.name) : saved.error };
+  const created = await withActor(actor, () => service.lookup(prisma, actor, { ids: [saved.values.id as string] }));
+  if (!created.ok || created.items.length !== 1) return { ok: false, error: "Se creó el registro, pero no se pudo leer. Búscalo de nuevo." };
+  return { ok: true, item: created.items[0], created: true };
+}
+
 export async function relationLookup(model: string, field: string, actor: ModelActor, input: unknown): Promise<Many2OneResult> {
   const found = getModuleModel(model);
   if (!found || !Object.hasOwn(lookupTargets(found.entry), field)) throw new Error("Relación no publicada.");
@@ -112,7 +142,8 @@ export function modelService(id: string): Service {
   const relations: Record<string, Many2OneLoader> = {};
   for (const [field, target] of Object.entries(lookupTargets(entry))) {
     // Labels reuse the actor of the current list operation; the lookup revalidates it in its own transaction.
-    if (entry.list.fields.includes(field)) relations[field] = async request => {
+    // Many2many columns (tags) also resolve their names per page.
+    if (entry.list.fields.includes(field) || Object.hasOwn(entry.contract.many2manyFields, field)) relations[field] = async request => {
       const actor = operationActor.getStore();
       if (!actor) throw new AccessError("UNAUTHENTICATED");
       return modelService(target).lookup(prisma, actor, request);

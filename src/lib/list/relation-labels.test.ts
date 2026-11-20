@@ -81,3 +81,17 @@ test("group headers resolve the current level in batches without merging identic
   assert.equal(denied.ok, false);
   assert.equal(groupDisplayLabel({ value: "car", count: 1 }, { field: "type", label: "Tipo", options: [{ value: "car", label: "Automóvil" }] }), "Automóvil");
 });
+
+test("Many2many rows resolve arrays of IDs into ordered names, dropping unreadable ones", async () => {
+  const tags: ListResult = { ok: true, data: { rows: [{ id: "1", tagIds: ["a", "b"] }, { id: "2", tagIds: [] }, { id: "3", tagIds: ["b", "hidden"] }], total: 3, page: 1, pageSize: 10 } };
+  const result = await resolveListLabels(tags, { tagIds: async request => {
+    assert.deepEqual(request, { ids: ["a", "b", "hidden"] });
+    return { ok: true, items: [{ value: "a", label: "Urgente", record: { id: "a" } }, { value: "b", label: "VIP", record: { id: "b" } }], total: 2, page: 1, pageSize: 3 };
+  } });
+  assert.ok(result.ok);
+  if (!result.ok) return;
+  const labels = (row: number) => (result.data.rows[row].$labels as Record<string, unknown>).tagIds;
+  assert.deepEqual(labels(0), [{ value: "a", label: "Urgente" }, { value: "b", label: "VIP" }]);
+  assert.deepEqual(labels(1), []);
+  assert.deepEqual(labels(2), [{ value: "b", label: "VIP" }]);
+});

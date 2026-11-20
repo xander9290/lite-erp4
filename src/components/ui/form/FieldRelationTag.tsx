@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
-import { Check, ChevronDown, Search, X } from "lucide-react";
-import { lookupModels, type Many2OneModel, type Many2OneOption, type Many2OneRecord } from "@/lib/many2one/types";
+import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
+import { lookupModels, type Many2OneCreator, type Many2OneModel, type Many2OneOption, type Many2OneRecord } from "@/lib/many2one/types";
 import type { BaseFieldProps } from "./field.types";
 import { fieldDirectionClassName, fieldInputClassName, fieldLabelClassName } from "./field.styles";
 import { useFormFieldValidation } from "./formValidation";
@@ -29,7 +29,12 @@ export type FieldRelationTagProps<TFieldValues extends FieldValues = FieldValues
     maxSelected?: number;
     clearable?: boolean;
     onChange?: (ids: string[], records: Many2OneRecord[]) => void;
+    /** Offer «Crear "texto"» when nothing matches (Many2many `create: true`; the server fixes the target). */
+    onCreate?: Many2OneCreator;
   };
+
+/** Same comparison as the server: trimmed, single spaces, case-insensitive. */
+const sameName = (a: string, b: string) => a.trim().replace(/\s+/g, " ").toLocaleLowerCase("es-MX") === b.trim().replace(/\s+/g, " ").toLocaleLowerCase("es-MX");
 
 export default function FieldRelationTag<TFieldValues extends FieldValues = FieldValues>(props: FieldRelationTagProps<TFieldValues>) {
   const { invisible, ...controlProps } = useModelField(props, "many2many");
@@ -40,7 +45,7 @@ export default function FieldRelationTag<TFieldValues extends FieldValues = Fiel
 function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
   name, label, direction: requestedDirection = "block", model = "partner", load: baseLoad, searchFields = lookupModels[model].searchFields,
   displayName = lookupModels[model].displayName, columns, pageSize = 10, maxSelected = 100, clearable = true,
-  onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y agregar…",
+  onChange, onCreate, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y agregar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps
 }: FieldRelationTagProps<TFieldValues>) {
   const load = useRelationDomainLoad(name, baseLoad);
@@ -77,7 +82,14 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
   const expanded = open && !editingBlocked && !modalOpen;
   const suggestions = useMany2OneSearch({ ...request, query, pageSize: 5 }, expanded, 250, load);
   const options = suggestions.data?.items ?? [];
-  const activeIndex = Math.min(active, options.length);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const text = query.trim().replace(/\s+/g, " ");
+  // «Crear» only when the search finished and no readable option already has that name.
+  const canCreate = Boolean(onCreate && text && !suggestions.loading && !suggestions.error && !options.some(option => sameName(option.label, text)) && ids.length < Math.min(100, Math.max(1, Math.trunc(maxSelected))));
+  const extra = canCreate ? 1 : 0;
+  const moreIndex = options.length + extra;
+  const activeIndex = Math.min(active, moreIndex);
   const fieldLabel = label?.trim();
   const accessibleLabel = ariaLabel || fieldLabel || name;
   const atLimit = ids.length >= maximum;
@@ -135,6 +147,21 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
     if (remaining) { commit(remaining); restoreFocus(); }
   }
 
+  async function create() {
+    if (!onCreate || !canCreate || creating || editingBlocked || !selected) return;
+    setCreating(true); setCreateError(null);
+    try {
+      const result = await onCreate(text);
+      if (!result.ok) { setCreateError(result.error); return; }
+      // An existing record with the same name may come back (created: false): just select it.
+      commit(ids.includes(result.item.value) ? selected : [...selected, result.item]);
+    } catch {
+      setCreateError("No se pudo crear el registro. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   function openModal() {
     if (!editingBlocked) { setOpen(false); setModalOpen(true); }
   }
@@ -166,7 +193,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
                 onFocus={event => { if (skipFocus.current) skipFocus.current = false; else if (!editingBlocked) { setQuery(""); setActive(0); setOpen(true); } onFocus?.(event); }}
                 onClick={() => { if (!editingBlocked) setOpen(true); }}
                 onBlur={event => { field.onBlur(); onBlur?.(event); }}
-                onChange={event => { if (!editingBlocked) { setQuery(event.currentTarget.value); setActive(0); setOpen(true); } }}
+                onChange={event => { if (!editingBlocked) { setQuery(event.currentTarget.value); setActive(0); setOpen(true); setCreateError(null); } }}
                 onKeyDown={event => {
                   if (event.key === "Tab") { setOpen(false); return; }
                   if (event.key === "Escape" && expanded) { event.preventDefault(); event.stopPropagation(); setOpen(false); return; }
@@ -174,10 +201,10 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
                   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                     event.preventDefault();
                     if (!expanded) { setOpen(true); setActive(0); }
-                    else setActive(index => (Math.min(index, options.length) + (event.key === "ArrowDown" ? 1 : options.length)) % (options.length + 1));
+                    else setActive(index => (Math.min(index, moreIndex) + (event.key === "ArrowDown" ? 1 : moreIndex)) % (moreIndex + 1));
                   } else if (event.key === "Enter" && expanded) {
                     event.preventDefault();
-                    if (activeIndex === options.length) openModal(); else toggle(options[activeIndex]);
+                    if (activeIndex === moreIndex) openModal(); else if (canCreate && activeIndex === options.length) void create(); else toggle(options[activeIndex]);
                   } else if (event.key === "Backspace" && !query && ids.length) { event.preventDefault(); remove(ids[ids.length - 1]); }
                 }} />
             </div>
@@ -188,11 +215,12 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
           </div>
         </div>
 
-        <div id={statusId} role="status" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/50">
+        {/* Only exceptional states below the control; empty (and without margin) in normal use. */}
+        <div id={statusId} role="status" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-base-content/50 empty:mt-0">
           {resolution.loading ? "Cargando selección…" : resolution.error ? <>{resolution.error}<button type="button" className="cursor-pointer underline" onClick={resolution.retry}>Reintentar</button></> : missing.length ? <>
             {missing.length} registro{missing.length === 1 ? " no disponible" : "s no disponibles"}.
             {!locked && <button type="button" className="cursor-pointer underline" onClick={() => commit(ids.flatMap(value => byId.get(value) ? [byId.get(value)!] : []))}>Quitar no disponibles</button>}
-          </> : domainInvalid ? <span className="text-error">Hay selecciones que no cumplen el filtro actual. Puedes retirarlas o corregir sus dependencias.</span> : ids.length > 0 ? `${ids.length} seleccionado${ids.length === 1 ? "" : "s"}${atLimit ? ` · Máximo ${maximum}` : ""}` : "Puedes seleccionar varios registros"}
+          </> : domainInvalid ? <span className="text-error">Hay selecciones que no cumplen el filtro actual. Puedes retirarlas o corregir sus dependencias.</span> : null}
         </div>
 
         {expanded && <RelationDropdown anchorRef={anchor} activeId={`${listId}-${activeIndex}`}>
@@ -205,8 +233,14 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
               onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(index)} onClick={() => toggle(option)}>
               <span className="min-w-0 wrap-anywhere">{option.label}</span>{ids.includes(option.value) && <Check size={15} className="shrink-0 text-primary" aria-hidden="true" />}
             </div>)}
-            <div id={`${listId}-${options.length}`} role="option" aria-selected="false" className={`border-t border-base-300 ${activeIndex === options.length ? "bg-primary/5" : ""}`}>
-              <button type="button" tabIndex={-1} className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm font-medium text-primary hover:bg-primary/5" onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(options.length)} onClick={openModal}><Search size={15} aria-hidden="true" />Buscar más…</button>
+            {canCreate && <div id={`${listId}-${options.length}`} role="option" aria-selected="false" aria-disabled={creating} className={`border-t border-base-300 ${activeIndex === options.length ? "bg-primary/5" : ""}`}>
+              <button type="button" tabIndex={-1} disabled={creating} className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm font-medium text-primary hover:bg-primary/5 disabled:cursor-wait disabled:opacity-60" onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(options.length)} onClick={() => void create()}>
+                {creating ? <span className="loading loading-spinner loading-xs" aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}<span className="min-w-0 wrap-anywhere">{creating ? "Creando…" : <>Crear «{text}»</>}</span>
+              </button>
+            </div>}
+            {createError && <p role="alert" className="border-t border-base-300 px-4 py-2 text-xs text-error">{createError}</p>}
+            <div id={`${listId}-${moreIndex}`} role="option" aria-selected="false" className={`border-t border-base-300 ${activeIndex === moreIndex ? "bg-primary/5" : ""}`}>
+              <button type="button" tabIndex={-1} className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm font-medium text-primary hover:bg-primary/5" onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(moreIndex)} onClick={openModal}><Search size={15} aria-hidden="true" />Buscar más…</button>
             </div>
           </div>
         </RelationDropdown>}

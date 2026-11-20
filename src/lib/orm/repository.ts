@@ -26,6 +26,13 @@ export interface ModelRepository<T> {
   readonly lookupPaths?: readonly string[];
   list(tx: Prisma.TransactionClient, query: RepositoryQuery): Promise<ListRecord[]>;
   groups?(tx: Prisma.TransactionClient, query: GroupQuery): Promise<ListGroup[]>;
+  /**
+   * Many2many in collections: a predicate over the link table (own or through an extension's
+   * companion row) for `any`/`all` IDs or emptiness. IDs are already validated by the service.
+   */
+  many2manyWhere?(field: string, operator: "any" | "all" | "empty" | "notEmpty", ids: readonly string[]): Record<string, unknown>;
+  /** Linked IDs per record of a page, ordered by ID. */
+  many2manyIds?(tx: Prisma.TransactionClient, field: string, ids: readonly string[]): Promise<ReadonlyMap<string, readonly string[]>>;
 }
 
 export function unboundRepository<T>(): ModelRepository<T> {
