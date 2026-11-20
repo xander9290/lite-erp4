@@ -6,6 +6,53 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Progreso guardado (2026-11-20, punto de continuación)
+
+Revisión posterior de contexto (2026-11-20): rama `codex/partner`, HEAD `c7e14da`
+(Implementación de etiquetas). El framework descrito abajo ya está en Git. Cambios
+locales al retomar: este documento y PartnerInsertions (Notebook `extras` insertado
+tras `group:contacto`, con páginas Contactos/Venta/Compra y contenido provisional).
+En código ya existen `tagIds` con `create: true`, FieldRelationTag en el formulario,
+Column en la lista, `drawer: false` en contactosextra y la migración
+`20261120174528_sync_contactosextra` de la tabla de vínculos. No se comprobó su
+aplicación en la BD ni el comportamiento visual/persistencia en esta revisión.
+El nombre PartnerTags se conserva. El menú Etiquetas de Contactos y su dependencia
+contactosextra se añadieron después en esta jornada: Configuración → Etiquetas
+abre `/erp/contactosextra/partnertags`, sujeto a lectura efectiva del catálogo,
+sin ampliar accessModels ni conceder permisos. Siguen pendientes la decisión
+de ocultar Ubicaciones y la guía de dirección. La lista siguiente conserva el plan
+anterior: no repetir los pasos ya presentes en código ni asumir SQL pendiente.
+Verificación del enlace: `test:applications` (14), ESLint del manifest y
+`git diff --check` aprobados; sin nueva revisión visual ni consultas de BD.
+Revisión de fuentes/Git únicamente, sin pruebas, consultas de BD ni migraciones;
+`git diff --check` aprobado para esta actualización documental.
+
+Framework terminado y verificado en esta jornada (detalle en las secciones de abajo): inserciones
+en formularios y colecciones, Many2many en extensiones, `drawer: false`, `create: true` en
+Many2many, FieldRelationTag sin textos de ayuda bajo el control (sólo estados excepcionales:
+carga, error, no disponibles, dominio) y Many2many en colecciones. Cambios pendientes de commit
+del usuario desde `1fe51cf` (create, helper de FieldRelationTag, etiquetas en colecciones y
+estas notas).
+
+Siguiente del usuario en Contactos, en este orden y a su ritmo (él escribe el código):
+
+1. Decidir si renombra `PartnerTags` a singular antes de crear la tabla de vínculos.
+2. `npm run orm:sync -- contactosextra`: debe proponer sólo CREATE/FK de
+   `contactosextra_core_partner_tag_ids_rel`; reiniciar el dev server.
+3. `<FieldRelationTag name="tagIds" />` en `PartnerInsertions` y, opcional, `create: true` en
+   `tagIds` (sin sync).
+4. `<Column field="tagIds" label="Etiquetas" />` en `PartnerListInsertions`.
+5. Enlace «Etiquetas» en Configuración de Contactos (`/erp/contactosextra/partnertags`, model
+   `contactosextra.partnertags`, contactosextra en `depends`); decidir `drawer: false` en
+   Ubicaciones.
+6. Pestañas (opcional): Notebook con `id` estable en `ContactForm` (recomendado `id="extra"` si
+   varios módulos agregarán páginas) o insertado por la extensión tras `group:contacto`.
+   Destinos `notebook:<id>` (inside sólo NotebookPage) y `page:<id>/<name>`; las páginas
+   insertadas no son destino. Contrato en [inserciones](inserciones-vistas.md).
+
+Después se retoma la guía de dirección: comprobar la repetición de la importación de estados
+sin `--aplicar` (32 sin cambios) y luego los importadores de Municipios y Localidades.
+
 ## Many2many en colecciones: columnas y filtros (2026-11-20)
 
 Pedido por el usuario («poder filtrar por etiquetas»), sin orden ni agrupación (acordado).

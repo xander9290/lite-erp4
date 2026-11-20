@@ -67,6 +67,16 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
       maxSelected: 20,
       create: true,
     });
+    saleUserId = Fields.Many2one("User", {
+      label: "Vendedor",
+      tracking: true,
+      domain: (d) => d.eq("active", true),
+    });
+    purchaseUserId = Fields.Many2one("User", {
+      label: "Comprador",
+      tracking: true,
+      domain: (d) => d.eq("active", true),
+    });
 
     normalize(values: Readonly<Record<string, unknown>>) {
       const normalized = super.normalize?.(values) ?? values;

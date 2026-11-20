@@ -27,6 +27,8 @@ model User {
 
   // BEGIN lite-erp:contactosextra:User
   contactosextraPartnertagsCreatedRecords ContactosextraPartnertags[] @relation("ContactosextraPartnertags_createBy")
+  contactosextraCorePartnerSaleUserIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_saleUserId")
+  contactosextraCorePartnerPurchaseUserIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_purchaseUserId")
   contactosextraCorePartnerCreatedRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_createBy")
   // END lite-erp:contactosextra:User
 }
