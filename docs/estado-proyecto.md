@@ -6,52 +6,85 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Progreso guardado (2026-11-19, inserciones y Contactos)
+## Progreso guardado (2026-11-19, Contactos e importación de estados)
 
-Rama `codex/partner`, HEAD `07949eb`. **Nada de esta parte tiene commit**: el usuario lo hará.
-Incluye en el árbol de trabajo:
+**Pausa solicitada por el usuario.** Rama comprobada `codex/partner`, HEAD
+`7e6d64b` (sistema de insertions implementada), con cambios locales y archivos
+nuevos sin commit. Este cierre no ejecutó commit/push/pull, consultas de BD,
+importaciones ni suites nuevas. Preservar código/vistas/migraciones del usuario.
+Leer este punto antes de los resúmenes históricos inferiores.
 
-- **Del usuario (guía de dirección):** `PartnerExtra.municipioId` y `localidadId` con
-  dominios Estado → Municipio → Localidad, y sus migraciones `20261119205510` y
-  `20261119210420` (nullable, índice, FK Restrict), con esquemas e instalaciones.
-- **Framework, inserciones en vistas extendidas** ([contrato](inserciones-vistas.md),
-  [diseño](ideas/inserciones-vistas.md)):
-  - formularios: `insertions.form` + `<Inserter target position>` con destinos `field:`,
-    `group:`, `stack:`, `notebook:` y `page:` (contenedores sólo con `id`);
-  - colecciones: `insertions.list|card|kanban` + `<Column field>` con `column:<campo>`,
-    `columns:end` y `card:title|body|footer`; sólo campos publicados de la extensión o de
-    sus dependencias, máximo 12 columnas;
-  - orden por dependencias, `replace` único (gana el dependiente), avisos claros en
-    desarrollo y fallback para que nada se pierda. Demos `/sample#insertions` y
-    `/sample#collection-insertions`.
-- **Contactos con inserciones (escrito por el usuario, guiado):** ContactForm publica
-  `group:contacto`, `stack:identidad` y `stack:medios`; contactosextra declara
-  `PartnerInsertions.tsx` (RFC tras el nombre, grupo `direccion` tras Datos de contacto) y
-  `PartnerListInsertions.tsx` (RFC y Estado tras el correo). Confirmado por el usuario en el
-  navegador: valores, dominios, guardado/recarga, lista y sin avisos.
+**Punto exacto al retomar:** el usuario ejecutó la importación real de estados de
+México y confirmó «sí funcionó». Falta su comprobación de repetición sobre esos datos:
 
-**Verificado por el agente:** `test:form-model` 22, `test:modules` 58, `test:collection-load`
-4, `test:extensions:integration` y `test:core:integration` (proyecto/esquema temporales,
-con build Next), `tsc`, ESLint completo (sólo el aviso previo de `erp/page.tsx`) y demos en
-navegador. No abrió Contactos real (requiere sesión); eso lo confirmó el usuario.
+```sh
+npm run ubicaciones:import -- TU_LOGIN
+```
 
-**Pendientes inmediatos del usuario:**
-1. Borrar `src/modules/contactosextra/views/PartnerExtraForm.tsx` (sin referencias).
-2. Commit de todo lo anterior en `codex/partner`.
+Sin --aplicar, esperar 0 crear, 0 actualizar, 32 sinCambios y 0 conflictos si no
+hubo cambios posteriores. No dar esta comprobación por hecha ni repetir la carga
+como efecto de ponerse en contexto. Después diseñar importación de Municipios,
+por Estado y con revisión/idempotencia/servicios; Localidades después.
 
-**Siguiente en la guía de dirección** ([guía](catalogos-direccion.md), paso 5 del recorrido):
-permisos de lectura de los catálogos para usuarios no administradores. Hoy el manifest de
-Ubicaciones no declara `groups` ni `access`, así que sólo los admin leen países, estados,
-municipios y localidades, y un usuario sin admin no podría elegirlos en un contacto. A
-decidir con el usuario antes de escribir: quién lee (todo usuario interno o un grupo
-propio), quién administra los catálogos y si el acceso de lectura se concede desde
-Ubicaciones o desde Contactos. Después: navegación a los catálogos desde la configuración de
-Contactos y, al final, la importación de fuentes oficiales (licencia, claves, volumen,
-idempotencia) antes de escribir un importador. Recordatorio: la lista de Contactos sólo
-publica 12 campos (Localidad queda fuera) hasta declarar `list.fields` explícitos.
+### Completado en esta sesión
 
-**Siguen vigentes** los pendientes 3–6 de la sección siguiente (ventas/facturación, residuo
-de Tickets, limpieza legacy, pendientes previos).
+- Ubicaciones concede sólo lectura de sus cuatro catálogos a core.internal.
+  Administración sigue admin. Usuario confirmó consulta y bloqueo de crear,
+  editar y eliminar con cuenta no admin.
+- Contactos declara depends ubicaciones y Configuración con Países/Estados/
+  Municipios/Localidades. Framework permite enlaces a modelos publicados de una
+  dependencia directa y ruta exacta /erp/<dependencia>/<clave>; visibilidad por
+  lectura del destino, sin snapshot se oculta. AccessModels de Contactos conserva
+  core.partner: el menú no concede acceso ni CRUD. Usuario confirmó navegación.
+  Los enlaces abren Ubicaciones; no se ocultó su tarjeta ni se incrustaron rutas.
+- Importador INEGI completo: scripts/importar-estados.ts y helper
+  src/modules/ubicaciones/imports/estados-inegi.ts. Plan por defecto; --aplicar
+  exige TTY y la palabra aplicar, aborta conflictos y termina sin escribir si no
+  hay cambios. Admin/versión/País MX/plan/revisiones revalidados en Serializable;
+  servicios transaction.persist/snapshot conservan validación, hooks, auditoría y
+  revisión del propietario. Sin reintentos automáticos, borrados ni reset de activo.
+  No consulta INEGI desde Fields ni durante la transacción de escritura.
+- Fuente, uso y operación en [Importar estados](importar-estados.md). Consultados
+  fuente/documentación/términos INEGI; claves geográficas, sin equivalencia SAT asumida.
+  El agente sólo aplicó datos de prueba en esquema exclusivo; la carga real fue
+  ejecutada y confirmada por el usuario. No hubo verificación independiente propia
+  de esa carga real.
+
+### Verificaciones realizadas antes de la pausa
+
+- test:applications 13 y test:modules 58 para navegación de dependencias; tsc y
+  ESLint focalizado aprobados.
+- test:ubicaciones:import aprobado en esquema import_states_test_<hex>, eliminado:
+  32 altas, autor/historial, repetición sin escrituras, actualizaciones preservando
+  activo, registros manuales conservados, revisiones/actores/País inválidos y
+  conflictos; rechazo tardío con rollback de filas/país/historial; concurrencia.
+- CLI probado en procesos con fuente/TTY ficticios: plan, cancelar, confirmar,
+  sin cambios, flags inválidos, no TTY, no admin y producción bloqueada.
+- TypeScript, ESLint focalizado y git diff --check aprobados al cerrar la
+  implementación. En esta petición de guardar progreso, sólo revisión documental.
+
+### Pendientes posteriores
+
+1. Confirmar revisión sin flag tras la importación real; después Municipios y
+   Localidades (importadores aún no existen). Revisar fuentes, claves por padre,
+   volumen, conflictos, concurrencia y preservar lógica/auditoría; no cargar todo
+   automáticamente ni crear código de ejercicios por adelantado.
+2. Unicidad compuesta/identidad geográfica y mantenimiento de catálogos ante cambios
+   de fuente se revisan al ampliar importadores. Estado/Municipio/Localidad no tienen
+   clave global única. No asumir equivalencia con catálogos SAT/Carta Porte.
+3. Lista Contactos publica máximo 12 campos; Localidad queda fuera hasta ajustar
+   list.fields. Reglas CP/RFC actuales son mexicanas: revisar política antes de
+   habilitar domicilios extranjeros.
+4. Limpieza opcional: PartnerExtraForm.tsx ya no tiene consumidores; existe además
+   un archivo vacío src/modules/ubicaciones/scripts/importar-estados.ts. El comando
+   npm usa scripts/importar-estados.ts en la raíz. No se borraron estos archivos.
+5. Pendientes previos 3–6 de la sección histórica siguiente siguen vigentes:
+   ventas/facturación, residuo de secuencias de Tickets, limpieza legacy y mejoras
+   anteriores. Tickets sigue retirado; no restaurarlo.
+
+Guía general: [Catálogos de dirección](catalogos-direccion.md). La próxima sesión
+comienza con revisión de Git/documentación y la comprobación pendiente del usuario;
+no asumir procesos dev activos ni estado remoto/BD de otra máquina.
 
 ## Progreso guardado (2026-11-19, cierre de sesión anterior)
 

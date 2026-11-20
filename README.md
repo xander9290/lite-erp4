@@ -34,9 +34,12 @@ desde cero cuando el usuario lo indique. La prioridad actual es consolidar
 Partner/User nativos en `core` y la app **Ajustes**; fases 1–4 implementadas.
 Fase 5 en curso: Contactos sobre `core.partner`, con revisiones compartidas
 entre Usuarios y Perfil. `contactosextra` añade dirección básica, RFC y País/Estado;
-Ubicaciones contiene País/Estado/Municipio/Localidad. Motor compartido de dominios
-implementado: [contrato](docs/dominios-modelos.md). Sigue aplicar País→Estado con el
-usuario antes de continuar relaciones e importaciones.
+Ubicaciones contiene País/Estado/Municipio/Localidad. Los dominios encadenados ya
+están aplicados y Contactos utiliza inserciones de formulario y lista. Motor de
+dominios: [contrato](docs/dominios-modelos.md); composición de vistas:
+[inserciones](docs/inserciones-vistas.md). Lectura de catálogos para usuarios internos y navegación desde Contactos ya
+completadas. Estados de México importados por el usuario; falta comprobar la
+repetición sin cambios, después importar Municipios y Localidades.
 [Estado y siguiente paso](docs/estado-proyecto.md#prioridad-actual-partneruser-nativos-y-app-ajustes-2026-11-18).
 
 ## Comandos del scaffold anterior, en orden
@@ -123,6 +126,10 @@ Prisma está en `prisma7.config.ts`; los scripts `db:*` la seleccionan explícit
 El inicio de dev no sustituye las migraciones ni la generación del acceso a datos.
 
 ## Comprobaciones
+
+Carga inicial de estados de México: `npm run ubicaciones:import -- TU_LOGIN`
+revisa el plan; añadir `--aplicar` permite confirmarlo desde una terminal.
+[Uso, fuente y pruebas](docs/importar-estados.md). No requiere migración.
 
 ```bash
 npm run test:orm

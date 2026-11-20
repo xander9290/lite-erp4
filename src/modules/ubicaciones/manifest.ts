@@ -11,11 +11,18 @@ export default defineModule({
   icon: "boxes",
   models: {
     pais: Pais,
-  
+
     estado: Estado,
-  
+
     municipio: Municipio,
-  
+
     localidad: Localidad,
   },
+  access: [
+    {
+      group: "core.internal",
+      models: ["pais", "estado", "municipio", "localidad"],
+      perms: "r",
+    },
+  ],
 });

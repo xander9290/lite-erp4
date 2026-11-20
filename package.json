@@ -55,7 +55,9 @@
     "test:extensions:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts --extensions-only",
     "test:core:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts --core-only",
     "test:nested:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts --nested-only",
-    "test:domains:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts --domains-only"
+    "test:domains:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts --domains-only",
+    "ubicaciones:import": "node --conditions=react-server --import tsx scripts/importar-estados.ts",
+    "test:ubicaciones:import": "node --conditions=react-server --import tsx scripts/importar-estados.integration.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

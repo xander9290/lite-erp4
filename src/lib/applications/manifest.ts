@@ -3,7 +3,7 @@ import type { AccessPerms } from "../access/declare";
 
 export type ApplicationAccess = "authenticated" | "admin";
 export type ApplicationMenuLink = {
-  /** Declarative model id: effective read replaces static group hints when available. */
+  /** Declarative model id: effective read controls visibility. A direct dependency may supply it. */
   readonly model?: string;
   readonly id: string;
   readonly label: string;
@@ -56,9 +56,13 @@ function validateMenus(application: ApplicationManifest) {
       if (nested || "href" in item || !Array.isArray(item.items) || !item.items.length) throw new Error(`Grupo de menú inválido en ${application.id}.`);
       item.items.forEach(child => validateItem(child, true));
     } else {
-      if (item.model !== undefined && (!application.accessModels?.includes(item.model))) throw new Error(`Modelo de menú no declarado en ${application.id}.`);
-      // Canonical application paths only; no external URLs, queries or fragments.
-      if (typeof item.href !== "string" || !/^\/erp\/[a-z0-9-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(item.href) || !(item.href === base || item.href.startsWith(`${base}/`))) throw new Error(`Ruta de menú inválida en ${application.id}.`);
+      const dependency = item.model?.split(".")[0];
+      const dependencyModel = Boolean(dependency && application.depends.includes(dependency) && /^[a-z][a-z0-9-]*\.[a-z][a-z0-9]*$/.test(item.model!));
+      if (item.model !== undefined && !application.accessModels?.includes(item.model) && !dependencyModel) throw new Error(`Modelo de menú no declarado en ${application.id}.`);
+      // Dependency links only open a declared model's conventional collection route.
+      // Never accept arbitrary foreign paths, external URLs, queries or fragments.
+      const expected = dependencyModel ? `/erp/${dependency}/${item.model!.split(".")[1]}` : undefined;
+      if (typeof item.href !== "string" || !/^\/erp\/[a-z0-9-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(item.href) || (expected ? item.href !== expected : !(item.href === base || item.href.startsWith(`${base}/`)))) throw new Error(`Ruta de menú inválida en ${application.id}.`);
       if (item.match !== undefined && !["exact", "prefix"].includes(item.match)) throw new Error(`Coincidencia de menú inválida en ${application.id}.`);
     }
   }
@@ -120,6 +124,15 @@ export function createApplicationRegistry(manifests: readonly ApplicationManifes
     ordered.push(manifest);
   }
   for (const id of byId.keys()) visit(id);
+  for (const manifest of ordered) {
+    const links = (manifest.menus ?? []).flatMap(item => "items" in item ? item.items : [item]);
+    for (const link of links) {
+      const dependency = link.model?.split(".")[0];
+      if (dependency && manifest.depends.includes(dependency) && !byId.get(dependency)?.accessModels?.includes(link.model!)) {
+        throw new Error(`${manifest.id}: el modelo de menú ${link.model} no está publicado por ${dependency}.`);
+      }
+    }
+  }
   return {
     get: (id: string) => byId.get(id),
     all: (): readonly ApplicationManifest[] => [...ordered],

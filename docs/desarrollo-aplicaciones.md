@@ -14,6 +14,37 @@ Este documento conserva la explicación de los pilotos y sus contratos de acceso
 
 ## El archivo que debes conocer primero
 
+### Menús hacia catálogos de una dependencia (2026-11-19)
+
+Una aplicación puede enlazar la colección de un modelo de otra aplicación si
+declara su propietario en `depends`. Por ejemplo, Contactos con
+`depends: ["ubicaciones"]` puede añadir a `menus`:
+
+```ts
+{
+  id: "configuracion",
+  label: "Configuración",
+  items: [
+    { id: "paises", label: "Países", href: "/erp/ubicaciones/pais", model: "ubicaciones.pais" },
+  ],
+},
+```
+
+No añadir esos modelos a `accessModels` de Contactos: esa propiedad sigue
+controlando la entrada a Contactos por lectura de `core.partner`. Cada enlace
+declara su `model` y usa la ruta exacta de colección `/erp/<dependencia>/<clave>`.
+No admite rutas arbitrarias, altas/IDs, parámetros, fragmentos ni URLs externas.
+El registro exige que el destino esté publicado en accessModels de la dependencia;
+una dependencia transitiva no basta.
+
+Los menús siguen la lectura efectiva del modelo destino y se ocultan sin snapshot
+de capacidades; grupos vacíos se omiten. Esto no concede CRUD, no cambia reglas
+de registro y no permite entrar a Contactos sólo por leer un catálogo. El enlace
+abre la aplicación propietaria, con su navegación y vistas existentes: no incrusta
+el catálogo en Contactos ni oculta Ubicaciones del cajón. No requiere SQL.
+
+### Manifest de aplicación
+
 Abre `src/app/(auth)/erp/contactos/manifest.ts`:
 
 ```ts

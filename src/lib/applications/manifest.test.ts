@@ -127,3 +127,39 @@ test("menus reject ambiguous declarations and unsafe or foreign application rout
   for (const href of ["https://example.test/erp/contactos", "//example.test/erp/contactos", "/erp/usuarios", "/erp/contactos-extra", "/erp/contactos/../usuarios", "/erp/contactos/%2e%2e/usuarios", "/erp/contactos\\nuevo", "/erp/contactos?q=x", "/erp/contactos#x"]) invalid.push([{ ...link, href }]);
   for (const menus of invalid) assert.throws(() => defineApplication({ ...contacts, menus } as ApplicationManifest));
 });
+
+const locations = defineApplication({ ...contacts, id: "ubicaciones", name: "Ubicaciones", models: ["UbicacionesPais"], accessModels: ["ubicaciones.pais"], menus: [] });
+const locationLink = { id: "countries", label: "Países", model: "ubicaciones.pais", href: "/erp/ubicaciones/pais" };
+
+test("dependency model menus keep application access separate and follow destination read capabilities", () => {
+  const app = defineApplication({ ...contacts, depends: ["ubicaciones"], accessModels: ["core.partner"], menus: [
+    { id: "contacts", label: "Contactos", href: "/erp/contactos", model: "core.partner" },
+    { id: "settings", label: "Configuración", items: [locationLink] },
+  ] });
+  const registry = createApplicationRegistry([app, locations]);
+  assert.deepEqual(registry.all().map(item => item.id), ["ubicaciones", "contactos"]);
+  const read = { read: true, create: false, write: false, unlink: false };
+  const actor = { isAdmin: false, modelAccess: { "core.partner": read, "ubicaciones.pais": read } };
+  assert.deepEqual(applicationNavigation(app, actor)?.menus.map(item => item.id), ["contacts", "settings"]);
+  assert.deepEqual(applicationNavigation(app, { ...actor, modelAccess: { "core.partner": read } })?.menus.map(item => item.id), ["contacts"]);
+  assert.equal(applicationNavigation(app, { ...actor, modelAccess: { "ubicaciones.pais": read } }), null, "catalog read alone does not open Contactos");
+  assert.equal(applicationNavigation(app, { isAdmin: true }), null, "model capabilities must be supplied even for admin presentation");
+  assert.deepEqual(app.accessModels, ["core.partner"], "a menu does not add grants or application entry models");
+  assert.equal(app.menus[1].items.length, 1);
+  const manual = defineApplication({ ...contacts, depends: ["ubicaciones"], menus: [locationLink] });
+  assert.deepEqual(applicationNavigation(manual, { isAdmin: true })?.menus, [], "dependency links also fail closed in manual apps without a snapshot");
+});
+
+test("dependency links require a direct dependency, matching model route and a published destination model", () => {
+  const app = { ...contacts, depends: ["ubicaciones"], menus: [locationLink] };
+  assert.throws(() => defineApplication({ ...app, depends: [] }), /Modelo de menú/);
+  for (const href of ["/erp/ubicaciones", "/erp/ubicaciones/pais/nuevo", "/erp/ubicaciones/estado", "/erp/contactos", "/erp/ubicaciones-extra/pais", "https://example.test/erp/ubicaciones/pais", "/erp/ubicaciones/pais?q=x", "/erp/ubicaciones/pais#x", "/erp/ubicaciones/%70ais"]) {
+    assert.throws(() => defineApplication({ ...app, menus: [{ ...locationLink, href }] }), /Ruta de menú/);
+  }
+  assert.throws(() => defineApplication({ ...app, menus: [{ id: "countries", label: "Países", href: locationLink.href }] }), /Ruta de menú/);
+  assert.throws(() => createApplicationRegistry([defineApplication(app)]), /dependencia ubicaciones/);
+  assert.throws(() => createApplicationRegistry([defineApplication({ ...app, menus: [{ ...locationLink, model: "ubicaciones.inexistente", href: "/erp/ubicaciones/inexistente" }] }), locations]), /no está publicado/);
+  const bridge = defineApplication({ ...contacts, id: "puente", models: [], depends: ["ubicaciones"] });
+  assert.throws(() => defineApplication({ ...contacts, depends: ["puente"], menus: [locationLink] }), /Modelo de menú/, "transitive dependency is not sufficient");
+  assert.deepEqual(createApplicationRegistry([bridge, locations]).all().map(item => item.id), ["ubicaciones", "puente"]);
+});

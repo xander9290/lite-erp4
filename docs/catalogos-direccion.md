@@ -6,16 +6,13 @@ y revisa un paso a la vez. Este documento no crea módulos, modelos ni datos.
 
 ## Estructura de trabajo
 
-**Punto vigente revisado el 2026-11-19:** [One2many anidados](ideas/one2many-anidados.md)
-y relaciones de consulta ya implementados. País conserva `estadoIds` editable
-(`maxRows: 50`); Estado declara `municipioIds` con `readonly: true`, como colección
-paginada fuera del documento. Los municipios se crean desde su propio formulario
-o desde «Nuevo» en esa colección. Detalle y verificaciones históricas en
-[el estado del proyecto](estado-proyecto.md#progreso-guardado-2026-11-19-cierre-de-sesión).
-
-El motor de dominios ya fue implementado y PartnerExtra.estadoId declara el filtro
-por paisId, con la constraint conservada. El usuario confirmó su funcionamiento
-en la app el 2026-11-19; las notas posteriores sobre dominios pendientes son históricas.
+**Punto vigente (2026-11-19):** catálogos, dominios encadenados, inserciones,
+permisos de lectura para usuarios internos y navegación desde Configuración de
+Contactos completados. Importador de estados INEGI terminado y carga real
+confirmada por el usuario. Guía pausada: falta comprobar repetición sin --aplicar,
+después continuar Municipios. Ver [estado y siguiente paso](#estado-y-siguiente-paso)
+y [uso del importador](importar-estados.md). El recorrido inferior explica la
+construcción; no son tareas para volver a ejecutar sobre módulos ya creados.
 
 Usar un módulo declarativo compartido `ubicaciones`, independiente de Contactos.
 Así otras aplicaciones podrán reutilizar los mismos registros geográficos.
@@ -63,71 +60,38 @@ una dirección única sólo a partir del código postal sin revisar la fuente po
 
 ## Estado y siguiente paso
 
-**Siguiente paso (2026-11-19):** paso 5 del recorrido, permisos de lectura de catálogos para
-no administradores. Municipio y Localidad ya están en el contacto con dominios encadenados;
-Contactos ya usa inserciones de formulario y lista. Detalle y decisiones pendientes en
-[estado del proyecto](estado-proyecto.md#progreso-guardado-2026-11-19-inserciones-y-contactos).
+**Avance guardado a petición del usuario (2026-11-19).** Rama codex/partner,
+HEAD 7e6d64b, cambios locales sin commit. No avanzar mientras dure la pausa.
 
-**Prioridad previa acordada (2026-11-19):** resolver el diseño de
-[`insertions` e Inserter para vistas extendidas](estado-proyecto.md#pendiente-prioritario-inserciones-en-vistas-extendidas-2026-11-19)
-antes de continuar esta guía. Implementado el 2026-11-19 ([contrato](inserciones-vistas.md)).
-Después se retoman permisos de catálogos, navegación e importaciones.
+Completados:
 
-**Actualización 2026-11-19:** motor de dominios implementado y comprobado en proyecto/
-esquema temporales. [Contrato](dominios-modelos.md). PartnerExtra.estadoId ya declara
-`domain: d => d.eq("paisId", d.draft("paisId"))`, conservando `validarPaisEstado`.
-El usuario confirmó las comprobaciones de Estado (municipios, búsqueda, «Nuevo» con
-estado preasignado, creación y regreso) y Contactos (dominio País→Estado, aviso de
-incompatibilidad, corrección/guardado/reapertura y País vacío sin candidatos).
-El agente no las repitió. `municipioId` opcional ya añadido por el usuario y revisado
-en fuentes, con Restrict/tracking y dominio por `estadoId`. El usuario indicó
-terminada la sincronización; migración `20261119205510_sync_contactosextra` revisada
-(columna nullable, índice y FK Restrict), esquema y selector personalizado presentes.
-Sin consulta propia de migrate status. El usuario confirmó Estado→Municipio, aviso
-de incompatibilidad al cambiar Estado, corrección/guardado/reapertura y ausencia de
-candidatos sin Estado. Localidad ya añadida por el usuario: campo opcional con
-Restrict/tracking, dominio por municipioId, selector y migración
-`20261119210420_sync_contactosextra` revisados (nullable, índice y FK Restrict).
-El usuario informa sincronización y funcionamiento correctos, sin detalle de casos;
-el agente no repitió navegador/BD. Siguen permisos de lectura para consumidores
-no administradores, navegación e importaciones.
+- Pais/Estado/Municipio/Localidad, relaciones, claves y fuentes de consulta.
+- PartnerExtra con dirección/RFC y relaciones geográficas opcionales, dominios
+  País→Estado→Municipio→Localidad y constraint País–Estado conservada.
+- Inserciones propias de formulario/lista sin duplicar el formulario base.
+- Lectura de Ubicaciones para todos los usuarios internos; modificación sólo admin.
+  Prueba de permisos y navegación desde Contactos confirmadas por el usuario.
+- Importador local de estados con plan/confirmación, servicios y lote atómico.
+  Aplicación real confirmada por el usuario; el agente no la repitió en su BD.
+  Prueba aislada de altas/cambios/repetición/rollback/concurrencia/CLI aprobada y
+  esquema temporal eliminado. Detalles en [Importar estados](importar-estados.md).
 
-### Cierre histórico del 2026-11-18
+**Lo primero al retomar:** pedir el resultado de
+`npm run ubicaciones:import -- TU_LOGIN`, sin --aplicar. Debe mostrar 32 sinCambios
+y ninguna alta, actualización o conflicto si no hubo cambios posteriores. El
+usuario todavía no reportó esa comprobación; no asumirla por la pausa.
 
-**Guía pausada a petición del usuario (2026-11-18).** Rama revisada codex/partner,
-con cambios locales sin commit. No seguir creando campos durante la pausa.
+Después preparar la importación de Municipios, inicialmente con alcance por
+Estado y revisión antes de aplicar; luego Localidades. Todavía no existen esos
+importadores. Reutilizar lo útil sin copiar autorización/transacciones de manera
+indiscriminada: revisar simplificaciones del framework a partir de este caso real.
+Considerar identidad por padre+clave, fuentes, actualización, volumen e idempotencia.
+Las claves SAT se homologarán aparte; no hay integración fiscal implementada.
 
-Completado por el usuario y revisado en fuentes:
+La lista Contactos mantiene límite de 12 columnas; Localidad no se publica por
+convención actualmente. CP/RFC siguen validando formato mexicano. Limpieza legacy,
+archivos sin uso y otros pendientes se conservan en
+[estado-proyecto.md](estado-proyecto.md). Tickets sigue retirado.
 
-- Módulo Ubicaciones con Pais, Estado, Municipio y Localidad; relaciones obligatorias
-  y Restrict hacia su padre. País tiene código de dos letras único, normalize y
-  constraint; los otros catálogos tienen claves Text sin unicidad global.
-- Dependencia ubicaciones en contactosextra; paisId/estadoId opcionales y sus FK.
-- Selectores País/Estado en PartnerExtraForm personalizado.
-- Constraint validarPaisEstado con contexto transaccional y autorización de lectura
-  del Estado; exige País cuando hay Estado y verifica la relación.
-- Campos básicos de dirección y RFC, con restricciones descritas en la guía core.
-
-El usuario confirmó sincronizaciones y pruebas propuestas, incluida la última:
-País/Estado correspondientes guardan y reabren, Estado sin País se rechaza y ambos
-vacíos se permiten. El agente no repitió pruebas en navegador/BD. Esquemas/SQL
-revisados; última migración 20261119041214_sync_contactosextra (estado_id nullable,
-índice y FK Restrict). TypeScript y ESLint de PartnerExtra aprobados.
-
-**Prioridad de aquel cierre, ya resuelta el 2026-11-19:** [dominios de relaciones y colecciones](ideas/dominios-relaciones-colecciones.md).
-Diseñar motor compartido con AND/OR/NOT y referencias a otros campos del borrador;
-primer caso: estadoId sólo muestra estados del paisId seleccionado. Hoy el selector
-muestra todos los estados legibles y la constraint rechaza combinaciones inválidas
-al guardar. API y filtros dependientes todavía no implementados. No eliminar la
-constraint sin acordar su convivencia con el nuevo contrato.
-
-Después de resolver esa mejora: aplicar el ejemplo País→Estado con el usuario,
-continuar Municipio/Localidad en PartnerExtra y coherencia de toda la dirección.
-Quedan lectura de catálogos para consumidores no admin, navegación desde
-Configuración de Contactos e importaciones oficiales. Ubicaciones sigue siendo
-módulo compartido. Interés futuro en Carta Porte/traslado: homologar claves SAT sin
-asumir equivalencia con códigos internos/INEGI; no hay integración fiscal aún.
-
-Detalle de migraciones/verificaciones en [estado-proyecto.md](estado-proyecto.md).
-Retomar con revisión de Git y documentación; no asumir estado de BD ni procesos.
-Tickets permanece retirado; no restaurarlo. Sin commit/push en este cierre.
+No se hicieron commit/push ni nuevas operaciones de BD en este cierre. Revisar Git,
+entorno y documentación al retomar; no asumir procesos o datos de otra máquina.

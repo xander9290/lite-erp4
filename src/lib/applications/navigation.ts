@@ -6,7 +6,7 @@ export type ApplicationNavigation = { id: string; name: string; href: string; me
 export function applicationNavigation(application: ApplicationManifest, actor: ApplicationUser): ApplicationNavigation | null {
   if (!canOpenApplication(application, actor)) return null;
   const visible = (item: { access?: "authenticated" | "admin"; groups?: readonly string[]; model?: string }) =>
-    item.model && actor?.modelAccess ? actor.modelAccess[item.model]?.read === true : (item.access !== "admin" || Boolean(actor?.isAdmin)) && memberOf(actor, item.groups);
+    item.model ? actor?.modelAccess?.[item.model]?.read === true : (item.access !== "admin" || Boolean(actor?.isAdmin)) && memberOf(actor, item.groups);
   const menus: ApplicationMenu[] = [];
   for (const item of application.menus ?? []) {
     if ("items" in item) {

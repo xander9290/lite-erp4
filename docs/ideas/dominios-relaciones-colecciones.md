@@ -4,8 +4,10 @@
 vigente: [motor compartido de dominios](../dominios-modelos.md), con constructor
 `domain: d => d.eq(...)`. Many2one/Many2many y fuentes Lista/Card/Kanban conectadas;
 One2many admite dominios de relaciones de su fila, sin filtrar las líneas mismas.
-El ejercicio País→Estado del usuario sigue sin editar. El resto de este documento
-conserva el alcance y las decisiones pendientes de la propuesta original.
+El usuario ya aplicó País→Estado→Municipio→Localidad y confirmó su funcionamiento;
+Contactos también utiliza inserciones de formulario/lista. Sigue acordar lectura
+de catálogos para no administradores, navegación e importación. El resto conserva
+el alcance histórico de la propuesta original; prevalece el estado del proyecto.
 
 Registrado el 2026-11-18 por petición expresa del usuario como **siguiente pendiente
 urgente**, antes de continuar la guía de dirección. Esta petición autoriza registrar
