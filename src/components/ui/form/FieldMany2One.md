@@ -9,6 +9,12 @@ catálogos manuales existentes.
 
 Buscador de registros existentes integrado con FormLayout/RHF. No crea ni edita registros. No requiere librerías adicionales.
 
+El desplegable rápido mide el espacio visible del viewport y de sus contenedores
+con scroll. Abre arriba cuando abajo no cabe y hay más espacio superior; limita
+su altura a 320 px y usa scroll interno. Recalcula al desplazar o redimensionar,
+sin aumentar el scroll del formulario. Permanece dentro del Field para conservar
+el foco en diálogos nativos. Ejemplo RHF/Zod sin BD: `/sample#relation-dropdown`.
+
 ```tsx
 const methods = useForm({
   resolver: zodResolver(schema),

@@ -2,6 +2,10 @@
 
 Selector múltiple de registros existentes con tags DaisyUI y modal paginado. Reutiliza la acción y el registro de modelos de FieldMany2One; no requiere librerías nuevas.
 
+Comparte el posicionamiento adaptable de FieldMany2One: abre arriba cuando falta
+espacio inferior y limita la altura con scroll interno, también dentro de
+contenedores desplazables y modales. Ejemplo: `/sample#relation-dropdown`.
+
 ```tsx
 const schema = z.object({ partnerIds: z.array(z.string().min(1)).min(1).max(5) });
 const methods = useForm({

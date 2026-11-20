@@ -13,6 +13,7 @@ import { Suspense } from "react";
 import SampleForms from "./SampleForms";
 import ImageSample from "./ImageSample";
 import Many2OneSample from "./Many2OneSample";
+import RelationDropdownSample from "./RelationDropdownSample";
 import ActionParametersSample from "./ActionParametersSample";
 import SequenceSample from "./SequenceSample";
 import Many2manySample from "./Many2manySample";
@@ -80,6 +81,7 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#field-number">FieldNumber</a>
             <a className="btn btn-sm btn-outline" href="#field-select">FieldSelect</a>
             <a className="btn btn-sm btn-outline" href="#field-many2one">FieldMany2One</a>
+            <a className="btn btn-sm btn-outline" href="#relation-dropdown">Dropdown adaptable</a>
             <a className="btn btn-sm btn-outline" href="#model-display-name">Nombre desde el modelo</a>
             <a className="btn btn-sm btn-outline" href="#field-relation-tag">FieldRelationTag</a>
             <a className="btn btn-sm btn-outline" href="#many2many-model">Many2many</a>
@@ -117,6 +119,7 @@ export default function PageSample() {
         <AuditSample />
         <SampleForms />
         <Many2OneSample />
+        <RelationDropdownSample />
         <ModelDisplayNameSample />
         <RelationTagSample />
         <Many2manySample />

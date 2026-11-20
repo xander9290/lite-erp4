@@ -15,6 +15,7 @@ import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
 import { useFieldDirection } from "./fieldDirection";
 import FieldVisibility from "./FieldVisibility";
 import { useRelationDomainLoad } from "./useRelationDomainLoad";
+import RelationDropdown from "./RelationDropdown";
 
 export type FieldRelationTagProps<TFieldValues extends FieldValues = FieldValues> =
   Omit<BaseFieldProps<TFieldValues>, "onChange"> &
@@ -48,6 +49,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
   const inputId = id ?? generatedId;
   const listId = `${inputId}-list`, errorId = `${inputId}-error`, statusId = `${inputId}-status`;
   const root = useRef<HTMLDivElement>(null);
+  const anchor = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const skipFocus = useRef(false);
   const { control, watch } = useFormContext<TFieldValues>();
@@ -141,7 +143,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
     <div data-form-field={name} className={fieldDirectionClassName(direction, fieldLabel)}>
       {fieldLabel && <label htmlFor={inputId} className={fieldLabelClassName(direction)}>{fieldLabel}</label>}
       <div ref={root} className="relative min-w-0" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
-        <div className={`${fieldInputClassName} h-auto! min-h-11 flex-wrap items-end gap-1 px-1 py-1 ${locked ? "opacity-55" : ""} ${className}`}>
+        <div ref={anchor} className={`${fieldInputClassName} h-auto! min-h-11 flex-wrap items-end gap-1 px-1 py-1 ${locked ? "opacity-55" : ""} ${className}`}>
           <div className="flex min-w-0 basis-48 flex-1 flex-wrap items-center gap-1.5">
             {ids.length > 0 && <ul role="list" aria-label={`${accessibleLabel}: seleccionados`} className="contents">
               {ids.map(value => {
@@ -193,7 +195,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
           </> : domainInvalid ? <span className="text-error">Hay selecciones que no cumplen el filtro actual. Puedes retirarlas o corregir sus dependencias.</span> : ids.length > 0 ? `${ids.length} seleccionado${ids.length === 1 ? "" : "s"}${atLimit ? ` · Máximo ${maximum}` : ""}` : "Puedes seleccionar varios registros"}
         </div>
 
-        {expanded && <div className="absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-lg">
+        {expanded && <RelationDropdown anchorRef={anchor} activeId={`${listId}-${activeIndex}`}>
           <div id={listId} role="listbox" aria-multiselectable="true" aria-label={`Resultados: ${accessibleLabel}`} aria-busy={suggestions.loading}>
             {suggestions.loading && <p role="status" className="flex items-center gap-2 px-4 py-3 text-sm text-base-content/55"><span className="loading loading-spinner loading-xs" aria-hidden="true" />Buscando…</p>}
             {suggestions.error && <div role="alert" className="space-y-2 p-3 text-sm"><p>{suggestions.error}</p><button type="button" className="btn btn-soft btn-xs" onClick={suggestions.retry}>Reintentar</button></div>}
@@ -207,7 +209,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
               <button type="button" tabIndex={-1} className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm font-medium text-primary hover:bg-primary/5" onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(options.length)} onClick={openModal}><Search size={15} aria-hidden="true" />Buscar más…</button>
             </div>
           </div>
-        </div>}
+        </RelationDropdown>}
         {fieldState.invalid && <span id={errorId} className="sr-only">{fieldState.error?.message || `${accessibleLabel}: selección inválida.`}</span>}
         {modalOpen && !editingBlocked && selected && <Many2OneSearchModal load={load} key={`${context}:${JSON.stringify(ids)}`} title={fieldLabel || "Registros"} request={{ ...request, pageSize }} initialQuery={query}
           multiple selectedOptions={selected} maxSelected={maximum} columns={columns} onConfirm={commit} onClose={() => setModalOpen(false)} onAfterClose={restoreFocus} />}

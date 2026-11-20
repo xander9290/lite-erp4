@@ -6,6 +6,22 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Corrección posterior: dropdowns de relaciones (2026-11-19)
+
+- FieldMany2One y FieldRelationTag comparten RelationDropdown: calculan espacio
+  visible en viewport y contenedores con scroll, abren arriba si conviene y
+  limitan altura con scroll interno. Conservan el subárbol del Field para
+  funcionar dentro de diálogos nativos; recalculan en scroll/resize.
+- Ejemplo local RHF/Zod sin BD en `/sample#relation-dropdown`, con selector
+  superior/inferior, etiquetas y modal. Verificados en navegador apertura en
+  ambos sentidos, altura de scroll del contenedor sin crecimiento, selección
+  por teclado y selección con ratón dentro del modal.
+- Validación: TypeScript, ESLint de archivos afectados y `test:form-model`
+  (25 pruebas, incluidas tres de geometría). Sin migraciones ni escrituras de BD.
+- La guía sigue pausada en la comprobación de idempotencia de estados descrita
+  abajo. Se preservaron cambios previos del usuario en importar-estados.ts y
+  el manifest de Ubicaciones.
+
 ## Progreso guardado (2026-11-19, Contactos e importación de estados)
 
 **Pausa solicitada por el usuario.** Rama comprobada `codex/partner`, HEAD

@@ -8,7 +8,7 @@ import { defineModule } from "@/lib/modules/define";
 export default defineModule({
   id: "ubicaciones",
   name: "Ubicaciones",
-  icon: "boxes",
+  icon: "globe",
   models: {
     pais: Pais,
 

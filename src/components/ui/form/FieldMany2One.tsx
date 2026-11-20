@@ -15,6 +15,7 @@ import { useMany2OneSearch } from "./useMany2OneSearch";
 import Many2OneSearchModal, { type Many2OneColumn } from "./Many2OneSearchModal";
 import { PartnerIdentity } from "../PartnerAvatar";
 import { useRelationDomainLoad } from "./useRelationDomainLoad";
+import RelationDropdown from "./RelationDropdown";
 
 export type { Many2OneModel, Many2OneRecord } from "@/lib/many2one/types";
 type EditableProps<TFieldValues extends FieldValues = FieldValues> =
@@ -77,6 +78,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
   const inputId = id ?? generatedId;
   const listId = `${inputId}-list`, errorId = `${inputId}-error`, statusId = `${inputId}-status`;
   const root = useRef<HTMLDivElement>(null);
+  const anchor = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const skipFocus = useRef(false);
   const { control, watch } = useFormContext<TFieldValues>();
@@ -151,7 +153,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
       <div ref={root} className="relative min-w-0" onBlur={event => {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
       }}>
-        <div className="relative flex min-w-0 items-center">
+        <div ref={anchor} className="relative flex min-w-0 items-center">
           <Search size={16} className="pointer-events-none absolute left-1 z-10 text-base-content/40" aria-hidden="true" />
           <input {...inputProps} id={inputId} name={field.name} ref={element => { input.current = element; field.ref(element); }}
             type="text" role="combobox" autoComplete="off" disabled={field.disabled} readOnly={readOnly}
@@ -190,7 +192,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
           </div>
         </div>
 
-        {expanded && <div className="absolute inset-x-0 top-full z-40 mt-2 overflow-hidden rounded-xl border border-base-300 bg-base-100 shadow-lg">
+        {expanded && <RelationDropdown anchorRef={anchor} activeId={`${listId}-${activeIndex}`}>
           <div id={listId} role="listbox" aria-label={`Resultados: ${accessibleLabel}`} aria-busy={suggestions.loading}>
             {suggestions.loading && <p role="status" className="flex items-center gap-2 px-4 py-3 text-sm text-base-content/55"><span className="loading loading-spinner loading-xs" aria-hidden="true" />Buscando…</p>}
             {suggestions.error && <div role="alert" className="space-y-2 p-3 text-sm"><p>{suggestions.error}</p><button type="button" className="btn btn-soft btn-xs" onClick={suggestions.retry}>Reintentar</button></div>}
@@ -204,7 +206,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
               <button type="button" tabIndex={-1} className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm font-medium text-primary hover:bg-primary/5" onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(options.length)} onClick={openModal}><Search size={15} aria-hidden="true" />Buscar más…</button>
             </div>
           </div>
-        </div>}
+        </RelationDropdown>}
 
         {value && !selected && !resolution.loading && <p id={statusId} role="status" className="mt-1 text-xs text-base-content/60">{resolution.error || "El registro ya no está disponible."}{resolution.error && <button type="button" className="ml-2 cursor-pointer underline" onClick={resolution.retry}>Reintentar</button>}</p>}
         {selected?.domainValid === false && <p id={statusId} role="status" className="mt-1 text-xs text-error">La selección no cumple el filtro actual. Cambia la selección o sus dependencias.</p>}
