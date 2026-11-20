@@ -1,14 +1,15 @@
 import "server-only";
 import { defineModule } from "@/lib/modules/define";
 import { EquipoSoporte } from "./models/equipo";
+import { Marca } from "./models/marca";
 
-/** Extension-only module: adds support fields to taller.equipo in its own companion table. */
+/** Adds support fields to taller.equipo in its own companion table, plus a Many2many to its own catalog. */
 export default defineModule({
   id: "soporte",
   name: "Soporte",
   icon: "life-buoy",
   depends: ["taller"],
-  models: {},
+  models: { marca: Marca },
   extends: { "taller.equipo": { model: EquipoSoporte, views: { form: () => import("./views/EquipoSoporte") } } },
   groups: { tecnico: { label: "Técnico", implies: ["taller.editor"] } },
   rules: [{ id: "nivel-tecnico", label: "Técnicos: nivel hasta 2", models: "taller.equipo", groups: ["tecnico"], domain: [{ field: "nivel", operator: "lte", value: 2 }] }],

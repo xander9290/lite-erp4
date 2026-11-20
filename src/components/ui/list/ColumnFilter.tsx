@@ -4,19 +4,22 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
 import RelationFilterValue from "./RelationFilterValue";
+import RelationFilterValues from "./RelationFilterValues";
 import { Filter, X } from "lucide-react";
-import { columnFilterOperators, columnOperatorLabel, filterValueError } from "@/lib/list/filters";
+import { columnFilterOperators, columnOperatorLabel, filterValueError, many2manyFilterIds, many2manyFilterLabels, many2manyFilterOperators } from "@/lib/list/filters";
 import type { ListDataType, ListFilter, ListFilterOperator } from "@/lib/list/types";
 import { filterInputValue, temporalFilter } from "./filterInputs";
 
-type FilterProps = { lookup?: Many2OneLoader; field: string; label: string; type: ListDataType; filter?: ListFilter; onApply: (filter: ListFilter | null) => void; options?: readonly { value: string; label: string }[]; triggerLabel?: string };
+/** `multiple`: Many2many (tags) column — membership of several records or emptiness. */
+type FilterProps = { multiple?: boolean; lookup?: Many2OneLoader; field: string; label: string; type: ListDataType; filter?: ListFilter; onApply: (filter: ListFilter | null) => void; options?: readonly { value: string; label: string }[]; triggerLabel?: string };
 
-function FilterPanel({ field, label, type, filter, onApply, options, lookup, onClose }: FilterProps & { onClose: (restore?: boolean) => void }) {
+function FilterPanel({ field, label, type, filter, onApply, options, lookup, multiple = false, onClose }: FilterProps & { onClose: (restore?: boolean) => void }) {
   const titleId = useId();
   const errorId = useId();
   const root = useRef<HTMLDivElement>(null);
   const temporal = type === "date" || type === "datetime";
-  const operators = columnFilterOperators(type, Boolean(options || lookup));
+  const operators = multiple ? many2manyFilterOperators : columnFilterOperators(type, Boolean(options || lookup));
+  const [ids, setIds] = useState<string[]>(multiple ? many2manyFilterIds(filter?.value) : []);
   const [operator, setOperator] = useState<ListFilterOperator>(filter && (operators as readonly string[]).includes(filter.operator) ? filter.operator : operators[0]);
   const [precision, setPrecision] = useState<"day" | "instant">(filter?.precision ?? "day");
   const [value, setValue] = useState(temporal ? filterInputValue(filter?.value, filter?.precision ?? "day") : lookup && filter && !(operators as readonly string[]).includes(filter.operator) ? "" : filter?.value ?? "");
@@ -30,6 +33,10 @@ function FilterPanel({ field, label, type, filter, onApply, options, lookup, onC
 
   function apply() {
     try {
+      if (multiple) {
+        if (needsValue && !ids.length) { setError("Selecciona al menos un registro."); return; }
+        onApply({ field, operator, ...(needsValue ? { value: ids.join(",") } : {}) }); onClose(); return;
+      }
       const next = temporal && needsValue ? temporalFilter(field, operator, value, to, precision) : { field, operator, ...(needsValue ? { value, ...(operator === "between" ? { to } : {}) } : {}) };
       const message = filterValueError(type, next);
       if (message) { setError(message); return; }
@@ -41,10 +48,10 @@ function FilterPanel({ field, label, type, filter, onApply, options, lookup, onC
   return <div ref={root} role="dialog" aria-modal="false" aria-labelledby={titleId} className="space-y-3 p-4 text-left text-sm font-normal text-base-content" onKeyDown={event => { if (event.key === "Enter" && event.target instanceof HTMLInputElement) { event.preventDefault(); event.stopPropagation(); apply(); } }}>
     <header className="flex items-center justify-between gap-2"><h3 id={titleId} className="min-w-0 font-semibold wrap-anywhere">Filtrar {label}</h3><button type="button" className="btn btn-circle btn-ghost btn-xs shrink-0" aria-label="Cerrar filtro" onClick={() => onClose()}><X size={15} aria-hidden="true" /></button></header>
     <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Condición</span><select className="select select-sm w-full rounded-lg border-base-300" autoComplete="off" aria-label={`Condición de ${label}`} value={operator} onChange={event => { setOperator(event.currentTarget.value as ListFilterOperator); setError(null); }}>
-      {operators.map(op => <option key={op} value={op}>{columnOperatorLabel(type, op)}</option>)}
+      {operators.map(op => <option key={op} value={op}>{(multiple ? many2manyFilterLabels[op] : undefined) ?? columnOperatorLabel(type, op)}</option>)}
     </select></label>
     {type === "datetime" && needsValue && <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Precisión</span><select className="select select-sm w-full rounded-lg border-base-300" aria-label={`Precisión de ${label}`} autoComplete="off" value={precision} onChange={event => { setPrecision(event.currentTarget.value as "day" | "instant"); setValue(""); setTo(""); setError(null); }}><option value="day">Día completo</option><option value="instant">Fecha y hora exactas</option></select></label>}
-    {needsValue && (lookup ? <RelationFilterValue label={label} load={lookup} value={value} onChange={id => { setValue(id); setError(null); }} /> : options || type === "boolean" ? <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Valor</span><select className="select select-sm w-full rounded-lg border-base-300" aria-label={`Valor de ${label}`} autoComplete="off" value={value} onChange={event => { setValue(event.currentTarget.value); setError(null); }}><option value="">Selecciona…</option>{(options ?? [{ value: "true", label: "Sí" }, { value: "false", label: "No" }]).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label> : <>
+    {needsValue && multiple && lookup ? <RelationFilterValues label={label} load={lookup} value={ids} onChange={next => { setIds(next); setError(null); }} /> : needsValue && (lookup ? <RelationFilterValue label={label} load={lookup} value={value} onChange={id => { setValue(id); setError(null); }} /> : options || type === "boolean" ? <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">Valor</span><select className="select select-sm w-full rounded-lg border-base-300" aria-label={`Valor de ${label}`} autoComplete="off" value={value} onChange={event => { setValue(event.currentTarget.value); setError(null); }}><option value="">Selecciona…</option>{(options ?? [{ value: "true", label: "Sí" }, { value: "false", label: "No" }]).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label> : <>
       <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">{operator === "between" ? temporal ? "Desde" : "Mínimo" : "Valor"}</span><input className={controlClass} type={inputType} step={inputType === "datetime-local" ? "0.001" : type === "integer" ? "1" : "any"} autoComplete="off" maxLength={120} aria-label={`Valor de ${label}`} aria-describedby={error ? errorId : undefined} value={value} onInput={event => { setValue(event.currentTarget.value); setError(null); }} onChange={event => { setValue(event.currentTarget.value); setError(null); }} /></label>
       {operator === "between" && <label className="flex flex-col gap-1.5"><span className="text-xs text-base-content/60">{temporal ? "Hasta" : "Máximo"}</span><input className={controlClass} type={inputType} step={inputType === "datetime-local" ? "0.001" : type === "integer" ? "1" : "any"} autoComplete="off" maxLength={120} aria-label={`Hasta de ${label}`} value={to} onInput={event => { setTo(event.currentTarget.value); setError(null); }} onChange={event => { setTo(event.currentTarget.value); setError(null); }} /></label>}
     </>)}

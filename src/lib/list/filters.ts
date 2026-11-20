@@ -17,7 +17,15 @@ export const filterOperatorLabels: Record<ListFilterOperator, string> = {
   contains: "Contiene", eq: "Es igual a", neq: "Es distinto de", startsWith: "Comienza con", endsWith: "Termina con",
   gt: "Mayor que / después de", gte: "Mayor o igual / desde", lt: "Menor que / antes de", lte: "Menor o igual / hasta",
   between: "Entre", empty: "Está vacío", notEmpty: "Tiene valor",
+  any: "Tiene alguna de", all: "Tiene todas",
 };
+/** Many2many (tags) columns: membership and emptiness only. */
+export const many2manyFilterOperators: readonly ListFilterOperator[] = ["any", "all", "empty", "notEmpty"];
+export const many2manyFilterLabels: Partial<Record<ListFilterOperator, string>> = { empty: "Sin registros", notEmpty: "Con registros" };
+/** IDs of an `any`/`all` filter value; the server validates count and access. */
+export function many2manyFilterIds(value: string | undefined): string[] {
+  return [...new Set((value ?? "").split(",").map(id => id.trim()).filter(Boolean))];
+}
 
 export function columnOperatorLabel(type: ListDataType, operator: ListFilterOperator) {
   const temporal: Partial<Record<ListFilterOperator, string>> = { eq: "En", gt: "Después de", gte: "Desde", lt: "Antes de", lte: "Hasta" };
@@ -37,6 +45,8 @@ export function isListFilterShape(value: unknown): value is ListFilter {
 
 export function filterValueError(type: ListDataType, filter: ListFilter): string | null {
   if (!filterOperators[type].includes(filter.operator)) return "Ese operador no corresponde al tipo de columna.";
+  // The schema admits longer values for Many2many ID lists only.
+  if ((filter.value?.length ?? 0) > 120 || (filter.to?.length ?? 0) > 120) return "El valor del filtro es demasiado largo.";
   if (filter.operator === "empty" || filter.operator === "notEmpty") return null;
   if (!filter.value?.trim() || filter.value.length > 120) return "Introduce un valor para el filtro.";
   if (type === "text") return null;

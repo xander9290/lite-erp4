@@ -5,7 +5,7 @@ import type { ModuleOperationPlan, OperationResult } from "./src/lib/module-mana
 import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
 const { prisma } = await import("./src/lib/prisma");
-const { modelService, modelClientConfig, getModuleModel, withActor } = await import("./src/lib/modules/registry");
+const { modelService, modelClientConfig, getModuleModel, withActor, relationQuickCreate } = await import("./src/lib/modules/registry");
 const { createModelImageSigner } = await import("./src/lib/uploads/model-image.server");
 const { authorizeModel } = await import("./src/lib/access/engine");
 const { hashPassword } = await import("./src/lib/auth/password");
@@ -46,6 +46,7 @@ const legacy = ok(await equipos.read(prisma, actor, legacyId), "leer registro pr
 assert.equal(legacy.values.name, "PREVIO");
 assert.equal(legacy.values.responsable, null);
 assert.equal(legacy.values.nivel, 1);
+assert.deepEqual(legacy.values.marcas, [], "sin fila compañera no hay vínculos");
 assert.equal((await companions()).length, 0);
 const initial = await listOf();
 assert.equal(initial.rows[0].nivel, null, "collections use empty storage semantics before a companion exists");
@@ -89,7 +90,9 @@ assert.equal((await equipos.save(prisma, lector, { ...read.values, responsable: 
 
 // Client contract and server-resolved lazy view: no loaders/functions in browser config.
 const client = modelClientConfig("taller.equipo");
-assert.deepEqual(client.extensions, [{ module: "soporte", label: "Soporte", fields: ["responsable", "nivel", "logo", "codigo", "equipoId", "etiqueta", "nombreEquipo", "responsableEquipo", "imagenEquipo"], depends: ["taller"] }]);
+assert.deepEqual(client.extensions, [{ module: "soporte", label: "Soporte", fields: ["responsable", "nivel", "logo", "codigo", "equipoId", "etiqueta", "nombreEquipo", "responsableEquipo", "imagenEquipo", "marcas"], depends: ["taller"] }]);
+assert.deepEqual(client.many2many?.marcas?.target, "SoporteMarca");
+assert.equal(client.lookups.marcas, "soporte.marca");
 assert.ok(client.fields.responsable && client.preview.etiqueta);
 assert.ok(client.list.fields.includes("responsable") && client.list.fields.includes("nombreEquipo"));
 assert.equal(typeof getModuleModel("taller.equipo")!.entry.extensions[0].views?.form, "function");
@@ -145,6 +148,70 @@ const deniedSign = createModelImageSigner({ authorize: () => prisma.$transaction
 assert.equal((await deniedSign("logo")).ok, false, "a read-only account cannot upload an extension image");
 ok(await equipos.remove(prisma, actor, [{ id: hidden.values.id, revision: hidden.values.revision }]), "cleanup hidden");
 
+// Many2many declared by the extension: links stored through the companion row.
+const marcas = modelService("soporte.marca");
+const marcaDefaults = getModuleModel("soporte.marca")!.entry.contract.createDefaults();
+const m1 = ok(await marcas.save(prisma, actor, { ...marcaDefaults, name: "Bosch" }), "marca 1").values.id;
+const m2 = ok(await marcas.save(prisma, actor, { ...marcaDefaults, name: "Makita" }), "marca 2").values.id;
+const linksTable = `"${schema}"."soporte_taller_equipo_marcas_rel"`;
+const links = async () => (await prisma.$queryRawUnsafe<{ n: number }[]>("SELECT count(*)::int AS n FROM " + linksTable))[0].n;
+const tagged = ok(await equipos.save(prisma, actor, { ...defaults, name: "esmeril", estado: "activo", nivel: 1, marcas: [m2, m1] }), "crear con marcas");
+assert.deepEqual(tagged.values.marcas, [m1, m2].sort(), "lectura ordenada por ID");
+assert.equal(await links(), 2);
+assert.equal((await companionOf(tagged.values.id)).length, 1, "la fila compañera se crea con los vínculos");
+const onlyLinks = ok(await equipos.save(prisma, actor, { ...tagged.values, marcas: [m2] }), "sólo cambiar vínculos");
+assert.notEqual(onlyLinks.values.revision, tagged.values.revision, "cambiar vínculos avanza la revisión del base");
+assert.deepEqual(onlyLinks.values.marcas, [m2]);
+assert.equal(await links(), 1);
+const taggedHistory = ok(await equipos.activity(prisma, actor, { id: tagged.values.id }), "historial de vínculos") as unknown as { data: { entries: { kind: string; summary?: string }[] } };
+assert.ok(JSON.stringify(taggedHistory.data.entries).includes("Relaciones actualizadas"), JSON.stringify(taggedHistory.data.entries));
+assert.equal((await equipos.save(prisma, actor, { ...onlyLinks.values, marcas: ["no-existe"] })).ok, false, "ID inexistente rechazado");
+assert.equal((await equipos.save(prisma, actor, { ...onlyLinks.values, marcas: [m1, m1] })).ok, false, "IDs repetidos rechazados");
+assert.equal(await links(), 1, "los rechazos no tocan los vínculos");
+assert.equal((await equipos.read(prisma, lector, tagged.values.id)).ok, false, "un vínculo ilegible para el actor bloquea la apertura");
+const m2Record = ok(await marcas.read(prisma, actor, m2), "leer marca usada");
+assert.equal((await marcas.remove(prisma, actor, [{ id: m2, revision: m2Record.values.revision }])).ok, false, "una marca en uso no se borra (Restrict)");
+const taggedNow = ok(await equipos.read(prisma, actor, tagged.values.id), "releer etiquetado");
+ok(await equipos.remove(prisma, actor, [{ id: taggedNow.values.id, revision: taggedNow.values.revision }]), "borrar etiquetado");
+assert.equal(await links(), 0, "borrar el registro base borra compañera y vínculos (Cascade)");
+console.log("✓ Many2many de extensión: tabla del extensor colgada de la compañera, lectura/escritura en la misma revisión, rechazos, Restrict y Cascade.");
+
+// «Crear» from the selector (create: true): only the name, through the target service.
+assert.equal(modelClientConfig("taller.equipo").many2many?.marcas?.create, true);
+const quick = await relationQuickCreate("taller.equipo", "marcas", actor, "  Hilti   Pro ");
+assert.ok(quick.ok && quick.created && quick.item.label === "Hilti Pro", JSON.stringify(quick));
+const reused = await relationQuickCreate("taller.equipo", "marcas", actor, "hilti pro");
+assert.ok(reused.ok && !reused.created && quick.ok && reused.item.value === quick.item.value, "un nombre existente se reutiliza (sin distinguir mayúsculas)");
+assert.equal((await relationQuickCreate("taller.equipo", "marcas", actor, "   ")).ok, false, "texto vacío rechazado");
+assert.equal((await relationQuickCreate("taller.equipo", "marcas", lector, "Nueva")).ok, false, "sin permiso de crear en el destino no se crea");
+await assert.rejects(() => relationQuickCreate("taller.equipo", "equipoId", actor, "X"), /no publicada/, "sólo Many2many declarados con create");
+assert.equal((await prisma.$queryRawUnsafe<{ n: number }[]>(`SELECT count(*)::int AS n FROM "${schema}"."soporte_marca" WHERE name = 'Hilti Pro'`))[0].n, 1);
+console.log("✓ Crear desde el selector: alta sólo con nombre por el servicio del destino, reutiliza nombres existentes y respeta permisos.");
+// Many2many in collections: filter by membership/emptiness, IDs and names per row.
+const quickId = quick.ok ? quick.item.value : "";
+const both = ok(await equipos.save(prisma, actor, { ...defaults, name: "lija", estado: "activo", nivel: 1, marcas: [m1, m2] }), "lista con dos marcas");
+const one = ok(await equipos.save(prisma, actor, { ...defaults, name: "pulidora", estado: "activo", nivel: 1, marcas: [quickId] }), "lista con una marca");
+const ids = (result: Awaited<ReturnType<typeof listOf>>) => result.rows.map(row => row.id).sort();
+const total = (await listOf()).total;
+assert.deepEqual(ids(await listOf({ filters: [{ field: "marcas", operator: "any", value: `${m1},${quickId}` }] })), [both.values.id, one.values.id].sort());
+assert.deepEqual(ids(await listOf({ filters: [{ field: "marcas", operator: "all", value: `${m1},${m2}` }] })), [both.values.id]);
+assert.equal((await listOf({ filters: [{ field: "marcas", operator: "notEmpty" }] })).total, 2);
+assert.equal((await listOf({ filters: [{ field: "marcas", operator: "empty" }] })).total, total - 2, "sin fila compañera o sin vínculos cuenta como vacío");
+const taggedRow = (await listOf({ filters: [{ field: "marcas", operator: "all", value: `${m1},${m2}` }] })).rows[0];
+assert.deepEqual(taggedRow.marcas, [m1, m2].sort());
+assert.deepEqual(((taggedRow.$labels as Record<string, { label: string }[]>).marcas).map(item => item.label).sort(), ["Bosch", "Makita"]);
+const filterRejected = async (filters: unknown[], who = actor) => (await withActor(who, () => equipos.list(prisma, who, { ...state, filters }))).ok;
+assert.equal(await filterRejected([{ field: "marcas", operator: "eq", value: m1 }]), false, "sólo alguna/todas/vacío");
+assert.equal(await filterRejected([{ field: "marcas", operator: "any", value: Array.from({ length: 11 }, (_, index) => `x${index}`).join(",") }]), false, "máximo 10 IDs");
+assert.equal(await filterRejected([{ field: "marcas", operator: "any", value: "no-existe" }]), false, "IDs inexistentes rechazados");
+assert.equal(await filterRejected([{ field: "marcas", operator: "any", value: m1 }], lector), false, "IDs que el actor no puede leer rechazados");
+for (const record of [both, one]) {
+  const current = ok(await equipos.read(prisma, actor, record.values.id), "releer para borrar");
+  ok(await equipos.remove(prisma, actor, [{ id: current.values.id, revision: current.values.revision }]), "limpiar");
+}
+console.log("✓ Many2many en colecciones: filtros alguna/todas/vacío/con valor, IDs y nombres por fila, rechazos de operador, límite y acceso.");
+
+
 await (await import("./extension-render")).verifyExtensionForm();
 
 // Deleting the base record deletes its companion row (Cascade).
@@ -168,6 +235,7 @@ assert.ok(base.blockers.length > 0, "desinstalar el base queda bloqueado por la 
 let drop = plan(request({ command: "review", input: { module: "soporte", operation: "uninstall", policy: "drop" } }));
 assert.deepEqual(drop.blockers, [], JSON.stringify(drop));
 assert.match(drop.sql, /DROP TABLE "soporte_taller_equipo"/);
+assert.match(drop.sql, /DROP TABLE "soporte_taller_equipo_marcas_rel"/);
 assert.doesNotMatch(drop.sql, /DROP TABLE "taller_equipo"|ALTER TABLE "taller_equipo" DROP COLUMN/);
 drop = plan(request({ command: "apply", id: drop.id, fingerprint: drop.fingerprint, confirmedModule: "soporte", maintenanceConfirmed: true }));
 assert.equal(drop.phase, "complete", JSON.stringify(drop));

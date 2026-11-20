@@ -19,7 +19,7 @@ export type FormLineModel = {
   lines?: Readonly<Record<string, FormLineModel>>;
 };
 export type RelationDomainLookup = { dependencies: readonly string[]; load: (request: import("@/lib/many2one/model-lookup").ModelLookupRequest, draft: Record<string, unknown>) => ReturnType<Many2OneLoader> };
-export type FormModel = { domainLookups?: Readonly<Record<string, RelationDomainLookup>>; many2many?: Readonly<Record<string, import("@/lib/orm/fields").Many2manyField>>; lines?: Readonly<Record<string, FormLineModel>>; readFields?:PublishedFields; reactions?:FormReactions; reactionState?:ReactionState; retryReaction?:()=>void; fields: PublishedFields; lookups?: Readonly<Record<string, Many2OneLoader>>; uploads?: Readonly<Record<string, ImageUploader>> };
+export type FormModel = { creators?: Readonly<Record<string, import("@/lib/many2one/types").Many2OneCreator>>; domainLookups?: Readonly<Record<string, RelationDomainLookup>>; many2many?: Readonly<Record<string, import("@/lib/orm/fields").Many2manyField>>; lines?: Readonly<Record<string, FormLineModel>>; readFields?:PublishedFields; reactions?:FormReactions; reactionState?:ReactionState; retryReaction?:()=>void; fields: PublishedFields; lookups?: Readonly<Record<string, Many2OneLoader>>; uploads?: Readonly<Record<string, ImageUploader>> };
 export const FormModelContext = createContext<FormModel | undefined>(undefined);
 
 /** Line model of a One2many path: "lineas", "lineas.0.entregas" (any depth). */
@@ -58,7 +58,7 @@ export function useModelField<P extends { name: string; direction?: FieldDirecti
   const layoutProps = direction === props.direction ? props : { ...props, direction };
   if (kind === "many2many") {
     const metadata = model?.many2many?.[props.name]?.many2many;
-    return { ...(metadata ? { label: metadata.label, required: metadata.minSelected > 0, invisible: metadata.invisible, maxSelected: metadata.maxSelected, load: model?.lookups?.[props.name] } : {}), ...Object.fromEntries(Object.entries(layoutProps).filter(([, value]) => value !== undefined)) } as P;
+    return { ...(metadata ? { label: metadata.label, required: metadata.minSelected > 0, invisible: metadata.invisible, maxSelected: metadata.maxSelected, load: model?.lookups?.[props.name], ...(metadata.create && model?.creators?.[props.name] ? { onCreate: model.creators[props.name] } : {}) } : {}), ...Object.fromEntries(Object.entries(layoutProps).filter(([, value]) => value !== undefined)) } as P;
   }
   const { line, key } = lineField(model, props.name);
   const fields = line?.fields ?? model?.fields;

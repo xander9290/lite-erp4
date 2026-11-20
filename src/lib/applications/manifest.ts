@@ -37,6 +37,11 @@ export type ApplicationManifest = {
   readonly menus?: readonly ApplicationMenu[];
   /** Prisma model names owned by this module; references to other modules are dependencies. */
   readonly models: readonly string[];
+  /**
+   * Card in the application drawer (default true). `false` hides only the card: routes,
+   * navigation, menu links from other applications and permissions stay the same.
+   */
+  readonly drawer?: boolean;
 };
 
 const identifier = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -78,6 +83,7 @@ export function defineApplication<const T extends ApplicationManifest>(manifest:
   if (new Set(manifest.depends).size !== manifest.depends.length || manifest.depends.some(id => !identifier.test(id) || id === manifest.id)) throw new Error(`Dependencias inválidas en ${manifest.id}.`);
   if (new Set(manifest.models).size !== manifest.models.length || manifest.models.some(model => !/^[A-Z][A-Za-z0-9]*$/.test(model))) throw new Error(`Modelos inválidos en ${manifest.id}.`);
   if (manifest.accessModels !== undefined && (!Array.isArray(manifest.accessModels) || new Set(manifest.accessModels).size !== manifest.accessModels.length || manifest.accessModels.some(model => typeof model !== "string" || (!model.startsWith(`${manifest.id}.`) && !/^core\.(partner|user)$/.test(model)) || !/^[a-z][a-z0-9-]*\.[a-z][a-z0-9]*$/.test(model)))) throw new Error(`Modelos de acceso inválidos en ${manifest.id}.`);
+  if (manifest.drawer !== undefined && typeof manifest.drawer !== "boolean") throw new Error(`drawer debe ser true o false en ${manifest.id}.`);
   validateMenus(manifest);
   return manifest;
 }
@@ -137,5 +143,7 @@ export function createApplicationRegistry(manifests: readonly ApplicationManifes
     get: (id: string) => byId.get(id),
     all: (): readonly ApplicationManifest[] => [...ordered],
     forUser: (user: ApplicationUser) => ordered.filter(manifest => canOpenApplication(manifest, user)),
+    /** Cards of the application drawer: openable applications not hidden with `drawer: false`. */
+    drawerFor: (user: ApplicationUser) => ordered.filter(manifest => manifest.drawer !== false && canOpenApplication(manifest, user)),
   };
 }

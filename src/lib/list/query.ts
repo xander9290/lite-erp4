@@ -3,8 +3,9 @@ import { listModels, listPartnerAvatarField, type ListDataType } from "./types";
 
 export const listFilterSchema = z.object({
   field: z.string().min(1).max(60),
-  operator: z.enum(["contains", "eq", "neq", "startsWith", "endsWith", "gt", "gte", "lt", "lte", "between", "empty", "notEmpty"]),
-  value: z.string().max(120).optional(), to: z.string().max(120).optional(), precision: z.enum(["day", "instant"]).optional(),
+  operator: z.enum(["contains", "eq", "neq", "startsWith", "endsWith", "gt", "gte", "lt", "lte", "between", "empty", "notEmpty", "any", "all"]),
+  // Up to 10 comma-separated IDs for Many2many filters; scalar values are still checked per type.
+  value: z.string().max(1100).optional(), to: z.string().max(120).optional(), precision: z.enum(["day", "instant"]).optional(),
 }).strict();
 
 export const listConfigSchema = z.object({

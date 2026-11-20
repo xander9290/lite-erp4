@@ -1,6 +1,7 @@
 import "server-only";
 import { compileModuleModel, nativeModule, type ModuleDefinition, type ModuleExtension, type ModuleModel } from "./define";
-import { extensionFields } from "./extend";
+import { extensionFields, extensionMany2many } from "./extend";
+import { many2manyStorage } from "../orm/many2many";
 import { relationFieldName } from "../orm/display";
 import { validateModuleDomains } from "./relation-domains";
 
@@ -40,10 +41,18 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       if (!entry) throw new Error(`${definition.id}: el modelo ${extension.target} no existe.`);
       if (entry.declaration.model !== extension.extension.base) throw new Error(`${definition.id}: extendModel(...) de ${extension.target} debe recibir la clase registrada por ${moduleId}.`);
       if (base.models.some(parent => Object.values(parent.contract.one2manyFields).some(field => field.one2many.target === entry.contract.name))) throw new Error(`${definition.id}: ${extension.target} es línea One2many; extender líneas aún no está soportado.`);
+      if (extension.many2many.length) {
+        // Links live through the companion row, written by the declarative repository.
+        if (entry.declaration.repository) throw new Error(`${definition.id}: ${extension.target} usa un repositorio propio; sus extensiones todavía no admiten Many2many.`);
+        for (const [field, descriptor] of Object.entries(extensionMany2many(extension.extension))) {
+          const target = registeredModels.get(descriptor.many2many.target);
+          if (!target || (target.module !== definition.id && target.module !== nativeModule && !(definition.application.depends ?? []).includes(target.module))) throw new Error(`${definition.id} → ${extension.target}.${field}: Many2many requiere un destino declarativo registrado y depends de su módulo.`);
+        }
+      }
       byTarget.set(extension.target, [...(byTarget.get(extension.target) ?? []), extension]);
     }
   }
-  if (!byTarget.size) return validateModuleDomains(definitions);
+  if (!byTarget.size) return validateQuickCreate(validateModuleDomains(definitions));
   const compose = (entry: ModuleModel): ModuleModel => {
     const extensions = byTarget.get(entry.id);
     if (!extensions) return entry;
@@ -51,7 +60,7 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
     const names = new Map<string, string>();
     for (const extension of ordered) {
       const fields = extensionFields(extension.extension);
-      for (const name of [...extension.fields, ...extension.computed].flatMap(name => fields[name].metadata.kind === "many2one" ? [name, relationFieldName(name)] : [name])) {
+      for (const name of [...[...extension.fields, ...extension.computed].flatMap(name => fields[name].metadata.kind === "many2one" ? [name, relationFieldName(name)] : [name]), ...extension.many2many]) {
         const owner = names.get(name);
         if (owner) throw new Error(`${entry.id}.${name}: lo declaran las extensiones de ${owner} y ${extension.module}.`);
         names.set(name, extension.module);
@@ -67,9 +76,11 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       module: extension.module, label: extension.label, fields: extension.fields, computed: extension.computed,
       ...(extension.views ? { views: extension.views } : {}),
       ...(extension.insertions ? { insertions: extension.insertions } : {}),
+      ...(extension.many2many.length && extension.companion ? { many2many: Object.freeze(Object.entries(extensionMany2many(extension.extension)).map(([field, descriptor]) => Object.freeze({ field, source: many2manyStorage(extension.companion!, field).source, maximum: descriptor.many2many.maxSelected }))) } : {}),
       depends: Object.freeze([...closure(extension.module)].sort()),
       ...(extension.companion ? { relation: extension.companion.relation, delegate: extension.companion.name[0].toLowerCase() + extension.companion.name.slice(1) } : {}),
     })), byId.get(entry.module)?.native === true);
+    if (Object.keys(compiled.contract.many2manyFields).length > 4) throw new Error(`${entry.id}: máximo cuatro relaciones Many2many, sumando el modelo base y sus extensiones.`);
     for (const action of compiled.contract.actions) for (const [name, field] of Object.entries(action.params ?? {})) {
       if (field.kind !== "many2one") continue;
       const owner = methodOwners.get(action.name) ?? entry.module;
@@ -81,8 +92,29 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       ...action, ...(action.groups ? { groups: Object.freeze(action.groups.map(group => group.includes(".") ? group : `${methodOwners.get(action.name) ?? entry.module}.${group}`)) } : {}),
     }))) }) });
   };
-  return validateModuleDomains(Object.freeze(definitions.map(definition => {
+  return validateQuickCreate(validateModuleDomains(Object.freeze(definitions.map(definition => {
     const models = definition.models.map(compose);
     return models.every((model, index) => model === definition.models[index]) ? definition : Object.freeze({ ...definition, models: Object.freeze(models) });
-  })));
+  }))));
+}
+
+/**
+ * Many2many with `create: true` creates target records from the selector text: the target must
+ * be a declarative model with a public Text `name` and no other required value without a
+ * default. Native targets (core.partner/user) keep their own creation flows.
+ */
+function validateQuickCreate(definitions: readonly ModuleDefinition[]): readonly ModuleDefinition[] {
+  const byName = new Map(definitions.flatMap(definition => definition.models.map(model => [model.contract.name, model] as const)));
+  for (const definition of definitions) for (const model of definition.models) for (const [field, descriptor] of Object.entries(model.contract.many2manyFields)) {
+    if (!descriptor.many2many.create) continue;
+    const target = byName.get(descriptor.many2many.target);
+    const where = `${model.id}.${field}`;
+    if (!target || target.module === nativeModule) throw new Error(`${where}: create requiere un destino declarativo (no Partner/User).`);
+    const metadata = target.metadata;
+    const name = Object.hasOwn(metadata, "name") ? metadata.name : undefined;
+    if (!name || name.kind !== "text" || name.sensitive || name.readOnly || name.compute || name.related || name.sequence) throw new Error(`${where}: create requiere que ${target.id} tenga un campo Text «name» editable.`);
+    const missing = Object.entries(metadata).filter(([key, field]) => key !== "name" && field.required && field.defaultKind !== "literal" && !field.sequence && !field.compute && !field.related).map(([key]) => key);
+    if (missing.length) throw new Error(`${where}: create sólo escribe el nombre; ${target.id} tiene obligatorios sin default: ${missing.join(", ")}.`);
+  }
+  return definitions;
 }

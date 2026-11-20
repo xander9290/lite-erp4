@@ -9,8 +9,8 @@ import type { FormViewResult } from "@/components/ui/form/formView.types";
 import { AccessError } from "../auth/policy";
 import { listStateSchema } from "../list/query";
 import { normalizeListState } from "../list/state";
-import { compileColumnFilter, filterValueError } from "../list/filters";
-import type { ListColumn, ListDataType, ListResult, ListViewConfig } from "../list/types";
+import { compileColumnFilter, filterValueError, many2manyFilterIds, many2manyFilterOperators } from "../list/filters";
+import type { ListColumn, ListDataType, ListFilter, ListRecord, ListResult, ListViewConfig } from "../list/types";
 import { validImageColumnOptions } from "../list/types";
 import { validBadgeColumnOptions } from "../list/badge";
 import { recordIdentitySchema, type RecordIdentity } from "./record";
@@ -176,6 +176,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   for (const [name, loader] of Object.entries(presentation.relations ?? {})) {
     // createBy (audit) is the creator Many2one to User, labelled by a fixed server provider.
     const creator = name === "createBy" && presentation.audit === true;
+    // Many2many (tags) names are resolved per page for their IDs; they are not list columns of the policy.
+    if (Object.hasOwn(model.many2manyFields ?? {}, name)) { if (typeof loader !== "function") throw new Error("Las etiquetas requieren un lookup autorizado."); continue; }
     if ((!creator && (model.metadata[name]?.kind !== "many2one" || model.metadata[name].sensitive)) || typeof loader !== "function" || !config.columns.some(column => column.field === name)) throw new Error("Las etiquetas requieren una relación publicada y un lookup autorizado.");
   }
   const allowed = new Set(["id", ...Object.keys(collectionMetadata)]);
@@ -374,6 +376,34 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     return persist(tx, actor, { ...values, ...patch, id, revision }, declared.label);
   }
 
+  /** Validated Many2many filter → repository predicate (no IDs from unreadable targets). */
+  async function many2manyPredicate(tx: Prisma.TransactionClient, actor: ModelActor, filter: ListFilter) {
+    if (!repository.many2manyWhere) throw new ModelValidationError("Este proveedor aún no admite filtros por relaciones múltiples.");
+    if (!many2manyFilterOperators.includes(filter.operator)) throw new ModelValidationError("Para relaciones múltiples usa «tiene alguna de», «tiene todas» o vacío.");
+    const ids = filter.operator === "any" || filter.operator === "all" ? many2manyFilterIds(filter.value) : [];
+    if ((filter.operator === "any" || filter.operator === "all") && (!ids.length || ids.length > 10 || ids.some(id => id.length > 100))) throw new ModelValidationError("Selecciona entre 1 y 10 registros para el filtro.");
+    if (ids.length) {
+      const access = relationAccessFor(tx, actor);
+      const readable = access ? await access(many[filter.field].many2many.target, ids) : new Set<string>();
+      if (ids.some(id => !readable.has(id))) throw new ModelValidationError("Revisa los registros del filtro.");
+    }
+    return repository.many2manyWhere(filter.field, filter.operator as "any" | "all" | "empty" | "notEmpty", ids);
+  }
+
+  /** Page rows get the readable linked IDs of every Many2many (labels come from the relation providers). */
+  async function withMany2manyIds(tx: Prisma.TransactionClient, rows: readonly ListRecord[], access?: RelationAccess): Promise<ListRecord[]> {
+    const fields = Object.keys(many);
+    if (!fields.length || !rows.length || !repository.many2manyIds) return [...rows];
+    const ids = rows.map(row => row.id);
+    const linked = await Promise.all(fields.map(async field => {
+      const byRow = await repository.many2manyIds!(tx, field, ids);
+      const all = [...new Set([...byRow.values()].flat())];
+      const readable = all.length && access ? await access(many[field].many2many.target, all) : new Set<string>();
+      return [field, byRow, readable] as const;
+    }));
+    return rows.map(row => ({ ...row, ...Object.fromEntries(linked.map(([field, byRow, readable]) => [field, (byRow.get(row.id) ?? []).filter(id => readable.has(id))])) }));
+  }
+
   async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>): Promise<ListResult> {
     try {
       const data = await prisma.$transaction(async tx => {
@@ -396,6 +426,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         if (baseDomain) predicates.push(baseDomain);
         if (scope) predicates.push(scope);
         for (const filter of state.filters) {
+          // Many2many (tags): membership/emptiness over the link table; IDs must be readable.
+          if (Object.hasOwn(many, filter.field)) { predicates.push(await many2manyPredicate(tx, actor, filter)); continue; }
           const column = config.columns.find(column => column.field === filter.field && column.filterable !== false);
           if (!column || !allowed.has(filter.field)) throw new ModelValidationError("La columna del filtro no está habilitada.");
           const field = model.metadata[filter.field];
@@ -435,7 +467,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const names = await resolveDisplayNames(tx, sourceRows, model, repository, access);
         // Repository contracts can contain extra edit fields: collection DTOs honor the fixed server publication.
         const publishedRows = policy ? rows.map(row => projectListRow(row, [...policy.fields, ...policy.fields.flatMap(name => auditAvatarField(name) ? [auditAvatarField(name)!] : [])])) : rows;
-        return { rows: publishedRows.map(row => ({ ...row, $displayName: names.get(row.id)! })), total, page, pageSize: state.pageSize };
+        const linkedRows = await withMany2manyIds(tx, publishedRows, access);
+        return { rows: linkedRows.map(row => ({ ...row, $displayName: names.get(row.id)! })), total, page, pageSize: state.pageSize };
       }, { isolationLevel: "RepeatableRead" });
       // Labels use independently authorized lookups after the list snapshot; no cross-request cache.
       // They are presentation, never predicates, ordering keys or authorization inputs.

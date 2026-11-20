@@ -35,6 +35,10 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
       label: "R.F.C.",
       tracking: true,
     });
+    curp = Fields.Text({
+      label: "CURP",
+      tracking: true,
+    });
     paisId = Fields.Many2one("UbicacionesPais", {
       label: "País",
       onDelete: "Restrict",
@@ -58,6 +62,33 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
       tracking: true,
       domain: (d) => d.eq("municipioId", d.draft("municipioId")),
     });
+    tagIds = Fields.Many2many("ContactosextraPartnertags", {
+      label: "Etiquetas",
+      maxSelected: 20,
+      create: true,
+    });
+    saleUserId = Fields.Many2one("User", {
+      label: "Vendedor",
+      tracking: true,
+      domain: (d) => d.eq("active", true),
+    });
+    purchaseUserId = Fields.Many2one("User", {
+      label: "Comprador",
+      tracking: true,
+      domain: (d) => d.eq("active", true),
+    });
+
+    normalize(values: Readonly<Record<string, unknown>>) {
+      const normalized = super.normalize?.(values) ?? values;
+
+      return {
+        ...normalized,
+        curp:
+          typeof normalized.curp === "string"
+            ? normalized.curp.trim().toUpperCase()
+            : normalized.curp,
+      };
+    }
 
     @constraint("paisId", "estadoId")
     async validarPaisEstado(

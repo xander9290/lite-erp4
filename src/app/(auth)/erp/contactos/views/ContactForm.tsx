@@ -31,6 +31,7 @@ export default function ContactForm({
           />
           <FieldText<Values> name="name" label="Nombre" />
         </Stack>
+        <Stack id="fiscal-data"></Stack>
         <Stack id="medios">
           <FieldText<Values> name="phone" inputMode="tel" widget="phone" />
           <FieldText<Values> name="email" widget="email" />

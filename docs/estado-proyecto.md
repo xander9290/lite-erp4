@@ -1,10 +1,198 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-19.
+Última actualización: 2026-11-20.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
+
+## Progreso guardado (2026-11-20, punto de continuación)
+
+Revisión posterior de contexto (2026-11-20): rama `codex/partner`, HEAD `c7e14da`
+(Implementación de etiquetas). El framework descrito abajo ya está en Git. Cambios
+locales al retomar: este documento y PartnerInsertions (Notebook `extras` insertado
+tras `group:contacto`, con páginas Contactos/Venta/Compra y contenido provisional).
+En código ya existen `tagIds` con `create: true`, FieldRelationTag en el formulario,
+Column en la lista, `drawer: false` en contactosextra y la migración
+`20261120174528_sync_contactosextra` de la tabla de vínculos. No se comprobó su
+aplicación en la BD ni el comportamiento visual/persistencia en esta revisión.
+El nombre PartnerTags se conserva. El menú Etiquetas de Contactos y su dependencia
+contactosextra se añadieron después en esta jornada: Configuración → Etiquetas
+abre `/erp/contactosextra/partnertags`, sujeto a lectura efectiva del catálogo,
+sin ampliar accessModels ni conceder permisos. Siguen pendientes la decisión
+de ocultar Ubicaciones y la guía de dirección. La lista siguiente conserva el plan
+anterior: no repetir los pasos ya presentes en código ni asumir SQL pendiente.
+Verificación del enlace: `test:applications` (14), ESLint del manifest y
+`git diff --check` aprobados; sin nueva revisión visual ni consultas de BD.
+Revisión de fuentes/Git únicamente, sin pruebas, consultas de BD ni migraciones;
+`git diff --check` aprobado para esta actualización documental.
+
+Framework terminado y verificado en esta jornada (detalle en las secciones de abajo): inserciones
+en formularios y colecciones, Many2many en extensiones, `drawer: false`, `create: true` en
+Many2many, FieldRelationTag sin textos de ayuda bajo el control (sólo estados excepcionales:
+carga, error, no disponibles, dominio) y Many2many en colecciones. Cambios pendientes de commit
+del usuario desde `1fe51cf` (create, helper de FieldRelationTag, etiquetas en colecciones y
+estas notas).
+
+Siguiente del usuario en Contactos, en este orden y a su ritmo (él escribe el código):
+
+1. Decidir si renombra `PartnerTags` a singular antes de crear la tabla de vínculos.
+2. `npm run orm:sync -- contactosextra`: debe proponer sólo CREATE/FK de
+   `contactosextra_core_partner_tag_ids_rel`; reiniciar el dev server.
+3. `<FieldRelationTag name="tagIds" />` en `PartnerInsertions` y, opcional, `create: true` en
+   `tagIds` (sin sync).
+4. `<Column field="tagIds" label="Etiquetas" />` en `PartnerListInsertions`.
+5. Enlace «Etiquetas» en Configuración de Contactos (`/erp/contactosextra/partnertags`, model
+   `contactosextra.partnertags`, contactosextra en `depends`); decidir `drawer: false` en
+   Ubicaciones.
+6. Pestañas (opcional): Notebook con `id` estable en `ContactForm` (recomendado `id="extra"` si
+   varios módulos agregarán páginas) o insertado por la extensión tras `group:contacto`.
+   Destinos `notebook:<id>` (inside sólo NotebookPage) y `page:<id>/<name>`; las páginas
+   insertadas no son destino. Contrato en [inserciones](inserciones-vistas.md).
+
+Después se retoma la guía de dirección: comprobar la repetición de la importación de estados
+sin `--aplicar` (32 sin cambios) y luego los importadores de Municipios y Localidades.
+
+## Many2many en colecciones: columnas y filtros (2026-11-20)
+
+Pedido por el usuario («poder filtrar por etiquetas»), sin orden ni agrupación (acordado).
+Widget `tags` en columnas, filtro alguna/todas/sin/con (1–10 IDs legibles), IDs legibles y
+nombres por fila. Repositorio declarativo: `many2manyWhere`/`many2manyIds` (propios y vía fila
+compañera). Inserciones de lista aceptan Many2many. Verificado: `test:modules` 62, `test:orm`
+115/116 (EPERM previo), list-grouping/relation-filter/collection-load/list-selection y filtros
+de lista, `test:extensions:integration` completo en temporal, `tsc`, ESLint (aviso previo) y
+demo `/sample#tag-collections` en navegador (chips, filtro «tiene todas» con nombres en la
+cabecera y en la URL sólo IDs). Contrato en
+[Many2many](relaciones-many2many.md#many2many-en-colecciones-etiquetas). Siguiente del usuario:
+`<Column field="tagIds" />` en `PartnerListInsertions` tras el `orm:sync` pendiente.
+
+## Crear desde el selector de Many2many (2026-11-20)
+
+Pedido por el usuario, sólo Many2many. `Fields.Many2many(target, { create: true })` ofrece
+«Crear "texto"» en FieldRelationTag; `modelQuickCreate`/`relationQuickCreate` reutiliza un
+nombre existente o crea con sólo `name` por el servicio del destino; la opción sólo se publica
+a quien puede crear en el destino. Al componer exige destino declarativo con Text `name` y sin
+otros obligatorios sin default. Cambio respecto a la propuesta: `create` no se combina con
+`domain` (rechazado al declarar) en lugar de validar el dominio al crear. Verificado:
+`test:orm` 115/116 (EPERM previo), `test:modules` 60, `test:form-model` 25,
+`test:extensions:integration` completo en temporal, `tsc`, ESLint (aviso previo) y demo
+`/sample#many2many-model` en navegador. Contrato en
+[Many2many](relaciones-many2many.md#crear-desde-el-selector-create-true). Siguiente del usuario:
+`create: true` en `PartnerExtra.tagIds` (no requiere orm:sync: no cambia el esquema).
+
+## Opción `drawer` del cajón de aplicaciones (2026-11-20)
+
+Pedido por el usuario: contactosextra apareció en el cajón al añadir su catálogo
+`PartnerTags`, porque todo módulo con modelos propios se registra como aplicación.
+`defineModule({ drawer: false })` (y `drawer` en `ApplicationManifest`) oculta sólo la tarjeta:
+la página del cajón usa `applications.drawerFor(user)`; navegación, rutas, enlaces desde otras
+aplicaciones y permisos siguen con `forUser`. Por defecto `true`, sin cambios en módulos
+existentes. Verificado: `test:applications` 14 y `test:modules` 60 (pruebas nuevas), `tsc` y
+ESLint (sólo el aviso previo de `erp/page.tsx`). Sin navegador. Contrato en
+[módulos declarativos](modulos-declarativos.md#1-declarar-el-módulo). Siguiente del usuario:
+`drawer: false` en contactosextra (y decidir si también en Ubicaciones), enlace «Etiquetas» en
+Configuración de Contactos, y renombrar/unificar carpetas antes de `orm:sync`.
+
+## Many2many en extensiones: implementado (2026-11-20)
+
+Autorizado por el usuario con las tres decisiones del [diseño](ideas/many2many-extensiones.md):
+vínculos colgados de la fila compañera, `core.user` fuera de la primera versión y grupo del
+módulo en el formulario automático. Contrato en [Many2many](relaciones-many2many.md#many2many-en-extensiones).
+Sin commit.
+
+- Código: `extensionMany2many` (extend.ts); el modelo compañero incluye los Many2many (el
+  generador crea la tabla del extensor); `compose` valida destino/dependencia, nombres, límite
+  de 4 y repositorio propio, y publica `ModelExtensionInfo.many2many`; el repositorio lee y
+  escribe los vínculos dentro de la fila compañera; ModelForm los ubica en el grupo del módulo.
+- Verificado: `test:modules` 59 (nueva prueba de extensiones con Many2many), `test:form-model`
+  25, `test:orm` 114/115 (EPERM de symlinks en Windows, previo), `tsc`, ESLint.
+  `test:extensions:integration` en temporal: instalación con SQL de la tabla y sus FK, y el
+  bloque Many2many completo (alta, lectura ordenada, cambio sólo de vínculos con revisión e
+  historial, inexistentes/repetidos, destino ilegible, Restrict y Cascade) **aprobados**.
+- **Arnés de integración corregido (mismo día, autorizado):** desde `91862ee` Contactos declara
+  `depends: ["ubicaciones"]` y los modos que reemplazan `src/modules/index.ts` y dibujan páginas
+  del ERP respondían 500 («No está registrada la dependencia ubicaciones»).
+  `scripts/modules.integration.ts` ahora calcula, leyendo los manifests de las aplicaciones
+  manuales y de sus módulos, las dependencias declarativas requeridas y las registra junto a
+  los módulos de ensayo (`renderIndex`) en los modos de extensiones y principal. Sin nombres
+  fijos; sus tablas ya existen porque el esquema temporal aplica todas las migraciones.
+- Verificado tras la corrección: `test:extensions:integration` completo (incluido render Next y
+  retirada del extensor con `DROP TABLE "soporte_taller_equipo_marcas_rel"`) y
+  `test:modules:integration` completo, ambos en proyecto/esquema temporales eliminados.
+- Retirar Ubicaciones en el ERP real **ya está bloqueado** por el gestor: su inventario lee
+  también los manifests de aplicaciones manuales (`inspectManifest`), Contactos aparece en
+  `dependents` de Ubicaciones y la revisión de retirada añade «Aplicaciones dependientes». Una
+  nota anterior lo daba como riesgo abierto por error. Fijado con prueba en
+  `catalogue.test.ts` (`test:module-manager` 21/21). Sin cambios de código del gestor.
+- Siguiente del usuario: declarar `tagIds` en PartnerExtra con destino
+  `ContactosextraPartnertags`, `orm:sync -- contactosextra` (revisar el SQL) e insertarlo con
+  `<FieldRelationTag name="tagIds" />`.
+
+## Pendiente: Many2many en modelos extendidos (2026-11-20) — implementado arriba
+
+Solicitado por el usuario al consultar cómo declarar una relación para presentarla
+como tags en una extensión de modelo, como PartnerExtra. Actualmente `extendModel`
+rechaza Fields.Many2many; FieldRelationTag ya presenta las relaciones declaradas
+en modelos propios. Registrar este pendiente no inicia su implementación.
+
+- Objetivo: permitir declarar Many2many desde una extensión y presentar el campo
+  con FieldRelationTag en vistas personalizadas o inserciones, reutilizando el
+  contexto y guardado del formulario base.
+- Diseñar antes de implementar propiedad y ciclo de vida de la tabla intermedia
+  del módulo extensor, composición de extensiones y compatibilidad con modelos
+  nativos como core.partner. No duplicar Partner ni escribir vínculos desde la vista.
+- Aceptación: generación/instalación/bindings y retirada coherentes con la propiedad
+  del módulo; defaults/esquemas/tipos y lookup autorizados; permisos del dueño y
+  destino, revisión compartida, hooks, constraints e historial conservados;
+  vínculos y registro guardados en una transacción con rollback. Verificar en
+  proyecto/esquema temporales y demo RHF/Zod, incluyendo inserciones y rechazo
+  de destinos inexistentes o no accesibles.
+- Contrato y alcance actual: [Many2many](relaciones-many2many.md). No se modifican
+  modelos, migraciones ni datos con esta anotación.
+- **Diseño propuesto (2026-11-20):** [many2many-extensiones](ideas/many2many-extensiones.md): vínculos colgados de la fila compañera del módulo extensor (generador y propiedad existentes), escritura anidada en su upsert, `core.user` fuera de la primera versión. Pendiente de decisiones del usuario y de autorización.
+
+## Stack: tres columnas adaptables (2026-11-20)
+
+- Stack distribuye Fields en una columna por debajo de 24rem de ancho propio,
+  dos desde 24rem y tres desde 42rem. Conserva dirección block, separación,
+  anclas de inserción y contexto del formulario. Contrato en [Stack](../src/components/ui/form/Stack.md)
+  y demo RHF/Zod existente en `/sample#stack` actualizados.
+- Cambio de presentación compartida; no modifica modelos ni BD. La guía sigue
+  pausada en la comprobación de repetición de estados descrita abajo.
+- Ajuste posterior: cuadrícula con `auto-fit` para colapsar columnas vacías;
+  dos campos ocupan mitades y uno todo el ancho. Admite inserciones sin contar
+  hijos React. En varias filas mantiene las columnas alineadas.
+- Verificación: ESLint de Stack y SampleForms, 11 pruebas existentes de
+  modelFields (incluido contexto/dirección de Stack) y `git diff --check`
+  aprobados. Sin nueva revisión visual en navegador.
+
+## Pendiente: importación y exportación desde ListView
+
+Solicitado por el usuario el 2026-11-19. Pendiente de diseño e implementación;
+este registro no inicia su desarrollo ni sustituye la guía en curso.
+
+- Integrar en Acciones de ListView la exportación Excel/CSV de seleccionados o
+  de todos los registros que coincidan con los filtros, respetando permisos de
+  registros y campos en el servidor.
+- Importación Excel/CSV: mapear columnas a Fields y resolver creación o
+  actualización mediante claves únicas declaradas (folio/código, no nombres).
+- Mostrar antes de confirmar un plan con altas, actualizaciones, registros sin
+  cambios y errores por fila/campo. Revalidar permisos y datos al aplicar para
+  detectar cambios posteriores a la revisión; reutilizar servicios, validaciones,
+  folios y lógica de negocio del ORM, sin escrituras directas que los omitan.
+- Many2one: resolver por clave única del modelo destino; señalar referencias
+  inexistentes, ambiguas o no accesibles. No crear relacionados automáticamente
+  por defecto; cualquier creación deberá habilitarse expresamente por modelo.
+- Many2many: resolver varias claves y distinguir explícitamente entre agregar
+  relaciones y reemplazar las existentes.
+- One2many: agrupar líneas por clave del padre y guardar cada padre con sus
+  líneas en una transacción, ejecutando la lógica de ambas clases.
+- Fases propuestas: campos simples y Many2one primero; Many2many y líneas
+  después. Para cargas grandes, lotes con reporte y reintentos idempotentes,
+  explicitando qué lotes se aplicaron si la importación queda incompleta.
+- Dependencias de catálogos: importar en orden (países, estados, municipios).
+  Aprovechar la experiencia de la importación de estados, conservando su CLI
+  específico hasta que exista el flujo general.
 
 ## Corrección posterior: dropdowns de relaciones (2026-11-19)
 

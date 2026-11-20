@@ -1,6 +1,6 @@
 # Stack
 
-Contenedor para organizar Fields en dos columnas con labels encima de los controles.
+Contenedor para organizar Fields en hasta tres columnas con labels encima de los controles.
 Admite `children`, atributos de `div`, `className` y únicamente `direction="block"`
 (por defecto). No es necesario repetir direction en cada Field.
 
@@ -17,10 +17,15 @@ import Stack from "@/components/ui/form/Stack";
 ```
 
 También se puede usar directamente dentro de ModelForm/FormLayout, sin FormGroup.
-La cuadrícula usa una columna cuando el ancho de Stack es menor de 24rem y dos
-a partir de ese tamaño, independientemente del ancho de la pantalla. Mantiene el
+La cuadrícula usa una columna cuando el ancho de Stack es menor de 24rem, dos
+desde 24rem y hasta tres desde 42rem, independientemente del ancho de la pantalla.
+Las columnas vacías se colapsan: con dos campos ambos se reparten el ancho por
+mitades; con uno ocupa todo el ancho. Se usa CSS `auto-fit`, sin contar hijos React,
+para incluir también campos insertados o devueltos por componentes propios.
+Si hay varias filas, sus columnas permanecen alineadas; no se expanden por separado
+los elementos de la última fila. Mantiene el
 orden de los hijos y separación uniforme. Un hijo con `className="col-span-full"`
-puede ocupar ambas columnas; un widget header ya ocupa ese ancho.
+puede ocupar todas las columnas; un widget header ya ocupa ese ancho.
 
 Los Fields descendientes siempre usan dirección block, incluso si declaran inline
 o están dentro de un componente propio o Fragment. Fuera de Stack conservan su

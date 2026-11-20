@@ -163,3 +163,16 @@ test("dependency links require a direct dependency, matching model route and a p
   assert.throws(() => defineApplication({ ...contacts, depends: ["puente"], menus: [locationLink] }), /Modelo de menú/, "transitive dependency is not sufficient");
   assert.deepEqual(createApplicationRegistry([bridge, locations]).all().map(item => item.id), ["ubicaciones", "puente"]);
 });
+
+test("drawer: false hides only the drawer card; the application stays registered and navigable", () => {
+  const catalog = defineApplication({ ...contacts, id: "etiquetas", name: "Etiquetas", models: ["Tag"], drawer: false });
+  const registry = createApplicationRegistry([contacts, catalog]);
+  const admin = { isAdmin: true };
+  assert.deepEqual(registry.drawerFor(admin).map(app => app.id), ["contactos"]);
+  assert.deepEqual(registry.forUser(admin).map(app => app.id), ["contactos", "etiquetas"], "navigation and routes keep it");
+  assert.equal(registry.get("etiquetas")?.drawer, false);
+  // Without drawer: false the usual rule applies: authenticated applications for any user.
+  assert.deepEqual(registry.drawerFor({ isAdmin: false }).map(app => app.id), ["contactos"]);
+  assert.deepEqual(registry.drawerFor(null), [], "the drawer still requires opening permission");
+  assert.throws(() => defineApplication({ ...catalog, drawer: "no" as never }), /drawer debe ser true o false/);
+});

@@ -8,6 +8,8 @@ import { extendModel } from "./extend";
 import { createRepository } from "./repository";
 import { generateModule } from "../orm/generator/generate";
 import type { ModelContext } from "../orm/context";
+import core from "../core/manifest";
+import { User } from "../core/models/user";
 
 class Equipo extends Model {
   name = Fields.Text({ label: "Nombre", required: true, maxLength: 80 });
@@ -126,7 +128,7 @@ test("the repository reads and writes companion fields in the same statement and
   const repository = createRepository(equipo, base.profile.module);
   // A record saved before the extension was installed has no companion row: defaults.
   assert.deepEqual(await repository.read(tx, "legacy"), { id: "legacy", revision: updatedAt.toISOString(), name: "VIEJO", estado: "activo", responsable: null, nivel: 1 });
-  assert.deepEqual((calls[0][1].select as Record<string, unknown>).soporteBasexEquipoRecordIdRecords, { select: { responsable: true, nivel: true } });
+  assert.deepEqual((calls[0][1].select as Record<string, unknown>).soporteBasexEquipoRecordIdRecords, { select: { id: true, responsable: true, nivel: true } });
   const created = await repository.create(tx, { name: "NUEVO", estado: "activo", responsable: "Ana", nivel: 2 } as never, "u1");
   assert.equal((created as Record<string, unknown>).responsable, "Ana");
   assert.deepEqual(calls[1][1].data, { name: "NUEVO", estado: "activo", createBy: "u1", soporteBasexEquipoRecordIdRecords: { create: { responsable: "Ana", nivel: 2, createBy: "u1" } } });
@@ -155,4 +157,96 @@ test("insertions: deferred loaders per view, form exclusive with views.form, tra
   assert.equal(info?.insertions?.form, loader);
   assert.deepEqual(info?.depends, ["basex", "soporte"]);
   assert.deepEqual(equipo.extensions.find(extension => extension.module === "soporte")?.depends, ["basex"]);
+});
+
+test("Many2many in extensions: companion link table, composition rules and repository writes", async () => {
+  class Marca extends Model { name = Fields.Text({ label: "Nombre", required: true }); }
+  const ExtraTags = extendModel(Equipo, Base => class extends Base {
+    marcas = Fields.Many2many("EtiquetasMarca", { label: "Marcas", maxSelected: 3 });
+  });
+  const etiquetas = defineModule({ id: "etiquetas", name: "Etiquetas", icon: "tag", depends: ["basex"], models: { marca: Marca }, extends: { "basex.equipo": ExtraTags } });
+  // An extension with only Many2many is valid; its links belong to the companion model.
+  const [extension] = etiquetas.extensions;
+  assert.deepEqual(extension.fields, []);
+  assert.deepEqual(extension.many2many, ["marcas"]);
+  const companion = etiquetas.profile.module.models.find(model => model.model.name === "EtiquetasBasexEquipo")!;
+  assert.deepEqual(Object.keys(companion.model.many2manyFields ?? {}), ["marcas"]);
+  const schema = ["datasource db {", '  provider = "postgresql"', "}", "", "model User {", "  id String @id @default(cuid())", "}", "", "model BasexEquipo {", "  id String @id @default(cuid())", "  name String", '  @@map("basex_equipo")', "}", ""].join(String.fromCharCode(10));
+  const files = generateModule(etiquetas.profile.module, { schema, owners: { BasexEquipo: "basex" } });
+  const prisma = files["models.prisma"];
+  assert.ok(prisma.includes("model EtiquetasBasexEquipoMarcasLink {"));
+  assert.ok(prisma.includes('source EtiquetasBasexEquipo @relation("EtiquetasBasexEquipoMarcasLink_source", fields: [sourceId], references: [id], onDelete: Cascade)'));
+  assert.ok(prisma.includes('target EtiquetasMarca @relation("EtiquetasBasexEquipoMarcasLink_target", fields: [targetId], references: [id], onDelete: Restrict)'));
+  assert.ok(prisma.includes('@@map("etiquetas_basex_equipo_marcas_rel")'));
+
+  const equipo = composeModules([base, etiquetas])[0].models[0];
+  assert.deepEqual(Object.keys(equipo.contract.many2manyFields), ["marcas"]);
+  assert.deepEqual(equipo.extensions[0].many2many, [{ field: "marcas", source: "etiquetasBasexEquipoMarcasLinkSourceRecords", maximum: 3 }]);
+  assert.deepEqual((equipo.contract.createDefaults() as Record<string, unknown>).marcas, []);
+
+  // Repository: links travel inside the companion row, in the same statement.
+  const calls: [string, Record<string, unknown>][] = [];
+  const updatedAt = new Date("2026-11-20T10:00:00.000Z");
+  const companionRow = (ids: string[]) => ({ id: "c1", etiquetasBasexEquipoMarcasLinkSourceRecords: ids.map(targetId => ({ targetId })) });
+  const delegate = {
+    findMany: async () => [],
+    findUnique: async (args: Record<string, unknown>) => { calls.push(["findUnique", args]); return (args.where as { id: string }).id === "viejo" ? { id: "viejo", updatedAt, name: "A", estado: "activo", etiquetasBasexEquipoRecordIdRecords: null } : { id: "e1", updatedAt, name: "B", estado: "activo", etiquetasBasexEquipoRecordIdRecords: companionRow(["m1", "m2"]) }; },
+    create: async (args: Record<string, unknown>) => { calls.push(["create", args]); return { id: "n1", updatedAt, name: "C", estado: "activo", etiquetasBasexEquipoRecordIdRecords: companionRow(["m1"]) }; },
+    update: async (args: Record<string, unknown>) => { calls.push(["update", args]); return { id: "e1", updatedAt, name: "B", estado: "activo", etiquetasBasexEquipoRecordIdRecords: companionRow([]) }; },
+  };
+  const tx = { basexEquipo: delegate } as never;
+  const repository = createRepository(equipo, base.profile.module);
+  assert.deepEqual((await repository.read(tx, "viejo") as Record<string, unknown>).marcas, [], "sin fila compañera: sin vínculos");
+  assert.deepEqual((await repository.read(tx, "e1") as Record<string, unknown>).marcas, ["m1", "m2"]);
+  assert.deepEqual((calls[0][1].select as Record<string, unknown>).etiquetasBasexEquipoRecordIdRecords, { select: { id: true, etiquetasBasexEquipoMarcasLinkSourceRecords: { select: { targetId: true }, orderBy: { targetId: "asc" }, take: 4 } } });
+  await repository.create(tx, { name: "C", estado: "activo", marcas: ["m1"] } as never, "u1");
+  assert.deepEqual(calls[2][1].data, { name: "C", estado: "activo", createBy: "u1", etiquetasBasexEquipoRecordIdRecords: { create: { etiquetasBasexEquipoMarcasLinkSourceRecords: { create: [{ targetId: "m1" }] }, createBy: "u1" } } });
+  await repository.update(tx, "e1", updatedAt.toISOString(), { name: "B", estado: "activo", marcas: [] } as never);
+  assert.deepEqual((calls[3][1].data as Record<string, unknown>).etiquetasBasexEquipoRecordIdRecords, { upsert: {
+    create: { etiquetasBasexEquipoMarcasLinkSourceRecords: { create: [] } },
+    update: { etiquetasBasexEquipoMarcasLinkSourceRecords: { deleteMany: {}, create: [] } },
+  } });
+  // No base Many2many relation is written for extension fields.
+  assert.equal(Object.keys(calls[3][1].data as object).some(key => key.startsWith("basexEquipoMarcas")), false);
+
+  // Rules: names, target dependency, limit of four and custom repositories.
+  const spec = { id: "etiquetas", name: "Etiquetas", icon: "tag", depends: ["basex"], models: { marca: Marca } };
+  assert.throws(() => defineModule({ ...spec, extends: { "basex.equipo": extendModel(Equipo, Base => class extends Base { name = Fields.Many2many("EtiquetasMarca", { label: "X" }) as never; }) } }), /ya declara/);
+  const ajeno = defineModule({ ...spec, models: {}, extends: { "basex.equipo": extendModel(Equipo, Base => class extends Base { otras = Fields.Many2many("OtroModelo", { label: "X" }); }) } });
+  assert.throws(() => composeModules([base, ajeno]), /Many2many requiere un destino declarativo registrado/);
+  const cinco = defineModule({ ...spec, extends: { "basex.equipo": extendModel(Equipo, Base => class extends Base {
+    a = Fields.Many2many("EtiquetasMarca", { label: "A" }); b = Fields.Many2many("EtiquetasMarca", { label: "B" }); c = Fields.Many2many("EtiquetasMarca", { label: "C" }); d = Fields.Many2many("EtiquetasMarca", { label: "D" }); e = Fields.Many2many("EtiquetasMarca", { label: "E" });
+  }) } });
+  assert.throws(() => composeModules([base, cinco]), /máximo cuatro relaciones Many2many/);
+  // core.user writes through its own repository: Many2many extensions are rejected clearly.
+  const sobreUsuario = defineModule({ id: "etiquetas", name: "Etiquetas", icon: "tag", models: { marca: Marca }, extends: { "core.user": extendModel(User, Base => class extends Base { marcas = Fields.Many2many("EtiquetasMarca", { label: "Marcas" }); }) } });
+  assert.throws(() => composeModules([core, sobreUsuario]), /repositorio propio/);
+});
+
+test("drawer option of a module reaches its application manifest", () => {
+  class Etiqueta extends Model { name = Fields.Text({ label: "Nombre", required: true }); }
+  const hidden = defineModule({ id: "etiquetas", name: "Etiquetas", icon: "tag", models: { etiqueta: Etiqueta }, drawer: false });
+  assert.equal(hidden.application.drawer, false);
+  assert.equal(defineModule({ id: "visible", name: "Visible", icon: "tag", models: { etiqueta: Etiqueta } }).application.drawer, undefined);
+});
+
+test("Many2many collection predicates and page IDs: own links and links through the companion row", async () => {
+  class Marca extends Model { name = Fields.Text({ label: "Nombre", required: true }); }
+  const ExtraTags = extendModel(Equipo, Base => class extends Base { marcas = Fields.Many2many("EtiquetasMarca", { label: "Marcas", maxSelected: 3 }); });
+  const etiquetas = defineModule({ id: "etiquetas", name: "Etiquetas", icon: "tag", depends: ["basex"], models: { marca: Marca }, extends: { "basex.equipo": ExtraTags } });
+  const equipo = composeModules([base, etiquetas])[0].models[0];
+  const repository = createRepository(equipo, base.profile.module);
+  const via = (predicate: unknown) => ({ etiquetasBasexEquipoRecordIdRecords: { is: { etiquetasBasexEquipoMarcasLinkSourceRecords: predicate } } });
+  assert.deepEqual(repository.many2manyWhere!("marcas", "any", ["m1", "m2"]), via({ some: { targetId: { in: ["m1", "m2"] } } }));
+  assert.deepEqual(repository.many2manyWhere!("marcas", "all", ["m1", "m2"]), { AND: [via({ some: { targetId: "m1" } }), via({ some: { targetId: "m2" } })] });
+  assert.deepEqual(repository.many2manyWhere!("marcas", "notEmpty", []), via({ some: {} }));
+  // A record without a companion row has no links: it counts as empty.
+  assert.deepEqual(repository.many2manyWhere!("marcas", "empty", []), { OR: [{ etiquetasBasexEquipoRecordIdRecords: { is: null } }, via({ none: {} })] });
+  assert.throws(() => repository.many2manyWhere!("name", "any", ["x"]), /no está publicada/);
+  const tx = { basexEquipo: { findMany: async (args: Record<string, unknown>) => {
+    assert.deepEqual(args, { where: { id: { in: ["e1", "e2"] } }, select: { id: true, etiquetasBasexEquipoRecordIdRecords: { select: { etiquetasBasexEquipoMarcasLinkSourceRecords: { select: { targetId: true }, orderBy: { targetId: "asc" } } } } } });
+    return [{ id: "e1", etiquetasBasexEquipoRecordIdRecords: { etiquetasBasexEquipoMarcasLinkSourceRecords: [{ targetId: "m1" }] } }, { id: "e2", etiquetasBasexEquipoRecordIdRecords: null }];
+  } } } as never;
+  const ids = await repository.many2manyIds!(tx, "marcas", ["e1", "e2"]);
+  assert.deepEqual([...ids], [["e1", ["m1"]], ["e2", []]]);
 });

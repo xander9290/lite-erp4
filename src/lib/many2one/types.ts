@@ -25,6 +25,8 @@ export type Many2OneRequest = {
   id?: string;
   ids?: readonly string[];
 };
+/** Creates a related record from the selector text (Many2many `create: true`); the server fixes the target. */
+export type Many2OneCreator = (text: string) => Promise<{ ok: true; item: Many2OneOption; created: boolean } | { ok: false; error: string }>;
 export type Many2OneResult =
   | { ok: true; items: Many2OneOption[]; total: number; page: number; pageSize: number }
   | { ok: false; error: string };

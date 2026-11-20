@@ -158,3 +158,20 @@ test("audit: true publishes the creator as a Many2one plus dates; groups by crea
   assert.deepEqual(placed.list.fields, ["createdAt", "name", "createByUser.partner.name"]);
   assert.deepEqual(placed.list.sortable, ["name", "createByUser.partner.name", "createdAt"]);
 });
+
+test("Many2many columns are tags: filterable by membership, never sorted or grouped", () => {
+  const tagged: ModelClientConfig = { ...config, lookups: { ...config.lookups, tags: "unit.etiqueta" }, many2many: { tags: { target: "UnitEtiqueta", label: "Etiquetas", minSelected: 0, maxSelected: 20 } } };
+  const declared = modelCollection(tagged, [{ field: "name" }, { field: "tags" }]);
+  const tags = declared.columns.find(column => column.field === "tags")!;
+  assert.equal(tags.widget, "tags");
+  assert.equal(tags.label, "Etiquetas");
+  assert.equal(tags.filterable, true);
+  assert.equal(tags.sortable, false);
+  assert.equal(tags.groupable, false);
+  assert.ok(declared.queryColumns.some(column => column.field === "tags"), "declared tag columns stay available to the filter toolbar");
+  // Without declared columns they follow the published ones while there is room (12 at most).
+  const derived = modelCollection(tagged);
+  assert.equal(derived.columns.at(-1)?.field, "tags");
+  assert.ok(derived.columns.length <= 12);
+  assert.equal(modelCollection(tagged, [{ field: "tags", label: "Marcas" }]).columns[0].label, "Marcas");
+});

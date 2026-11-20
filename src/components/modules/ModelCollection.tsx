@@ -47,7 +47,7 @@ function useCollectionInsertions(config: ModelClientConfig, view: CollectionView
     const unplaced = fallback.map(parse);
     if (!Object.keys(parsed).length && !unplaced.length) return { columns, cards: undefined, issues };
     const policy = {
-      published: config.list.fields,
+      published: [...config.list.fields, ...Object.keys(config.many2many ?? {})],
       extensionFields: Object.fromEntries((config.extensions ?? []).map(extension => [extension.module, extension.fields])),
       modules: (config.extensions ?? []).map(extension => ({ module: extension.module, depends: extension.depends ?? [] })),
     };

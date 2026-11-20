@@ -3,8 +3,13 @@
   "modules": {
     "contactosextra": {
       "file": "orm-contactosextra.prisma",
-      "hash": "4806d97453d1d11ac9916286215c634017a9e7fa98e31dc2937c9c5237b6d781",
+      "hash": "91a70f51c55b69e644adfe37d300746a62d4be4a91aed0ecde23c211263b6a94",
       "inverses": [
+        {
+          "file": "user.prisma",
+          "target": "User",
+          "text": "\n  // BEGIN lite-erp:contactosextra:User\n  contactosextraPartnertagsCreatedRecords ContactosextraPartnertags[] @relation(\"ContactosextraPartnertags_createBy\")\n  contactosextraCorePartnerSaleUserIdRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_saleUserId\")\n  contactosextraCorePartnerPurchaseUserIdRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_purchaseUserId\")\n  contactosextraCorePartnerCreatedRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_createBy\")\n  // END lite-erp:contactosextra:User\n"
+        },
         {
           "file": "partner.prisma",
           "target": "Partner",
@@ -29,11 +34,6 @@
           "file": "orm-ubicaciones.prisma",
           "target": "UbicacionesLocalidad",
           "text": "\n  // BEGIN lite-erp:contactosextra:UbicacionesLocalidad\n  contactosextraCorePartnerLocalidadIdRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_localidadId\")\n  // END lite-erp:contactosextra:UbicacionesLocalidad\n"
-        },
-        {
-          "file": "user.prisma",
-          "target": "User",
-          "text": "\n  // BEGIN lite-erp:contactosextra:User\n  contactosextraCorePartnerCreatedRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_createBy\")\n  // END lite-erp:contactosextra:User\n"
         }
       ]
     },

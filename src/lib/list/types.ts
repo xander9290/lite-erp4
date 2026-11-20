@@ -5,7 +5,8 @@ export const listModels = {
 
 export type ListModel = keyof typeof listModels;
 export type ListDataType = "text" | "number" | "integer" | "date" | "datetime" | "boolean";
-export type ListFilterOperator = "contains" | "eq" | "neq" | "startsWith" | "endsWith" | "gt" | "gte" | "lt" | "lte" | "between" | "empty" | "notEmpty";
+/** `any`/`all`: Many2many columns; value is a comma-separated list of IDs (1–10). */
+export type ListFilterOperator = "contains" | "eq" | "neq" | "startsWith" | "endsWith" | "gt" | "gte" | "lt" | "lte" | "between" | "empty" | "notEmpty" | "any" | "all";
 export type ListFilter = { field: string; operator: ListFilterOperator; value?: string; to?: string; precision?: "day" | "instant" };
 export type BadgeColor = "primary" | "secondary" | "accent" | "info" | "success" | "warning" | "error" | "neutral";
 export type ListColumn = {
@@ -13,7 +14,8 @@ export type ListColumn = {
   label: string;
   /** Use the server record label; defaults to true for name/id. False preserves the field value. */
   displayName?: boolean;
-  widget?: "partner" | "image" | "many2one" | "badge";
+  /** `tags`: Many2many column; IDs in the row, labels in `$labels` (resolved by the server). */
+  widget?: "partner" | "image" | "many2one" | "badge" | "tags";
   /** Selection value → theme color. Badge background with widget badge; text color without a widget. */
   colors?: Readonly<Record<string, BadgeColor>>;
   options?: readonly { value: string; label: string }[];

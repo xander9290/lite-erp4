@@ -72,12 +72,18 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
     if (field.kind === "text" && field.writeOnly && !secrets.has(name)) throw new Error(`${entry.id}.${name}: un campo writeOnly necesita su transformación en el repositorio.`);
   }
   const auditSelect = creator ? creatorSelect : datesSelect;
-  const many = Object.entries(entry.contract.many2manyFields).map(([field, descriptor]) => ({ field, maximum: descriptor.many2many.maxSelected, ...many2manyStorage(entry.contract, field) }));
+  // Many2many of extensions are read and written through their companion row (below).
+  const extensionMany = new Set(entry.extensions.flatMap(extension => extension.many2many?.map(link => link.field) ?? []));
+  const many = Object.entries(entry.contract.many2manyFields).filter(([field]) => !extensionMany.has(field)).map(([field, descriptor]) => ({ field, maximum: descriptor.many2many.maxSelected, ...many2manyStorage(entry.contract, field) }));
   const metadata: Readonly<Record<string, FieldMetadata>> = entry.contract.metadata;
   // Fields of extensions live in companion tables owned by the extending modules (1:1 relation).
   // An inherited relation (Odoo _inherits, e.g. User → Partner) is a 1:1 row read and written the
   // same way, but its table has no creator column and the foreign key lives on this model.
-  const companions = entry.extensions.filter(extension => extension.relation && extension.fields.length) as readonly { relation: string; fields: readonly string[]; inherits?: boolean }[];
+  type CompanionLink = { field: string; source: string; maximum: number };
+  const companions = entry.extensions.filter(extension => extension.relation && (extension.fields.length || extension.many2many?.length)) as readonly { relation: string; fields: readonly string[]; inherits?: boolean; many2many?: readonly CompanionLink[] }[];
+  const linkSelect = (link: CompanionLink | { source: string; maximum: number }) => [link.source, { select: { targetId: true }, orderBy: { targetId: "asc" }, take: link.maximum + 1 }] as const;
+  // `id` keeps the select valid when an extension only declares Many2many.
+  const companionSelect = (links: boolean) => companions.map(companion => [companion.relation, { select: { id: true, ...Object.fromEntries(companion.fields.map(name => [name, true])), ...(links ? Object.fromEntries((companion.many2many ?? []).map(linkSelect)) : {}) } }] as const);
   const storage = storageProjection(entry, models);
   const whereOf = (where: Record<string, unknown>) => extensionWhere(entry, where);
   const extended = new Set(companions.flatMap(companion => companion.fields));
@@ -85,8 +91,12 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
   const generation = { model: entry.contract, clientFields: entry.clientFields };
   if (!module.models.some(model => model.model.name === entry.contract.name)) throw new Error(`${entry.id}: el modelo no pertenece al perfil del módulo.`);
   const select = Object.fromEntries([["id", true], ["updatedAt", true], ...names.filter(name => !secrets.has(name)).map(name => [name, true]),
-    ...companions.map(companion => [companion.relation, { select: Object.fromEntries(companion.fields.map(name => [name, true])) }])]);
-  const recordSelect = { ...select, ...Object.fromEntries(many.map(link => [link.source, { select: { targetId: true }, orderBy: { targetId: "asc" }, take: link.maximum + 1 }])) };
+    ...companionSelect(false)]);
+  const recordSelect = { ...select, ...Object.fromEntries(companionSelect(true)), ...Object.fromEntries(many.map(linkSelect)) };
+  const linkIds = (rows: unknown, maximum: number) => {
+    if (!Array.isArray(rows) || rows.length > maximum) throw new ModelValidationError("La relación supera el límite declarado. Revisa su configuración.");
+    return (rows as { targetId: string }[]).map(row => row.targetId);
+  };
   const metadataOf = (model: string) => model === entry.contract.name ? metadata : module.models.find(candidate => candidate.model.name === model)?.model.metadata ?? {};
   const guardsOf = (policy: Record<string, readonly { model: string; field: string; target?: string }[]>): Guards =>
     Object.fromEntries(Object.entries(policy).map(([path, guards]) => [path, guards.map(guard => ({ metadata: metadataOf(guard.model)[guard.field], ...(guard.target ? { target: guard.target } : {}) }))]));
@@ -103,15 +113,13 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
     const read = (name: string, value: unknown) => metadata[name].kind === "datetime" ? (value instanceof Date ? value.toISOString() : null) : value;
     // Secrets are never read back: the form receives them empty.
     for (const name of names) result[name] = secrets.has(name) ? null : read(name, row[name]);
-    for (const link of includeMany ? many : []) {
-      const rows = row[link.source] as { targetId: string }[];
-      if (!Array.isArray(rows) || rows.length > link.maximum) throw new ModelValidationError("La relación supera el límite declarado. Revisa su configuración.");
-      result[link.field] = rows.map(row => row.targetId);
-    }
+    for (const link of includeMany ? many : []) result[link.field] = linkIds(row[link.source], link.maximum);
     for (const companion of companions) {
       const extension = row[companion.relation] as Record<string, unknown> | null | undefined;
       // Records saved before the extension was installed have no companion row: present defaults.
       for (const name of companion.fields) result[name] = extension ? read(name, extension[name]) : (defaults && metadata[name].defaultKind === "literal" ? metadata[name].defaultValue ?? null : null);
+      // Without a companion row there are no links yet.
+      for (const link of includeMany ? companion.many2many ?? [] : []) result[link.field] = extension ? linkIds(extension[link.source], link.maximum) : [];
     }
     return result as T & { id: string; revision: string };
   };
@@ -129,7 +137,10 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
   const nested = (values: T, actorId?: string, revision?: Date) => ({ ...Object.fromEntries(many.map(link => [link.source, { ...(actorId ? {} : { deleteMany: {} }), create: (values[link.field] as string[]).map(targetId => ({ targetId })) }])), ...Object.fromEntries(companions.map(companion => {
     const fields = write(companion.fields, values);
     if (companion.inherits && revision) fields.updatedAt = revision;
-    return [companion.relation, actorId ? { create: { ...fields, ...(companion.inherits ? {} : { createBy: actorId }) } } : { upsert: { create: fields, update: fields } }];
+    const created = (link: CompanionLink) => (values[link.field] as string[]).map(targetId => ({ targetId }));
+    const create = { ...fields, ...Object.fromEntries((companion.many2many ?? []).map(link => [link.source, { create: created(link) }])) };
+    const update = { ...fields, ...Object.fromEntries((companion.many2many ?? []).map(link => [link.source, { deleteMany: {}, create: created(link) }])) };
+    return [companion.relation, actorId ? { create: { ...create, ...(companion.inherits ? {} : { createBy: actorId }) } } : { upsert: { create, update } }];
   })) });
   const relatedGroup = (field: string) => {
     const group = related.find(candidate => candidate.root === field);
@@ -150,6 +161,31 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
         return row ? [row.updatedAt] : [];
       }));
       return dto(await delegateOf(tx, entry.delegate).update({ where: { id, updatedAt: new Date(revision) }, data: { ...await data(values), ...nested(values, undefined, updatedAt), ...(await options.beforeUpdate?.(tx, id, values) ?? {}), updatedAt }, select: recordSelect }));
+    },
+    many2manyWhere(field, operator, ids) {
+      const own = many.find(link => link.field === field);
+      const companion = own ? undefined : companions.find(item => item.many2many?.some(link => link.field === field));
+      const link = own ?? companion?.many2many?.find(item => item.field === field);
+      if (!link) throw new ModelValidationError("La relación del filtro no está publicada.");
+      // Own links hang from this model; extension links hang from its companion row.
+      const through = (predicate: Record<string, unknown>) => own ? { [link.source]: predicate } : { [companion!.relation]: { is: { [link.source]: predicate } } };
+      if (operator === "any") return through({ some: { targetId: { in: [...ids] } } });
+      if (operator === "all") return { AND: ids.map(id => through({ some: { targetId: id } })) };
+      if (operator === "notEmpty") return through({ some: {} });
+      return own ? through({ none: {} }) : { OR: [{ [companion!.relation]: { is: null } }, through({ none: {} })] };
+    },
+    async many2manyIds(tx, field, ids) {
+      const own = many.find(link => link.field === field);
+      const companion = own ? undefined : companions.find(item => item.many2many?.some(link => link.field === field));
+      const link = own ?? companion?.many2many?.find(item => item.field === field);
+      if (!link || !ids.length) return new Map();
+      const links = { [link.source]: { select: { targetId: true }, orderBy: { targetId: "asc" } } };
+      const rows = await delegateOf(tx, entry.delegate).findMany({ where: { id: { in: [...ids] } }, select: { id: true, ...(own ? links : { [companion!.relation]: { select: links } }) } }) as Record<string, unknown>[];
+      return new Map(rows.map(row => {
+        const holder = own ? row : row[companion!.relation] as Record<string, unknown> | null;
+        const linked = (holder?.[link.source] as { targetId: string }[] | undefined) ?? [];
+        return [row.id as string, linked.map(item => item.targetId)];
+      }));
     },
     async remove(tx, id, revision) { await delegateOf(tx, entry.delegate).delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },
     count(tx, where) { return delegateOf(tx, entry.delegate).count({ where: whereOf(where) }); },

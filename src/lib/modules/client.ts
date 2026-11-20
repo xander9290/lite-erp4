@@ -9,7 +9,7 @@ import type { ModelLookupRequest } from "../many2one/model-lookup";
 import type { ReactionRequest } from "../orm/reactions.types";
 import { collectionFieldMetadata, type ModelClientConfig, type ModelLineConfig } from "./config";
 import type { FormLineModel } from "@/components/ui/form/modelFields";
-import { modelLookup, modelRelationLookup, modelReact, modelSignImage } from "./actions";
+import { modelLookup, modelRelationLookup, modelReact, modelSignImage, modelQuickCreate } from "./actions";
 import { domainDependencies, type DomainExpression } from "../orm/domain-builder";
 
 const mapValues = <T, R>(source: Readonly<Record<string, T>>, map: (value: T, key: string) => R) =>
@@ -44,6 +44,8 @@ export function buildModelUI(config: ModelClientConfig) {
     fields, readFields, lines, many2many,
     reactions: { rules: config.reactionRules, load: (request: ReactionRequest) => modelReact(config.id, request) },
     lookups: mapValues(config.lookups, target => (request: ModelLookupRequest) => modelLookup(target, request)),
+    // Only fields still marked create after the access projection (actor may create the target).
+    creators: Object.fromEntries(Object.entries(config.many2many ?? {}).filter(([, metadata]) => metadata.create).map(([name]) => [name, (text: string) => modelQuickCreate(config.id, name, text)])),
     domainLookups: domainLookups(config.id, config.fields, config.many2many ?? {}),
     uploads: Object.fromEntries(images.map(name => [name, createSignedCloudinaryImageUploader(() => modelSignImage(config.id, name))])),
   };

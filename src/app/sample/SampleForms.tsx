@@ -101,7 +101,7 @@ function StackSample() {
     methods.reset(values); setSubmitted(null);
   }
   return (
-    <SampleCard id="stack" title="Stack dentro de FormGroup" description="Dos columnas cuando el contenedor tiene espacio y una en tamaños estrechos. Stack coloca todos los labels encima de sus controles. Ejemplo local sin persistencia.">
+    <SampleCard id="stack" title="Stack dentro de FormGroup" description="Hasta tres columnas según el ancho del contenedor: una en tamaños estrechos, dos desde 24rem y tres desde 42rem. Las columnas vacías se colapsan para aprovechar todo el ancho. Stack coloca todos los labels encima de sus controles. Ejemplo local sin persistencia.">
       <FormLayout methods={methods} onSubmit={data => setSubmitted(data)} onInvalid={() => setSubmitted(null)} aria-labelledby="stack-title">
         <FormGroup legend="Datos del vehículo de ejemplo" fullWidth>
           <Stack>

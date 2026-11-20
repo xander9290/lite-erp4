@@ -1,0 +1,7 @@
+import "server-only";
+import { Fields, Model } from "@/lib/orm";
+
+/** Catalog owned by the extending module, target of the extension's Many2many. */
+export class Marca extends Model {
+  name = Fields.Text({ label: "Marca", required: true, maxLength: 60 });
+}
