@@ -143,3 +143,19 @@ test("servicio revalida admin/sesión antes de leer fuentes y parametriza el sch
   }
   assert.equal(queries, 1);
 }));
+
+test("una aplicación manual que depende de un módulo declarativo bloquea su retirada", () => {
+  // Same shape as the Contactos manifest: menus with nested items and a dependency.
+  const manual = inspectManifest(`import { defineApplication } from "@/lib/applications/manifest";
+export const contactsManifest = defineApplication({
+  id: "contactos", name: "Contactos", version: "0.1.0", icon: UsersRound, depends: ["ubicaciones"],
+  access: "authenticated", models: ["Partner"], accessModels: ["core.partner"],
+  menus: [{ id: "configuracion", label: "Configuración", items: [{ id: "paises", label: "Países", href: "/erp/ubicaciones/pais", model: "ubicaciones.pais" }] }],
+});`, "contactos", "manual");
+  assert.deepEqual(manual.depends, ["ubicaciones"]);
+  const source = inventory();
+  source.declarations = [{ ...declaration("ubicaciones", ["UbicacionesPais"]), kind: "declarative" }, manual];
+  const ubicaciones = resolveCatalogue(source, new Set(["ubicaciones"]), []).find(row => row.id === "ubicaciones");
+  // operation-engine turns dependents into the blocker «Aplicaciones dependientes» on uninstall.
+  assert.deepEqual(ubicaciones?.dependents, ["contactos"]);
+});

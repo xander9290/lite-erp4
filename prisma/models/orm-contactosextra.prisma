@@ -8,6 +8,7 @@ model ContactosextraCorePartner {
   interiorNumber String? @map("interior_number") @db.VarChar(20)
   zip String? @db.VarChar(5)
   vat String?
+  curp String?
   paisId String? @map("pais_id")
   pais UbicacionesPais? @relation("ContactosextraCorePartner_paisId", fields: [paisId], references: [id], onDelete: Restrict)
   estadoId String? @map("estado_id")

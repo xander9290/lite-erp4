@@ -30,6 +30,36 @@ function command(binary: string, args: string[], name: string, expected = 0) {
 const tsx = (file: string, args: string[] = [], name = file) => command(process.execPath, ["--conditions=react-server", "--import", "tsx", file, ...args], name);
 const prisma = (args: string[]) => command("prisma", [...args, "--config", join(root, "prisma7.config.ts")], `prisma ${args[0]}`);
 const exists = (path: string) => access(path).then(() => true, () => false);
+/**
+ * Hand-written applications (e.g. Contactos) may depend on declarative modules of the
+ * project (e.g. ubicaciones). Modes that replace src/modules/index.ts and render ERP pages
+ * keep those modules registered; otherwise every page fails with an unregistered dependency.
+ * Their tables already exist: the temporary schema deploys every project migration.
+ */
+async function applicationModules() {
+  const { readdir } = await import("node:fs/promises");
+  const dependsOf = async (file: string) => {
+    const text = await readFile(file, "utf8").catch(() => "");
+    const list = /\bdepends:\s*\[([^\]]*)\]/.exec(text)?.[1] ?? "";
+    return [...list.matchAll(/"([a-z][a-z0-9_-]*)"/g)].map(match => match[1]);
+  };
+  const required = new Set<string>();
+  const visit = async (id: string) => {
+    if (required.has(id) || !await exists(join(project, "src/modules", id, "manifest.ts"))) return;
+    required.add(id);
+    for (const next of await dependsOf(join(project, "src/modules", id, "manifest.ts"))) await visit(next);
+  };
+  const erp = join(project, "src/app/(auth)/erp");
+  for (const entry of await readdir(erp, { withFileTypes: true })) if (entry.isDirectory()) for (const id of await dependsOf(join(erp, entry.name, "manifest.ts"))) await visit(id);
+  return [...required];
+}
+/** Module index of a rendering mode: fixture modules plus the application dependencies. */
+async function renderIndex(ids: readonly string[]) {
+  const all = [...new Set([...await applicationModules(), ...ids])];
+  const name = (id: string) => `module_${id.replace(/[^a-z0-9]/g, "_")}`;
+  const lines = [`import "server-only";`, `import type { ModuleDefinition } from "@/lib/modules/define";`, ...all.map(id => `import ${name(id)} from "./${id}/manifest";`), `export const modules: readonly ModuleDefinition[] = [${all.map(name).join(", ")}];`, ""];
+  await writeFile(join(root, "src/modules/index.ts"), lines.join("\n"));
+}
 
 try {
   await database.connect();
@@ -189,7 +219,7 @@ try {
       prisma(["migrate", "deploy"]); prisma(["generate"]);
       return sql;
     };
-    const index = (ids: string[]) => writeFile(join(root, "src/modules/index.ts"), `import "server-only";\nimport type { ModuleDefinition } from "@/lib/modules/define";\n${ids.map(id => `import ${id} from "./${id}/manifest";`).join("\n")}\nexport const modules: readonly ModuleDefinition[] = [${ids.join(", ")}];\n`);
+    const index = (ids: string[]) => renderIndex(ids);
     await mkdir(join(root, "src/modules/taller/models"), { recursive: true });
     await cp(join(fixture, "taller.manifest.fixture"), join(root, "src/modules/taller/manifest.ts"));
     await cp(join(fixture, "equipo.fixture"), join(root, "src/modules/taller/models/equipo.ts"));
@@ -201,6 +231,7 @@ try {
     await mkdir(join(root, "src/modules/soporte/models"), { recursive: true });
     await cp(join(fixture, "soporte.manifest.fixture"), join(root, "src/modules/soporte/manifest.ts"));
     await cp(join(fixture, "equipo-soporte.fixture"), join(root, "src/modules/soporte/models/equipo.ts"));
+    await cp(join(fixture, "marca.fixture"), join(root, "src/modules/soporte/models/marca.ts"));
     await mkdir(join(root, "src/modules/soporte/views"), { recursive: true });
     await cp(join(fixture, "equipo-form.fixture"), join(root, "src/modules/soporte/views/EquipoSoporte.tsx"));
     const baseSchema = await readFile(join(root, "prisma/models/orm-taller.prisma"), "utf8");
@@ -213,6 +244,10 @@ try {
     assert.match(sql, /CREATE UNIQUE INDEX "soporte_taller_equipo_record_id_key"/);
     assert.match(sql, /REFERENCES "taller_equipo"\("id"\) ON DELETE CASCADE/);
     assert.doesNotMatch(sql, /ALTER TABLE "taller_equipo"/);
+    // Many2many of the extension: link table owned by soporte, hanging from the companion row.
+    assert.match(sql, /CREATE TABLE "soporte_taller_equipo_marcas_rel"/);
+    assert.ok(sql.includes('"soporte_taller_equipo_marcas_rel_source_id_fkey" FOREIGN KEY ("source_id") REFERENCES "soporte_taller_equipo"("id") ON DELETE CASCADE'), sql);
+    assert.ok(sql.includes('"soporte_taller_equipo_marcas_rel_target_id_fkey" FOREIGN KEY ("target_id") REFERENCES "soporte_marca"("id") ON DELETE RESTRICT'), sql);
     await index(["taller", "soporte"]);
     console.log("✓ Extensión instalada: tabla compañera 1:1 con Cascade; el esquema del base sólo recibe la inversa de la extensión.");
     command("next", ["typegen"], "Next route types");
@@ -250,7 +285,7 @@ try {
   await writeFile(join(root, "prisma/migrations/20990201000000_ensayo_module/migration.sql"), sql);
   prisma(["migrate", "deploy"]); prisma(["generate"]);
   for (const generated of ["src/generated/orm/apps/ensayo", "src/generated/orm/bindings/ensayo", "src/generated/orm/uploads/ensayo"]) assert.equal(await exists(join(root, generated)), false, `${generated} no debe generarse`);
-  await writeFile(join(root, "src/modules/index.ts"), `import "server-only";\nimport type { ModuleDefinition } from "@/lib/modules/define";\nimport ensayo from "./ensayo/manifest";\nexport const modules: readonly ModuleDefinition[] = [ensayo];\n`);
+  await renderIndex(["ensayo"]);
   console.log("✓ Módulo ensayo instalado: sólo esquema y migración; sin contratos, bindings ni uploads generados.");
 
   await cp(join(project, "scripts/fixtures/modules-check.fixture"), join(root, "modules-check.ts"));

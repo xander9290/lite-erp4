@@ -1,6 +1,6 @@
 import "server-only";
 import { Model } from "../orm/model";
-import { isField, isOne2many, isMany2many, type Field } from "../orm/fields";
+import { isField, isOne2many, isMany2many, type Field, type Many2manyField } from "../orm/fields";
 import { relationFieldName } from "../orm/display";
 
 type ModelClass = new () => Model;
@@ -40,9 +40,9 @@ export function extensionFields(extension: ModelExtension): Readonly<Record<stri
   const fields: Record<string, Field> = {};
   for (const [name, value] of Object.entries(new Extended())) {
     if (value === undefined || typeof value === "function") continue;
-    if (isMany2many(value)) throw new Error(`${name}: las extensiones todavía no admiten Many2many.`);
+    // Many2many of an extension are stored through its companion row (extensionMany2many).
+    if (isMany2many(value)) continue;
     if (isOne2many(value)) throw new Error(`${name}: las extensiones todavía no admiten One2many.`);
-    if (isField(value) && value.metadata.sequence) throw new Error(`${name}: sequence debe declararse en el modelo dueño, no en una extensión.`);
     if (isField(value) && value.metadata.sequence) throw new Error(`${name}: sequence debe declararse en el modelo dueño, no en una extensión.`);
     if (isField(value)) fields[name] = value;
   }
@@ -58,4 +58,14 @@ export function declaredNames(Declaration: ModelClass): ReadonlySet<string> {
     if (isField(value) && value.metadata.kind === "many2one") names.add(relationFieldName(name));
   }
   return names;
+}
+
+/**
+ * Many2many declared by an extension. Their link tables belong to the extending module and
+ * reference its companion row (docs/ideas/many2many-extensiones.md).
+ */
+export function extensionMany2many(extension: ModelExtension): Readonly<Record<string, Many2manyField>> {
+  class Probe extends Model {}
+  const Extended = extension.apply(Probe);
+  return Object.fromEntries(Object.entries(new Extended()).filter((entry): entry is [string, Many2manyField] => isMany2many(entry[1])));
 }

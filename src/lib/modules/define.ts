@@ -15,7 +15,7 @@ import type { KanbanConfig, KanbanTransition } from "../kanban/types";
 import { auditCollectionFields, defaultAuditFields } from "../orm/audit";
 import type { NativeRepositoryOptions } from "./repository";
 import { MAX_LINE_DEPTH } from "../orm/one2many";
-import { declaredNames, extensionFields, isModelExtension, type ModelExtension } from "./extend";
+import { declaredNames, extensionFields, extensionMany2many, isModelExtension, type ModelExtension } from "./extend";
 import { relationFieldName } from "../orm/display";
 import type { CollectionDomain } from "../orm/domain";
 
@@ -114,6 +114,8 @@ export type ModelExtensionInfo = {
   readonly insertions?: ModelInsertions;
   /** Transitive dependencies of the extending module (insertion order and published targets). */
   readonly depends?: readonly string[];
+  /** Many2many of the extension: field and relation (on the companion model) of its links. */
+  readonly many2many?: readonly { readonly field: string; readonly source: string; readonly maximum: number }[];
   /** Prisma relation (on the base model) to the companion row; absent without persistent fields. */
   readonly relation?: string;
   /** Delegated storage of a native model (no creator column; the foreign key is on the base). */
@@ -130,6 +132,8 @@ export type ModuleExtension = {
   readonly extension: ModelExtension;
   readonly fields: readonly string[];
   readonly computed: readonly string[];
+  /** Many2many declared by the extension (links stored through the companion row). */
+  readonly many2many: readonly string[];
   readonly views?: { readonly form?: () => Promise<{ default: ModelListView }> };
   readonly insertions?: ModelInsertions;
   readonly companion?: { readonly name: string; readonly table: string; readonly relation: string };
@@ -310,7 +314,13 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
     if (baseModule !== nativeModule && !(spec.depends ?? []).includes(baseModule)) throw new Error(`${id}: declara depends: ["${baseModule}"] para extender ${target}.`);
     if (!isModelExtension(extension)) throw new Error(`${id}: ${target} debe declararse con extendModel(...).`);
     const fields = extensionFields(extension);
+    const many = extensionMany2many(extension);
     const baseNames = declaredNames(extension.base);
+    for (const name of Object.keys(many)) {
+      const where = `${id} → ${target}.${name}`;
+      if (!/^[a-z][A-Za-z0-9]*$/.test(name) || reservedExtensionNames.has(name)) throw new Error(`${where}: nombre de campo inválido o reservado.`);
+      if (baseNames.has(name)) throw new Error(`${where}: el modelo base ya declara ese nombre.`);
+    }
     for (const [name, field] of Object.entries(fields)) {
       const where = `${id} → ${target}.${name}`;
       if (!/^[a-z][A-Za-z0-9]*$/.test(name) || reservedExtensionNames.has(name)) throw new Error(`${where}: nombre de campo inválido o reservado.`);
@@ -323,7 +333,7 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
     }
     const persistent = Object.keys(fields).filter(name => !fields[name].metadata.compute && !fields[name].metadata.related);
     const computed = Object.keys(fields).filter(name => fields[name].metadata.compute || fields[name].metadata.related);
-    if (!persistent.length) throw new Error(`${id}: la extensión de ${target} necesita al menos un campo persistente.`);
+    if (!persistent.length && !Object.keys(many).length) throw new Error(`${id}: la extensión de ${target} necesita al menos un campo persistente o Many2many.`);
     let companion: ModuleExtension["companion"];
     {
       const name = `${pascal(id)}${pascal(baseModule)}${pascal(baseKey)}`;
@@ -331,13 +341,14 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
       const link = Fields.Many2one(nativeModelNames[target] ?? `${pascal(baseModule)}${pascal(baseKey)}`, { label: "Registro", required: true, unique: true });
       // Internal policy: the companion row belongs to its base record and goes with it.
       const cascade = Object.freeze({ ...link, metadata: Object.freeze({ ...link.metadata, onDelete: "Cascade" as const }) }) as Field;
-      const own = Object.fromEntries([[companionLink, cascade], ...persistent.map(field => [field, fields[field]])]);
+      // Many2many links reference the companion row: the generator creates their table here.
+      const own = Object.fromEntries([[companionLink, cascade], ...persistent.map(field => [field, fields[field]]), ...Object.entries(many)]);
       class Companion extends Model { constructor() { super(); Object.assign(this, own); } }
       const contract = defineModel(Companion, { name, table });
       companions.push({ model: contract, clientFields: Object.keys(contract.metadata) });
       companion = Object.freeze({ name, table, relation: `${lowerFirst(name)}${pascal(companionLink)}Records` });
     }
-    extensions.push(Object.freeze({ target, module: id, label: spec.name, extension, fields: Object.freeze(persistent), computed: Object.freeze(computed), ...(views ? { views } : {}), ...(insertions ? { insertions } : {}), ...(companion ? { companion } : {}) }));
+    extensions.push(Object.freeze({ target, module: id, label: spec.name, extension, fields: Object.freeze(persistent), computed: Object.freeze(computed), many2many: Object.freeze(Object.keys(many)), ...(views ? { views } : {}), ...(insertions ? { insertions } : {}), ...(companion ? { companion } : {}) }));
   }
   return { extensions, companions };
 }

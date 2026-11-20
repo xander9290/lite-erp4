@@ -9,8 +9,9 @@ import FieldMany2One from "@/components/ui/form/FieldMany2One";
 export default function PartnerInsertions() {
   return (
     <>
-      <Inserter target="field:name" position="after">
+      <Inserter target="stack:fiscal-data" position="inside">
         <FieldText name="vat" />
+        <FieldText name="curp" />
       </Inserter>
 
       <Inserter target="group:contacto" position="after">

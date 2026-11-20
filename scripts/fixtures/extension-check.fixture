@@ -46,6 +46,7 @@ const legacy = ok(await equipos.read(prisma, actor, legacyId), "leer registro pr
 assert.equal(legacy.values.name, "PREVIO");
 assert.equal(legacy.values.responsable, null);
 assert.equal(legacy.values.nivel, 1);
+assert.deepEqual(legacy.values.marcas, [], "sin fila compañera no hay vínculos");
 assert.equal((await companions()).length, 0);
 const initial = await listOf();
 assert.equal(initial.rows[0].nivel, null, "collections use empty storage semantics before a companion exists");
@@ -89,7 +90,9 @@ assert.equal((await equipos.save(prisma, lector, { ...read.values, responsable: 
 
 // Client contract and server-resolved lazy view: no loaders/functions in browser config.
 const client = modelClientConfig("taller.equipo");
-assert.deepEqual(client.extensions, [{ module: "soporte", label: "Soporte", fields: ["responsable", "nivel", "logo", "codigo", "equipoId", "etiqueta", "nombreEquipo", "responsableEquipo", "imagenEquipo"], depends: ["taller"] }]);
+assert.deepEqual(client.extensions, [{ module: "soporte", label: "Soporte", fields: ["responsable", "nivel", "logo", "codigo", "equipoId", "etiqueta", "nombreEquipo", "responsableEquipo", "imagenEquipo", "marcas"], depends: ["taller"] }]);
+assert.deepEqual(client.many2many?.marcas?.target, "SoporteMarca");
+assert.equal(client.lookups.marcas, "soporte.marca");
 assert.ok(client.fields.responsable && client.preview.etiqueta);
 assert.ok(client.list.fields.includes("responsable") && client.list.fields.includes("nombreEquipo"));
 assert.equal(typeof getModuleModel("taller.equipo")!.entry.extensions[0].views?.form, "function");
@@ -145,6 +148,34 @@ const deniedSign = createModelImageSigner({ authorize: () => prisma.$transaction
 assert.equal((await deniedSign("logo")).ok, false, "a read-only account cannot upload an extension image");
 ok(await equipos.remove(prisma, actor, [{ id: hidden.values.id, revision: hidden.values.revision }]), "cleanup hidden");
 
+// Many2many declared by the extension: links stored through the companion row.
+const marcas = modelService("soporte.marca");
+const marcaDefaults = getModuleModel("soporte.marca")!.entry.contract.createDefaults();
+const m1 = ok(await marcas.save(prisma, actor, { ...marcaDefaults, name: "Bosch" }), "marca 1").values.id;
+const m2 = ok(await marcas.save(prisma, actor, { ...marcaDefaults, name: "Makita" }), "marca 2").values.id;
+const linksTable = `"${schema}"."soporte_taller_equipo_marcas_rel"`;
+const links = async () => (await prisma.$queryRawUnsafe<{ n: number }[]>("SELECT count(*)::int AS n FROM " + linksTable))[0].n;
+const tagged = ok(await equipos.save(prisma, actor, { ...defaults, name: "esmeril", estado: "activo", nivel: 1, marcas: [m2, m1] }), "crear con marcas");
+assert.deepEqual(tagged.values.marcas, [m1, m2].sort(), "lectura ordenada por ID");
+assert.equal(await links(), 2);
+assert.equal((await companionOf(tagged.values.id)).length, 1, "la fila compañera se crea con los vínculos");
+const onlyLinks = ok(await equipos.save(prisma, actor, { ...tagged.values, marcas: [m2] }), "sólo cambiar vínculos");
+assert.notEqual(onlyLinks.values.revision, tagged.values.revision, "cambiar vínculos avanza la revisión del base");
+assert.deepEqual(onlyLinks.values.marcas, [m2]);
+assert.equal(await links(), 1);
+const taggedHistory = ok(await equipos.activity(prisma, actor, { id: tagged.values.id }), "historial de vínculos") as unknown as { data: { entries: { kind: string; summary?: string }[] } };
+assert.ok(JSON.stringify(taggedHistory.data.entries).includes("Relaciones actualizadas"), JSON.stringify(taggedHistory.data.entries));
+assert.equal((await equipos.save(prisma, actor, { ...onlyLinks.values, marcas: ["no-existe"] })).ok, false, "ID inexistente rechazado");
+assert.equal((await equipos.save(prisma, actor, { ...onlyLinks.values, marcas: [m1, m1] })).ok, false, "IDs repetidos rechazados");
+assert.equal(await links(), 1, "los rechazos no tocan los vínculos");
+assert.equal((await equipos.read(prisma, lector, tagged.values.id)).ok, false, "un vínculo ilegible para el actor bloquea la apertura");
+const m2Record = ok(await marcas.read(prisma, actor, m2), "leer marca usada");
+assert.equal((await marcas.remove(prisma, actor, [{ id: m2, revision: m2Record.values.revision }])).ok, false, "una marca en uso no se borra (Restrict)");
+const taggedNow = ok(await equipos.read(prisma, actor, tagged.values.id), "releer etiquetado");
+ok(await equipos.remove(prisma, actor, [{ id: taggedNow.values.id, revision: taggedNow.values.revision }]), "borrar etiquetado");
+assert.equal(await links(), 0, "borrar el registro base borra compañera y vínculos (Cascade)");
+console.log("✓ Many2many de extensión: tabla del extensor colgada de la compañera, lectura/escritura en la misma revisión, rechazos, Restrict y Cascade.");
+
 await (await import("./extension-render")).verifyExtensionForm();
 
 // Deleting the base record deletes its companion row (Cascade).
@@ -168,6 +199,7 @@ assert.ok(base.blockers.length > 0, "desinstalar el base queda bloqueado por la 
 let drop = plan(request({ command: "review", input: { module: "soporte", operation: "uninstall", policy: "drop" } }));
 assert.deepEqual(drop.blockers, [], JSON.stringify(drop));
 assert.match(drop.sql, /DROP TABLE "soporte_taller_equipo"/);
+assert.match(drop.sql, /DROP TABLE "soporte_taller_equipo_marcas_rel"/);
 assert.doesNotMatch(drop.sql, /DROP TABLE "taller_equipo"|ALTER TABLE "taller_equipo" DROP COLUMN/);
 drop = plan(request({ command: "apply", id: drop.id, fingerprint: drop.fingerprint, confirmedModule: "soporte", maintenanceConfirmed: true }));
 assert.equal(drop.phase, "complete", JSON.stringify(drop));

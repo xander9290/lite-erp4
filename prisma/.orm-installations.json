@@ -3,7 +3,7 @@
   "modules": {
     "contactosextra": {
       "file": "orm-contactosextra.prisma",
-      "hash": "4806d97453d1d11ac9916286215c634017a9e7fa98e31dc2937c9c5237b6d781",
+      "hash": "2f5c7131c3b3df0620a303e5c260b8746c3b50a782f77e30b470ae09fd055e37",
       "inverses": [
         {
           "file": "partner.prisma",

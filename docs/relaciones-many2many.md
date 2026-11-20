@@ -121,14 +121,50 @@ quitarEtiquetas() {
 - Sin creación/edición de destinos desde la selección ni comandos Odoo/XML.
 - Sin columnas de Many2many, filtros/domains/orden/grupos por sus miembros,
   `@onchange`/`@depends` sobre el arreglo ni rutas que lo atraviesen todavía.
-- No se añaden Many2many desde `extendModel`, ni en hijos One2many. Un modelo dueño
-  sí puede declarar ambos tipos de colección. El scaffold legacy con orm.config.ts
+- Sin Many2many en hijos One2many. Un modelo dueño sí puede declarar ambos tipos de
+  colección. Desde `extendModel` sí (2026-11-20): ver [Many2many en extensiones](#many2many-en-extensiones). El scaffold legacy con orm.config.ts
   y bindings se rechaza explícitamente antes de instalar: usar defineModule.
 - El gestor reconoce las tablas intermedias desde el esquema instalado con hashes
   verificados, sin evaluar manifests para el catálogo. Sus planes de retirada
   incluyen ese almacenamiento. No se aplican migraciones destructivas por defecto.
 
+## Many2many en extensiones
+
+Implementado el 2026-11-20 ([diseño](ideas/many2many-extensiones.md)). Una extensión declara el
+campo como en un modelo propio:
+
+```ts
+export const PartnerExtra = extendModel(Partner, Base => {
+  class PartnerExtra extends Base {
+    tagIds = Fields.Many2many("ContactosextraPartnertags", { label: "Etiquetas", maxSelected: 20 });
+  }
+  return PartnerExtra;
+});
+```
+
+- **Almacenamiento:** la tabla intermedia es del módulo extensor y cuelga de su fila compañera
+  (`<modulo>_<base>_<campo>_rel`, source → compañera Cascade, target Restrict). No toca el
+  esquema del módulo base. Retirar el extensor retira compañera y vínculos.
+- **Repositorio:** los vínculos se leen y escriben dentro de la fila compañera, en la misma
+  sentencia, transacción y revisión. Un registro sin fila compañera presenta `[]`; guardar
+  vínculos la crea.
+- Validación, permisos (lectura de los destinos, create/write del dueño), dominio, historial
+  «Relaciones actualizadas» y avance de revisión son los mismos de un modelo propio.
+- **Destino:** modelo registrado del propio extensor, de una dependencia o nativo.
+- **Límites:** máximo 4 Many2many sumando base y extensiones; el nombre no puede repetir uno
+  del base ni de otra extensión. Una extensión sólo con Many2many es válida.
+- **Fuera de alcance:** modelos con repositorio propio (`core.user`), con error claro al componer.
+- **Presentación:** en el formulario automático va al grupo del módulo extensor. En vistas
+  propias o inserciones: `<FieldRelationTag name="tagIds" />`.
+- Después de declararlo: `npm run orm:sync -- <modulo>` y revisar el SQL de la tabla nueva.
+
 ## Verificación
+
+Many2many en extensiones: `test:modules` (declaración, esquema generado, composición,
+repositorio, límites, destino sin dependencia y `core.user` rechazados) y
+`test:extensions:integration` (proyecto/esquema temporales: SQL de la tabla y sus FK,
+alta/lectura ordenada/cambio sólo de vínculos con revisión e historial, IDs inexistentes o
+repetidos, destino ilegible, Restrict del destino y Cascade al borrar).
 
 `/sample#many2many-model` usa datos ficticios en memoria, proveedor `load`, RHF y Zod;
 no instala módulos ni guarda vínculos en el ERP.

@@ -18,6 +18,8 @@ export const EquipoSoporte = extendModel(Equipo, Base => {
     nombreEquipo = Fields.Text({ label: "Nombre del equipo", related: "equipoId.name" });
     responsableEquipo = Fields.Text({ label: "Responsable del equipo", related: "equipoId.responsable" });
     imagenEquipo = Fields.Image({ label: "Logo del equipo", related: "equipoId.logo" });
+    // Many2many of an extension: links reference the companion row (owned by soporte).
+    marcas = Fields.Many2many("SoporteMarca", { label: "Marcas", maxSelected: 3 });
 
     @depends("nivel")
     calcularEtiqueta(values: ReactionValues) { return `Nivel ${values.nivel}`; }

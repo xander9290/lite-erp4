@@ -1,10 +1,83 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-19.
+Última actualización: 2026-11-20.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
+
+## Many2many en extensiones: implementado (2026-11-20)
+
+Autorizado por el usuario con las tres decisiones del [diseño](ideas/many2many-extensiones.md):
+vínculos colgados de la fila compañera, `core.user` fuera de la primera versión y grupo del
+módulo en el formulario automático. Contrato en [Many2many](relaciones-many2many.md#many2many-en-extensiones).
+Sin commit.
+
+- Código: `extensionMany2many` (extend.ts); el modelo compañero incluye los Many2many (el
+  generador crea la tabla del extensor); `compose` valida destino/dependencia, nombres, límite
+  de 4 y repositorio propio, y publica `ModelExtensionInfo.many2many`; el repositorio lee y
+  escribe los vínculos dentro de la fila compañera; ModelForm los ubica en el grupo del módulo.
+- Verificado: `test:modules` 59 (nueva prueba de extensiones con Many2many), `test:form-model`
+  25, `test:orm` 114/115 (EPERM de symlinks en Windows, previo), `tsc`, ESLint.
+  `test:extensions:integration` en temporal: instalación con SQL de la tabla y sus FK, y el
+  bloque Many2many completo (alta, lectura ordenada, cambio sólo de vínculos con revisión e
+  historial, inexistentes/repetidos, destino ilegible, Restrict y Cascade) **aprobados**.
+- **Arnés de integración corregido (mismo día, autorizado):** desde `91862ee` Contactos declara
+  `depends: ["ubicaciones"]` y los modos que reemplazan `src/modules/index.ts` y dibujan páginas
+  del ERP respondían 500 («No está registrada la dependencia ubicaciones»).
+  `scripts/modules.integration.ts` ahora calcula, leyendo los manifests de las aplicaciones
+  manuales y de sus módulos, las dependencias declarativas requeridas y las registra junto a
+  los módulos de ensayo (`renderIndex`) en los modos de extensiones y principal. Sin nombres
+  fijos; sus tablas ya existen porque el esquema temporal aplica todas las migraciones.
+- Verificado tras la corrección: `test:extensions:integration` completo (incluido render Next y
+  retirada del extensor con `DROP TABLE "soporte_taller_equipo_marcas_rel"`) y
+  `test:modules:integration` completo, ambos en proyecto/esquema temporales eliminados.
+- Retirar Ubicaciones en el ERP real **ya está bloqueado** por el gestor: su inventario lee
+  también los manifests de aplicaciones manuales (`inspectManifest`), Contactos aparece en
+  `dependents` de Ubicaciones y la revisión de retirada añade «Aplicaciones dependientes». Una
+  nota anterior lo daba como riesgo abierto por error. Fijado con prueba en
+  `catalogue.test.ts` (`test:module-manager` 21/21). Sin cambios de código del gestor.
+- Siguiente del usuario: declarar `tagIds` en PartnerExtra con destino
+  `ContactosextraPartnertags`, `orm:sync -- contactosextra` (revisar el SQL) e insertarlo con
+  `<FieldRelationTag name="tagIds" />`.
+
+## Pendiente: Many2many en modelos extendidos (2026-11-20) — implementado arriba
+
+Solicitado por el usuario al consultar cómo declarar una relación para presentarla
+como tags en una extensión de modelo, como PartnerExtra. Actualmente `extendModel`
+rechaza Fields.Many2many; FieldRelationTag ya presenta las relaciones declaradas
+en modelos propios. Registrar este pendiente no inicia su implementación.
+
+- Objetivo: permitir declarar Many2many desde una extensión y presentar el campo
+  con FieldRelationTag en vistas personalizadas o inserciones, reutilizando el
+  contexto y guardado del formulario base.
+- Diseñar antes de implementar propiedad y ciclo de vida de la tabla intermedia
+  del módulo extensor, composición de extensiones y compatibilidad con modelos
+  nativos como core.partner. No duplicar Partner ni escribir vínculos desde la vista.
+- Aceptación: generación/instalación/bindings y retirada coherentes con la propiedad
+  del módulo; defaults/esquemas/tipos y lookup autorizados; permisos del dueño y
+  destino, revisión compartida, hooks, constraints e historial conservados;
+  vínculos y registro guardados en una transacción con rollback. Verificar en
+  proyecto/esquema temporales y demo RHF/Zod, incluyendo inserciones y rechazo
+  de destinos inexistentes o no accesibles.
+- Contrato y alcance actual: [Many2many](relaciones-many2many.md). No se modifican
+  modelos, migraciones ni datos con esta anotación.
+- **Diseño propuesto (2026-11-20):** [many2many-extensiones](ideas/many2many-extensiones.md): vínculos colgados de la fila compañera del módulo extensor (generador y propiedad existentes), escritura anidada en su upsert, `core.user` fuera de la primera versión. Pendiente de decisiones del usuario y de autorización.
+
+## Stack: tres columnas adaptables (2026-11-20)
+
+- Stack distribuye Fields en una columna por debajo de 24rem de ancho propio,
+  dos desde 24rem y tres desde 42rem. Conserva dirección block, separación,
+  anclas de inserción y contexto del formulario. Contrato en [Stack](../src/components/ui/form/Stack.md)
+  y demo RHF/Zod existente en `/sample#stack` actualizados.
+- Cambio de presentación compartida; no modifica modelos ni BD. La guía sigue
+  pausada en la comprobación de repetición de estados descrita abajo.
+- Ajuste posterior: cuadrícula con `auto-fit` para colapsar columnas vacías;
+  dos campos ocupan mitades y uno todo el ancho. Admite inserciones sin contar
+  hijos React. En varias filas mantiene las columnas alineadas.
+- Verificación: ESLint de Stack y SampleForms, 11 pruebas existentes de
+  modelFields (incluido contexto/dirección de Stack) y `git diff --check`
+  aprobados. Sin nueva revisión visual en navegador.
 
 ## Pendiente: importación y exportación desde ListView
 

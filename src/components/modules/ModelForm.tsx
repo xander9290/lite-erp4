@@ -95,7 +95,7 @@ export function ModelExtensions({ excludeFields = [] }: { excludeFields?: readon
     const customView = views[extension.module];
     if (customView != null) return <Fragment key={extension.module}>{customView}</Fragment>;
     return <FormGroup key={extension.module} legend={extension.label}>
-      {fields.map(name => Object.hasOwn(ui.config.fields, name) ? control(ui, name, ui.config.fields[name]) : Object.hasOwn(ui.config.preview, name) ? display(name, ui.config.preview[name]) : null)}
+      {fields.map(name => Object.hasOwn(ui.config.fields, name) ? control(ui, name, ui.config.fields[name]) : Object.hasOwn(ui.config.preview, name) ? display(name, ui.config.preview[name]) : Object.hasOwn(ui.recordUI.many2many, name) ? <FieldRelationTag key={name} name={name} direction="inline" /> : null)}
     </FormGroup>;
   })}</>;
 }
@@ -105,7 +105,7 @@ export function ModelFields({ ui }: { ui: ModelUI }) {
   const extended = new Set(ui.config.extensions?.flatMap(extension => extension.fields) ?? []);
   const controls = Object.entries(ui.config.fields).filter(([name]) => !extended.has(name)).map(([name, field]) => control(ui, name, field));
   const previews = Object.entries(ui.config.preview).filter(([name]) => !extended.has(name)).map(([name, field]) => display(name, field));
-  return <><FormGroup id="general" legend="Datos generales">{controls}{previews}{Object.keys(ui.recordUI.many2many).map(name => <FieldRelationTag key={name} name={name} direction="inline" />)}</FormGroup><ModelExtensions />{Object.keys(ui.recordUI.lines).map(name => <FormGroup fullWidth key={name}><FieldOne2many name={name} /></FormGroup>)}<ModelChildCollections /></>;
+  return <><FormGroup id="general" legend="Datos generales">{controls}{previews}{Object.keys(ui.recordUI.many2many).filter(name => !extended.has(name)).map(name => <FieldRelationTag key={name} name={name} direction="inline" />)}</FormGroup><ModelExtensions />{Object.keys(ui.recordUI.lines).map(name => <FormGroup fullWidth key={name}><FieldOne2many name={name} /></FormGroup>)}<ModelChildCollections /></>;
 }
 
 function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; record: Values; displayName?: string; onReload?: () => void; children?: ReactNode }) {

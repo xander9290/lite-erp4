@@ -1,13 +1,16 @@
 import "server-only";
 import { defineModule } from "@/lib/modules/define";
-import { PartnerExtra } from "./model/partner";
+import { PartnerTags } from "./models/partnertags";
+import { PartnerExtra } from "./models/partner";
 
 export default defineModule({
   id: "contactosextra",
   name: "Contactosextra",
   icon: "boxes",
   depends: ["ubicaciones"],
-  models: {},
+  models: {
+    partnertags: PartnerTags,
+  },
   extends: {
     "core.partner": {
       model: PartnerExtra,
