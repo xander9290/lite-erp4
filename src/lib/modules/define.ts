@@ -100,6 +100,11 @@ export type ModuleSpec = {
    * never installed/uninstalled by the module manager, over hand-written schema files.
    */
   readonly native?: boolean;
+  /**
+   * Card in the application drawer (default true). `false` keeps routes, navigation, links from
+   * other applications and permissions; e.g. a catalog administered from another application.
+   */
+  readonly drawer?: boolean;
 } & AccessSpec;
 
 /** Server-side compiled extension; modelClientConfig publishes only its names and label. */
@@ -424,6 +429,7 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
   const application = {
     id, name: spec.name, description: spec.description ?? `Aplicación ${spec.name}.`, version: spec.version ?? "0.1.0",
     ...visibility(access.groups.map(group => group.id)), depends: spec.depends ?? [], models: models.map(model => model.contract.name), accessModels: models.map(model => model.id), menus,
+    ...(spec.drawer !== undefined ? { drawer: spec.drawer } : {}),
   };
   // Validate ids, menus and dependencies now; the icon component is attached by the registry.
   defineApplication({ ...application, icon: (() => null) as unknown as ApplicationManifest["icon"] });

@@ -6,6 +6,19 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Opción `drawer` del cajón de aplicaciones (2026-11-20)
+
+Pedido por el usuario: contactosextra apareció en el cajón al añadir su catálogo
+`PartnerTags`, porque todo módulo con modelos propios se registra como aplicación.
+`defineModule({ drawer: false })` (y `drawer` en `ApplicationManifest`) oculta sólo la tarjeta:
+la página del cajón usa `applications.drawerFor(user)`; navegación, rutas, enlaces desde otras
+aplicaciones y permisos siguen con `forUser`. Por defecto `true`, sin cambios en módulos
+existentes. Verificado: `test:applications` 14 y `test:modules` 60 (pruebas nuevas), `tsc` y
+ESLint (sólo el aviso previo de `erp/page.tsx`). Sin navegador. Contrato en
+[módulos declarativos](modulos-declarativos.md#1-declarar-el-módulo). Siguiente del usuario:
+`drawer: false` en contactosextra (y decidir si también en Ubicaciones), enlace «Etiquetas» en
+Configuración de Contactos, y renombrar/unificar carpetas antes de `orm:sync`.
+
 ## Many2many en extensiones: implementado (2026-11-20)
 
 Autorizado por el usuario con las tres decisiones del [diseño](ideas/many2many-extensiones.md):

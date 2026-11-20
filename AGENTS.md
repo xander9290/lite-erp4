@@ -21,6 +21,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Cajón de aplicaciones
 
+- `drawer: false` (2026-11-20) en defineModule o ApplicationManifest oculta sólo la tarjeta del cajón (`applications.drawerFor`); rutas, navegación (`forUser`), enlaces desde otras apps, permisos y gestor no cambian. Por defecto true. Para catálogos administrados desde otra aplicación (p. ej. etiquetas de contactosextra). Contrato en docs/modulos-declarativos.md.
+
 - Menús a catálogos de dependencias (2026-11-19): un enlace con model de una dependencia directa y href exacto /erp/<dependencia>/<clave> es válido. El registro comprueba el modelo publicado por el destino; no añadirlo a accessModels de la app consumidora ni ampliar permisos para mostrar el menú. Visibilidad por lectura efectiva y cierre sin snapshot. Abre la aplicación propietaria; no es ruta incrustada ni oculta su tarjeta. Contrato en docs/desarrollo-aplicaciones.md.
 
 - Los nombres de AppContainer deben verse completos: permitir varias líneas con palabras largas adaptables, sin `truncate` ni recorte por cantidad de líneas. Mantener espacio uniforme bajo los iconos, separación lateral y dos columnas en pantallas de 320 px. AppGrid centra las columnas ocupadas y conserva scroll vertical.

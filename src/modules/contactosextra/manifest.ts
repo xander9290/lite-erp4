@@ -8,6 +8,7 @@ export default defineModule({
   name: "Contactosextra",
   icon: "boxes",
   depends: ["ubicaciones"],
+  drawer: false,
   models: {
     partnertags: PartnerTags,
   },

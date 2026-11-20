@@ -222,3 +222,10 @@ test("Many2many in extensions: companion link table, composition rules and repos
   const sobreUsuario = defineModule({ id: "etiquetas", name: "Etiquetas", icon: "tag", models: { marca: Marca }, extends: { "core.user": extendModel(User, Base => class extends Base { marcas = Fields.Many2many("EtiquetasMarca", { label: "Marcas" }); }) } });
   assert.throws(() => composeModules([core, sobreUsuario]), /repositorio propio/);
 });
+
+test("drawer option of a module reaches its application manifest", () => {
+  class Etiqueta extends Model { name = Fields.Text({ label: "Nombre", required: true }); }
+  const hidden = defineModule({ id: "etiquetas", name: "Etiquetas", icon: "tag", models: { etiqueta: Etiqueta }, drawer: false });
+  assert.equal(hidden.application.drawer, false);
+  assert.equal(defineModule({ id: "visible", name: "Visible", icon: "tag", models: { etiqueta: Etiqueta } }).application.drawer, undefined);
+});

@@ -84,6 +84,17 @@ Cada clave de `models` define la convención completa. Para `demo.tarea`:
 Opciones por modelo: `table`, `list` (sobrescribe la política), `kanban` (Selection
 obligatoria), `view: "list" | "card"`, `defaultSort` y `views` (ver eject).
 
+**Tarjeta en el cajón (`drawer`, 2026-11-20).** Todo módulo con modelos propios es una
+aplicación con tarjeta en el cajón. `drawer: false` oculta sólo la tarjeta: sus rutas
+(`/erp/<módulo>/<clave>`), su navegación al entrar, los enlaces desde otras aplicaciones
+(p. ej. el menú Configuración de Contactos) y los permisos siguen igual, y el gestor de
+módulos lo sigue listando. Útil para catálogos que se administran desde otra aplicación,
+como las etiquetas de contacto de contactosextra:
+
+```ts
+export default defineModule({ id: "contactosextra", /* … */ drawer: false });
+```
+
 No importes `lucide-react` ni vistas de forma estática en el manifest: `orm:sync` lo
 carga desde scripts sin React.
 

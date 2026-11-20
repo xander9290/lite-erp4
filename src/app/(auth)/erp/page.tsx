@@ -10,7 +10,7 @@ async function Applications() {
   const user = await getCurrentAccessUser();
   return (
     <AppGrid>
-      {applications.forUser(user).map((application) => {
+      {applications.drawerFor(user).map((application) => {
         const Icon = application.icon;
         return (
           <AppContainer
