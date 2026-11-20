@@ -6,6 +6,34 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Pendiente: importación y exportación desde ListView
+
+Solicitado por el usuario el 2026-11-19. Pendiente de diseño e implementación;
+este registro no inicia su desarrollo ni sustituye la guía en curso.
+
+- Integrar en Acciones de ListView la exportación Excel/CSV de seleccionados o
+  de todos los registros que coincidan con los filtros, respetando permisos de
+  registros y campos en el servidor.
+- Importación Excel/CSV: mapear columnas a Fields y resolver creación o
+  actualización mediante claves únicas declaradas (folio/código, no nombres).
+- Mostrar antes de confirmar un plan con altas, actualizaciones, registros sin
+  cambios y errores por fila/campo. Revalidar permisos y datos al aplicar para
+  detectar cambios posteriores a la revisión; reutilizar servicios, validaciones,
+  folios y lógica de negocio del ORM, sin escrituras directas que los omitan.
+- Many2one: resolver por clave única del modelo destino; señalar referencias
+  inexistentes, ambiguas o no accesibles. No crear relacionados automáticamente
+  por defecto; cualquier creación deberá habilitarse expresamente por modelo.
+- Many2many: resolver varias claves y distinguir explícitamente entre agregar
+  relaciones y reemplazar las existentes.
+- One2many: agrupar líneas por clave del padre y guardar cada padre con sus
+  líneas en una transacción, ejecutando la lógica de ambas clases.
+- Fases propuestas: campos simples y Many2one primero; Many2many y líneas
+  después. Para cargas grandes, lotes con reporte y reintentos idempotentes,
+  explicitando qué lotes se aplicaron si la importación queda incompleta.
+- Dependencias de catálogos: importar en orden (países, estados, municipios).
+  Aprovechar la experiencia de la importación de estados, conservando su CLI
+  específico hasta que exista el flujo general.
+
 ## Corrección posterior: dropdowns de relaciones (2026-11-19)
 
 - FieldMany2One y FieldRelationTag comparten RelationDropdown: calculan espacio
