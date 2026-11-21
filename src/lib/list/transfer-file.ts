@@ -56,13 +56,23 @@ export async function readTransferFile(name: string, bytes: Buffer): Promise<unk
     await checkArchive(bytes);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(bytes as unknown as ExcelJS.Buffer);
-    const sheets = workbook.worksheets.filter(sheet => sheet.actualRowCount > 0);
+    // Editors can serialize hundreds of empty/formatted rows and columns. Measure
+    // cell content before enforcing bounds; retain internal gaps and row numbers.
+    const sheets = workbook.worksheets.map(sheet => {
+      let rowCount = 0, columnCount = 0;
+      sheet.eachRow(row => row.eachCell((cell, column) => {
+        if (cell.value === null || cell.value === undefined || cell.value === "") return;
+        rowCount = Math.max(rowCount, row.number);
+        columnCount = Math.max(columnCount, column);
+      }));
+      return { sheet, rowCount, columnCount };
+    }).filter(({ rowCount }) => rowCount > 0);
     if (sheets.length !== 1) throw new TransferInputError("Usa una sola hoja de datos con encabezados.");
-    const sheet = sheets[0];
-    if (sheet.rowCount > MAX_IMPORT_ROWS + 1 || sheet.columnCount > 12) throw new TransferInputError("Máximo 200 filas de datos y 12 columnas.");
-    rows = Array.from({ length: sheet.rowCount }, (_, index) => {
+    const { sheet, rowCount, columnCount } = sheets[0];
+    if (rowCount > MAX_IMPORT_ROWS + 1 || columnCount > 12) throw new TransferInputError("Máximo 200 filas de datos y 12 columnas.");
+    rows = Array.from({ length: rowCount }, (_, index) => {
       const row = sheet.getRow(index + 1);
-      return Array.from({ length: sheet.columnCount }, (_, column) => row.getCell(column + 1).value);
+      return Array.from({ length: columnCount }, (_, column) => row.getCell(column + 1).value);
     });
   } else throw new TransferInputError("Selecciona un archivo .xlsx o .csv UTF-8.");
   while (rows.length && rows.at(-1)!.every(cell => cell === null || cell === "")) rows.pop();

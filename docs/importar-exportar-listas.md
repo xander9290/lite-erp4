@@ -331,6 +331,10 @@ con nombres técnicos exactos; una fila por registro, o por línea si habilita O
   (excepto fechas nativas en campos DateTime),
   también textos que Excel interprete como fórmulas.
 - Máximo 200 filas, 12 columnas, 512 KB de archivo y 8 MB descomprimidos para XLSX.
+  En XLSX se ignoran filas/columnas vacías finales y hojas completamente vacías,
+  aunque el editor las haya guardado con formato. El límite se comprueba sobre
+  la última celda con contenido; se conservan huecos interiores y números de fila.
+  Cero, false y fórmulas (incluso con resultado vacío) cuentan como contenido.
   Si el plan firmado resulta demasiado grande, se pide dividir el archivo.
 
 ## Revisar y confirmar

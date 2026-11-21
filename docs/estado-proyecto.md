@@ -8,6 +8,26 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Progreso guardado (2026-11-20, punto de continuación)
 
+### Corrección de dimensiones vacías en XLSX (2026-11-20)
+
+Rama `codex/partner`, HEAD inicial `c20ad1c`, árbol limpio al empezar. Corregida la
+lectura de Excel: los límites se comprobaban con las dimensiones guardadas por el
+editor antes de quitar el área vacía final. Un archivo con 125 filas de datos y
+cinco columnas, pero filas registradas hasta la 1000, se rechazaba incorrectamente.
+Ahora se mide la última celda con contenido, ignorando filas/columnas vacías finales
+y hojas vacías. Se conservan huecos interiores y números de fila; cero, false y
+fórmulas con resultado vacío no se descartan. Siguen vigentes 200 filas físicas,
+12 columnas y las protecciones de tamaño/ZIP/fórmulas. CSV no se modifica.
+
+Verificación actual en Mac: `test:list-transfer` 16/16, ESLint de ambos archivos,
+TypeScript y `git diff --check` aprobados. Lectura del archivo aportado comprobada
+con el parser real: 125 filas de datos/cinco columnas, sin modificar el archivo.
+Regresiones sintéticas cubren formato hasta fila 1000/columna Z, celdas vacías
+explícitas, 200 filas admitidas, exceso real de filas/columnas y huecos interiores.
+Sin consultas de BD, importaciones, migraciones ni nueva revisión de navegador/build.
+Cambios sin commit. Siguiente: usuario vuelve a revisar el archivo desde Municipio;
+la lectura corregida no demuestra todavía la validación de negocio ni su aplicación.
+
 ### Transferencias generales: fechas, Many2many y One2many (2026-11-20, vigente)
 
 Trabajo iniciado en `codex/importexport`, HEAD inicial `d67333c`, árbol limpio.

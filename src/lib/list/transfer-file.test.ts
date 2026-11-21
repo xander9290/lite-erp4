@@ -57,3 +57,39 @@ test("Excel formulas, excessive rows/sheets, formats and expanded ZIP data canno
   const zip = new JSZip(); zip.file("huge.xml", "a".repeat(8_000_001));
   await assert.rejects(readTransferFile("bomb.xlsx", await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" })), /8 MB/);
 });
+
+test("XLSX ignores empty/formatted trailing rows, columns and sheets before enforcing content bounds", async () => {
+  for (const count of [125, 200]) {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Datos");
+    sheet.addRow(["codigo", "cantidad", "active"]);
+    for (let index = 1; index <= count; index++) sheet.addRow([String(index).padStart(3, "0"), 0, false]);
+    sheet.getRow(1000).height = 20;
+    sheet.getCell("Z1000").numFmt = "@";
+    sheet.getCell("E999").value = "";
+    workbook.addWorksheet("Vacía").getCell("A1000").value = "";
+    const rows = await readTransferFile("datos.xlsx", Buffer.from(await workbook.xlsx.writeBuffer()));
+    assert.equal(rows.length, count + 1);
+    assert.deepEqual(rows[0], ["codigo", "cantidad", "active"]);
+    assert.deepEqual(rows.at(-1), [String(count).padStart(3, "0"), 0, false]);
+  }
+});
+
+test("XLSX preserves internal gaps and rejects real content beyond row/column limits", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Datos");
+  sheet.addRow(["codigo"]);
+  sheet.getCell("A2").value = "001";
+  sheet.getCell("A4").value = "002";
+  sheet.getRow(1000).height = 20;
+  const read = () => workbook.xlsx.writeBuffer().then(bytes => readTransferFile("datos.xlsx", Buffer.from(bytes)));
+  assert.deepEqual(await read(), [["codigo"], ["001"], [null], ["002"]]);
+  sheet.getCell("A202").value = "201";
+  await assert.rejects(read(), /200 filas/);
+  sheet.getCell("A202").value = null;
+  sheet.getCell("M2").value = false;
+  await assert.rejects(read(), /12 columnas/);
+  sheet.getCell("M2").value = null;
+  sheet.getCell("M2").value = { formula: '\"\"', result: "" };
+  await assert.rejects(read(), /12 columnas/, "formulas with empty cached results are content, not trailing blanks");
+});
