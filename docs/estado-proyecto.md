@@ -12,8 +12,9 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 Trabajo iniciado en `codex/importexport`, HEAD inicial `d67333c`, árbol limpio.
 Usuario autorizó ampliar tipos y eligió One2many por filas, agregando/actualizando
-y conservando las líneas omitidas. Cambios aún sin commit; no habilitan otros
-modelos ni modifican el esquema/migraciones del ERP.
+y conservando las líneas omitidas. Implementación ya versionada en `802eac7`
+(`servicio transfer terminado`); árbol limpio al comenzar esta actualización de
+progreso. No habilita otros modelos ni modifica el esquema/migraciones del ERP.
 
 - DateTime admite YYYY-MM-DD como medianoche UTC, ISO con zona y celdas nativas
   de fecha Excel; exporta ISO UTC. Calendario inválido y horas sin zona se rechazan.
@@ -31,6 +32,12 @@ modelos ni modifican el esquema/migraciones del ERP.
   físicas/12 columnas al importar y 2.000 padres filtrados/filas al exportar.
 - `create:model` no cambia: habilitación manual en el manifest, sin acciones,
   botones ni vistas adicionales. [Contrato y ejemplo](importar-exportar-listas.md).
+- Configuración aclarada: `transfer` se declara por modelo dentro del manifest.
+  No todos los modelos necesitan `uniqueTogether`: una clave Text de un solo
+  campo usa `unique: true`; una clave compuesta requiere `uniqueTogether`.
+  En One2many es habitual combinar la inversa del padre y el código de línea;
+  una clave Text global única también es válida. Reutilizar restricciones existentes,
+  sin añadir claves ni migraciones por anticipación.
 
 **Verificado en esta Mac:** `test:list-transfer` 14/14, `test:modules` 62/62,
 `test:orm` 116/116, TypeScript y ESLint focalizado. Integración histórica de
@@ -44,6 +51,10 @@ Todos los recursos de integración fueron eliminados. Sin importaciones/migracio
 en el ERP ni revisión visual nueva. Build aprobado fuera del sandbox con los
 tres avisos previos de tracing del gestor de módulos; el intento dentro del
 sandbox se detuvo tras quedar sin progreso. `git diff --check` aprobado.
+Actualización posterior de progreso (2026-11-20): contrastados Git, contrato y
+validación de claves; sólo documentación y `git diff --check`, sin repetir suites,
+build, consultas de BD, migraciones ni importaciones. La evidencia anterior
+corresponde a la implementación, no a una nueva comprobación en otra máquina.
 
 **Siguiente:** comprobar el comportamiento visual con un modelo que el usuario
 elija habilitar; las capacidades nuevas sólo están activadas en el fixture de

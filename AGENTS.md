@@ -22,7 +22,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Cajón de aplicaciones
 
 - Transferencias generales (2026-11-20): `transfer` continúa opt-in manual en el
-  manifest; create:model no lo activa. Admite DateTime (día YYYY-MM-DD como UTC o
+  manifest; create:model no lo activa. Clave Text simple: unique:true; clave
+  compuesta: uniqueTogether (no obligatorio para todos los modelos). Reutilizar
+  restricciones existentes. Admite DateTime (día YYYY-MM-DD como UTC o
   ISO con zona), Many2many en celda JSON por claves externas con mode add/replace
   explícito, y One2many por filas con clave del padre repetida y mode merge:
   agregar/actualizar, conservar líneas omitidas, sin borrado/reemplazo. Una cadena
