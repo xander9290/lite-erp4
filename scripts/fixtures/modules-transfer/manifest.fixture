@@ -1,0 +1,73 @@
+import "server-only";
+import { Fields, Model, ModelValidationError, type ModelContext } from "@/lib/orm";
+import { defineModule } from "@/lib/modules/define";
+
+export class Documento extends Model {
+  codigo = Fields.Text({ required: true, unique: true, tracking: true });
+  name = Fields.Text({ required: true, tracking: true });
+  fecha = Fields.DateTime({ tracking: true });
+  etiquetas = Fields.Many2many("TransferenciaEtiqueta", { maxSelected: 3, domain: d => d.eq("active", true) });
+  compuestas = Fields.Many2many("TransferenciaEtiqueta", { maxSelected: 3 });
+  lineas = Fields.One2many("TransferenciaLinea", { inverse: "documentoId", maxRows: 3 });
+  normalize(values: Readonly<Record<string, unknown>>) { return { ...values, codigo: String(values.codigo ?? "").trim().toUpperCase() }; }
+  async afterSave(record: Record<string, unknown>, context: ModelContext) {
+    // A late failure after lines were persisted must undo the whole document.
+    if (record.name === "FALLAR" && context.operation === "create") throw new ModelValidationError("Fallo tardío del documento.");
+  }
+}
+class Linea extends Model {
+  readonly uniqueTogether = [["documentoId", "codigo"]] as const;
+  codigo = Fields.Text({ required: true, tracking: true });
+  cantidad = Fields.Integer({ required: true, min: 1, default: 1, tracking: true });
+  fecha = Fields.DateTime();
+  descuento = Fields.Integer();
+  documentoId = Fields.Many2one("TransferenciaDocumento", { required: true });
+  etiquetaId = Fields.Many2one("TransferenciaEtiqueta");
+  entregas = Fields.One2many("TransferenciaEntrega", { inverse: "lineaId", maxRows: 3 });
+  normalize(values: Readonly<Record<string, unknown>>) { return { ...values, codigo: String(values.codigo ?? "").trim().toUpperCase() }; }
+  beforeSave(values: Record<string, unknown>) { return values.cantidad === 88 ? { ...values, codigo: "CAMBIADA" } : values; }
+  afterSave(record: Record<string, unknown>) { if (record.cantidad === 99) throw new ModelValidationError("Fallo tardío de línea."); }
+}
+class Entrega extends Model {
+  readonly uniqueTogether = [["lineaId", "codigo"]] as const;
+  codigo = Fields.Text({ required: true });
+  cantidad = Fields.Integer({ required: true, min: 1, default: 1 });
+  lineaId = Fields.Many2one("TransferenciaLinea", { required: true });
+}
+class Etiqueta extends Model {
+  readonly uniqueTogether = [["grupo", "codigo"]] as const;
+  codigo = Fields.Text({ required: true, unique: true });
+  grupo = Fields.Text({ required: true, default: "general" });
+  name = Fields.Text({ required: true });
+  active = Fields.Boolean({ default: true });
+}
+class Lista extends Model {
+  codigo = Fields.Text({ required: true, unique: true });
+  etiquetas = Fields.Many2many("TransferenciaEtiqueta", { maxSelected: 3 });
+}
+
+export default defineModule({
+  id: "transferencia", name: "Transferencia de ensayo", icon: "boxes",
+  models: {
+    documento: { model: Documento, transfer: {
+      key: "codigo", fields: ["codigo", "name", "fecha", "etiquetas", "compuestas", "lineas"],
+      many2many: { etiquetas: { key: "codigo", mode: "add" }, compuestas: { key: ["grupo", "codigo"], mode: "replace" } },
+      lines: { lineas: {
+        key: "codigo", mode: "merge", fields: ["codigo", "cantidad", "fecha", "descuento", "etiquetaId", "entregas"], relations: { etiquetaId: { key: "codigo" } },
+        lines: { entregas: { key: "codigo", mode: "merge", fields: ["codigo", "cantidad"] } },
+      } },
+    } },
+    lista: { model: Lista, transfer: { key: "codigo", fields: ["codigo", "etiquetas"], many2many: { etiquetas: { key: "codigo", mode: "replace" } } } },
+    etiqueta: Etiqueta, linea: Linea, entrega: Entrega,
+  },
+  groups: { editor: "Editor", parcial: "Líneas parciales" },
+  access: [
+    { group: "editor", models: ["documento", "lista", "linea", "entrega"], perms: "crud", import: true, export: true },
+    { group: "editor", models: "etiqueta", perms: "r" },
+    { group: "parcial", models: ["documento", "lista", "linea", "entrega", "etiqueta"], perms: "crud", import: true, export: true },
+  ],
+  rules: [
+    { id: "etiquetas-legibles", label: "Etiquetas activas", models: "etiqueta", groups: ["editor"], domain: [{ field: "active", operator: "eq", value: true }] },
+    { id: "lineas-parciales", label: "Líneas de uno", models: "linea", groups: ["parcial"], domain: [{ field: "cantidad", operator: "eq", value: 1 }] },
+  ],
+});

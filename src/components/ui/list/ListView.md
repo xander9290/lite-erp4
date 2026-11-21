@@ -3,7 +3,10 @@
 Importación/exportación Excel/CSV opcional en Acciones, incluso sin selección.
 ModelCollection sólo conecta `transfer` en ListView estándar de modelos que lo
 declaran; no en Card/Kanban, fuentes personalizadas o colecciones embebidas.
-Permisos y ejecución se revalidan en servidor. [Contrato y piloto País](../../../../docs/importar-exportar-listas.md).
+Permisos y ejecución se revalidan en servidor. Admite fechas, Many2many con política
+add/replace explícita y One2many agrupado por filas (conserva líneas omitidas).
+La revisión muestra un resultado por documento; la exportación puede ocupar varias
+filas por padre. [Contrato y configuración](../../../../docs/importar-exportar-listas.md).
 
 Los servicios declarativos publican `$displayName` por registro, separado de sus
 escalares. Las columnas name/id de texto lo presentan por defecto y los controles

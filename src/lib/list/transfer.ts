@@ -6,10 +6,11 @@ import { AccessError } from "../auth/policy";
 import { authorizeModel, modelPerms, userGroups } from "../access/engine";
 import { ModelValidationError, type ModelActor } from "../orm/context";
 import { transferColumns, transferHeaders, transferKeyFields } from "./transfer-contract";
-import { decodeTransferReferences, encodeTransferValues, normalizeTransferDraft, transferColumnKinds, transferIdentity, type TransferReferenceCache } from "./transfer-relations";
+import { assertTransferIdentity, decodeTransferReferences, encodeTransferValues, normalizeTransferDraft, prepareTransferDocument, transferColumnKinds, transferIdentity, type TransferReferenceCache } from "./transfer-relations";
+import { flattenTransferDocument, groupTransferRows, validateTransferHeaders } from "./transfer-table";
 import { getModuleModel, modelService } from "../modules/registry";
 import { listStateSchema } from "./query";
-import { cellValue, readTransferFile, writeTransferFile } from "./transfer-file";
+import { readTransferFile, writeTransferFile } from "./transfer-file";
 import type { TransferFormat, TransferPlan, TransferRow } from "./transfer-types";
 
 // Plans expire on restart as well as after 15 minutes; no private configuration added.
@@ -67,28 +68,14 @@ export async function reviewTransfer(prisma: PrismaClient, actor: ModelActor, mo
   const { entry, spec, service, fingerprint } = transferContract(model);
   await prisma.$transaction(tx => authorizeTransfer(tx, actor, model, "import"));
   const table = await readTransferFile(name, bytes);
-  const headers = table[0], columns = transferColumns(spec), allowedHeaders = columns.map(column => column.header), keys = transferKeyFields(spec);
-  const requiredHeaders = columns.filter(column => keys.includes(column.field)).map(column => column.header);
-  if (headers.some(header => typeof header !== "string" || !allowedHeaders.includes(header)) || new Set(headers).size !== headers.length || requiredHeaders.some(header => !headers.includes(header))) throw new ModelValidationError(`Encabezados válidos: ${allowedHeaders.join(", ")}; incluye ${requiredHeaders.join(", ")}, sin duplicados.`);
-  // A reference travels whole: every column of its key, or none to keep the current value.
-  const partial = Object.keys(spec.relations ?? {}).map(field => columns.filter(column => column.field === field).map(column => column.header)).find(group => group.some(header => headers.includes(header)) && !group.every(header => headers.includes(header)));
-  if (partial) throw new ModelValidationError(`Incluye juntas las columnas de la referencia: ${partial.join(", ")}.`);
+  const columns = transferColumns(spec), keys = transferKeyFields(spec);
+  const requiredHeaders = columns.filter(column => !column.document?.length && keys.includes(column.field)).map(column => column.header);
+  validateTransferHeaders(spec, table[0]);
   const kinds = transferColumnKinds(entry, spec);
   const rows: TransferRow[] = [], reviewed: Reviewed[] = [], seen = new Map<string, TransferRow>();
-  for (let index = 1; index < table.length; index++) {
-    const row: TransferRow = { row: index + 1, key: "", operation: "error" };
+  for (const { row: rowNumber, raw, errors } of groupTransferRows(table, spec, kinds)) {
+    const row: TransferRow = { row: rowNumber, key: "", operation: "error" };
     rows.push(row);
-    const cells = table[index], raw: Record<string, unknown> = {}, errors: Record<string, string> = {};
-    if (cells.slice(headers.length).some(cell => cell !== "" && cell != null)) { row.errors = { "": "La fila contiene más celdas que encabezados." }; continue; }
-    headers.forEach((header, index) => {
-      const column = columns.find(item => item.header === header)!;
-      try {
-        const value = cellValue(cells[index] ?? null, kinds.get(column.header)!);
-        if (!column.path.length) raw[column.field] = value;
-        else ((raw[column.field] ??= {}) as Record<string, unknown>)[column.path.join(".")] = value;
-      }
-      catch (error) { errors[header as string] = (error as Error).message; }
-    });
     if (Object.keys(errors).length) { row.errors = errors; continue; }
     try {
       await prisma.$transaction(async tx => {
@@ -98,7 +85,7 @@ export async function reviewTransfer(prisma: PrismaClient, actor: ModelActor, mo
         const identity = transferIdentity(entry, spec, normalized);
         if (keys.some(key => identity[key] === null || identity[key] === undefined || identity[key] === "")) throw new ModelValidationError("La clave de importación está incompleta.");
         const current = await service.findUniqueInTransaction(tx, actor, spec.key, typeof spec.key === "string" ? identity[spec.key] : identity);
-        const input = { ...(current ?? entry.contract.createDefaults()), ...decoded, ...identity };
+        const input = await prepareTransferDocument(tx, actor, entry, spec, { ...decoded, ...identity }, current);
         const before = await encodeTransferValues(tx, actor, entry, spec, input);
         row.key = requiredHeaders.map(header => String(before.values[header])).join(" · ");
         const signature = digest(identity);
@@ -110,10 +97,10 @@ export async function reviewTransfer(prisma: PrismaClient, actor: ModelActor, mo
         seen.set(signature, row);
         // Exercise the full pipeline and always roll back the preview, including owner revisions.
         const prepared = await service.transaction.persist(tx, actor, input);
-        if (keys.some(key => prepared[key] !== identity[key])) throw new ModelValidationError("La lógica del modelo cambió la clave; revisa su normalización.");
-        const changed = !current || spec.fields.some(field => JSON.stringify(prepared[field]) !== JSON.stringify(current[field]));
-        const operation = !current ? "create" : changed ? "update" : "unchanged";
+        assertTransferIdentity(entry, spec, input, prepared);
         const display = await encodeTransferValues(tx, actor, entry, spec, prepared, true);
+        const changed = !current || digest(display.values) !== digest((await encodeTransferValues(tx, actor, entry, spec, current)).values);
+        const operation = !current ? "create" : changed ? "update" : "unchanged";
         throw new PreviewRollback({ row: row.row, key: row.key, identity, references: digest(before.references), values: raw, baseline: digest(current), expected: digest(display.values), operation }, display.values);
       }, { isolationLevel: "RepeatableRead", timeout: 15_000 });
     } catch (error) {
@@ -143,7 +130,7 @@ export async function applyTransfer(prisma: PrismaClient, actor: ModelActor, mod
   if (ticket.actor !== actor.id || ticket.version !== actor.sessionVersion || ticket.model !== model || ticket.contract !== fingerprint || ticket.expires < Date.now()) throw new ModelValidationError("El plan cambió o expiró; vuelve a revisar el archivo.");
   try { return await prisma.$transaction(async tx => {
     await authorizeTransfer(tx, actor, model, "import");
-    const result = { created: 0, updated: 0, unchanged: 0 }, keys = transferKeyFields(spec);
+    const result = { created: 0, updated: 0, unchanged: 0 };
     const pending: { row: Reviewed; input: Record<string, unknown>; id?: string }[] = [];
     let activeRow = 0;
     try {
@@ -157,7 +144,7 @@ export async function applyTransfer(prisma: PrismaClient, actor: ModelActor, mod
         if (digest(identity) !== digest(row.identity)) throw new ModelValidationError("La clave o su referencia cambió; vuelve a revisar el archivo.");
         const current = await service.findUniqueInTransaction(tx, actor, spec.key, typeof spec.key === "string" ? identity[spec.key] : identity);
         if (digest(current) !== row.baseline) throw new ModelValidationError("El registro o sus líneas cambiaron después de revisar; vuelve a revisar el archivo.");
-        const input = { ...(current ?? entry.contract.createDefaults()), ...decoded, ...identity };
+        const input = await prepareTransferDocument(tx, actor, entry, spec, { ...decoded, ...identity }, current);
         const before = await encodeTransferValues(tx, actor, entry, spec, input, row.operation === "unchanged");
         if (digest(before.references) !== row.references) throw new ModelValidationError("Un registro relacionado cambió después de revisar; vuelve a revisar el archivo.");
         await authorizeModel(tx, actor, model, current ? "write" : "create");
@@ -169,7 +156,7 @@ export async function applyTransfer(prisma: PrismaClient, actor: ModelActor, mod
         if (row.operation === "unchanged") { result.unchanged++; continue; }
         const saved = await service.transaction.persist(tx, actor, item.input);
         item.id = saved.id;
-        if (keys.some(key => saved[key] !== row.identity[key])) throw new ModelValidationError("La lógica del modelo cambió la clave de importación.");
+        assertTransferIdentity(entry, spec, item.input, saved);
         if (row.operation === "create") result.created++; else result.updated++;
       }
       for (const item of pending) {
@@ -202,18 +189,23 @@ export async function exportTransfer(prisma: PrismaClient, actor: ModelActor, mo
     const output: Record<string, unknown>[] = [];
     let page = 1;
     const selected = new Set(request.selection);
+    const exported = new Set<string>();
     const references: TransferReferenceCache = new Map();
     while (true) {
       const result = await service.listInTransaction(prisma, tx, actor, { ...request.state, page, pageSize: 50, groupBy: [], groupPath: [] });
       if (!result.ok) throw new ModelValidationError(result.error);
-      if (result.data.total > 2000) throw new ModelValidationError("La fase 1 permite hasta 2.000 registros filtrados; reduce los filtros antes de exportar.");
+      if (result.data.total > 2000) throw new ModelValidationError("Máximo 2.000 registros filtrados; reduce los filtros antes de exportar.");
       for (const row of result.data.rows.filter(row => !selected.size || selected.has(row.id))) {
-        output.push((await encodeTransferValues(tx, actor, entry, spec, row, false, references)).values);
+        const document = Object.keys(spec.lines ?? {}).length || Object.keys(spec.many2many ?? {}).length ? await service.transaction.snapshot(tx, actor, row.id) : row;
+        if (!document) throw new ModelValidationError("El registro ya no está disponible.");
+        output.push(...flattenTransferDocument(spec, (await encodeTransferValues(tx, actor, entry, spec, document, false, references)).values));
+        exported.add(row.id);
+        if (output.length > 2000) throw new ModelValidationError("Máximo 2.000 filas exportadas, incluidas las líneas; reduce los filtros.");
       }
       if (page * 50 >= result.data.total) break;
       page++;
     }
-    if (selected.size && output.length !== selected.size) throw new ModelValidationError("La selección cambió o contiene registros fuera de tus filtros/permisos. Actualiza la lista.");
+    if (selected.size && exported.size !== selected.size) throw new ModelValidationError("La selección cambió o contiene registros fuera de tus filtros/permisos. Actualiza la lista.");
     return output;
   }, { isolationLevel: "RepeatableRead", timeout: 30_000 });
   return writeTransferFile(request.format as TransferFormat, transferHeaders(spec), rows, `${entry.key}${request.template ? "-plantilla" : ""}`);

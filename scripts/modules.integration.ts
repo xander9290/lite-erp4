@@ -80,7 +80,23 @@ try {
     .replace('"@tailwindcss/turbopack"', `{ loader: "@tailwindcss/turbopack", options: { base: ${JSON.stringify(join(root, "src"))} } }`));
   prisma(["migrate", "deploy"]);
 
-  if (process.argv.includes("--domains-only")) {
+  if (process.argv.includes("--transfer-only")) {
+    const target = join(root, "src/modules/transferencia");
+    await mkdir(target, { recursive: true });
+    await cp(join(project, "scripts/fixtures/modules-transfer/manifest.fixture"), join(target, "manifest.ts"));
+    tsx(join(root, "scripts/orm-install.ts"), ["transferencia", "--write"], "orm:install transfer fixture");
+    const sql = command("prisma", ["migrate", "diff", "--from-config-datasource", "--to-schema", join(root, "prisma/models"), "--script", "--config", join(root, "prisma7.config.ts")], "transfer migration diff");
+    assert.match(sql, /CREATE TABLE "transferencia_documento"/);
+    assert.doesNotMatch(sql, /\bDROP\s+(TABLE|COLUMN|TYPE)\b|\bTRUNCATE\b/i);
+    await mkdir(join(root, "prisma/migrations/20990208000000_transfer"));
+    await writeFile(join(root, "prisma/migrations/20990208000000_transfer/migration.sql"), sql);
+    prisma(["migrate", "deploy"]); prisma(["generate"]);
+    await renderIndex(["transferencia"]);
+    await cp(join(project, "scripts/fixtures/transfer-check.fixture"), join(root, "transfer-check.ts"));
+    console.log(tsx(join(root, "transfer-check.ts"), [], "transfer service check").trim());
+    command("next", ["typegen"], "Next route types");
+    command("tsc", ["--noEmit", "--incremental", "false"], "transfer fixture types");
+  } else if (process.argv.includes("--domains-only")) {
     const target = join(root, "src/modules/dominios");
     await mkdir(target, { recursive: true });
     await cp(join(project, "scripts/fixtures/modules-domains/manifest.fixture"), join(target, "manifest.ts"));

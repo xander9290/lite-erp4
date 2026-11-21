@@ -2,6 +2,7 @@ import "server-only";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { Readable } from "node:stream";
+import { z } from "zod";
 import type { TransferFile, TransferFormat } from "./transfer-types";
 
 export const MAX_IMPORT_BYTES = 512_000;
@@ -70,6 +71,15 @@ export async function readTransferFile(name: string, bytes: Buffer): Promise<unk
 }
 
 export function cellValue(value: unknown, kind: string): unknown {
+  if (kind === "datetime") {
+    if (value === null || value === "") return null;
+    if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+    if (typeof value === "string") {
+      if (z.iso.date().safeParse(value).success) return `${value}T00:00:00.000Z`;
+      if (z.iso.datetime({ offset: true }).safeParse(value).success) return new Date(value).toISOString();
+    }
+    throw new TransferInputError("Usa YYYY-MM-DD o una fecha y hora ISO con Z o desfase horario explícito.");
+  }
   if (value !== null && typeof value === "object") throw new TransferInputError("No se admiten fórmulas, enlaces, errores ni objetos de Excel.");
   if (typeof value === "string" && formula.test(value) && !(kind === "integer" && /^-?\d+$/.test(value))) throw new TransferInputError("No se admiten fórmulas ni texto que Excel interprete como fórmula.");
   if (kind === "boolean") {

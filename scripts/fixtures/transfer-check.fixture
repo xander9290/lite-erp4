@@ -1,0 +1,146 @@
+import assert from "node:assert/strict";
+import { prisma } from "./src/lib/prisma";
+import { modelService, modelClientConfig, getModuleModel } from "./src/lib/modules/registry";
+import { reviewTransfer, applyTransfer, exportTransfer } from "./src/lib/list/transfer";
+import { readTransferFile, writeTransferFile } from "./src/lib/list/transfer-file";
+import { transferHeaders } from "./src/lib/list/transfer-contract";
+import { setModelAccess } from "./src/lib/access/admin";
+
+assert.match(new URL(process.env.DATABASE_URL!).searchParams.get("schema") ?? "", /^modules_test_[a-f0-9]{16}$/);
+const root = await prisma.user.create({ data: { login: "transfer-root", password: "unused", isAdmin: true } });
+const editor = await prisma.user.create({ data: { login: "transfer-editor", password: "unused" } });
+const partial = await prisma.user.create({ data: { login: "transfer-partial", password: "unused" } });
+await prisma.accessUserGroup.createMany({ data: [{ userId: editor.id, groupId: "transferencia.editor" }, { userId: partial.id, groupId: "transferencia.parcial" }] });
+const admin = { id: root.id, sessionVersion: root.sessionVersion }, actor = { id: editor.id, sessionVersion: editor.sessionVersion }, incomplete = { id: partial.id, sessionVersion: partial.sessionVersion };
+const model = "transferencia.documento", service = modelService(model);
+const spec = getModuleModel(model)!.entry.declaration.transfer!;
+const headers = transferHeaders(spec);
+const state = { query: "", page: 1, pageSize: 25, sort: "codigo", direction: "asc", filters: [] };
+type Line = Record<string, unknown> & { id: string; revision: string; codigo: string; cantidad: number; entregas: Line[] };
+type Doc = Record<string, unknown> & { id: string; revision: string; codigo: string; fecha: string | null; etiquetas: string[]; compuestas: string[]; lineas: Line[] };
+const save = async (model: string, values: unknown) => { const result = await modelService(model).save(prisma, admin, values); assert.ok(result.ok, JSON.stringify(result)); return result.values; };
+const read = async (id: string) => { const result = await service.read(prisma, actor, id); assert.ok(result.ok, JSON.stringify(result)); return result.values as Doc; };
+const counts = async () => ({ documents: await prisma.transferenciaDocumento.findMany({ orderBy: { id: "asc" } }), lines: await prisma.transferenciaLinea.findMany({ orderBy: { id: "asc" } }), deliveries: await prisma.transferenciaEntrega.findMany({ orderBy: { id: "asc" } }), history: await prisma.recordActivity.count(), links: await prisma.transferenciaDocumentoEtiquetasLink.count() });
+async function review(rows: Record<string, unknown>[], fields = headers, who = actor, target = model, format: "csv" | "xlsx" = "csv") {
+  const file = await writeTransferFile(format, fields, rows, "documentos");
+  return reviewTransfer(prisma, who, target, file.name, Buffer.from(file.base64, "base64"));
+}
+async function rejectsRows(rows: Record<string, unknown>[], fields = headers, who = actor) {
+  const before = await counts(), plan = await review(rows, fields, who);
+  assert.equal(plan.token, undefined, JSON.stringify(plan));
+  assert.ok(plan.rows.some(row => row.operation === "error"), JSON.stringify(plan));
+  assert.deepEqual(await counts(), before, "rejected previews commit nothing");
+  return JSON.stringify(plan.rows);
+}
+try {
+  const a = await save("transferencia.etiqueta", { codigo: "A", name: "A", grupo: "general", active: true });
+  const b = await save("transferencia.etiqueta", { codigo: "B", name: "B", grupo: "general", active: true });
+  const hidden = await save("transferencia.etiqueta", { codigo: "OCULTA", name: "Privada", grupo: "general", active: false });
+  const parent = { codigo: "D1", name: "Primero", fecha: "2026-11-20T12:30:00-06:00", etiquetas: '["A"]', compuestas: '[{"grupo":"general","codigo":"B"}]' };
+  const row1 = { ...parent, "lineas.codigo": "01", "lineas.cantidad": 2, "lineas.etiquetaId.codigo": "A", "lineas.entregas.codigo": "E1", "lineas.entregas.cantidad": 1 };
+  const row2 = { ...row1, "lineas.entregas.codigo": "E2", "lineas.entregas.cantidad": 2 };
+  const row3 = { ...parent, "lineas.codigo": "02", "lineas.cantidad": 3 };
+  const before = await counts(), plan = await review([row1, row2, row3]);
+  assert.ok(plan.token, JSON.stringify(plan)); assert.equal(plan.rows.length, 1);
+  assert.equal(plan.rows[0].operation, "create");
+  assert.deepEqual(await counts(), before, "preview rolls back parent, children, nested children, links and history");
+  assert.deepEqual(await applyTransfer(prisma, actor, model, plan.token!), { created: 1, updated: 0, unchanged: 0 });
+  const stored = await prisma.transferenciaDocumento.findUniqueOrThrow({ where: { codigo: "D1" } });
+  let doc = await read(stored.id);
+  assert.equal(doc.fecha, "2026-11-20T18:30:00.000Z");
+  assert.deepEqual(doc.etiquetas, [a.id]); assert.deepEqual(doc.compuestas, [b.id]);
+  assert.equal(doc.lineas.length, 2); assert.equal(doc.lineas.find(row => row.codigo === "01")!.entregas.length, 2);
+  assert.ok(doc.lineas.every(row => row.fecha === null && row.descuento === null), "blank optional line cells normalize just like root fields");
+  const repeated = await review([row3, row2, row1]);
+  assert.ok(repeated.token, JSON.stringify(repeated)); assert.equal(repeated.rows[0].operation, "unchanged");
+  const stable = await counts();
+  await applyTransfer(prisma, actor, model, repeated.token!);
+  assert.deepEqual(await counts(), stable, "reordered roundtrip does not advance revisions/history");
+
+  const fields = ["codigo", "etiquetas", "lineas.codigo", "lineas.cantidad"];
+  const merge = await review([{ codigo: "D1", etiquetas: '["B"]', "lineas.codigo": "01", "lineas.cantidad": 5 }, { codigo: "D1", etiquetas: '["B"]', "lineas.codigo": "03", "lineas.cantidad": 1 }], fields);
+  assert.ok(merge.token, JSON.stringify(merge));
+  await applyTransfer(prisma, actor, model, merge.token!);
+  doc = await read(doc.id);
+  assert.deepEqual(new Set(doc.etiquetas), new Set([a.id, b.id]), "add retains prior links");
+  assert.deepEqual(doc.lineas.map(row => row.codigo).sort(), ["01", "02", "03"], "omitted line survives");
+  assert.equal(doc.lineas.find(row => row.codigo === "01")!.entregas.length, 2, "omitted nested relation survives");
+  assert.equal(doc.lineas.find(row => row.codigo === "01")!.cantidad, 5);
+  const blank = await review([{ codigo: "D1", "lineas.codigo": "", "lineas.cantidad": "" }], ["codigo", "lineas.codigo", "lineas.cantidad"]);
+  assert.ok(blank.token, JSON.stringify(blank)); assert.equal(blank.rows[0].operation, "unchanged");
+
+  for (const format of ["csv", "xlsx"] as const) {
+    const file = await exportTransfer(prisma, actor, model, { format, state, selection: [doc.id], template: false });
+    const bytes = Buffer.from(file.base64, "base64"), rows = await readTransferFile(file.name, bytes);
+    assert.deepEqual(rows[0], headers); assert.equal(rows.length, 5, "one selected parent expands to four rows");
+    assert.ok(rows.slice(1).every(row => !row.some(cell => cell === a.id || cell === doc.id)), "no internal IDs in the file");
+    const reimport = await reviewTransfer(prisma, actor, model, file.name, bytes);
+    assert.ok(reimport.token, JSON.stringify(reimport)); assert.equal(reimport.rows[0].operation, "unchanged");
+  }
+  const listFields = ["codigo", "etiquetas"];
+  for (const value of ['["A","B"]', '["B"]', "[]"]) {
+    const plan = await review([{ codigo: "L1", etiquetas: value }], listFields, actor, "transferencia.lista");
+    assert.ok(plan.token, JSON.stringify(plan)); await applyTransfer(prisma, actor, "transferencia.lista", plan.token!);
+    const row = await prisma.transferenciaLista.findUniqueOrThrow({ where: { codigo: "L1" } });
+    const loaded = await modelService("transferencia.lista").read(prisma, actor, row.id);
+    assert.ok(loaded.ok); assert.equal((loaded.values.etiquetas as string[]).length, (JSON.parse(value) as string[]).length, "replace removes only explicitly replaced links");
+  }
+  for (const etiquetas of ['["A","A"]', '["NO_EXISTE"]', JSON.stringify([hidden.id]), '["OCULTA"]', '{"id":"A"}', '["A","B","C","D"]']) {
+    await rejectsRows([{ codigo: "D1", etiquetas }], ["codigo", "etiquetas"]);
+  }
+  await rejectsRows([{ codigo: "D1", compuestas: '[{"grupo":"general"}]' }], ["codigo", "compuestas"]);
+  await rejectsRows([{ codigo: "D1", fecha: "2026-02-29" }], ["codigo", "fecha"]);
+  await rejectsRows([{ codigo: "D1", "lineas.codigo": "01", "lineas.cantidad": 1 }, { codigo: "D1", "lineas.codigo": " 01 ", "lineas.cantidad": 1 }], ["codigo", "lineas.codigo", "lineas.cantidad"]);
+  await rejectsRows([{ codigo: "D1", "lineas.codigo": "04", "lineas.cantidad": 1 }], ["codigo", "lineas.codigo", "lineas.cantidad"]);
+  assert.match(await rejectsRows([{ codigo: "D1", "lineas.codigo": "01", "lineas.cantidad": 99 }], ["codigo", "lineas.codigo", "lineas.cantidad"]), /tardío/);
+  assert.match(await rejectsRows([{ codigo: "D1", "lineas.codigo": "01", "lineas.cantidad": 88 }], ["codigo", "lineas.codigo", "lineas.cantidad"]), /claves/);
+  await rejectsRows([{ codigo: "D2", name: "FALLAR", "lineas.codigo": "01", "lineas.cantidad": 1 }], ["codigo", "name", "lineas.codigo", "lineas.cantidad"]);
+  await assert.rejects(review([{ codigo: "D1", "lineas.documentoId": doc.id }], ["codigo", "lineas.documentoId"]), /Encabezados/);
+  await rejectsRows([{ codigo: "D1", name: "No parcial" }], ["codigo", "name"], incomplete);
+  await assert.rejects(exportTransfer(prisma, incomplete, model, { format: "csv", state, selection: [], template: false }), /colección completa/);
+  await assert.rejects(review([{ codigo: "D1", "lineas.cantidad": 2 }], ["codigo", "lineas.cantidad"]), /lineas.codigo/);
+
+  const late = await review([{ codigo: "D3", name: "Primero del lote" }, { codigo: "D4", name: "Segundo del lote" }], ["codigo", "name"]);
+  assert.ok(late.token, JSON.stringify(late));
+  const { Documento } = await import("./src/modules/transferencia/manifest");
+  const original = Documento.prototype.afterSave;
+  const beforeLate = await counts();
+  try {
+    Documento.prototype.afterSave = async function(record, context) {
+      await original.call(this, record, context);
+      if (record.codigo === "D4") throw new Error("Fallo al confirmar la segunda fila");
+    };
+    await assert.rejects(applyTransfer(prisma, actor, model, late.token!), /Fila 3.*ninguna fila/);
+    assert.deepEqual(await counts(), beforeLate, "confirmation rolls back an earlier successfully persisted document and its history");
+  } finally { Documento.prototype.afterSave = original; }
+
+  const referencePlan = await review([{ codigo: "D1", etiquetas: '["B"]' }], ["codigo", "etiquetas"]);
+  assert.ok(referencePlan.token, JSON.stringify(referencePlan));
+  await prisma.transferenciaEtiqueta.update({ where: { id: b.id }, data: { name: "Renombrada" } });
+  await assert.rejects(applyTransfer(prisma, actor, model, referencePlan.token!), /relacionado cambió/);
+
+  const deniedLine = await review([{ codigo: "D1", "lineas.codigo": "01", "lineas.cantidad": 4 }], ["codigo", "lineas.codigo", "lineas.cantidad"]);
+  assert.ok(deniedLine.token, JSON.stringify(deniedLine));
+  await setModelAccess(prisma, admin, "transferencia.editor", new Map([["transferencia.linea", { read: true, create: false, write: false, unlink: false }]]));
+  const beforeDenied = await counts();
+  await assert.rejects(applyTransfer(prisma, actor, model, deniedLine.token!), /ninguna fila/);
+  assert.deepEqual(await counts(), beforeDenied, "child permission revocation also rolls back the parent's revision");
+  await setModelAccess(prisma, admin, "transferencia.editor", new Map([["transferencia.linea", { read: true, create: true, write: true, unlink: false }]]));
+
+  const stale = await review([{ codigo: "D1", "lineas.codigo": "01", "lineas.cantidad": 4 }], ["codigo", "lineas.codigo", "lineas.cantidad"]);
+  assert.ok(stale.token, JSON.stringify(stale));
+  doc = await read(doc.id);
+  await save(model, { ...doc, lineas: doc.lineas.map(row => ({ ...row, cantidad: row.codigo === "02" ? 2 : row.cantidad })) });
+  const changed = await counts();
+  await assert.rejects(applyTransfer(prisma, actor, model, stale.token!), /cambiaron/);
+  assert.deepEqual(await counts(), changed);
+  const clearedDate = await review([{ codigo: "D1", fecha: "" }], ["codigo", "fecha"]);
+  assert.ok(clearedDate.token, JSON.stringify(clearedDate)); await applyTransfer(prisma, actor, model, clearedDate.token!);
+  assert.equal((await read(doc.id)).fecha, null);
+  const revoked = await review([{ codigo: "D1", name: "Revocado" }], ["codigo", "name"]);
+  assert.ok(revoked.token, JSON.stringify(revoked));
+  await setModelAccess(prisma, admin, "transferencia.editor", new Map([[model, { read: true, create: true, write: true, unlink: false, import: false, export: true }]]));
+  await assert.rejects(applyTransfer(prisma, actor, model, revoked.token!), /permiso/);
+  assert.ok(modelClientConfig(model).transfer, "any registered compatible model receives the standard transfer configuration");
+  console.log("✓ Transferencias generales: fechas UTC, Many2many add/replace y claves compuestas, One2many anidado por filas, conservación, roundtrip Excel/CSV, permisos, límites, revisiones y rollback.");
+} finally { await prisma.$disconnect(); }

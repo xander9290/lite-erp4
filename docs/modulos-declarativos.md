@@ -5,9 +5,10 @@ Guía para crear aplicaciones con `defineModule` (fases 2–4 del
 de modelo; rutas, acciones, servicios, repositorio y vistas salen por convención.
 Sólo se escribe TSX para lo que se personaliza.
 
-> Estado: prototipo en la rama `refactor/modulos-declarativos`. Autorización por
-> grupos, permisos por modelo y reglas de registro (sección 5); sin grupos, sólo administradores.
-> Contactos y Usuarios conservan su flujo anterior. Citas y la Flota anterior fueron retiradas.
+> Estado: utilizado por Ubicaciones y contactosextra. Autorización por grupos,
+> permisos por modelo y reglas de registro (sección 5); sin concesiones, sólo
+> administradores. Contactos y Usuarios presentan los modelos nativos de core;
+> las referencias a Flota y Tickets describen aplicaciones retiradas.
 
 ## Estructura
 
@@ -82,7 +83,13 @@ Cada clave de `models` define la convención completa. Para `demo.tarea`:
 | Menú | etiqueta del `menu`, o la clave capitalizada |
 
 Opciones por modelo: `table`, `list` (sobrescribe la política), `kanban` (Selection
-obligatoria), `view: "list" | "card"`, `defaultSort` y `views` (ver eject).
+obligatoria), `view: "list" | "card"`, `defaultSort`, `views` (ver eject) y `transfer`.
+
+`transfer` es opt-in manual: claves de negocio y campos explícitos habilitan
+Excel/CSV sólo en ListView estándar, según permisos. Admite escalares, DateTime,
+Many2one, Many2many add/replace y One2many por filas que conserva omitidas; no
+requiere nuevas vistas/acciones ni concede acceso. `create:model` no lo añade.
+[Configuración y límites](importar-exportar-listas.md#configurar-otro-modelo).
 
 **Tarjeta en el cajón (`drawer`, 2026-11-20).** Todo módulo con modelos propios es una
 aplicación con tarjeta en el cajón. `drawer: false` oculta sólo la tarjeta: sus rutas
@@ -118,8 +125,8 @@ export class Tarea extends Model {
 ```
 
 Many2one entre modelos de módulos usa el nombre Prisma (`"DemoCategoria"`) y obtiene
-búsqueda y etiquetas autorizadas sin configurar nada. Many2one a modelos manuales
-(Partner, User) aún requiere un proveedor propio.
+búsqueda y etiquetas autorizadas sin configurar nada. Partner y User son destinos
+nativos de core y utilizan sus lookups autorizados.
 
 ### Opciones de colección en cada Field
 

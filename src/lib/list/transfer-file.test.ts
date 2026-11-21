@@ -29,6 +29,22 @@ test("XLSX and CSV roundtrip Unicode, text codes and booleans; export neutralize
   assert.match(Buffer.from(csv.base64, "base64").toString(), /'=HYPERLINK/);
 });
 
+test("dates use UTC, validate the calendar and require an explicit timezone for times", async () => {
+  assert.equal(cellValue("2024-02-29", "datetime"), "2024-02-29T00:00:00.000Z");
+  assert.equal(cellValue("2026-11-20T12:30:00-06:00", "datetime"), "2026-11-20T18:30:00.000Z");
+  assert.equal(cellValue(null, "datetime"), null);
+  for (const value of ["2026-02-29", "20/11/2026", "2026-11-20T12:30:00", 46346, new Date(NaN), { formula: "NOW()" }]) assert.throws(() => cellValue(value, "datetime"), /ISO/);
+  const wb = new ExcelJS.Workbook();
+  wb.addWorksheet("Datos").addRows([["fecha"], [new Date("2026-11-20T18:30:00Z")]]);
+  const rows = await readTransferFile("fechas.xlsx", Buffer.from(await wb.xlsx.writeBuffer()));
+  assert.equal(cellValue(rows[1][0], "datetime"), "2026-11-20T18:30:00.000Z");
+  for (const format of ["csv", "xlsx"] as const) {
+    const file = await writeTransferFile(format, ["fecha"], [{ fecha: "2026-11-20T18:30:00.000Z" }], "fechas");
+    const cells = await readTransferFile(file.name, Buffer.from(file.base64, "base64"));
+    assert.equal(cellValue(cells[1][0], "datetime"), "2026-11-20T18:30:00.000Z");
+  }
+});
+
 test("Excel formulas, excessive rows/sheets, formats and expanded ZIP data cannot enter imports", async () => {
   const wb = new ExcelJS.Workbook();
   const sheet = wb.addWorksheet("Datos"); sheet.addRow(["name"]); sheet.addRow([{ formula: "1+1", result: 2 }]);

@@ -8,7 +8,57 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Progreso guardado (2026-11-20, punto de continuación)
 
-### Cierre vigente: País, Estado y Municipio operativos (2026-11-20)
+### Transferencias generales: fechas, Many2many y One2many (2026-11-20, vigente)
+
+Trabajo iniciado en `codex/importexport`, HEAD inicial `d67333c`, árbol limpio.
+Usuario autorizó ampliar tipos y eligió One2many por filas, agregando/actualizando
+y conservando las líneas omitidas. Cambios aún sin commit; no habilitan otros
+modelos ni modifican el esquema/migraciones del ERP.
+
+- DateTime admite YYYY-MM-DD como medianoche UTC, ISO con zona y celdas nativas
+  de fecha Excel; exporta ISO UTC. Calendario inválido y horas sin zona se rechazan.
+- `transfer.many2many` declara claves externas y mode add/replace obligatorio;
+  celdas JSON con claves simples, compuestas o anidadas. No creación implícita.
+  Firma/revalida referencias, lectura, dominios y límites; la UI explica el modo.
+- `transfer.lines` agrupa prefijos de columnas por clave del padre y de cada línea;
+  mode merge conserva omitidas y nunca borra. Una cadena por nivel, hasta tres
+  niveles. Clave única global o uniqueTogether con la inversa del dueño; el servidor
+  resuelve ID/revisión desde el documento autorizado completo. Rechaza contradicciones,
+  duplicados normalizados, acceso parcial y cambios de clave desde hooks.
+- Revisión/confirmación reutilizan los servicios transaccionales existentes; los
+  resultados se comparan sin depender del orden no persistido de líneas/vínculos.
+  Exportar expande líneas y comprueba selección por padres. Mantiene 200 filas
+  físicas/12 columnas al importar y 2.000 padres filtrados/filas al exportar.
+- `create:model` no cambia: habilitación manual en el manifest, sin acciones,
+  botones ni vistas adicionales. [Contrato y ejemplo](importar-exportar-listas.md).
+
+**Verificado en esta Mac:** `test:list-transfer` 14/14, `test:modules` 62/62,
+`test:orm` 116/116, TypeScript y ESLint focalizado. Integración histórica de
+País/Estado/Municipio aprobada. Nueva `test:list-transfer:relations:integration`
+aprobada en módulo/proyecto/esquema propios: fechas, add/replace, claves compuestas,
+documento→línea→sublínea, noops al reordenar, conservación, vacíos de fecha/número
+opcionales en líneas, Excel/CSV,
+permisos parciales/revocados, límites, claves alteradas por hooks y rollback durante
+revisión y confirmación (incluida segunda fila tras una escritura exitosa).
+Todos los recursos de integración fueron eliminados. Sin importaciones/migraciones
+en el ERP ni revisión visual nueva. Build aprobado fuera del sandbox con los
+tres avisos previos de tracing del gestor de módulos; el intento dentro del
+sandbox se detuvo tras quedar sin progreso. `git diff --check` aprobado.
+
+**Siguiente:** comprobar el comportamiento visual con un modelo que el usuario
+elija habilitar; las capacidades nuevas sólo están activadas en el fixture de
+prueba. Carga inicial de Municipios y estrategia de entornos siguen pendientes;
+no asumir migraciones de Windows aplicadas en esta Mac. Planes firmados siguen
+siendo efímeros por proceso (15 minutos), sin soporte para varias instancias.
+
+**Oportunidad de mejora:** varias colecciones One2many independientes no se pueden
+representar sin ambigüedad en la misma tabla actual; diseñar varias hojas/tablas
+antes de admitirlas. Aceptación: claves externas, conservación de omitidas,
+errores localizados, permisos por rama y una sola transacción por documento,
+sin multiplicar filas por productos cartesianos. Grandes lotes, mapeo de encabezados
+y firma compartida permanecen pendientes; no se amplían límites por anticipación.
+
+### Cierre anterior: País, Estado y Municipio operativos (2026-11-20)
 
 Revisión de continuidad en Mac (2026-11-20): rama `main`, HEAD `ff970cd`
 (`primera fase de export e import`), árbol limpio al comenzar. Ese commit ya incluye

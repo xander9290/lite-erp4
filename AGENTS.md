@@ -21,6 +21,18 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Cajón de aplicaciones
 
+- Transferencias generales (2026-11-20): `transfer` continúa opt-in manual en el
+  manifest; create:model no lo activa. Admite DateTime (día YYYY-MM-DD como UTC o
+  ISO con zona), Many2many en celda JSON por claves externas con mode add/replace
+  explícito, y One2many por filas con clave del padre repetida y mode merge:
+  agregar/actualizar, conservar líneas omitidas, sin borrado/reemplazo. Una cadena
+  editable por nivel, máximo documento→línea→sublínea; identidad de línea única
+  global o uniqueTogether con la inversa implícita, sin IDs/revisiones en archivos.
+  Servicios de cada nivel, permisos, límites, concurrencia y rollback intactos.
+  200 filas físicas/12 columnas al importar; 2.000 padres filtrados y 2.000 filas
+  al exportar. Sin nuevos modelos habilitados ni DDL por esta ampliación.
+  Contrato y límites en [Importar/exportar listas](docs/importar-exportar-listas.md).
+
 - Importación/exportación de datos (2026-11-20): interfaz sólo en ListView estándar,
   opt-in `transfer: {key,fields}` por modelo; piloto ubicaciones.pais con codigo/name/active.
   Permisos `import`/`export` por grupo/modelo (false/omitido no concede, OR entre grupos,

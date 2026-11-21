@@ -1,6 +1,8 @@
 # Importar y exportar desde ListView
 
-Fases 1–3 implementadas el 2026-11-20. Pilotos habilitados: País, Estado y Municipio de Ubicaciones. Sólo la ListView
+Función compartida de módulos declarativos (2026-11-20), opt-in por modelo en el
+manifest. Admite escalares, fechas, Many2one, Many2many y una cadena One2many editable.
+Pilotos habilitados: País, Estado y Municipio de Ubicaciones. Sólo la ListView
 estándar ofrece estas acciones; Card, Kanban, formularios y colecciones embebidas
 no las muestran. Los endpoints revalidan acceso en servidor.
 
@@ -19,15 +21,128 @@ models: {
 
 Una clave simple debe ser Text y única; una compuesta debe coincidir con
 `uniqueTogether` del modelo. Los campos deben estar publicados en el contrato
-cliente y en la política de lista; se valida al registrar el modelo. Fase 1:
-Text, Integer, Boolean y Selection persistentes; fase 2 añade Many2one mediante
-una clave externa explícita. Sin sensibles, writeOnly, readOnly, secuencias, IDs,
-revisiones, imágenes, virtuales ni vínculos Many2many o líneas One2many.
+cliente y en la política de lista; se valida al registrar el modelo. Se admiten
+Text, Integer, Boolean, Selection y DateTime persistentes, además de Many2one
+mediante una clave externa explícita. Las colecciones se habilitan por separado
+en `many2many`/`lines`: no necesitan una columna visible en la lista. Los campos
+de cada línea deben pertenecer a su contrato público de captura; no se amplía su
+política de búsqueda/lista. Sin sensibles, writeOnly, readOnly, secuencias, IDs,
+revisiones, imágenes ni virtuales.
 Los repositorios personalizados requieren un contrato posterior.
 
 País sí declara Estados como One2many: no se transfiere ese campo. Al actualizar
 se carga el documento autorizado completo y se conservan sus líneas; al crear
 se usan los defaults. Sus límites/permisos siguen siendo los habituales.
+
+## Configurar otro modelo
+
+`create:model` conserva su generación habitual: **no activa transferencias** ni
+inventa una clave de negocio. Después de personalizar y sincronizar los campos,
+añadir `transfer` manualmente al modelo del manifest. No hacen falta acciones,
+servicios, botones ni vistas nuevos. El framework valida el contrato al registrar
+el módulo y ModelCollection conecta la ListView estándar. Configurar `transfer`
+por sí solo no cambia el esquema ni concede permisos.
+
+Ejemplo sobre modelos ya declarados (no crea una aplicación en el ERP):
+
+```ts
+pedido: {
+  model: Pedido,
+  transfer: {
+    key: "codigo",
+    fields: ["codigo", "fecha", "etiquetaIds", "lineaIds"],
+    many2many: { etiquetaIds: { key: "codigo", mode: "add" } },
+    lines: {
+      lineaIds: {
+        key: "codigo",
+        mode: "merge",
+        fields: ["codigo", "cantidad"],
+      },
+    },
+  },
+},
+```
+
+Pedido debe declarar `codigo` Text único y `lineaIds` One2many editable con una
+inversa obligatoria, por ejemplo `pedidoId`. La línea declara `codigo` obligatorio
+y `readonly uniqueTogether = [["pedidoId", "codigo"]] as const`, o una clave Text
+global única. La inversa no se incluye en `key`/`fields` del contrato de líneas ni
+se escribe en el archivo: el servicio la establece a partir del padre autorizado.
+El destino de `etiquetaIds` debe tener su clave pública única y estar registrado
+en el módulo o sus dependencias. No necesita habilitar su propio `transfer`.
+
+## Fechas
+
+Para un Field DateTime:
+
+- `2026-11-20` significa `2026-11-20T00:00:00.000Z`.
+- `2026-11-20T12:30:00-06:00` se normaliza a `2026-11-20T18:30:00.000Z`.
+- Se admiten celdas nativas de fecha de Excel, interpretadas en UTC; se exporta
+  texto ISO UTC para conservar el instante al volver a importar.
+- Fecha/hora sin zona, fechas de calendario inválidas, formatos locales ambiguos,
+  números seriales sin formato de fecha y fórmulas se rechazan. Vacío solicita null
+  y el esquema del Field decide si es obligatorio.
+
+No se añade un Field Date distinto de DateTime ni se infiere la zona del navegador.
+
+## Many2many: claves externas y modo explícito
+
+Cada campo se incluye en `fields` y en `many2many` con `key` y `mode` obligatorios.
+La celda contiene un arreglo JSON, no IDs ni nombres de presentación:
+
+- Clave Text única: `["ROJA","AZUL"]`.
+- Clave compuesta: `[{"grupo":"general","codigo":"ROJA"}]`.
+- Referencia anidada: `[{"paisId.codigo":"MX","codigo":"01"}]`, declarando
+  `key: ["paisId", "codigo"]` y `relations.paisId.key: "codigo"`.
+
+`mode: "add"` agrega vínculos y conserva los existentes; vacío o `[]` no quita
+ninguno. `mode: "replace"` sustituye el conjunto completo; vacío o `[]` solicita
+quitar todos. Una columna omitida conserva sus vínculos en ambos modos. La interfaz
+muestra esta política antes de revisar/confirmar; no se infiere del contenido.
+
+Se resuelve cada clave con la normalización y lectura/reglas del destino. No hay
+creación implícita; se rechazan duplicados normalizados, claves inexistentes u
+ocultas y conjuntos que excedan el maxSelected. Revisión y confirmación conservan
+dominios, acceso a todos los vínculos existentes y permisos de escritura del dueño.
+Las identidades/revisiones de los destinos se firman también: si cambian, se exige
+revisar otra vez. Exportar usa las mismas claves, ordenadas de forma estable.
+
+## One2many: una fila por línea, sin borrar omitidas
+
+Se declara el campo en `fields` y en `lines`, con su propia `key`, `fields` y
+`mode: "merge"`. El archivo usa encabezados con prefijo:
+
+| codigo | fecha | etiquetaIds | lineaIds.codigo | lineaIds.cantidad |
+| --- | --- | --- | --- | --- |
+| P001 | 2026-11-20 | ["ROJA"] | 01 | 2 |
+| P001 | 2026-11-20 | ["ROJA"] | 02 | 5 |
+
+La clave del padre y sus demás valores deben repetirse iguales en todas sus filas.
+Se agrupan antes de validar y la revisión muestra un resultado por documento,
+identificado por su primera fila. Valores contradictorios del padre o claves
+duplicadas normalizadas de una línea rechazan el plan completo.
+
+Las líneas se identifican **dentro de su padre** con sus claves declaradas. Se
+reutilizan ID/revisión sólo desde el snapshot autorizado del servidor, nunca desde
+el archivo. Se agregan las nuevas y se actualizan las existentes; líneas, sublíneas
+y campos omitidos se conservan. Celdas de línea completamente vacías no crean ni
+eliminan líneas. No se admite reemplazo/borrado de líneas por importación.
+
+Una tabla admite una cadena One2many por nivel, hasta documento → línea → sublínea
+(tres niveles). Cada sublínea añade otro prefijo, por ejemplo
+`lineaIds.entregas.codigo`. Varias colecciones independientes en el mismo nivel se
+rechazan: necesitan un formato de varias tablas, pendiente. Relaciones readonly de
+consulta no se transfieren como líneas. Los límites del documento siguen vigentes
+(maxRows de cada relación y 500 filas totales); 200 filas físicas y 12 columnas
+del archivo incluyen todos los niveles. Las referencias Many2one de las líneas se
+declaran con `relations` dentro de su contrato.
+
+Se carga el documento autorizado completo; acceso parcial a líneas impide revisar
+o exportar. El servicio del padre ejecuta los servicios/validaciones/hooks de cada
+nivel en la misma transacción y conserva permisos heredados, revisión, restricciones
+e historial. Si cambian claves de líneas durante los hooks, se rechaza el plan.
+Reordenar las filas del archivo no produce cambios por sí mismo: no hay orden
+persistido de líneas.
 
 ## Estado: Many2one a País y clave compuesta
 
@@ -193,7 +308,7 @@ contra el ERP para probarla.
 ## Plantilla y archivo
 
 Acciones → Importar Excel/CSV permite descargar una plantilla vacía. Primera fila
-con nombres técnicos exactos; una fila por registro:
+con nombres técnicos exactos; una fila por registro, o por línea si habilita One2many:
 
 | codigo | name | active |
 | --- | --- | --- |
@@ -203,15 +318,17 @@ con nombres técnicos exactos; una fila por registro:
 - XLSX: una sola hoja con contenido. CSV: UTF-8, separador coma y comillas dobles
   para comas/saltos; BOM y CRLF admitidos. No se acepta XLS antiguo.
 - Clave obligatoria, normalizada antes de buscar: País convierte `mx` a `MX`.
-  Duplicados tras normalizar marcan ambas filas como error.
+  Se rechazan duplicados tras normalizar, salvo la repetición del padre que agrupa líneas.
 - Clave nueva: crear. Existente legible: actualizar. Mismos datos: sin cambios.
   Cambiar la clave en el archivo no renombra la del registro original.
 - Columna omitida: conserva valor al actualizar; default u obligatorio al crear.
-  Celda vacía: solicita vaciar el campo y pasa por su validación.
+  Celda vacía en escalares: solicita vaciar el campo y pasa por su validación;
+  en colecciones se aplica la política explícita descrita arriba.
 - Texto/códigos como celdas de texto para conservar ceros iniciales. Booleanos:
   true/false o celdas booleanas de Excel. Selection usa su valor técnico.
 - Encabezados desconocidos/duplicados se rechazan; no hay mapeo manual de nombres
-  alternativos todavía. Fórmulas, enlaces, errores y objetos Excel se rechazan,
+  alternativos todavía. Fórmulas, enlaces, errores y objetos Excel se rechazan
+  (excepto fechas nativas en campos DateTime),
   también textos que Excel interprete como fórmulas.
 - Máximo 200 filas, 12 columnas, 512 KB de archivo y 8 MB descomprimidos para XLSX.
   Si el plan firmado resulta demasiado grande, se pide dividir el archivo.
@@ -220,7 +337,7 @@ con nombres técnicos exactos; una fila por registro:
 
 La revisión muestra altas, actualizaciones, sin cambios y errores por fila/campo,
 con valores previstos. Con errores no se habilita confirmación parcial.
-Cada fila pasa por el servicio completo en una transacción que **siempre se
+Cada documento agrupado pasa por el servicio completo en una transacción que **siempre se
 revierte**, incluso cuando valida: normalize, Zod, hooks, constraints, relaciones
 e historial se prueban sin confirmar datos. Puede adquirir locks temporales;
 no es una consulta SQL readonly. Rige el contrato de hooks sin efectos externos
@@ -262,7 +379,9 @@ lista, dominio fijo, orden y reglas de lectura. La agrupación es presentación:
 se exportan registros, no encabezados de grupo. Sólo salen `transfer.fields`,
 con encabezados técnicos, sin IDs/revisiones/auditoría/proyecciones privadas.
 La selección se intersecta con filtros/permisos y se rechaza si falta un ID.
-Límite: 2.000 registros filtrados, también al exportar una selección.
+Límite: 2.000 registros filtrados, también al exportar una selección, y 2.000 filas
+físicas resultantes al expandir líneas. La selección se comprueba por padres;
+seleccionar un documento exporta todas sus líneas autorizadas, aunque ocupe varias filas.
 
 CSV neutraliza textos convertibles en fórmulas con un apóstrofo inicial; ese
 escape permanece como texto si se reimporta. XLSX escribe valores, sin fórmulas.
@@ -275,6 +394,13 @@ Los archivos pueden usarse como base de una importación.
 aplica allí las migraciones, prueba servicios/permisos y lo elimina al terminar.
 Nunca ejecutar manualmente sus workers contra un esquema real.
 
-Pendiente: Many2many/One2many;
-mapeo interactivo de encabezados, Date/DateTime y grandes volúmenes con lotes,
-trabajos e idempotencia duradera. No se crean referencias automáticamente.
+`npm run test:list-transfer:relations:integration` usa un módulo de ensayo propio
+en proyecto/esquema desechables. Comprueba fechas, vínculos add/replace y claves
+compuestas, documentos de tres niveles, conservación de omitidos, revisión sin
+escrituras, rollback al confirmar, permisos parciales/revocados, límites, claves
+alteradas por hooks, concurrencia y reimportación CSV/Excel sin cambios.
+
+Pendiente: varias colecciones independientes por tabla, mapeo interactivo de
+encabezados y grandes volúmenes con lotes, trabajos e idempotencia duradera.
+La firma sigue siendo efímera por proceso: varias instancias requieren contrato
+compartido. No se crean referencias automáticamente.

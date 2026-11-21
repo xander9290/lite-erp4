@@ -102,3 +102,35 @@ test("compound uniqueness only accepts required persistent fields and cannot sil
   assert.doesNotThrow(() => assertAdditiveEvolution(before, after));
   assert.throws(() => assertAdditiveEvolution(after, before, true), /índices/);
 });
+
+class Document extends Model {
+  codigo = Fields.Text({ unique: true, required: true });
+  fecha = Fields.DateTime();
+  etiquetas = Fields.Many2many("TestCountry");
+  lineas = Fields.One2many("TestDetail", { inverse: "documentId" });
+  consulta = Fields.One2many("TestDetail", { inverse: "documentId", readonly: true });
+}
+class Detail extends Model {
+  readonly uniqueTogether = [["documentId", "codigo"]] as const;
+  codigo = Fields.Text({ required: true });
+  documentId = Fields.Many2one("TestDocument", { required: true });
+  cantidad = Fields.Integer({ required: true, default: 1 });
+  imagen = Fields.Image({ folder: "test" });
+}
+
+test("general transfers admit UTC dates, explicit link modes and scoped child identities without enabling other models", () => {
+  const transfer = { key: "codigo", fields: ["codigo", "fecha", "etiquetas", "lineas"],
+    many2many: { etiquetas: { key: "codigo", mode: "add" as const } },
+    lines: { lineas: { key: "codigo", fields: ["codigo", "cantidad"], mode: "merge" as const } },
+  };
+  const build = (spec = transfer) => defineModule({ id: "test", name: "Test", icon: "boxes", models: { document: { model: Document, transfer: spec }, detail: Detail, country: Country } });
+  const [module] = composeModules([build()]);
+  assert.deepEqual(transferHeaders(transfer), ["codigo", "fecha", "etiquetas", "lineas.codigo", "lineas.cantidad"]);
+  assert.equal(module.models.find(model => model.key === "detail")!.declaration.transfer, undefined);
+  assert.throws(() => build({ ...transfer, many2many: { etiquetas: { key: "codigo", mode: "implicit" as "add" } } }), /mode add o replace/);
+  assert.throws(() => composeModules([build({ ...transfer, many2many: { etiquetas: { key: "name", mode: "add" } } })]), /Text única/);
+  assert.throws(() => build({ ...transfer, lines: { lineas: { ...transfer.lines.lineas, mode: "replace" as "merge" } } }), /conserva/);
+  assert.throws(() => composeModules([build({ ...transfer, lines: { lineas: { ...transfer.lines.lineas, fields: ["codigo", "imagen"] } } })]), /habilitado/);
+  assert.throws(() => composeModules([build({ ...transfer, lines: { lineas: { ...transfer.lines.lineas, fields: ["codigo", "documentId"] } } })]), /inversa/);
+  assert.throws(() => composeModules([build({ ...transfer, lines: { lineas: { ...transfer.lines.lineas, key: "cantidad" } } })]), /única/);
+});
