@@ -8,6 +8,19 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Progreso guardado (2026-11-20, punto de continuación)
 
+### FieldMany2One sin lupas en el control (2026-11-20)
+
+Rama `codex/partner`, HEAD inicial `cc79787`, árbol limpio al retomar. Retiradas
+las lupas del input y de «Buscar más…» en el componente compartido; eliminado
+el padding izquierdo reservado al icono. Se conservan sugerencias, búsqueda,
+teclado, limpieza y flecha de apertura. El modal de búsqueda no se modifica.
+Contrato en [FieldMany2One](../src/components/ui/form/FieldMany2One.md).
+
+Verificación: ESLint del componente, TypeScript y `git diff --check` aprobados.
+Cambio de presentación, sin nuevas pruebas ni revisión visual en navegador,
+SQL o cambios de datos. Pendiente comprobar visualmente los campos, por ejemplo
+en `/sample#field-many2one`. Cambios sin commit.
+
 ### Corrección de dimensiones vacías en XLSX (2026-11-20)
 
 Rama `codex/partner`, HEAD inicial `c20ad1c`, árbol limpio al empezar. Corregida la

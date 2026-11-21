@@ -1,5 +1,9 @@
 # FieldMany2One
 
+El control y la opción «Buscar más…» no muestran iconos de lupa; el input utiliza
+el padding izquierdo estándar. Se conservan sugerencias, búsqueda por teclado,
+limpieza y apertura del modal mediante la flecha.
+
 Para modelos declarativos, usar `load={lookupRecords}` del servicio del modelo
 relacionado, sin plantilla de presentación ni campos de búsqueda en la vista.
 Contrato, permisos, compatibilidad y ejemplo RHF/Zod en

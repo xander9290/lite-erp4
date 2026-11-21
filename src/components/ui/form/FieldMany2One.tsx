@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import { useController, useFormContext, type FieldValues } from "react-hook-form";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, X } from "lucide-react";
 import { lookupModels, type Many2OneModel, type Many2OneOption, type Many2OneRecord } from "@/lib/many2one/types";
 import type { Many2OneLoader } from "@/lib/many2one/model-lookup";
 import { useModelField } from "./modelFields";
@@ -154,11 +154,10 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
       }}>
         <div ref={anchor} className="relative flex min-w-0 items-center">
-          <Search size={16} className="pointer-events-none absolute left-1 z-10 text-base-content/40" aria-hidden="true" />
           <input {...inputProps} id={inputId} name={field.name} ref={element => { input.current = element; field.ref(element); }}
             type="text" role="combobox" autoComplete="off" disabled={field.disabled} readOnly={readOnly}
             value={expanded ? query : selected?.label ?? (value ? resolution.loading ? "Cargando selección…" : "" : "")}
-            placeholder={placeholder} maxLength={120} className={`${fieldInputClassName} pl-7 pr-18 ${className}`}
+            placeholder={placeholder} maxLength={120} className={`${fieldInputClassName} pr-18 ${className}`}
             aria-label={inputProps["aria-labelledby"] ? ariaLabel : accessibleLabel}
             aria-expanded={expanded} aria-controls={expanded ? listId : undefined} aria-autocomplete="list" aria-haspopup="listbox"
             aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined}
@@ -203,7 +202,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
               <span className="min-w-0 wrap-anywhere">{option.label}</span>{option.value === value && <Check size={15} className="shrink-0 text-primary" aria-hidden="true" />}
             </div>)}
             <div id={`${listId}-${options.length}`} role="option" aria-selected="false" className={`border-t border-base-300 ${activeIndex === options.length ? "bg-primary/5" : ""}`}>
-              <button type="button" tabIndex={-1} className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left text-sm font-medium text-primary hover:bg-primary/5" onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(options.length)} onClick={openModal}><Search size={15} aria-hidden="true" />Buscar más…</button>
+              <button type="button" tabIndex={-1} className="flex w-full cursor-pointer items-center px-4 py-3 text-left text-sm font-medium text-primary hover:bg-primary/5" onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActive(options.length)} onClick={openModal}>Buscar más…</button>
             </div>
           </div>
         </RelationDropdown>}
