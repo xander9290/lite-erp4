@@ -8,6 +8,37 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Progreso guardado (2026-11-20, punto de continuación)
 
+### Siguiente pendiente: Grupos y acceso directo frente a relaciones (2026-11-20)
+
+El usuario solicita anotarlo como siguiente pendiente, no implementarlo. Mantener
+los grupos en manifests de cada módulo, detectarlos desde Ajustes → Grupos y
+asignar usuarios existentes mediante tags. Un usuario puede pertenecer a varios
+grupos; se descartó expresamente la propuesta de grupo único/Many2one en Usuarios.
+La UI de nombre/activo y páginas de modelos, campos, acciones y aplicaciones
+es una propuesta por concretar sobre Accesos, conservando identidades/asignaciones.
+
+Separar entrada directa a aplicaciones de lectura relacional: sin entrada no hay
+tarjeta ni navegación por URL, pero un catálogo puede seguir consultándose desde
+otra aplicación con permisos/reglas y proyección mínima. Caso: Contactos permite
+seleccionar País/Estado/Municipio sin habilitar entrada a Ubicaciones ni edición
+de catálogos. Lectura relacional no concede automáticamente entrada directa.
+Excepciones de campos/acciones son opt-in; los omitidos conservan el comportamiento
+normal. Combinación de grupos, precedencia, alcance de acciones y configuración
+en manifest/BD siguen por diseñar; «false siempre gana» no fue una decisión.
+
+**Al retomar:** diseñar primero ese caso y los contratos de rutas/endpoints,
+grupos implícitos/heredados y administración; después acordar fases. Alcance,
+oportunidades y aceptación en [el pendiente](ideas/access-manager.md), enlazado
+con [permisos por campo](ideas/permisos-campos.md). Esta prioridad sustituye los
+siguientes pasos de ejercicios anotados en cierres anteriores.
+
+Revisión documental en rama `production`, HEAD `8194259`, árbol limpio al empezar;
+el commit ya contiene la retirada de lupas y la corrección XLSX anterior está en
+`cc79787`. Contrastados registro de aplicaciones, administración de grupos y
+rutas con el código: hoy visibilidad/navegación siguen lectura efectiva del modelo,
+sin el contrato nuevo. Sólo documentación y `git diff --check`; sin código, pruebas,
+consultas de BD, migraciones, despliegues ni cambios de acceso/asignaciones.
+
 ### FieldMany2One sin lupas en el control (2026-11-20)
 
 Rama `codex/partner`, HEAD inicial `cc79787`, árbol limpio al retomar. Retiradas

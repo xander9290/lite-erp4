@@ -147,6 +147,19 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Ideas pendientes
 
+- **Siguiente pendiente acordado (2026-11-20): Grupos en Ajustes y separación de
+  entrada directa/consulta relacional.** Mantener grupos y permisos base en los
+  manifests; detectar grupos desde su registro y asignar usuarios mediante tags,
+  con varios grupos por usuario (descartado el grupo único). Una app sin entrada
+  directa no aparece en el cajón ni abre por URL; sus modelos pueden seguir siendo
+  consultables como relaciones de otra app con lectura mínima autorizada, sin
+  conceder navegación ni CRUD adicional. Campos/acciones omitidos conservan su
+  comportamiento normal; excepciones, UI de Grupos y composición de grupos aún
+  requieren diseño (no se acordó «false siempre gana»). Prioriza este diseño sobre
+  los siguientes ejercicios históricos. Sólo documentado, sin autorizar código,
+  SQL, cambios de asignaciones ni reactivar la ampliación retirada automáticamente.
+  Alcance y aceptación en [Accesos ampliado](docs/ideas/access-manager.md).
+
 - **Siguiente prioridad acordada (2026-11-19): inserciones en vistas extendidas**, antes de retomar la guía de dirección. Manifest `insertions: { form: () => import(...) }` con un archivo por extensión/formulario; componente `<Inserter target="..." position="before|after|inside|replace">`. Un bloque por destino+posición en el archivo, varios hijos permitidos; inside sólo en contenedores y replace único por destino. Varios módulos pueden extender el mismo modelo; destinos ausentes y conflictos requieren errores claros. **Implementado el 2026-11-19:** anclas `field:`/`group:`/`stack:`/`notebook:`/`page:` (contenedores sólo con `id`), orden por dependencias, replace único (gana el dependiente), fallback en `<ModelExtensions />` y avisos en desarrollo. El contenido se pinta en la posición del ancla (mismo RHF/contexto). Colecciones también (2026-11-19): `insertions.list|card|kanban` con `<Column field>` en `column:<campo>`, `columns:end` y `card:title|body|footer`; sólo campos publicados de la extensión o sus dependencias, máximo 12 columnas, lista sin `columns` no aplica. Contrato [docs/inserciones-vistas.md](docs/inserciones-vistas.md), demos /sample#insertions y #collection-insertions. Migrar PartnerExtraForm es del usuario, a su ritmo.
 
 - **One2many anidados implementados (2026-11-19, fase B):** documento → línea → sublínea (máx. 3 niveles, sin ciclos, un dueño), `maxRows ≤ 100` por relación y 500 filas por documento. Árbol completo cargado/guardado en una transacción con el servicio de cada nivel; revisión por rama; quitar una línea quita sus sublíneas de abajo hacia arriba (borrado suelto conserva Restrict); errores con ruta completa; acceso heredado recursivo. FieldOne2many expande sublíneas inline (sin modales), cerradas siguen montadas. Rutas anidadas vía `lineAt`/`lineField`. No para catálogos grandes: para ellos usar la fase A, implementada el 2026-11-19: `Fields.One2many(target, { inverse, readonly: true })` (relación de consulta) muestra los hijos paginados/filtrables en el formulario del padre con dominio fijo del servidor, lectura del padre exigida y reglas del hijo; fuera del documento (sin RHF/guardado/límite); «Nuevo» con `?default_<inverse>=` y creación desde el formulario del hijo. Regla del usuario: hijos numerosos se crean desde su propio formulario. Colecciones sin `<form>` propios (búsqueda y filtro de columna) para poder embeberse. Contrato docs/lineas-one2many.md, diseño docs/ideas/one2many-anidados.md, prueba test:nested:integration.

@@ -3,6 +3,13 @@
 Pendiente solicitado y ampliado el 2026-11-14. El usuario confirmó mantenerlo como
 pendiente de diseño; esta nota no autoriza implementación ni cambios en Flota.
 
+Actualización del 2026-11-20: forma parte del siguiente pendiente de
+[Grupos y separación de entrada/consulta relacional](access-manager.md).
+Se mantienen grupos declarados en manifests y varios grupos por usuario,
+asignables mediante tags. Las excepciones de campos/acciones omitidas conservan
+el comportamiento normal del modelo; la composición entre grupos y su contrato
+final siguen pendientes. La decisión de un solo grupo por usuario fue descartada.
+
 ## Objetivo y alcance
 
 Ampliar el sistema actual de grupos, permisos por modelo y reglas de registro
