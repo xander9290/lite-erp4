@@ -17,6 +17,25 @@ const entry = (module: string, target: string, position: InsertionPosition, cont
 const modules = [{ module: "contactosextra", depends: ["ubicaciones"] }, { module: "crm", depends: ["contactosextra", "ubicaciones"] }, { module: "whatsapp", depends: [] }];
 const mounted = (...targets: string[]) => new Map(targets.map(target => [target, { count: 1 }]));
 
+test("Notebook page descriptors render server slots without a form provider", () => {
+  const html = renderToStaticMarkup(<Notebook label="Accesos del grupo" pages={[
+    { name: "modelos", label: "Modelos", children: <form autoComplete="off"><button>Guardar permisos</button></form> },
+    { name: "reglas", label: "Reglas", children: <p>Sin reglas</p> },
+  ]} />);
+  assert.equal(html.match(/role="tab"/g)?.length, 2);
+  assert.equal(html.match(/role="tabpanel"/g)?.length, 2);
+  assert.match(html, /aria-selected="true"/);
+  assert.match(html, /data-notebook-panel="reglas"[^>]*hidden=""/);
+  assert.match(html, /Guardar permisos/);
+  assert.match(html, /Sin reglas/);
+  assert.equal(html.match(/<form /g)?.length, 1, "Notebook creates no wrapper form");
+});
+
+test("Notebook rejects mixed page declarations and unrelated child elements", () => {
+  assert.throws(() => renderToStaticMarkup(<Notebook pages={[]}><NotebookPage name="x" label="X">Contenido</NotebookPage></Notebook>), /no ambos/);
+  assert.throws(() => renderToStaticMarkup(<Notebook><div>Inválido</div></Notebook>), /solo admite NotebookPage/);
+});
+
 test("declaration syntax and allowed positions per kind of target", () => {
   assert.equal(insertionDeclarationIssue("field:email", "after"), undefined);
   assert.equal(insertionDeclarationIssue("page:extra/notas", "inside"), undefined);

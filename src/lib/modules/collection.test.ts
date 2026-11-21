@@ -48,6 +48,10 @@ test("actor config filters actions and graph without mutating definitions or gra
   assert.equal(base.kanbanTransitions.length, 2);
   assert.equal(projectModelAccess(config, actor, declarations).capabilities?.move, true, "legacy direct moves still require write");
   assert.equal(projectModelAccess(base, { ...actor, modelAccess: {} }, declarations, graph).capabilities?.read, false);
+  const params = { nota: Fields.Text({ label: "Nota" }).metadata };
+  const parameterized = { ...base, actions: [{ ...declarations[0], params, sourceModel: config.id, lookups: {} }] };
+  const projected = projectModelAccess(parameterized, actor, declarations, graph);
+  assert.deepEqual(projected.actions[0], { name: "start", label: "Iniciar", params, sourceModel: config.id, lookups: {} }, "permission projection preserves parameter contracts");
 });
 
 test("collection source separates display columns from shared query capabilities and kanban paging", () => {

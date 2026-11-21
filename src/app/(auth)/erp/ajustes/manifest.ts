@@ -13,7 +13,7 @@ export const settingsManifest = defineApplication({
   models: ["User"],
   menus: [
     { id: "usuarios", label: "Usuarios", href: "/erp/ajustes/usuarios" },
-    { id: "accesos", label: "Accesos", href: "/erp/ajustes/accesos" },
+    { id: "accesos", label: "Grupos", href: "/erp/ajustes/accesos" },
     { id: "modulos", label: "Módulos", href: "/erp/ajustes/modulos" },
   ],
 });

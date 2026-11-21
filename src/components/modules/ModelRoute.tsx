@@ -9,6 +9,7 @@ import type { InsertionViewKind, ModuleModel } from "@/lib/modules/define";
 import { getModuleModel, modelClientConfig } from "@/lib/modules/registry";
 import { modelRead } from "@/lib/modules/actions";
 import { getCurrentAccessUser } from "@/lib/access/current";
+import { hasModuleGroup } from "@/lib/access/membership";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -48,7 +49,7 @@ export default async function ModelRoute({ modelId, path, searchParams, applicat
   const actor = await getCurrentAccessUser();
   if (!actor) redirect("/auth");
   const permissions = actor.modelAccess[entry.id];
-  if (!permissions?.read || (!collection && !id && !permissions.create)) return <p role="alert" className="p-6">No tienes permiso para abrir esta vista.</p>;
+  if ((!actor.isAdmin && !hasModuleGroup(entry.id.split(".")[0], actor.directGroups)) || !permissions?.read || (!collection && !id && !permissions.create)) return <p role="alert" className="p-6">No tienes permiso para abrir esta vista.</p>;
   const baseConfig = modelClientConfig(entry.id, actor);
   const config = application ? { ...baseConfig, label: application.label, application: { name: application.name, href: application.href } } : baseConfig;
   const { views } = entry;

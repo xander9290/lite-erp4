@@ -30,6 +30,7 @@ export function collectionViewHref(pathname: string, current: string, view: Coll
 
 /** Serializable, browser-safe description of a module model. Never contains functions or server classes. */
 export type ModelLineConfig = {
+  readonly fieldAccess?: import("../access/element-policy").FieldRestrictions;
   readonly metadata: One2manyMetadata;
   readonly model: string;
   readonly fields: Readonly<Record<string, FieldMetadata>>;
@@ -47,6 +48,7 @@ export type ModelChildCollectionConfig = {
   readonly config: ModelClientConfig;
 };
 export type ModelClientConfig = {
+  readonly fieldAccess?: import("../access/element-policy").FieldRestrictions;
   readonly transfer?: { readonly fields: readonly string[]; readonly key: string | readonly string[]; readonly canImport: boolean; readonly canExport: boolean; readonly collections: readonly import("../list/transfer-types").TransferCollection[] };
   /** Read-only relations shown in the form (children created and edited in their own form). */
   readonly collections?: Readonly<Record<string, ModelChildCollectionConfig>>;

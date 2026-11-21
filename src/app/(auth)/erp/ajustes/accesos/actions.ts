@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/access";
 import { AccessError } from "@/lib/auth/policy";
 import { prisma } from "@/lib/prisma";
-import { setGroupMembers, setModelAccess, setRulesActive } from "@/lib/access/admin";
+import { setGroupMembers, setModelAccess, setRulesActive, setFieldRestrictions, setActionRestrictions } from "@/lib/access/admin";
+import { fieldRestrictionKeys, type FieldRestriction } from "@/lib/access/element-policy";
 import { accessPermissionKeys, type AccessPerms } from "@/lib/access/declare";
+import { GroupMembershipError } from "@/lib/access/membership";
 
 export type AccessActionState = { ok: boolean; message: string } | null;
-const failure = (error: unknown, fallback: string): AccessActionState => ({ ok: false, message: error instanceof AccessError ? error.message : fallback });
+const failure = (error: unknown, fallback: string): AccessActionState => ({ ok: false, message: error instanceof AccessError || error instanceof GroupMembershipError ? error.message : fallback });
 const text = (value: FormDataEntryValue | null) => typeof value === "string" ? value : "";
 const done = (message: string): AccessActionState => { revalidatePath("/erp", "layout"); return { ok: true, message }; };
 
@@ -19,6 +21,34 @@ export async function saveMembers(_state: AccessActionState, form: FormData): Pr
     await setGroupMembers(prisma, await requireAdmin(), text(form.get("group")), users);
     return done("Miembros guardados.");
   } catch (error) { return failure(error, "No se pudieron guardar los miembros."); }
+}
+
+export async function saveFieldRestrictions(_state: AccessActionState, form: FormData): Promise<AccessActionState> {
+  try {
+    const entries = form.getAll("field").map(text);
+    if (entries.length > 2000) throw new Error("Selección inválida.");
+    const changes = entries.map(entry => {
+      const [model, field, extra] = entry.split("|");
+      if (!model || !field || extra !== undefined) throw new Error("Selección inválida.");
+      return { model, field, policy: Object.fromEntries(fieldRestrictionKeys.map(key => [key, form.get(`${entry}|${key}`) === "on"])) as FieldRestriction };
+    });
+    await setFieldRestrictions(prisma, await requireAdmin(), text(form.get("group")), changes);
+    return done("Restricciones de campos guardadas.");
+  } catch (error) { return failure(error, "No se pudieron guardar las restricciones de campos."); }
+}
+
+export async function saveActionRestrictions(_state: AccessActionState, form: FormData): Promise<AccessActionState> {
+  try {
+    const entries = form.getAll("action").map(text);
+    if (entries.length > 1000) throw new Error("Selección inválida.");
+    const changes = entries.map(entry => {
+      const [model, action, extra] = entry.split("|");
+      if (!model || !action || extra !== undefined) throw new Error("Selección inválida.");
+      return { model, action, blocked: form.get(`${entry}|blocked`) === "on" };
+    });
+    await setActionRestrictions(prisma, await requireAdmin(), text(form.get("group")), changes);
+    return done("Restricciones de acciones guardadas.");
+  } catch (error) { return failure(error, "No se pudieron guardar las restricciones de acciones."); }
 }
 
 /** Every listed model is posted; unchecked boxes mean no permission. Matching the defaults removes the override. */

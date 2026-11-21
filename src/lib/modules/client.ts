@@ -9,7 +9,7 @@ import type { ModelLookupRequest } from "../many2one/model-lookup";
 import type { ReactionRequest } from "../orm/reactions.types";
 import { collectionFieldMetadata, type ModelClientConfig, type ModelLineConfig } from "./config";
 import type { FormLineModel } from "@/components/ui/form/modelFields";
-import { modelLookup, modelRelationLookup, modelReact, modelSignImage, modelQuickCreate } from "./actions";
+import { modelRelationLookup, modelReact, modelSignImage, modelQuickCreate } from "./actions";
 import { domainDependencies, type DomainExpression } from "../orm/domain-builder";
 
 const mapValues = <T, R>(source: Readonly<Record<string, T>>, map: (value: T, key: string) => R) =>
@@ -26,24 +26,27 @@ export function buildModelUI(config: ModelClientConfig) {
   const buildLine = (line: ModelLineConfig): LineUI => {
     const fields = mapValues(line.fields, fieldFromMetadata);
     const nested = mapValues(line.lines ?? {}, buildLine);
-    const schema = z.strictObject({ ...mapValues(fields, field => fieldInputSchema(field)), ...mapValues(nested, child => z.array(child.schema).min(child.minRows).max(child.maxRows)) }).extend(recordIdentityShape).superRefine(validateRecordIdentity as never);
+    const readable = Object.fromEntries(Object.entries(fields).filter(([name]) => !line.fieldAccess?.[name]?.noRead));
+    const readableNested = Object.fromEntries(Object.entries(nested).filter(([name]) => !line.fieldAccess?.[name]?.noRead));
+    const schema = z.strictObject({ ...mapValues(readable, field => fieldInputSchema(field)), ...mapValues(readableNested, child => z.array(child.schema).min(child.minRows).max(child.maxRows)) }).extend(recordIdentityShape).superRefine(validateRecordIdentity as never);
     return {
-      fields, schema, ...line.metadata, capabilities: line.capabilities,
+      fields, schema, fieldAccess: line.fieldAccess, ...line.metadata, capabilities: line.capabilities,
       ...(Object.keys(nested).length ? { lines: nested } : {}),
-      createRow: () => ({ ...mapValues(fields, field => field.createDefault()), ...mapValues(nested, () => []) }),
-      lookups: mapValues(line.lookups, target => (request: ModelLookupRequest) => modelLookup(target, request)),
+      createRow: () => ({ ...mapValues(readable, field => field.createDefault()), ...mapValues(readableNested, () => []) }),
+      lookups: mapValues(line.lookups, (_target, field) => (request: ModelLookupRequest) => modelRelationLookup(line.model, field, { request, draft: {} })),
       domainLookups: domainLookups(line.model, line.fields, {}),
       uploads: Object.fromEntries(Object.entries(line.fields).filter(([, field]) => field.kind === "image").map(([name]) => [name, createSignedCloudinaryImageUploader(() => modelSignImage(line.model, name))])),
     };
   };
   const lines = mapValues(config.lines ?? {}, buildLine);
-  const schema = z.strictObject({ ...mapValues(fields, field => fieldInputSchema(field)), ...mapValues(many2many, field => field.schema), ...mapValues(lines, line => z.array(line.schema).min(line.minRows).max(line.maxRows)) }).extend(recordIdentityShape).superRefine(validateRecordIdentity as never);
+  const readable = <T,>(source: Record<string, T>) => Object.fromEntries(Object.entries(source).filter(([name]) => !config.fieldAccess?.[name]?.noRead));
+  const schema = z.strictObject({ ...mapValues(readable(fields), field => fieldInputSchema(field)), ...mapValues(readable(many2many), field => field.schema), ...mapValues(readable(lines), line => z.array(line.schema).min(line.minRows).max(line.maxRows)) }).extend(recordIdentityShape).superRefine(validateRecordIdentity as never);
   const collectionFields: Record<string, Pick<Field, "metadata">> = mapValues(collectionFieldMetadata(config), metadata => ({ metadata }));
   const images = Object.entries(config.fields).filter(([, field]) => field.kind === "image" && !field.sensitive).map(([name]) => name);
   const recordUI = {
-    fields, readFields, lines, many2many,
+    fields, readFields, lines, many2many, fieldAccess: config.fieldAccess,
     reactions: { rules: config.reactionRules, load: (request: ReactionRequest) => modelReact(config.id, request) },
-    lookups: mapValues(config.lookups, target => (request: ModelLookupRequest) => modelLookup(target, request)),
+    lookups: mapValues(config.lookups, (_target, field) => (request: ModelLookupRequest) => modelRelationLookup(config.id, field, { request, draft: {} })),
     // Only fields still marked create after the access projection (actor may create the target).
     creators: Object.fromEntries(Object.entries(config.many2many ?? {}).filter(([, metadata]) => metadata.create).map(([name]) => [name, (text: string) => modelQuickCreate(config.id, name, text)])),
     domainLookups: domainLookups(config.id, config.fields, config.many2many ?? {}),
@@ -51,7 +54,7 @@ export function buildModelUI(config: ModelClientConfig) {
   };
   return {
     config, fields, readFields, collectionFields, schema, recordUI,
-    createDefaults: (): Record<string, unknown> => ({ ...mapValues(fields, field => field.createDefault()), ...mapValues(many2many, field => field.createDefault()), ...mapValues(lines, () => []) }),
+    createDefaults: (): Record<string, unknown> => ({ ...mapValues(readable(fields), field => field.createDefault()), ...mapValues(readable(many2many), field => field.createDefault()), ...mapValues(readable(lines), () => []) }),
   };
 }
 

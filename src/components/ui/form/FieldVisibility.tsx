@@ -12,9 +12,12 @@ export default function FieldVisibility({ name, invisible, children }: { name?: 
   const model = useContext(FormModelContext);
   const inherited = useFieldInvisible();
   const owner = name ? lineField(model, name) : undefined;
+  const policy = owner ? (owner.line?.fieldAccess ?? model?.fieldAccess)?.[owner.key] : undefined;
   const line = owner?.line?.fields[owner.key]?.metadata;
   const metadata = name ? (model?.fields[name] ?? model?.readFields?.[name])?.metadata ?? line : undefined;
-  const hidden = inherited || (invisible ?? metadata?.invisible ?? false);
+  const hidden = inherited || policy?.invisible || (invisible ?? metadata?.invisible ?? false);
+  // No-read fields are absent from RHF and the DOM; ordinary invisible fields stay mounted.
+  if (policy?.noRead) return null;
   // Top-level fields are insertion anchors (`field:<name>`); line cells (dotted names) are not.
   return <InsertionAnchor target={name && !name.includes(".") ? `field:${name}` : undefined}>
     <FieldVisibilityContext.Provider value={hidden}>

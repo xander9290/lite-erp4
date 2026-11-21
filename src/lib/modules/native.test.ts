@@ -8,7 +8,7 @@ import { composeModules } from "./compose";
 import { extendModel } from "./extend";
 import { createRepository } from "./repository";
 import { generateModule } from "../orm/generator/generate";
-import { internalGroup, userGroups } from "../access/engine";
+import { userGroups } from "../access/engine";
 
 test("core is a native module over the hand-written partners table, without an app of its own", () => {
   assert.equal(core.native, true);
@@ -19,7 +19,7 @@ test("core is a native module over the hand-written partners table, without an a
   assert.equal(partner.delegate, "partner");
   assert.deepEqual(core.application.menus, []);
   assert.deepEqual(Object.keys(partner.metadata), ["name", "email", "phone", "avatarUrl"]);
-  assert.ok(core.access.groups.some(group => group.id === internalGroup));
+  assert.deepEqual(core.access.groups, []);
 });
 
 test("native options are reserved and core is an implicit dependency", () => {
@@ -68,10 +68,10 @@ test("native repository writes no creator column and reads only dates as audit",
   assert.deepEqual(calls[1].select, { createdAt: true, updatedAt: true });
 });
 
-test("every account belongs implicitly to the internal group, which reads contacts", async () => {
+test("accounts receive no implicit group or contact grant", async () => {
   const tx = { accessUserGroup: { findMany: async () => [] } } as never;
-  assert.deepEqual([...await userGroups(tx, "u1")], [internalGroup]);
-  assert.deepEqual(core.access.grants.find(grant => grant.model === "core.partner")?.perms, { read: true, create: false, write: false, unlink: false });
+  assert.deepEqual([...await userGroups(tx, "u1")], []);
+  assert.deepEqual(core.access.grants, []);
 });
 
 test("core.user delegates contact fields to its Partner and keeps the password write-only", async () => {

@@ -23,6 +23,22 @@ assert.equal(doc.lineas.length,2);assert.equal(doc.lineas.find(line=>line.name==
 assert.ok(doc.lineas.every(line=>line.id&&line.revision&&!Object.hasOwn(line,"documentoId")));
 assert.equal((await prisma.lineasDetalle.findFirstOrThrow()).createBy,actor.id);
 assert.equal((await prisma.recordActivity.count()),3);
+// Redacted child required values are restored from the checked snapshot before validation.
+await prisma.accessFieldRestriction.create({ data: { groupId: "lineas.editor", model: "lineas.detalle", field: "name", noRead: true, noWrite: true } });
+const privateDoc = await parents.read(prisma, editor, doc.id);
+assert.ok(privateDoc.ok, JSON.stringify(privateDoc));
+assert.ok((privateDoc.values as Doc).lineas.every(line => !Object.hasOwn(line, "name")));
+const privateSaved = await parents.save(prisma, editor, { ...privateDoc.values, limite: 101 });
+assert.ok(privateSaved.ok, JSON.stringify(privateSaved));
+assert.ok((privateSaved.values as Doc).lineas.every(line => !Object.hasOwn(line, "name")));
+assert.equal((await parents.action(prisma, editor, { action: "confirmar", id: doc.id, revision: privateSaved.values.revision })).ok, false, "parent actions cannot consume private child snapshots");
+const privateAccess = await prisma.$transaction(tx => readAccessCapabilities(tx, editor));
+assert.deepEqual(modelClientConfig("lineas.documento", privateAccess).actions, []);
+const hiddenNames = doc.lineas.map(line => line.name);
+doc = await reopened(doc.id);
+assert.deepEqual(doc.lineas.map(line => line.name), hiddenNames);
+await fail({ ...privateSaved.values, lineas: (privateSaved.values as Doc).lineas.map(line => ({ ...line, name: "forged" })) }, editor);
+await prisma.accessFieldRestriction.deleteMany({ where: { groupId: "lineas.editor" } });
 const failed=await fail({...doc,lineas:[row("bloqueado")]});
 assert.ok(!failed.ok&&failed.fieldErrors?.["lineas.0.name"]);
 await fail({...doc,lineas:[row("fallar")]});

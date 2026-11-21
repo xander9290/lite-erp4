@@ -8,6 +8,9 @@ import { ModelValidationError, type ModelActor } from "../orm/context";
 import { modelSnapshot } from "../orm/snapshot";
 import type { Field } from "../orm/fields";
 import { cellValue } from "./transfer-file";
+import { withRelationRead, readActorElementPolicies } from "../access/engine";
+import { projectElementAccess } from "../modules/element-access";
+import { AccessError } from "../auth/policy";
 import { transferColumns, transferKeyFields, transferReferenceColumns, transferReferenceKeys, type TransferReference, type TransferSpec } from "./transfer-contract";
 
 type ReferenceRecord = NonNullable<Awaited<ReturnType<ReturnType<typeof modelService>["findUniqueInTransaction"]>>>;
@@ -18,6 +21,27 @@ export type TransferReferenceCells = Record<string, unknown>;
 type SignedReference = { field: string; model: string; id: string; revision: unknown; key: unknown };
 
 const blank = (value: unknown) => value === "" || value === null || value === undefined;
+
+/** Full-document transfer never exports private data or imports protected documents. */
+export async function assertTransferElementAccess(tx: Prisma.TransactionClient, actor: ModelActor, entry: ModuleModel, spec: TransferSpec, operation: "import" | "export") {
+  const policies = await readActorElementPolicies(tx, actor);
+  const entries = installedModules().flatMap(module => module.models);
+  const check = (model: ModuleModel, writing: boolean) => {
+    const access = projectElementAccess(model, policies, entries);
+    if (Object.values(access.fields).some(field => field.noRead || writing && field.noWrite)) throw new AccessError("DENIED");
+  };
+  const reference = (owner: ModuleModel, field: string, spec: TransferReference) => {
+    const target = targetFor(owner, field);
+    check(target, false);
+    for (const [field, nested] of Object.entries(spec.relations ?? {})) reference(target, field, nested);
+  };
+  const visit = (owner: ModuleModel, spec: TransferSpec) => {
+    check(owner, operation === "import");
+    for (const [field, ref] of Object.entries({ ...spec.relations, ...spec.many2many })) reference(owner, field, ref);
+    for (const [field, line] of Object.entries(spec.lines ?? {})) visit(targetFor(owner, field), line);
+  };
+  visit(entry, spec);
+}
 
 function targetFor(entry: ModuleModel, field: string) {
   const metadata = entry.metadata[field];
@@ -67,6 +91,10 @@ export function transferIdentity(entry: ModuleModel, spec: TransferSpec, draft: 
  * uses the destination's normalization/schema and its read access and record rules.
  */
 async function resolveReference(tx: Prisma.TransactionClient, actor: ModelActor, owner: ModuleModel, field: string, reference: TransferReference, cells: TransferReferenceCells, root: string, prefix: readonly string[]): Promise<string> {
+  return withRelationRead(tx, actor, owner.id, targetFor(owner, field).id, () => resolveReferenceAuthorized(tx, actor, owner, field, reference, cells, root, prefix));
+}
+
+async function resolveReferenceAuthorized(tx: Prisma.TransactionClient, actor: ModelActor, owner: ModuleModel, field: string, reference: TransferReference, cells: TransferReferenceCells, root: string, prefix: readonly string[]): Promise<string> {
   const target = targetFor(owner, field), keys = transferReferenceKeys(reference);
   const values: Record<string, unknown> = {};
   for (const key of keys) {
@@ -180,12 +208,16 @@ async function checkDomain(tx: Prisma.TransactionClient, actor: ModelActor, entr
   if (!domain) return;
   const target = targetFor(entry, field);
   const draft = Object.fromEntries(domainDependencies(domain).map(name => [name, record[name]]));
-  const candidates = await modelService(target.id).lookupInTransaction(tx, actor, { ids: [id] }, relationDomainWhere(entry, target, domain, draft));
+  const candidates = await withRelationRead(tx, actor, entry.id, target.id, () => modelService(target.id).lookupInTransaction(tx, actor, { ids: [id] }, relationDomainWhere(entry, target, domain, draft)));
   if (!candidates.items.some(item => item.value === id)) throw new ModelValidationError("La referencia no cumple el dominio.", { [field]: "Selecciona una referencia compatible con los datos de la fila." });
 }
 
 /** Walk outward from an ID, writing each leaf key and signing every hop's identity/revision. */
 async function encodeReference(tx: Prisma.TransactionClient, actor: ModelActor, owner: ModuleModel, field: string, reference: TransferReference, id: unknown, root: string, prefix: readonly string[], values: Record<string, unknown>, references: SignedReference[], cache?: TransferReferenceCache) {
+  return withRelationRead(tx, actor, owner.id, targetFor(owner, field).id, () => encodeReferenceAuthorized(tx, actor, owner, field, reference, id, root, prefix, values, references, cache));
+}
+
+async function encodeReferenceAuthorized(tx: Prisma.TransactionClient, actor: ModelActor, owner: ModuleModel, field: string, reference: TransferReference, id: unknown, root: string, prefix: readonly string[], values: Record<string, unknown>, references: SignedReference[], cache?: TransferReferenceCache): Promise<ReferenceRecord> {
   const target = targetFor(owner, field), keys = transferReferenceKeys(reference);
   const cacheKey = `${target.id}:${id}`;
   const row = cache?.get(cacheKey) ?? await modelService(target.id).findUniqueInTransaction(tx, actor, "id", id, true);

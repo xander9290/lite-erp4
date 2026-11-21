@@ -1,4 +1,7 @@
 import "server-only";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { assertUniqueModuleGroups, hasModuleGroup } from "./membership";
+import { loadElementPolicies } from "./element-policy.server";
 import type { Prisma } from "@/generated/prisma/client";
 import { registeredModules } from "../modules/installed";
 import { extensionWhere } from "../modules/storage";
@@ -52,13 +55,32 @@ export function closeGroups(direct: Iterable<string>, groups = accessCatalog().g
   return result;
 }
 
-/** Implicit group of every active account (Odoo base.group_user); declared by the native core. */
-export const internalGroup = "core.internal";
-
 export async function userGroups(tx: Prisma.TransactionClient, userId: string, catalogGroups = accessCatalog().groups) {
+  return closeGroups(await directUserGroups(tx, userId, catalogGroups), catalogGroups);
+}
+
+async function directUserGroups(tx: Prisma.TransactionClient, userId: string, catalogGroups = accessCatalog().groups) {
   const rows = await tx.accessUserGroup.findMany({ where: { userId }, select: { groupId: true } });
-  // Callers revalidate that the account is active before asking for its groups.
-  return closeGroups([...rows.map(row => row.groupId), ...(catalogGroups.has(internalGroup) ? [internalGroup] : [])], catalogGroups);
+  const direct = rows.map(row => row.groupId);
+  assertUniqueModuleGroups(direct, catalogGroups);
+  return new Set(direct.filter(id => catalogGroups.has(id)));
+}
+
+const relationalRead = new AsyncLocalStorage<{ tx: Prisma.TransactionClient; actor: ModelActor; target: string }>();
+
+/** Internal only: caller resolves a published relation in trusted model metadata. */
+export async function withRelationRead<T>(tx: Prisma.TransactionClient, actor: ModelActor, source: string, target: string, run: () => Promise<T>): Promise<T> {
+  await authorizeModel(tx, actor, source, "read");
+  return relationalRead.run({ tx, actor, target }, run);
+}
+
+/** Direct endpoints need an explicit membership in the model's owning module. */
+export async function authorizeModelEntry(tx: Prisma.TransactionClient, actor: ModelActor, model: string) {
+  const user = await tx.user.findUnique({ where: { id: actor.id }, select: { active: true, isAdmin: true, sessionVersion: true } });
+  if (!user?.active || user.sessionVersion !== actor.sessionVersion) throw new AccessError("UNAUTHENTICATED");
+  if (!accessCatalog().models.has(model)) throw new AccessError("DENIED");
+  if (!user.isAdmin && model === "core.user") throw new AccessError("DENIED"); // Ajustes remains administrative.
+  if (!user.isAdmin && !hasModuleGroup(model.split(".")[0], await directUserGroups(tx, actor.id))) throw new AccessError("DENIED");
 }
 
 /** Effective permissions of a set of groups on a model: database overrides replace code defaults per group. */
@@ -84,7 +106,8 @@ function mergePermissions(groups: ReadonlySet<string>, defaults: readonly Access
 export async function readAccessCapabilities(tx: Prisma.TransactionClient, actor: ModelActor, catalog = accessCatalog()) {
   const user = await tx.user.findUnique({ where: { id: actor.id }, select: { active: true, isAdmin: true, sessionVersion: true } });
   if (!user?.active || user.sessionVersion !== actor.sessionVersion) throw new AccessError("UNAUTHENTICATED");
-  const groups = user.isAdmin ? new Set<string>() : await userGroups(tx, actor.id, catalog.groups);
+  const directGroups = user.isAdmin ? new Set<string>() : await directUserGroups(tx, actor.id, catalog.groups);
+  const groups = closeGroups(directGroups, catalog.groups);
   const models = [...catalog.models.keys()];
   const overrides = !user.isAdmin && groups.size && models.length ? await tx.accessModelOverride.findMany({ where: { model: { in: models }, groupId: { in: [...groups] } } }) : [];
   const byModel = new Map<string, typeof overrides>();
@@ -92,15 +115,28 @@ export async function readAccessCapabilities(tx: Prisma.TransactionClient, actor
   const permissions = new Map(models.map(model => [model, user.isAdmin
     ? { read: true, create: true, write: true, unlink: true, import: true, export: true }
     : mergePermissions(groups, catalog.grants.get(model) ?? [], (byModel.get(model) ?? []).map(row => ({ ...row, import: row.canImport, export: row.canExport })))]));
+  // These are direct capabilities. Relational reads use their own scoped authorization.
+  if (!user.isAdmin) for (const model of models) {
+    if (model === "core.user" || !hasModuleGroup(model.split(".")[0], directGroups)) permissions.set(model, { read: false, create: false, write: false, unlink: false });
+  }
   // Hints only: a line also needs read access to its owner. The server repeats this check.
   if (!user.isAdmin) for (const [child, owner] of catalog.owners ?? []) {
     if (!permissions.get(owner.model)?.read) permissions.set(child, { read: false, create: false, write: false, unlink: false });
   }
   return {
     isAdmin: user.isAdmin,
+    ...await loadElementPolicies(tx, groups),
+    directGroups: directGroups as ReadonlySet<string>,
     groups: groups as ReadonlySet<string>,
     modelAccess: Object.freeze(Object.fromEntries([...permissions].map(([model, perms]) => [model, Object.freeze(perms)]))),
   };
+}
+
+/** Fresh policy snapshot in the operation transaction; administrators keep their bypass. */
+export async function readActorElementPolicies(tx: Prisma.TransactionClient, actor: ModelActor) {
+  const user = await tx.user.findUnique({ where: { id: actor.id }, select: { active: true, isAdmin: true, sessionVersion: true } });
+  if (!user?.active || user.sessionVersion !== actor.sessionVersion) throw new AccessError("UNAUTHENTICATED");
+  return loadElementPolicies(tx, user.isAdmin ? new Set<string>() : await userGroups(tx, actor.id));
 }
 
 /**
@@ -115,8 +151,13 @@ export async function authorizeModel(tx: Prisma.TransactionClient, actor: ModelA
   const { models, rules } = accessCatalog();
   const metadata = models.get(model);
   if (!metadata) throw new AccessError("DENIED");
-  const groups = await userGroups(tx, actor.id);
-  if (!(await modelPerms(tx, groups, model))[operation]) throw new AccessError("DENIED");
+  const direct = await directUserGroups(tx, actor.id);
+  const groups = closeGroups(direct);
+  const relation = relationalRead.getStore();
+  const related = operation === "read" && relation?.tx === tx && relation.target === model && relation.actor.id === actor.id && relation.actor.sessionVersion === actor.sessionVersion;
+  if (!related && model === "core.user") throw new AccessError("DENIED");
+  if (!related && !hasModuleGroup(model.split(".")[0], direct)) throw new AccessError("DENIED");
+  if (!related && !(await modelPerms(tx, groups, model))[operation]) throw new AccessError("DENIED");
   const candidates = (rules.get(model) ?? []).filter(rule => rule.operations.includes(operation));
   const states = candidates.length ? await tx.accessRuleState.findMany({ where: { ruleId: { in: candidates.map(rule => rule.id) } } }) : [];
   const active = candidates.filter(rule => states.find(state => state.ruleId === rule.id)?.active ?? true);
@@ -132,7 +173,9 @@ export async function authorizeModel(tx: Prisma.TransactionClient, actor: ModelA
   // Keep this outside group-rule ORs: a child's own "all records" rule cannot widen it.
   const owner = accessCatalog().owners?.get(model);
   if (owner) {
-    const scope = await authorizeModel(tx, actor, owner.model, "read");
+    const scope = related && relation
+      ? await relationalRead.run({ ...relation, target: owner.model }, () => authorizeModel(tx, actor, owner.model, "read"))
+      : await authorizeModel(tx, actor, owner.model, "read");
     if (scope) predicates.push({ [owner.relation]: { is: scope } });
   }
   const predicate = predicates.length ? { AND: predicates } : undefined;

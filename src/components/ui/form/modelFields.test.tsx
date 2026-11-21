@@ -13,6 +13,20 @@ import Stack from "./Stack";
 import { FormActionsContext, FormButton } from "./formActions";
 const fields={name:Fields.Text({label:"Nombre heredado",required:true,maxLength:12}),state:Fields.Selection([{value:"draft",label:"Borrador"}],{label:"Estado",required:true}),ownerId:Fields.Many2one("Owner")};
 const load=async()=>({ok:false as const,error:"sample"});
+
+test("field policies omit no-read controls and lock no-write controls even with explicit presentation overrides", () => {
+  function Restricted() {
+    const methods = useForm({ defaultValues: { name: "PRIVATE VALUE", state: "draft" } });
+    return <FormProvider {...methods}><FormModelContext.Provider value={{ fields, fieldAccess: {
+      name: { noRead: true, noWrite: true, invisible: false, readOnly: false },
+      state: { noRead: false, noWrite: true, invisible: false, readOnly: false },
+    } }}><FieldText name="name" invisible={false} /><FieldSelect name="state" readOnly={false} /></FormModelContext.Provider></FormProvider>;
+  }
+  const html = renderToStaticMarkup(<Restricted />);
+  assert.doesNotMatch(html, /PRIVATE VALUE|name="name"/);
+  assert.match(html, /draft/);
+  assert.match(html, /disabled=""|readOnly=""/);
+});
 function Probe(){const props=useModelField({name:"ownerId"},"many2one") as {load?:unknown};return <span>{props.load===load?"lookup heredado":"sin lookup"}</span>;}
 function Fixture({override=false,bound=true}:{override?:boolean;bound?:boolean}) {
   const methods=useForm({defaultValues:{name:"",state:"draft"}});

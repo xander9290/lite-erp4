@@ -38,13 +38,11 @@ assert.ok(!invalid.ok && "fieldErrors" in invalid && invalid.fieldErrors?.email,
 const created = ok(await partners.save(prisma, actor, { name: "Nuevo contacto", email: "", phone: "", avatarUrl: null, empresa: null }), "crear contacto");
 assert.equal((await prisma.partner.findUniqueOrThrow({ where: { id: created.values.id } })).email, null);
 
-// Every account is an internal user: it reads, lists and searches contacts but cannot write.
-ok(await partners.read(prisma, lector, legacy.id), "lectura del usuario interno");
-const listed = ok(await withActor(lector, () => partners.list(prisma, lector, state)), "lista del usuario interno") as unknown as { data: { total: number } };
-assert.ok(listed.data.total >= 4);
-const found = ok(await partners.lookup(prisma, lector, { query: "previo" }), "búsqueda del usuario interno") as unknown as { items: { label: string }[] };
-assert.deepEqual(found.items.map(item => item.label), ["Contacto previo"]);
-assert.equal((await partners.save(prisma, lector, { ...saved.values, phone: "1" })).ok, false, "el usuario interno no edita contactos");
+// No implicit groups: direct contacts need a declared group and explicit membership.
+assert.equal((await partners.read(prisma, lector, legacy.id)).ok, false);
+assert.equal((await withActor(lector, () => partners.list(prisma, lector, state))).ok, false);
+assert.equal((await partners.lookup(prisma, lector, { query: "previo" })).ok, false);
+assert.equal((await partners.save(prisma, lector, { ...saved.values, phone: "1" })).ok, false);
 assert.equal(JSON.stringify(modelClientConfig("core.partner")).includes("password"), false);
 
 // Another module relates to Partner with labels from the native lookup.
@@ -130,4 +128,4 @@ const results = await Promise.all([
 assert.equal(results.filter(result => result.ok).length, 1, "sólo un guardado concurrente puede confirmar");
 await prisma.$disconnect();
 console.log("✓ core.user: alta con contacto en la misma sentencia, contraseña hasheada y nunca publicada, revocación de sesión, lastLogin de sistema, último admin/propia cuenta y acceso sólo admin.");
-console.log("✓ core.partner: tabla partners sin cambios, servicio declarativo, usuario interno de sólo lectura, Many2one desde otro módulo y extensión CRM en tabla compañera.");
+console.log("✓ core.partner: tabla partners sin cambios, servicio declarativo, sin lectura implícita para usuarios sin grupo, Many2one desde otro módulo y extensión CRM en tabla compañera.");

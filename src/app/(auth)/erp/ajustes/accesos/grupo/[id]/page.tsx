@@ -6,7 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { groupDetail } from "@/lib/access/admin";
 import { accessPermissionKeys } from "@/lib/access/declare";
 import ActionForm from "../../ActionForm";
-import { saveMembers, saveModelAccess, saveRules } from "../../actions";
+import MembersForm from "../../MembersForm";
+import { FieldRestrictions, ActionRestrictions } from "../../ElementRestrictions";
+import Notebook from "@/components/ui/form/Notebook";
+import { saveModelAccess, saveRules } from "../../actions";
 
 type Props = { params: Promise<{ id: string }> };
 const operationLabels = { read: "Leer", create: "Crear", write: "Editar", unlink: "Eliminar", import: "Importar", export: "Exportar" } as const;
@@ -17,30 +20,20 @@ async function Group({ params }: Props) {
   if (!detail) notFound();
   const { group, users, models, rules } = detail;
   return <>
-    <Breadcrumbs items={[{ label: "Aplicaciones", href: "/erp" }, { label: "Ajustes", href: "/erp/ajustes" }, { label: "Accesos", href: "/erp/ajustes/accesos" }, { label: group.label }]} />
+    <Breadcrumbs items={[{ label: "Aplicaciones", href: "/erp" }, { label: "Ajustes", href: "/erp/ajustes" }, { label: "Grupos", href: "/erp/ajustes/accesos" }, { label: group.label }]} />
     <header className="space-y-1">
       <h1 className="text-lg font-semibold">{group.label} <code className="text-xs font-normal text-base-content/50">{group.id}</code></h1>
       {group.implies.length > 0 && <p className="text-sm text-base-content/70">Incluye los permisos de: {group.implies.join(", ")}.</p>}
     </header>
 
-    <section aria-labelledby="miembros" className="space-y-2 rounded-box border border-base-300 p-3">
+    <section aria-labelledby="miembros" className="col-span-full space-y-2 rounded-box border border-base-300 p-3">
       <h2 id="miembros" className="font-semibold">Miembros</h2>
-      {group.implicit ? <p className="text-sm text-base-content/70">Incluye automáticamente a todos los usuarios activos; no se asignan miembros.</p> : <ActionForm action={saveMembers} label="Guardar miembros">
-        <input type="hidden" name="group" value={group.id} />
-        <ul className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-          {users.map(user => <li key={user.id}>
-            <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-base-200">
-              <input type="checkbox" className="checkbox checkbox-sm" name="user" value={user.id} defaultChecked={user.member} />
-              <span className="min-w-0 wrap-anywhere">{user.name} <span className="text-xs text-base-content/50">({user.login})</span></span>
-              {user.isAdmin && <span className="badge badge-ghost badge-sm">admin</span>}
-              {!user.active && <span className="badge badge-ghost badge-sm">inactivo</span>}
-            </label>
-          </li>)}
-        </ul>
-      </ActionForm>}
+      <MembersForm group={group.id} users={users} />
     </section>
 
-    <section aria-labelledby="permisos" className="space-y-2 rounded-box border border-base-300 p-3">
+    <Notebook label="Accesos del grupo" pages={[
+      { name: "modelos", label: "Modelos", children: (
+    <section aria-labelledby="permisos" className="col-span-full space-y-2 rounded-box border border-base-300 p-3">
       <h2 id="permisos" className="font-semibold">Permisos por modelo</h2>
       <p className="text-xs text-base-content/60">Marcados según el manifest; un cambio se guarda como ajuste y, si vuelve a coincidir con el manifest, el ajuste se elimina.</p>
       <ActionForm action={saveModelAccess} label="Guardar permisos">
@@ -62,7 +55,11 @@ async function Group({ params }: Props) {
       </ActionForm>
     </section>
 
-    <section aria-labelledby="reglas" className="space-y-2 rounded-box border border-base-300 p-3">
+      ) },
+      { name: "campos", label: "Campos", children: <FieldRestrictions group={group.id} fields={detail.fields} /> },
+      { name: "acciones", label: "Acciones", children: <ActionRestrictions group={group.id} actions={detail.actions} /> },
+      { name: "reglas", label: "Reglas de registro", children: (
+    <section aria-labelledby="reglas" className="col-span-full space-y-2 rounded-box border border-base-300 p-3">
       <h2 id="reglas" className="font-semibold">Reglas de registro</h2>
       {rules.length ? <ActionForm action={saveRules} label="Guardar reglas">
         <ul className="space-y-1">
@@ -78,6 +75,8 @@ async function Group({ params }: Props) {
         </ul>
       </ActionForm> : <p className="text-sm text-base-content/60">Sin reglas para este grupo.</p>}
     </section>
+      ) },
+    ]} />
   </>;
 }
 

@@ -9,7 +9,7 @@ import { useFormFieldValidation } from "./formValidation";
 import { rowLimits, sameRowData } from "./one2manyValues";
 import { formErrorPaths } from "./notebookErrors";
 import { useFieldDirection } from "./fieldDirection";
-import { FormModelContext, lineAt } from "./modelFields";
+import { FormModelContext, lineAt, lineField } from "./modelFields";
 import FieldText from "./FieldText";
 import FieldNumber from "./FieldNumber";
 import FieldDate from "./FieldDate";
@@ -257,7 +257,9 @@ function FieldOne2many<TValues extends FieldValues = FieldValues, TName extends 
   const { invisible, children: _children, ...controlProps } = props;
   void _children;
   const capabilities = line?.capabilities;
-  const noWrites = capabilities && !capabilities.create && !capabilities.write && !capabilities.unlink;
+  const policyOwner = lineField(model, props.name);
+  const policy = (policyOwner.line?.fieldAccess ?? model?.fieldAccess)?.[policyOwner.key];
+  const noWrites = Boolean(policy?.noWrite || policy?.readOnly) || capabilities && !capabilities.create && !capabilities.write && !capabilities.unlink;
   const persisted = (row: FieldArray<TValues, TName>) => Boolean((row as { id?: string }).id);
   return <FieldVisibility name={props.name} invisible={invisible ?? line?.invisible}>
     <Suspense fallback={<div role="status" className="col-span-full min-w-0 rounded-xl border border-base-300 bg-base-200/30 p-5 text-sm text-base-content/50">Cargando líneas…</div>}>

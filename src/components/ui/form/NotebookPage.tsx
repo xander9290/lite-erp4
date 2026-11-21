@@ -17,14 +17,16 @@ export type NotebookPageProps = {
 
 export default function NotebookPage({ name, disabled = false, children, className = "" }: NotebookPageProps) {
   const notebook = useContext(NotebookContext);
-  const { subscribe, getErrors } = useFormContext();
+  const form = useFormContext();
+  const subscribe = form?.subscribe;
+  const getErrors = form?.getErrors;
   const panel = useRef<HTMLDivElement>(null);
   if (!notebook) throw new Error("NotebookPage debe estar dentro de Notebook.");
   const { id, active, activate, reportErrors } = notebook;
 
   useEffect(() => {
     const element = panel.current;
-    if (!element) return;
+    if (!element || !subscribe || !getErrors) return;
     const sync = () => reportErrors(name, invalidFormFields(element, getErrors()).length);
     const reveal = () => { if (!disabled) activate(name); };
     element.addEventListener(revealNotebookFieldEvent, reveal);

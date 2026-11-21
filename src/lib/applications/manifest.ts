@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import type { AccessPerms } from "../access/declare";
+import { hasModuleGroup } from "../access/membership";
 
 export type ApplicationAccess = "authenticated" | "admin";
 export type ApplicationMenuLink = {
@@ -92,13 +93,16 @@ export function applicationHref(manifest: ApplicationManifest): `/erp/${string}`
   return `/erp/${manifest.id}`;
 }
 
-export type ApplicationUser = { isAdmin: boolean; groups?: ReadonlySet<string>; modelAccess?: Readonly<Record<string, AccessPerms>> } | null;
+export type ApplicationUser = { isAdmin: boolean; groups?: ReadonlySet<string>; directGroups?: ReadonlySet<string>; modelAccess?: Readonly<Record<string, AccessPerms>> } | null;
 /** Presentation only: groups and admin flags decide visibility; every operation is authorized on the server. */
 export function memberOf(user: ApplicationUser, groups: readonly string[] | undefined) {
   return !groups || Boolean(user?.isAdmin) || groups.some(group => user?.groups?.has(group));
 }
 export function canOpenApplication(manifest: ApplicationManifest, user: ApplicationUser): boolean {
-  if (manifest.accessModels) return Boolean(user && manifest.accessModels.some(model => user.modelAccess?.[model]?.read === true));
+  if (!user) return false;
+  if (user.isAdmin) return !manifest.accessModels || manifest.accessModels.some(model => user.modelAccess?.[model]?.read === true);
+  if (manifest.access === "admin") return false;
+  if (manifest.accessModels) return manifest.accessModels.some(model => hasModuleGroup(model.split(".")[0], user.directGroups ?? user.groups) && user.modelAccess?.[model]?.read === true);
   return user !== null && (manifest.access === "authenticated" || user.isAdmin) && memberOf(user, manifest.groups);
 }
 

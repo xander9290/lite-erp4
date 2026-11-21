@@ -32,8 +32,9 @@ assert.equal(cfg.lookups.etiquetas, "vinculos.etiqueta"); assert.equal(cfg.many2
 for (const etiquetas of [[a.id, a.id], ["missing"], [hidden.id], [a.id, b.id, hidden.id, "four"], [{}]]) await fail({ ...one, etiquetas });
 await fail({ ...one, name: "forjar" }); // hooks cannot introduce unauthorized IDs
 await fail({ ...one, name: "fallar", etiquetas: [b.id] }); // base/revision/links/activity rollback
-await fail({ ...one, etiquetas: [] }, noRead);
-const unauthorized = await service.read(prisma, noRead, one.id); assert.equal(unauthorized.ok, false);
+one = await save({ ...one, etiquetas: [] }, noRead);
+const relationalOnly = await service.read(prisma, noRead, one.id); assert.equal(relationalOnly.ok, true);
+assert.equal((await modelService("vinculos.etiqueta").read(prisma, noRead, a.id)).ok, false, "relations do not grant direct catalog read");
 const outsider = await save({ name: "Admin", etiquetas: [a.id] }, admin);
 assert.equal((await service.read(prisma, actor, outsider.id)).ok, false);
 const activityBefore = await prisma.recordActivity.count({ where: { recordId: one.id } });

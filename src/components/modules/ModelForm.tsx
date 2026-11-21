@@ -26,7 +26,7 @@ import type { FieldMetadata } from "@/lib/orm/fields";
 import ModelCollection from "./ModelCollection";
 import FieldVisibility from "@/components/ui/form/FieldVisibility";
 import type { ListState } from "@/lib/list/types";
-import { modelChildren, modelLookup, modelAction, modelActivity, modelDelete, modelNote, modelRead, modelSave } from "@/lib/modules/actions";
+import { modelChildren, modelRelationLookup, modelAction, modelActivity, modelDelete, modelNote, modelRead, modelSave } from "@/lib/modules/actions";
 import { modelUiCapabilities } from "@/lib/access/capabilities";
 import { useModelExtensionInsertions, useModelExtensionViews } from "./ModelExtensionViews";
 import { InsertionProvider, useInsertionFallback } from "@/components/ui/form/insertions/Insertions";
@@ -63,10 +63,10 @@ export function ModelChildCollections({ name }: { name?: string }) {
   const recordId = useWatch({ name: "id" }) as string | undefined;
   const collections = Object.entries(ui?.config.collections ?? {}).filter(([field]) => !name || field === name);
   if (!ui || !collections.length) return null;
-  return <>{collections.map(([field, collection]) => <FieldVisibility key={field} invisible={collection.invisible}><FormGroup fullWidth legend={collection.label}>
+  return <>{collections.map(([field, collection]) => <FieldVisibility key={field} name={field} invisible={collection.invisible}><FormGroup fullWidth legend={collection.label}>
     {recordId ? <ModelCollection embedded config={collection.config} view="list" title={collection.label} paramPrefix={field}
       createDefaults={{ [collection.inverse]: recordId }}
-      source={{ load: (state: ListState) => modelChildren(ui.config.id, field, recordId, state), filterLookups: Object.fromEntries(Object.entries(collection.config.lookups).map(([lookup, target]) => [lookup, modelLookup.bind(null, target)])) }} />
+      source={{ load: (state: ListState) => modelChildren(ui.config.id, field, recordId, state), filterLookups: Object.fromEntries(Object.keys(collection.config.lookups).map(lookup => [lookup, (request: import("@/lib/many2one/model-lookup").ModelLookupRequest) => modelRelationLookup(collection.config.id, lookup, { request, draft: {}, filter: true })])) }} />
       : <p className="text-sm text-base-content/60">Guarda el registro para ver {collection.label.toLowerCase()}.</p>}
   </FormGroup></FieldVisibility>)}</>;
 }

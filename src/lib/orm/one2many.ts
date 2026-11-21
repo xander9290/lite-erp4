@@ -11,7 +11,7 @@ export type Document = Record<string, unknown> & { id: string; revision: string 
  * `withLines`: the deletion comes from the owner's document (a removed line), so the line's own
  * lines go with it, bottom-up and through their services. A standalone deletion keeps Restrict.
  */
-export type MutationOptions = { skipOwner?: { model: string; id: string }; previous?: Document; withLines?: boolean };
+export type MutationOptions = { skipOwner?: { model: string; id: string }; previous?: Document; withLines?: boolean; system?: boolean };
 /** Nested documents: document → line → sub-line, and a bounded total for the whole tree. */
 export const MAX_LINE_DEPTH = 3;
 export const MAX_DOCUMENT_ROWS = 500;
@@ -25,6 +25,8 @@ export type TransactionModel = {
   persist(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, label?: string, options?: MutationOptions): Promise<Document>;
   remove(tx: Prisma.TransactionClient, actor: ModelActor, id: string, revision: string, options?: MutationOptions): Promise<void>;
   refresh(tx: Prisma.TransactionClient, actor: ModelActor, previous: Document): Promise<void>;
+  present?(tx: Prisma.TransactionClient, actor: ModelActor, record: Document): Promise<Document>;
+  prepareInput?(tx: Prisma.TransactionClient, actor: ModelActor, input: Record<string, unknown>, previous: Document | null, inverse?: string): Promise<Record<string, unknown>>;
 };
 export type LineRelation = { metadata: One2manyMetadata; child: () => TransactionModel };
 export type OwnerRelation = { inverse: string; parent: () => TransactionModel };
@@ -69,7 +71,8 @@ export async function persistLines(tx: Prisma.TransactionClient, actor: ModelAct
     const child = relation.child(), inverse = relation.metadata.inverse;
     const owned = (previous?.[name] ?? []) as Document[];
     const changes = planOne2manyChanges(owned, input[name] as (Record<string, unknown> & { id?: string })[]);
-    const options = { skipOwner: { model, id: parent.id } };
+    // The owner has already hydrated/revalidated every child's protected input before its schema/hooks.
+    const options = { skipOwner: { model, id: parent.id }, system: true };
     for (const item of changes.create) {
       try { await child.persist(tx, actor, { ...item.values, [inverse]: parent.id }, undefined, options); changed = true; }
       catch (error) { lineFailure(error, `${name}.${item.index}`, inverse); }

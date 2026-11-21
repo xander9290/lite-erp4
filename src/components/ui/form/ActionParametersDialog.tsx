@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { ClientModelAction } from "@/lib/orm/action-parameters";
 import { fieldFromMetadata } from "@/lib/modules/fields";
-import { modelLookup } from "@/lib/modules/actions";
+import { modelLookup, modelParameterLookup } from "@/lib/modules/actions";
 import type { ModelLookupRequest } from "@/lib/many2one/model-lookup";
 import Modal from "../alerts/Modal";
 import FormLayout from "./FormLayout";
@@ -29,7 +29,7 @@ export default function ActionParametersDialog({ action, initialValues, errors, 
   const fields = useMemo(() => Object.fromEntries(Object.entries(action.params ?? {}).map(([name, metadata]) => [name, fieldFromMetadata(metadata)])), [action.params]);
   const schema = useMemo(() => z.strictObject(Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, field.schema]))), [fields]);
   const methods = useForm<Record<string, unknown>>({ resolver: zodResolver(schema), defaultValues: initialValues ?? Object.fromEntries(Object.entries(fields).map(([name, field]) => [name, field.createDefault()])) });
-  const lookups = useMemo(() => Object.fromEntries(Object.entries(action.lookups ?? {}).map(([name, target]) => [name, (request: ModelLookupRequest) => modelLookup(target, request)])), [action.lookups]);
+  const lookups = useMemo(() => Object.fromEntries(Object.entries(action.lookups ?? {}).map(([name, target]) => [name, (request: ModelLookupRequest) => action.sourceModel ? modelParameterLookup(action.sourceModel, action.name, name, request) : modelLookup(target, request)])), [action.lookups, action.sourceModel, action.name]);
   useEffect(() => { for (const [name, message] of Object.entries(errors ?? {})) methods.setError(Object.hasOwn(fields, name) ? name : "root.server", { type: "server", message }); }, [errors, methods, fields]);
   return <Modal open title={action.label} onClose={onCancel}>
     <FormLayout methods={methods} model={{ fields, lookups }} onSubmit={onConfirm} contentClassName="flex flex-col gap-4">

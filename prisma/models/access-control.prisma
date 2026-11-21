@@ -38,3 +38,24 @@ model AccessRuleState {
 
   @@map("access_rule_states")
 }
+
+// Opt-in restrictions; absence preserves the model's normal behavior.
+model AccessFieldRestriction {
+  groupId String @map("group_id") @db.VarChar(120)
+  model String @db.VarChar(120)
+  field String @db.VarChar(120)
+  noRead Boolean @default(false) @map("no_read")
+  noWrite Boolean @default(false) @map("no_write")
+  invisible Boolean @default(false)
+  readOnly Boolean @default(false) @map("read_only")
+  @@id([groupId, model, field])
+  @@map("access_field_restrictions")
+}
+
+model AccessActionRestriction {
+  groupId String @map("group_id") @db.VarChar(120)
+  model String @db.VarChar(120)
+  action String @db.VarChar(120)
+  @@id([groupId, model, action])
+  @@map("access_action_restrictions")
+}

@@ -4,7 +4,7 @@ import { modelService, modelClientConfig, getModuleModel } from "./src/lib/modul
 import { reviewTransfer, applyTransfer, exportTransfer } from "./src/lib/list/transfer";
 import { readTransferFile, writeTransferFile } from "./src/lib/list/transfer-file";
 import { transferHeaders } from "./src/lib/list/transfer-contract";
-import { setModelAccess } from "./src/lib/access/admin";
+import { setModelAccess, setFieldRestrictions } from "./src/lib/access/admin";
 
 assert.match(new URL(process.env.DATABASE_URL!).searchParams.get("schema") ?? "", /^modules_test_[a-f0-9]{16}$/);
 const root = await prisma.user.create({ data: { login: "transfer-root", password: "unused", isAdmin: true } });
@@ -40,6 +40,10 @@ try {
   const row1 = { ...parent, "lineas.codigo": "01", "lineas.cantidad": 2, "lineas.etiquetaId.codigo": "A", "lineas.entregas.codigo": "E1", "lineas.entregas.cantidad": 1 };
   const row2 = { ...row1, "lineas.entregas.codigo": "E2", "lineas.entregas.cantidad": 2 };
   const row3 = { ...parent, "lineas.codigo": "02", "lineas.cantidad": 3 };
+  await setFieldRestrictions(prisma, admin, "transferencia.editor", [{ model, field: "name", policy: { noRead: true, noWrite: true, invisible: false, readOnly: false } }]);
+  await assert.rejects(review([row1]), /permiso/);
+  await assert.rejects(exportTransfer(prisma, actor, model, { state, format: "csv", template: false, selection: [] }), /permiso/);
+  await setFieldRestrictions(prisma, admin, "transferencia.editor", [{ model, field: "name", policy: { noRead: false, noWrite: false, invisible: false, readOnly: false } }]);
   const before = await counts(), plan = await review([row1, row2, row3]);
   assert.ok(plan.token, JSON.stringify(plan)); assert.equal(plan.rows.length, 1);
   assert.equal(plan.rows[0].operation, "create");

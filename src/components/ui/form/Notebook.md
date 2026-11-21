@@ -30,10 +30,26 @@ Notebook ocupa todas las columnas del formulario. Cada página organiza sus Form
 
 ## Props
 
-- `Notebook`: `children`, `label` (nombre accesible del tablist), `id`, `className`, `defaultPage`, `activePage`, `onPageChange(name)`.
+- `Notebook`: `children` o `pages`, `label` (nombre accesible del tablist), `id`, `className`, `defaultPage`, `activePage`, `onPageChange(name)`.
 - `NotebookPage`: `name` único y no vacío, `label`, `children`, `icon`, `badge`, `disabled`, `className`.
 
 Sin `activePage`, Notebook gestiona su selección y usa `defaultPage` o la primera página habilitada. Si la selección desaparece o se deshabilita, muestra la primera habilitada. Admite páginas condicionales y fragments; todos sus hijos deben ser NotebookPage.
+
+Desde un Server Component, usar `pages` con descriptores `NotebookPageProps`:
+
+```tsx
+<Notebook label="Accesos del grupo" pages={[
+  { name: "modelos", label: "Modelos", children: <p>Contenido de modelos</p> },
+  { name: "reglas", label: "Reglas", children: <p>Contenido de reglas</p> },
+]} />
+```
+
+Notebook crea los elementos NotebookPage dentro de su límite cliente. Evita
+comparar por identidad referencias de componentes recibidas mediante RSC.
+No combinar `pages` y `children`. El contenido admite slots renderizados en servidor.
+Fuera de un FormProvider también funciona: conserva paneles, navegación y
+accesibilidad, sin suscripciones ni contadores de errores RHF. Dentro de un
+formulario conserva el seguimiento y revelado de errores habituales.
 
 Para controlarlo desde el formulario:
 

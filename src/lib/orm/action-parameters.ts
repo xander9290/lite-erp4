@@ -6,7 +6,7 @@ export type ActionParameterFields = Readonly<Record<string, Field>>;
 export type ActionParams<T extends ActionParameterFields> = Readonly<{ [K in keyof T]: z.output<T[K]["schema"]> }>;
 export type ActionParameterMetadata = Readonly<Record<string, FieldMetadata>>;
 /** Public presentation only. Lookup IDs resolve registered, authorized server providers. */
-export type ClientModelAction = { readonly name: string; readonly label: string; readonly params?: ActionParameterMetadata; readonly lookups?: Readonly<Record<string, string>> };
+export type ClientModelAction = { readonly name: string; readonly label: string; readonly params?: ActionParameterMetadata; readonly lookups?: Readonly<Record<string, string>>; readonly sourceModel?: string };
 export type CompiledActionParameters = { readonly fields: ActionParameterFields; readonly metadata: ActionParameterMetadata; readonly schema: z.ZodType<Record<string, unknown>> };
 
 export function compileActionParameters(fields: ActionParameterFields | undefined): CompiledActionParameters | undefined {

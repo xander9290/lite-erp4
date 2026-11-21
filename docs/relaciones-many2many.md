@@ -74,8 +74,10 @@ espacios, inexistentes o inaccesibles se rechazan; no se corrigen silenciosament
   borrado del dueño limpia sus vínculos con Cascade. Borrar un destino vinculado
   se rechaza con Restrict. No se añade lógica de negocio al destino ni se ejecuta
   su guardado por asociarlo.
-- El servidor exige create/write del dueño y lectura de todos los destinos según
-  sus permisos/reglas vigentes. No exige write del destino. Sesión, revisión,
+- El servidor exige create/write del dueño y lectura relacional de todos los
+  destinos según sus reglas vigentes. Desde 2026-11-21 una relación publicada no
+  requiere grupo ni entrada directa al catálogo; no concede write/create del destino.
+  [Contrato de grupos](ideas/access-manager.md). Sesión, revisión,
   normalización, hooks, constraints, acciones, historial y vínculos comparten la
   transacción Serializable existente. Se valida la entrada antes de los hooks y
   su resultado antes de escribir; los fallos revierten todo.

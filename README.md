@@ -24,7 +24,12 @@ automáticamente; lista y formulario se resuelven por convención. No requiere
 Las [capacidades efectivas](docs/capacidades-modelos.md) comparten permisos del
 actor entre menús, formularios y colecciones: consulta, crear, eliminar, acciones
 y movimientos. Incluye grupos heredados y ajustes desde Accesos; el servidor
-revalida cada operación. El [catálogo y gestor ampliado de Accesos](docs/ideas/access-manager.md) quedan pendientes; se conserva la administración básica de grupos, miembros, CRUD y reglas.
+revalida cada operación. Los [grupos por módulo](docs/ideas/access-manager.md)
+se asignan desde Ajustes → Grupos, con un máximo de un grupo por usuario y módulo.
+Entrada directa y consulta relacional están separadas. Los grupos y concesiones
+iniciales se retiraron para declararlos desde cero; admin conserva acceso.
+Las [restricciones de campos y acciones](docs/ideas/permisos-campos.md) se
+administran desde Grupos; requieren su migración aditiva antes de usar esta fase.
 
 ## Aprender desde cero
 
@@ -37,10 +42,12 @@ entre Usuarios y Perfil. `contactosextra` añade dirección básica, RFC y País
 Ubicaciones contiene País/Estado/Municipio/Localidad. Los dominios encadenados ya
 están aplicados y Contactos utiliza inserciones de formulario y lista. Motor de
 dominios: [contrato](docs/dominios-modelos.md); composición de vistas:
-[inserciones](docs/inserciones-vistas.md). Lectura de catálogos para usuarios internos y navegación desde Contactos ya
-completadas. Estados de México importados por el usuario; falta comprobar la
+[inserciones](docs/inserciones-vistas.md). La lectura automática para usuarios
+internos fue retirada el 2026-11-21: los catálogos se consultan mediante relaciones
+publicadas desde un modelo autorizado. Estados de México importados por el
+usuario; falta comprobar la
 repetición sin cambios, después importar Municipios y Localidades.
-[Estado y siguiente paso](docs/estado-proyecto.md#progreso-guardado-2026-11-20-punto-de-continuación).
+[Estado y siguiente paso](docs/estado-proyecto.md#progreso-guardado-2026-11-21-grupos-por-módulo).
 
 ## Comandos del scaffold anterior, en orden
 

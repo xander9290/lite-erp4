@@ -1,5 +1,16 @@
 # Capacidades efectivas por modelo
 
+## Cambio vigente: grupos por módulo (2026-11-21)
+
+Máximo un grupo explícito por usuario/módulo, sin grupo implícito universal.
+La lectura efectiva sola no abre aplicaciones: se necesita pertenencia explícita
+al módulo dueño. Relaciones publicadas consultan ID/etiqueta con autorización del
+origen y reglas del destino, sin entrada ni escritura del destino. Se aplica en
+rutas/acciones y dentro de los servicios transaccionales. Detalles, excepciones
+nativas y transición en [Grupos por módulo](ideas/access-manager.md).
+Las verificaciones siguientes son históricas salvo el cierre del 2026-11-21 en
+el estado del proyecto.
+
 Importar/exportar (2026-11-20): concesiones independientes por grupo/modelo,
 sin ampliar CRUD. `false`/omitido no concede; otro grupo puede conceder, con
 overrides por pareja grupo/modelo. Sólo ListView ofrece estas acciones en modelos
@@ -23,13 +34,13 @@ privadas en el registro estático ni en cachés de servicios entre usuarios.
 
 Las reglas por registro siguen evaluándose dentro de cada operación del servidor.
 La capacidad general no garantiza que cualquier registro pueda modificarse.
-Tampoco concede lectura de modelos relacionados ni permisos por campo.
+La consulta relacional tiene su autorización separada; los permisos por campo siguen pendientes.
 
 ## Comportamiento compartido
 
 | Capacidad | Presentación |
 | --- | --- |
-| read | Acceso a colección/formulario, enlace del modelo y aplicación en el cajón. |
+| read | Colección/formulario y navegación cuando además existe grupo explícito del dueño. |
 | create | Nuevo y apertura del formulario de creación. |
 | write | Campos editables, Guardar/Revertir y acciones de negocio. |
 | unlink | Eliminar en lista y formulario, independiente de write. |
@@ -69,9 +80,10 @@ suscripción en tiempo real. Las acciones de Accesos ya invalidan el layout de E
 Una pantalla anterior nunca autoriza una operación: guardar, eliminar, acciones,
 lecturas y movimientos vuelven a comprobar sesión, permisos, revisión y reglas.
 
-No requiere migraciones ni orm:sync. Recargar la aplicación tras actualizar código.
-Los permisos de campos/vistas desde Accesos y el fallback seguro cuando un lookup
-relacionado carece de lectura continúan pendientes, con alcances independientes.
+Las capacidades CRUD originales no requieren migraciones ni orm:sync.
+La ampliación de [campos y acciones](ideas/permisos-campos.md) incorpora políticas
+por actor y sí requiere su migración aditiva. El fallback cuando un registro
+relacionado carece de lectura conserva su alcance independiente.
 
 ## Verificación
 

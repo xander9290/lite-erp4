@@ -26,7 +26,7 @@ export function modelCollection(config: ModelClientConfig, declared?: readonly M
   // Many2many (tags): IDs and labels come from the server; filter by membership, never sort/group.
   const many = config.many2many ?? {};
   const tagColumn = (column: ModelColumn): ListColumn => ({ ...column, field: column.field, label: column.label ?? many[column.field].label ?? column.field, widget: "tags", type: "text", sortable: false, groupable: false, filterable: column.filterable !== false });
-  const project = (columns: readonly ModelColumn[]) => columns.map(column => {
+  const project = (columns: readonly ModelColumn[]) => columns.filter(column => !config.fieldAccess?.[column.field]?.noRead && !config.fieldAccess?.[column.field]?.invisible).map(column => {
     if (Object.hasOwn(many, column.field)) return tagColumn(column);
     const isAudit = Object.hasOwn(audit, column.field);
     if (!config.list.fields.includes(column.field) || (!Object.hasOwn(fields, column.field) && !isAudit)) throw new Error(`${config.id}: la columna ${column.field} no está publicada en la política de lista del servidor.`);
@@ -53,7 +53,7 @@ export function modelCollection(config: ModelClientConfig, declared?: readonly M
     columns,
     queryColumns,
     common: {
-      model: config.name, searchFields: config.list.searchFields, defaultSort: config.defaultSort,
+      model: config.name, searchFields: config.list.searchFields.filter(field => !config.fieldAccess?.[field]?.noRead), defaultSort: config.defaultSort && !config.fieldAccess?.[config.defaultSort.field]?.noRead ? config.defaultSort : undefined,
       createHref: `${config.route}/nuevo`, createLabel: "Nuevo", recordHref: `${config.route}/{id}`,
     },
     kanban: kanbanField?.kind === "selection" ? { groupField: config.kanban!, groups: kanbanField.choices, transitions: config.kanbanTransitions } : undefined,

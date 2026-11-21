@@ -45,6 +45,8 @@ import { parseActionParameters } from "./action-parameters";
 import { ActionParameterError } from "./context";
 import { assignSequences, assertSequences } from "./sequence.server";
 import { validateMany2many } from "./many2many";
+import { prepareFieldInput, publicFieldValues, unrestrictedElements } from "./element-access";
+import { hasPrivateFields, type ModelElementAccess } from "../access/element-policy";
 
 const conflict = "El registro cambió desde que lo abriste. Recarga sus datos antes de guardar.";
 type Contract<T extends Record<string, unknown>> = CollectionComputed & {
@@ -67,6 +69,7 @@ type Contract<T extends Record<string, unknown>> = CollectionComputed & {
   runAction?(name: string, record: Readonly<Record<string, unknown>>, context: ActionContext, params?: unknown): Promise<Record<string, unknown>>;
   parseActionParams?(name: string, input: unknown): Record<string, unknown>;
   readonly displayFields?: readonly string[];
+  createDefaults?(): Record<string, unknown>;
   displayName?(record: Readonly<Record<string, unknown>>): string;
 };
 const idSchema = z.string().trim().min(1).max(100);
@@ -123,6 +126,7 @@ export type ServiceOperation = "read" | "create" | "write" | "unlink";
  */
 export type ServiceAuthorizer = (tx: Prisma.TransactionClient, actor: ModelActor, operation: ServiceOperation) => Promise<Record<string, unknown> | undefined>;
 type ServicePresentation = {
+  elementAccess?: (tx: Prisma.TransactionClient, actor: ModelActor) => Promise<ModelElementAccess>;
   domain?: CollectionDomain;
   validateRelations?: (tx: Prisma.TransactionClient, actor: ModelActor, values: Readonly<Record<string, unknown>>) => Promise<void>;
   /** Fields whose storage row may be absent (declarative extensions only). */
@@ -139,7 +143,7 @@ type ServicePresentation = {
    * target models). Unreadable ones are presented empty. Without it, projections are unmasked.
    */
   relationAccess?: (tx: Prisma.TransactionClient, actor: ModelActor) => RelationAccess;
-  /** Extra check for actions that declare groups (resolved by the module registry). Superusers are handled by the caller. */
+  /** Revalidated for every published action (groups and element policies in the registry). */
   authorizeAction?: (tx: Prisma.TransactionClient, actor: ModelActor, action: ModelAction) => Promise<void>;
 } & ({ list: ModelListPolicy; columns?: never; searchFields?: never } | { list?: never; columns: readonly ListColumn[]; searchFields: readonly string[] });
 
@@ -201,16 +205,47 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   // Normalize date types for server filters even when the view omitted an explicit type.
   config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(Object.hasOwn(virtualFields,column.field)?{filterable:false,sortable:false,groupable:false}:{}), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));
   const authorize: ServiceAuthorizer = presentation.authorize ?? (async (tx, actor) => { await assertActor(tx, actor); return undefined; });
+  const elements = (tx: Prisma.TransactionClient, actor: ModelActor) => presentation.elementAccess?.(tx, actor) ?? Promise.resolve(unrestrictedElements);
+  async function publicDocument(tx: Prisma.TransactionClient, actor: ModelActor, record: Values & Document): Promise<Values & Document> {
+    const access = await elements(tx, actor);
+    const values = publicFieldValues(record, access);
+    for (const [name, relation] of Object.entries(lines)) if (Array.isArray(values[name]) && relation.child().present) {
+      (values as Record<string, unknown>)[name] = await Promise.all((values[name] as Document[]).map(row => relation.child().present!(tx, actor, row)));
+    }
+    return values;
+  }
+  async function prepareDocumentInput(tx: Prisma.TransactionClient, actor: ModelActor, input: Record<string, unknown>, previous: Document | null, inverse?: string): Promise<Record<string, unknown>> {
+    if (inverse && Object.hasOwn(input, inverse)) throw new ModelValidationError("No envíes la relación inversa de una línea.");
+    const access = await elements(tx, actor);
+    const policy = inverse ? { ...access, fields: Object.fromEntries(Object.entries(access.fields).filter(([name]) => name !== inverse)) } : access;
+    const baseline = previous ?? model.createDefaults?.() ?? {};
+    const comparison = previous ? await publicDocument(tx, actor, previous as Values & Document) : baseline;
+    const values = prepareFieldInput(input, baseline, policy, comparison);
+    if (inverse) delete values[inverse];
+    for (const [name, relation] of Object.entries(lines)) {
+      const rows = values[name];
+      if (policy.fields[name]?.noRead || policy.fields[name]?.noWrite) continue;
+      if (!Array.isArray(rows) || !relation.child().prepareInput) continue;
+      const owned = (previous?.[name] ?? []) as Document[];
+      values[name] = await Promise.all(rows.map(row => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) throw new ModelValidationError("La línea no es válida.");
+        const current = owned.find(previous => previous.id === row.id) ?? null;
+        return relation.child().prepareInput!(tx, actor, row, current, relation.metadata.inverse);
+      }));
+    }
+    return values;
+  }
   /** Record rules: the record must exist and satisfy the predicate returned by authorize. */
   async function inScope(tx: Prisma.TransactionClient, id: string, scope: Record<string, unknown> | undefined) {
     return !scope || await repository.count(tx, { AND: [{ id }, scope] }) > 0;
   }
-  async function readAudit(tx: Prisma.TransactionClient, id: string) {
+  async function readAudit(tx: Prisma.TransactionClient, id: string, actor: ModelActor) {
     if (!presentation.audit) return {};
     if (!repository.audit) throw new Error("MODEL_NOT_BOUND");
     const audit = await repository.audit(tx, id);
     if (!audit) throw new ModelValidationError("El registro ya no está disponible.");
-    return { audit };
+    const access = await elements(tx, actor);
+    return { audit: access.canRead(["createByUser.login", "createByUser.partner.name", "createByUser.partner.avatarUrl"]) ? audit : { ...audit, createBy: null } };
   }
   /** One cached access decision per target/ID within the operation. */
   const relationAccessFor = (tx: Prisma.TransactionClient, actor: ModelActor) => presentation.relationAccess ? cachedRelationAccess(presentation.relationAccess(tx, actor)) : undefined;
@@ -220,6 +255,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     return values;
   }
   async function readDisplayName(tx: Prisma.TransactionClient, actor: ModelActor, values: Values) {
+    if (!(await elements(tx, actor)).canRead(displayProjectionPaths(model.metadata, model.displayFields))) return { displayName: values.id! };
     const names = await resolveDisplayNames(tx, [values], model, repository, relationAccessFor(tx, actor));
     return { displayName: names.get(values.id!)! };
   }
@@ -239,17 +275,27 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         if (!await inScope(tx, id.data, scope)) return null;
         const scalar = await repository.read(tx, id.data);
         const values = scalar ? await loadDocument(tx, actor, scalar) as Values : null;
-        return values ? { values, ...await readAudit(tx, id.data), ...await readDisplayName(tx, actor, values) } : null;
+        return values ? { values: await publicDocument(tx, actor, values as Values & Document), ...await readAudit(tx, id.data, actor), ...await readDisplayName(tx, actor, values) } : null;
       }, { isolationLevel: "RepeatableRead" });
       return record ? { ok: true, ...record } : { ok: false, error: "No se encontró este registro." };
     } catch (error) { return { ok: false, kind: error instanceof ModelValidationError ? "validation" : "server", error: messageFor(error) }; }
   }
 
-  async function persist(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, activityLabel?: string, options?: MutationOptions) {
+  async function persist(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, activityLabel?: string, options?: MutationOptions): Promise<Values & Document> {
+    const policy = await elements(tx, actor);
+    try { return await persistCore(tx, actor, input, activityLabel, options); }
+    catch (error) {
+      if ((policy.privateDocument || hasPrivateFields(policy.fields)) && (error instanceof ModelValidationError || error instanceof z.ZodError)) throw new ModelValidationError("No se pudo validar el registro con tus permisos actuales.");
+      throw error;
+    }
+  }
+
+  async function persistCore(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, activityLabel?: string, options?: MutationOptions) {
     const updating = Boolean(input && typeof input === "object" && !Array.isArray(input) && (input as Record<string, unknown>).id);
     const scope = await authorize(tx, actor, updating ? "write" : "create");
     if (!input || typeof input !== "object" || Array.isArray(input)) throw new ModelValidationError("Revisa los datos del registro.");
-    const { id, revision, ...fields } = input as Record<string, unknown>;
+    const { id, revision, ...submitted } = input as Record<string, unknown>;
+    let fields = submitted;
     const identity = recordIdentitySchema.safeParse({ id, revision });
     // Reject forged/unknown fields before any model code can discard them.
     if (Object.keys(fields).some(key => !Object.hasOwn(model.metadata, key) && !Object.hasOwn(lines, key) && !Object.hasOwn(many, key))) throw new ModelValidationError("El registro contiene campos no declarados.");
@@ -264,6 +310,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (metadata.id) {
       if (!current || current.revision !== metadata.revision) throw new ModelValidationError(conflict);
     }
+    if (!options?.system) fields = await prepareDocumentInput(tx, actor, fields, current as Document | null);
     const context: ModelContext<T> = Object.freeze({ tx, actor: Object.freeze({ ...actor }), operation: metadata.id ? "update" : "create", id: metadata.id, previous: current ? modelSnapshot(options?.previous ?? current) as ModelContext<T>["previous"] : null });
     if (JSON.stringify(fields).length > 256000) throw new ModelValidationError("El documento supera el tamaño permitido.");
     if (!options?.skipOwner && countDocumentRows(fields, lines) > MAX_DOCUMENT_ROWS) throw new ModelValidationError(`El documento supera el máximo de ${MAX_DOCUMENT_ROWS} líneas en total.`);
@@ -315,7 +362,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         try {
           record = await prisma.$transaction(async tx => {
             const values = await persist(tx, actor, input);
-            return { values, ...await readAudit(tx, values.id), ...await readDisplayName(tx, actor, values) };
+            return { values: await publicDocument(tx, actor, values), ...await readAudit(tx, values.id, actor), ...await readDisplayName(tx, actor, values) };
           }, { isolationLevel: "Serializable" });
           break;
         } catch (error) {
@@ -354,7 +401,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const current = await inScope(tx, request.data.id, scope) ? await repository.read(tx, request.data.id) : null;
         if (!current || current.revision !== request.data.revision) throw new ModelValidationError(conflict);
         const values2 = await persistAction(tx, actor, declared, current, request.data.params);
-        return { values: values2, ...await readAudit(tx, values2.id), ...await readDisplayName(tx, actor, values2) };
+        return { values: await publicDocument(tx, actor, values2), ...await readAudit(tx, values2.id, actor), ...await readDisplayName(tx, actor, values2) };
       }, { isolationLevel: "Serializable" });
       return { ok: true, ...record, message: `${declared.label}: acción completada.` };
     } catch (error) { return writeFailure(error); }
@@ -362,7 +409,9 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
 
   /** Shared by form actions and Kanban moves; always uses the caller's transaction. */
   async function persistAction(tx: Prisma.TransactionClient, actor: ModelActor, declared: ModelAction, current: Values, input?: unknown) {
-    if (declared.groups && presentation.authorizeAction) await presentation.authorizeAction(tx, actor, declared);
+    if (presentation.authorizeAction) await presentation.authorizeAction(tx, actor, declared);
+    const policy = await elements(tx, actor);
+    if (policy.blockedActions.includes(declared.name) || policy.privateDocument || hasPrivateFields(policy.fields)) throw new AccessError("DENIED");
     if (!model.runAction) throw new ModelValidationError("La acción no está publicada en este modelo.");
     current = await loadDocument(tx, actor, current as Document) as Values;
     if (declared.params && !model.parseActionParams) throw new ActionParameterError("El contrato de parámetros no está cargado.");
@@ -374,7 +423,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     }
     const patch = await model.runAction(declared.name, current, { tx, actor: Object.freeze({ ...actor }), action: declared.name }, params);
     const { id, revision, ...values } = current;
-    return persist(tx, actor, { ...values, ...patch, id, revision }, declared.label);
+    return persist(tx, actor, { ...values, ...patch, id, revision }, declared.label, { system: true });
   }
 
   /** Validated Many2many filter → repository predicate (no IDs from unreadable targets). */
@@ -411,12 +460,16 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         if (computedNames.length && !transaction) await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         const scope = await authorize(tx, actor, "read");
         const fixedDomain = domain ? await domain({ actor: Object.freeze({ id: actor.id, sessionVersion: actor.sessionVersion }), tx }) : undefined;
+        const elementPolicy = await elements(tx, actor);
         const baseDomain = presentation.domain ? await compileCollectionDomain(domainMetadata, presentation.domain, { actor: Object.freeze({ ...actor }), tx }) : undefined;
         const parsed = listStateSchema.safeParse(input);
         if (!parsed.success || parsed.data.invalidFilters) throw new ModelValidationError("Revisa los filtros y parámetros de esta lista.");
-        if (policy && parsed.data.sort && !(parsed.data.sort === "id" && !policy.sortable?.length) && !policy.sortable?.includes(parsed.data.sort)) throw new ModelValidationError("El orden solicitado no está habilitado.");
+        if (policy && parsed.data.sort && parsed.data.sort !== "id" && !policy.sortable?.includes(parsed.data.sort)) throw new ModelValidationError("El orden solicitado no está habilitado.");
         if (policy && parsed.data.query && !policy.searchFields.length) throw new ModelValidationError("La búsqueda no está habilitada.");
         const state = normalizeListState(config, parsed.data);
+        if (parsed.data.sort && !elementPolicy.canRead([parsed.data.sort])) throw new AccessError("DENIED");
+        if (!elementPolicy.canRead([state.sort])) state.sort = "id";
+        if (!elementPolicy.canRead([...state.filters.map(filter => filter.field), ...(state.groupBy ?? []), ...(group ? [group.field] : [])])) throw new AccessError("DENIED");
         let grouping: ReturnType<typeof groupingPlan>;
         try { grouping = groupingPlan(config.columns, state); }
         catch (error) { throw new ModelValidationError((error as Error).message); }
@@ -446,7 +499,9 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
           } else predicates.push(compileColumnFilter(type, filter, nullableCollection.has(filter.field) || (field ? !field.required : ["createBy", "createByUser.partner.name"].includes(filter.field)), presentation.audit ? ["createByUser", "createByUser.partner"] : []));
         }
         if (state.query) {
-          predicates.push({ OR: config.searchFields.map(field => compileColumnFilter("text", { field, operator: "contains", value: state.query })) });
+          const search = config.searchFields.filter(field => elementPolicy.canRead([field]));
+          if (!search.length) throw new AccessError("DENIED");
+          predicates.push({ OR: search.map(field => compileColumnFilter("text", { field, operator: "contains", value: state.query })) });
         }
         const where = { AND: predicates };
         const total = await repository.count(tx, where);
@@ -463,13 +518,13 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const page = Math.min(state.page, Math.max(1, Math.ceil(total / state.pageSize)));
         const sourceRows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize, audit: presentation.audit === true });
         const access = relationAccessFor(tx, actor);
-        const relatedRows = await resolveCollectionRelated(tx,sourceRows,config.columns.map(column=>column.field).filter(name=>Object.hasOwn(relatedFields,name)),relatedFields,repository,access);
-        const rows = await resolveCollectionComputed(relatedRows, computedNames, model, Object.freeze({ tx, actor: Object.freeze({ ...actor }) }), [...nullableCollection].filter(name => model.metadata[name]?.required));
-        const names = await resolveDisplayNames(tx, sourceRows, model, repository, access);
+        const relatedRows = await resolveCollectionRelated(tx,sourceRows,config.columns.map(column=>column.field).filter(name=>Object.hasOwn(relatedFields,name) && elementPolicy.canRead([name])),relatedFields,repository,access);
+        const rows = await resolveCollectionComputed(relatedRows, computedNames.filter(name => elementPolicy.canRead([name])), model, Object.freeze({ tx, actor: Object.freeze({ ...actor }) }), [...nullableCollection].filter(name => model.metadata[name]?.required));
+        const names = elementPolicy.canRead(displayProjectionPaths(model.metadata, model.displayFields)) ? await resolveDisplayNames(tx, sourceRows, model, repository, access) : new Map(sourceRows.map(row => [row.id, row.id]));
         // Repository contracts can contain extra edit fields: collection DTOs honor the fixed server publication.
         const publishedRows = policy ? rows.map(row => projectListRow(row, [...policy.fields, ...policy.fields.flatMap(name => auditAvatarField(name) ? [auditAvatarField(name)!] : [])])) : rows;
         const linkedRows = await withMany2manyIds(tx, publishedRows, access);
-        return { rows: linkedRows.map(row => ({ ...row, $displayName: names.get(row.id)! })), total, page, pageSize: state.pageSize };
+        return { rows: linkedRows.map(row => publicFieldValues({ ...row, $displayName: names.get(row.id)! }, elementPolicy)), total, page, pageSize: state.pageSize };
       };
       const data = transaction ? await query(transaction) : await prisma.$transaction(query, { isolationLevel: "RepeatableRead" });
       // Labels use independently authorized lookups after the list snapshot; no cross-request cache.
@@ -490,6 +545,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const scope = await authorize(tx, actor, "write");
         const parsed = z.strictObject({ id: idSchema, revision: z.iso.datetime({ precision: 3 }), from: z.string().min(1).max(100), to: z.string().min(1).max(100) }).safeParse(input);
         if (!groupField || !parsed.success || !groups.some(group => group.value === parsed.data.from) || !groups.some(group => group.value === parsed.data.to)) throw new ModelValidationError("El movimiento no corresponde a los estados permitidos.");
+        const policy = await elements(tx, actor);
+        if (!policy.canRead([groupField]) || policy.fields[groupField]?.noWrite || policy.privateDocument || hasPrivateFields(policy.fields)) throw new AccessError("DENIED");
         const current = await inScope(tx, parsed.data.id, scope) ? await repository.read(tx, parsed.data.id) : null;
         if (!current || current.revision !== parsed.data.revision || current[groupField] !== parsed.data.from) throw new ModelValidationError(conflict);
         if (parsed.data.from === parsed.data.to) return;
@@ -544,8 +601,11 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       if (!parsed.success) throw new ModelValidationError("La consulta de actividad no es válida.");
       const data = await prisma.$transaction(async tx => {
         await assertActivityRecord(tx, actor, parsed.data.id, "read");
-        return readActivity(tx, model.name, model.metadata, parsed.data, presentation.activityLabels
+        const page = await readActivity(tx, model.name, model.metadata, parsed.data, presentation.activityLabels
           ? (target, ids) => presentation.activityLabels!(tx, actor, target, ids) : undefined);
+        const policy = await elements(tx, actor);
+        const authorReadable = policy.canRead(["createByUser.login", "createByUser.partner.name", "createByUser.partner.avatarUrl"]);
+        return { ...page, entries: page.entries.map(entry => ({ ...entry, changes: entry.changes.filter(change => policy.canRead([change.field]) && !policy.fields[change.field]?.noRead), ...(authorReadable ? {} : { author: { id: entry.author.id, login: "", name: "Usuario", avatarUrl: null } }) })) };
       }, { isolationLevel: "RepeatableRead" });
       return { ok: true, data };
     } catch (error) { return { ok: false, error: messageFor(error) }; }
@@ -582,9 +642,11 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     const request = modelLookupSchema.parse(input);
     const scope = await authorize(tx, actor, "read");
     if (!repository.lookup) throw new Error("MODEL_NOT_BOUND");
-    const fields = displayProjectionPaths(model.metadata, model.displayFields);
+    const policy = await elements(tx, actor);
+    const displayReadable = policy.canRead(displayProjectionPaths(model.metadata, model.displayFields));
+    const fields = displayReadable ? displayProjectionPaths(model.metadata, model.displayFields) : ["id"];
     if (fields.some(field => field.includes(".") && !repository.lookupPaths?.includes(field))) throw new Error("MODEL_NOT_BOUND");
-    const search = config.searchFields.filter(field => model.metadata[field]?.kind === "text" && !model.metadata[field].sensitive);
+    const search = config.searchFields.filter(field => model.metadata[field]?.kind === "text" && !model.metadata[field].sensitive && policy.canRead([field]));
     const predicates: Record<string, unknown>[] = scope ? [scope] : [];
     if (domain) predicates.push(domain);
     if (request.id) predicates.push({ id: request.id });
@@ -600,7 +662,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     return { ok: true as const, total, page, pageSize, items: records.map(row => {
       if (typeof row.id !== "string") throw new Error("Invalid lookup record");
       // Only the label and ID leave this service, never the inputs used to construct it.
-      const label = modelDisplayName(model, row);
+      const label = displayReadable ? modelDisplayName(model, row) : row.id;
       return { value: row.id, label, record: { id: row.id } };
     }) };
   }
@@ -613,13 +675,17 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       const result=await prisma.$transaction(async tx=>{
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         const scope=await authorize(tx,actor,request.id?"write":"create");
+        const policy = await elements(tx, actor);
+        const rules = model.reactionRules?.filter(rule => rule.fields.includes(request.field)) ?? [];
+        if (!policy.canRead([request.field, ...Object.keys(request.values), ...rules.flatMap(rule => [...rule.reads, ...rule.preview])])) throw new AccessError("DENIED");
         if(request.id) {
           const current=await inScope(tx,request.id,scope)?await repository.read(tx,request.id):null;
           if(!current || current.revision!==request.revision) throw new ModelValidationError(conflict);
         }
-        return model.react!(request.field,request.values,Object.freeze({tx,actor:Object.freeze({...actor}),id:request.id,
+        const result = await model.react!(request.field,request.values,Object.freeze({tx,actor:Object.freeze({...actor}),id:request.id,
           resolveRelated: repository.related ? (access => (field:string,id:string) => repository.related!(tx,field,id,access))(relationAccessFor(tx,actor)) : undefined,
         }));
+        return { patch: Object.fromEntries(Object.entries(publicFieldValues(result.patch, policy)).filter(([name]) => !policy.fields[name]?.noWrite)), preview: publicFieldValues(result.preview, policy) };
       },{isolationLevel:"RepeatableRead"});
       return {ok:true,...result};
     } catch(error) {
@@ -629,6 +695,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
 
   const transaction: TransactionModel = {
     name: model.name, metadata: model.metadata, lines,
+    prepareInput: prepareDocumentInput,
+    present: (tx, actor, record) => publicDocument(tx, actor, record as Values & Document),
     async snapshot(tx, actor, id, operation = "read") {
       const scope = await authorize(tx, actor, operation);
       const row = await inScope(tx, id, scope) ? await repository.read(tx, id) : null;
@@ -668,7 +736,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     async refresh(tx, actor, previous) {
       const current = await transaction.snapshot(tx, actor, previous.id, "write");
       if (!current || current.revision !== previous.revision) throw new ModelValidationError(conflict);
-      await persist(tx, actor, current, "Líneas actualizadas", { previous });
+      await persist(tx, actor, current, "Líneas actualizadas", { previous, system: true });
     },
   };
   async function findUniqueInTransaction(tx: Prisma.TransactionClient, actor: ModelActor, field: string | readonly string[], value: unknown, scalar = false) {

@@ -1,74 +1,93 @@
-# Pendiente: ampliación de Accesos
+# Grupos por módulo
 
-Estado: siguiente pendiente acordado el 2026-11-20. Diseño por concretar; esta
-anotación no autoriza implementación, SQL ni cambios de permisos o asignaciones.
+Contrato vigente desde 2026-11-21. Implementación autorizada por el usuario.
+Reemplaza las propuestas del 2026-11-20 de pertenencia múltiple sin límite y la
+propuesta intermedia de un único grupo global por puesto.
 
-## Dirección acordada el 2026-11-20
+## Declaración y asignación
 
-- Mantener grupos y permisos predeterminados en los manifests de cada módulo.
-  No retirar ese contrato ni trasladar toda la definición de seguridad a BD.
-- Ajustes → Grupos detectaría los grupos del registro de manifests, indicando
-  módulo de origen. Aprovechar la gestión actual de Accesos; no duplicar grupos
-  ni crear otra fuente de identidad.
-- Asignar usuarios existentes mediante etiquetas en cada grupo. Un usuario puede
-  pertenecer a varios grupos para desempeñar varios roles. La propuesta de un
-  único grupo por usuario/Many2one se descartó expresamente.
-- Las configuraciones por campo/acción son excepciones: los elementos omitidos
-  conservan la implementación del modelo y los permisos generales vigentes.
-- Separar entrada directa a aplicaciones/pantallas de la consulta autorizada de
-  modelos relacionados. Sin entrada directa: sin tarjeta en el cajón ni acceso
-  mediante URL. Esto no implica denegar un catálogo que otra aplicación necesita
-  consultar mediante una relación, siempre con autorización explícita.
+Cada módulo declara `groups`, `access` y `rules` en su manifest. Ajustes → Grupos
+(ruta conservada `/erp/ajustes/accesos`) refleja esos grupos, su origen y permisos.
+Los usuarios se agregan mediante etiquetas. No se crean grupos automáticamente
+ni se inventan nuevos perfiles de negocio. Los overrides CRUD/import/export y
+los estados de reglas existentes conservan su contrato; no se purgan por este cambio.
 
-Caso de aceptación: un usuario entra a Contactos y selecciona País/Estado/Municipio,
-pero no ve Ubicaciones en el cajón, no abre sus rutas directas ni modifica sus
-catálogos. La consulta relacional debe conservar permisos de lectura/reglas y
-publicación mínima; ocultar una aplicación no concede acceso a todos sus datos.
-La entrada directa tampoco debe obtenerse sólo por tener lectura relacional.
+La pestaña Modelos muestra sólo los modelos del módulo dueño del grupo.
+`setModelAccess` rechaza cualquier lote que incluya modelos de otro módulo antes
+de escribir, incluso mezclados con modelos válidos. Abrir o guardar un grupo no
+borra los overrides históricos ajenos; esta fase conserva las filas existentes.
 
-## Interfaz propuesta, pendiente de contrato
+Un usuario puede pertenecer a varios módulos, pero a un solo grupo explícito de
+cada módulo. Para cambiarlo de grupo, quitarlo del anterior y asignarlo al nuevo.
+El servidor comprueba todos los miembros antes de escribir, en Serializable;
+una carrera se aborta o se rechaza, nunca combina ambos puestos. Al leer permisos,
+asignaciones antiguas incompatibles también se rechazan. `implies` reutiliza
+permisos y reglas; no crea pertenencias explícitas ni entrada a otros módulos.
+El selector compartido de etiquetas admite hasta 100 usuarios seleccionados;
+la acción conserva su límite previo de 1.000 miembros por petición.
 
-Formulario del grupo con nombre y estado activo (resolver origen y significado del
-estado sin contradecir el manifest), usuarios mediante tags y Notebook:
+Ejemplo para un módulo que ya tenga `pedido` (sólo documentación; no crea Ventas):
 
-- Modelos: conservar CRUD/import/export y reglas de registro existentes.
-- Campos: modelo, campo, no leer, no escribir e invisible. No leer debe impedir
-  entregar datos desde servidor; no escribir debe impedir mutaciones. Invisible
-  es presentación y no sustituye permisos. Estudiar implicación no leer→no escribir.
-- Acciones de modelo: modelo, acción y restricción. Propuesta: «Bloquear» deniega
-  ejecución y oculta el botón; no confundir con ocultación exclusivamente visual.
-  Mantener condiciones de @action, permisos del modelo y reglas de registro.
-- Aplicaciones: configuración de entrada directa y visibilidad, coherente con
-  modelos compartidos. Ocultar una tarjeta por sí solo no bloquea rutas/servicios.
+```ts
+groups: { vendedor: "Vendedor", responsable: "Responsable" },
+access: [
+  { group: "vendedor", models: "pedido", perms: "cru" },
+  { group: "responsable", models: "pedido", perms: "crud", export: true },
+],
+```
 
-Modelo/campo/acción se seleccionarían desde sus declaraciones registradas. La
-forma final de las tablas, el nombre Grupos frente a Accesos y la sintaxis de
-excepciones en manifest/BD siguen por diseñar. No hay API nueva implementada.
+## Entrada directa y relaciones
 
-## Siguiente paso y criterios de aceptación
+Entrada directa exige grupo explícito del módulo dueño más el permiso efectivo
+para la operación. Cajón, menús, rutas, metadatos y acciones de servidor comparten
+esta separación. Tener un permiso por herencia u override de otro módulo no
+concede entrada por sí solo. Sin snapshot de capacidades la presentación deniega.
+Admin conserva bypass y Ajustes/core.user permanecen administrativos.
+Contactos presenta core.partner: sus grupos se declaran en core, su dueño actual.
+No se modifica el contrato de aplicaciones manuales sin modelos declarativos.
+`drawer: false` sigue ocultando sólo la tarjeta, sin sustituir autorización.
 
-1. Diseñar el contrato de entrada directa frente a lectura relacional con el caso
-   Contactos/Ubicaciones, cubriendo rutas de lista/registro y endpoints de servidor:
-   no basta esconder tarjetas o enlaces ni confiar en una intención del cliente.
-2. Definir precedencia manifest/overrides, valores omitidos y combinación de varios
-   grupos. La propuesta anterior de que «false siempre gana» NO se acordó; no
-   adoptarla como decisión. Mantener explícitos grupos implícitos/heredados y
-   protección del administrador, sin ampliar privilegios al migrar configuraciones.
-3. Concretar restricciones de campos y acciones conforme al
-   [pendiente de permisos por campo](permisos-campos.md), preservando valores
-   omitidos, constraints, concurrencia, auditoría y personalizaciones.
-4. Acordar fases y comprobaciones con casos pequeños antes de implementar.
+Una relación Many2one/Many2many publicada permite consultar el destino desde el
+modelo de origen autorizado, sin grupo del módulo destino. El servidor resuelve
+el campo/destino desde el registro y entrega ID/etiqueta, no fichas completas.
+Conserva reglas del destino, dominios de formulario y reglas recursivas del padre
+One2many. Los filtros de listas usan la relación publicada sin un borrador de
+formulario; los parámetros sólo usan destinos de acciones publicadas autorizadas.
+El guardado revalida referencias; seleccionar no concede creación/edición/borrado
+al destino. Quick-create requiere sus permisos directos habituales.
 
-Aceptación: varios roles por usuario; asignación por tags sin cuentas nuevas;
-grupos detectados sin duplicación; permisos omitidos compatibles; lectura de
-relaciones mínima y autorizada sin entrada directa; URL/peticiones falsificadas
-denegadas; bloqueo real de campos/acciones; revocaciones efectivas y sin fugas en
-listas, búsquedas, lookups, exportaciones, historial y salidas derivadas.
+El alcance de lectura relacional es interno, ligado a actor, transacción y destino;
+no puede usarse para escribir ni abrir el endpoint completo del catálogo. También
+se reutiliza al resolver etiquetas, related/displayName, historial y las claves
+externas declaradas de importación/exportación. Esas proyecciones mantienen sus
+contratos y no publican campos sensibles por defecto.
 
-Oportunidad de simplificación: resolver pertenencia y capacidades una vez por
-petición y compartirlas entre navegación, campos y servicios. Aceptación: sin
-consultas/condiciones duplicadas por vista ni cachés privadas entre usuarios,
-con revalidación transaccional y semánticas de entrada/lectura claramente separadas.
+## Inicio desde cero y límites
+
+Retirados del código el grupo core.internal, su lectura automática de Partner y
+las concesiones de Ubicaciones a ese grupo. El primer perfil nuevo acordado es
+`ubicaciones.gestor`: CRUD sobre los cuatro catálogos e importar/exportar sobre
+País/Estado/Municipio; sin usuarios asignados. Los
+usuarios normales no obtienen entrada hasta declarar/asignar nuevos grupos; admin
+puede seguir configurando. No hubo DDL ni borrado de asignaciones, overrides o
+reglas de la base. IDs sin declaración se ignoran. Reutilizar un ID retirado exige
+revisar sus asignaciones y ajustes guardados antes de volver a declararlo.
+
+La unicidad por módulo se valida en servicios, con Serializable, sin una nueva
+restricción SQL: escrituras Prisma/SQL directas deben respetar este contrato.
+No se configura un grupo único en User ni se duplican identidades.
+
+Campos y Acciones incorporan las excepciones por grupo descritas en
+[Restricciones de campos y acciones](permisos-campos.md), con validación de datos
+en servidor y migración aditiva propia. `invisible` sigue siendo presentación.
+La visibilidad de pestañas y required por grupo permanecen pendientes.
+
+Oportunidad de simplificación: compartir el contexto transaccional de entrada y
+operación para reducir revalidaciones, manteniendo revocaciones y sin confiar en
+una intención enviada por el cliente. No añadir cachés entre usuarios.
+
+La evidencia de pruebas y las limitaciones actuales están en
+[Estado del proyecto](../estado-proyecto.md).
 
 ## Antecedente: reversión del 2026-11-16
 

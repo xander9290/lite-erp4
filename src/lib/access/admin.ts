@@ -3,8 +3,11 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { registeredModules as modules } from "../modules/installed";
 import { AccessError } from "../auth/policy";
 import type { ModelActor } from "../orm/context";
-import { accessCatalog, internalGroup } from "./engine";
+import { accessCatalog } from "./engine";
 import { accessOperations, accessPermissionKeys, type AccessPerms } from "./declare";
+import { assertUniqueModuleGroups } from "./membership";
+import { restrictionFields } from "../modules/element-access";
+import { fieldRestrictionKeys, type FieldRestriction } from "./element-policy";
 
 /** Administration of access control. Every function revalidates an active superuser inside its transaction. */
 async function assertAdmin(tx: Prisma.TransactionClient, actor: ModelActor) {
@@ -23,15 +26,13 @@ export async function accessOverview(prisma: PrismaClient, actor: ModelActor) {
   return prisma.$transaction(async tx => {
     await assertAdmin(tx, actor);
     const counts = await tx.accessUserGroup.groupBy({ by: ["groupId"], _count: { _all: true } });
-    // The internal group includes every active account implicitly (no stored memberships).
-    const activeUsers = await tx.user.count({ where: { active: true } });
     return modules.filter(definition => definition.access.groups.length).map(definition => ({
       id: definition.id, name: definition.application.name,
       groups: definition.access.groups.map(group => ({
         id: group.id, label: group.label,
         implies: group.implies.map(id => accessCatalog().groups.get(id)?.label ?? id),
-        members: group.id === internalGroup ? activeUsers : counts.find(row => row.groupId === group.id)?._count._all ?? 0,
-        implicit: group.id === internalGroup,
+        members: counts.find(row => row.groupId === group.id)?._count._all ?? 0,
+        implicit: false,
       })),
     }));
   }, { isolationLevel: "RepeatableRead" });
@@ -43,14 +44,16 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
   return prisma.$transaction(async tx => {
     await assertAdmin(tx, actor);
     const catalog = accessCatalog();
-    const [users, members, overrides, states] = await Promise.all([
+    const [users, members, overrides, states, fieldPolicies, actionPolicies] = await Promise.all([
       tx.user.findMany({ select: { id: true, login: true, active: true, isAdmin: true, partner: { select: { name: true } } }, orderBy: { login: "asc" } }),
       tx.accessUserGroup.findMany({ where: { groupId }, select: { userId: true } }),
       tx.accessModelOverride.findMany({ where: { groupId } }),
       tx.accessRuleState.findMany(),
+      tx.accessFieldRestriction.findMany({ where: { groupId } }),
+      tx.accessActionRestriction.findMany({ where: { groupId } }),
     ]);
     const memberIds = new Set(members.map(row => row.userId));
-    const models = modules.flatMap(definition => definition.models.map(model => {
+    const models = modules.filter(definition => definition.id === group.module).flatMap(definition => definition.models.map(model => {
       const defaults = catalog.grants.get(model.id)?.find(grant => grant.group === groupId)?.perms ?? none;
       const override = overrides.find(row => row.model === model.id);
       const perms = override ? { read: override.read, create: override.create, write: override.write, unlink: override.unlink, import: override.canImport, export: override.canExport } : defaults;
@@ -62,20 +65,68 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
       .filter(rule => rule.groups ? rule.groups.includes(groupId) : rule.models.some(model => reachable.has(model)))
       .map(rule => ({ id: rule.id, label: rule.label, scope: rule.groups ? "grupo" as const : "global" as const, models: rule.models, operations: rule.operations, active: states.find(state => state.ruleId === rule.id)?.active ?? true }));
     return {
-      group: { id: group.id, label: group.label, module: group.module, implies: group.implies.map(id => catalog.groups.get(id)?.label ?? id), implicit: group.id === internalGroup },
-      users: users.map(user => ({ id: user.id, login: user.login, name: user.partner?.name ?? user.login, active: user.active, isAdmin: user.isAdmin, member: group.id === internalGroup ? user.active : memberIds.has(user.id) })),
+      group: { id: group.id, label: group.label, module: group.module, implies: group.implies.map(id => catalog.groups.get(id)?.label ?? id), implicit: false },
+      users: users.map(user => ({ id: user.id, login: user.login, name: user.partner?.name ?? user.login, active: user.active, isAdmin: user.isAdmin, member: memberIds.has(user.id) })),
       models, rules,
+      fields: modules.filter(module => module.id === group.module).flatMap(module => module.models.flatMap(model => Object.entries(restrictionFields(model)).map(([field, label]) => ({
+        model: model.id, modelLabel: model.label, field, label,
+        policy: Object.fromEntries(fieldRestrictionKeys.map(key => [key, fieldPolicies.find(row => row.model === model.id && row.field === field)?.[key] ?? false])) as FieldRestriction,
+      })))),
+      actions: modules.filter(module => module.id === group.module).flatMap(module => module.models.flatMap(model => (model.contract.actions ?? []).map(action => ({ model: model.id, modelLabel: model.label, name: action.name, label: action.label, blocked: actionPolicies.some(row => row.model === model.id && row.action === action.name) })))),
     };
   }, { isolationLevel: "RepeatableRead" });
 }
 
+/** Opt-in policies only; deleting a policy restores normal model behavior. */
+export async function setFieldRestrictions(prisma: PrismaClient, actor: ModelActor, groupId: string, changes: readonly { model: string; field: string; policy: FieldRestriction }[]) {
+  const group = knownGroup(groupId);
+  if (!group || changes.length > 2000) throw new AccessError("DENIED");
+  const models = modules.find(module => module.id === group.module)?.models ?? [];
+  const seen = new Set<string>();
+  for (const change of changes) {
+    const model = models.find(model => model.id === change.model);
+    const key = `${change.model}|${change.field}`;
+    if (!model || !Object.hasOwn(restrictionFields(model), change.field) || seen.has(key) || Object.keys(change.policy).some(key => !fieldRestrictionKeys.includes(key as typeof fieldRestrictionKeys[number])) || fieldRestrictionKeys.some(key => typeof change.policy[key] !== "boolean")) throw new AccessError("DENIED");
+    seen.add(key);
+  }
+  await prisma.$transaction(async tx => {
+    await assertAdmin(tx, actor);
+    for (const { model, field, policy } of changes) {
+      const data = { ...policy, noWrite: policy.noWrite || policy.noRead };
+      if (!fieldRestrictionKeys.some(key => data[key])) await tx.accessFieldRestriction.deleteMany({ where: { groupId, model, field } });
+      else await tx.accessFieldRestriction.upsert({ where: { groupId_model_field: { groupId, model, field } }, create: { groupId, model, field, ...data }, update: data });
+    }
+  }, { isolationLevel: "Serializable" });
+}
+
+export async function setActionRestrictions(prisma: PrismaClient, actor: ModelActor, groupId: string, changes: readonly { model: string; action: string; blocked: boolean }[]) {
+  const group = knownGroup(groupId);
+  if (!group || changes.length > 1000) throw new AccessError("DENIED");
+  const models = modules.find(module => module.id === group.module)?.models ?? [];
+  const seen = new Set<string>();
+  for (const change of changes) {
+    const key = `${change.model}|${change.action}`;
+    if (seen.has(key) || typeof change.blocked !== "boolean" || !models.find(model => model.id === change.model)?.contract.actions?.some(action => action.name === change.action)) throw new AccessError("DENIED");
+    seen.add(key);
+  }
+  await prisma.$transaction(async tx => {
+    await assertAdmin(tx, actor);
+    for (const { model, action, blocked } of changes) {
+      if (!blocked) await tx.accessActionRestriction.deleteMany({ where: { groupId, model, action } });
+      else await tx.accessActionRestriction.upsert({ where: { groupId_model_action: { groupId, model, action } }, create: { groupId, model, action }, update: {} });
+    }
+  }, { isolationLevel: "Serializable" });
+}
+
 export async function setGroupMembers(prisma: PrismaClient, actor: ModelActor, groupId: string, userIds: readonly string[]) {
-  if (!knownGroup(groupId) || groupId === internalGroup) throw new AccessError("DENIED");
+  if (!knownGroup(groupId)) throw new AccessError("DENIED");
   const wanted = new Set(userIds);
   await prisma.$transaction(async tx => {
     await assertAdmin(tx, actor);
     const existing = await tx.user.count({ where: { id: { in: [...wanted] } } });
     if (existing !== wanted.size) throw new Error("Usuario inexistente.");
+    const memberships = await tx.accessUserGroup.findMany({ where: { userId: { in: [...wanted] }, groupId: { not: groupId } }, select: { userId: true, groupId: true } });
+    for (const userId of wanted) assertUniqueModuleGroups([groupId, ...memberships.filter(row => row.userId === userId).map(row => row.groupId)], accessCatalog().groups);
     await tx.accessUserGroup.deleteMany({ where: { groupId, userId: { notIn: [...wanted] } } });
     await tx.accessUserGroup.createMany({ data: [...wanted].map(userId => ({ userId, groupId })), skipDuplicates: true });
   }, { isolationLevel: "Serializable" });
@@ -83,9 +134,13 @@ export async function setGroupMembers(prisma: PrismaClient, actor: ModelActor, g
 
 /** Store only differences from the code defaults; matching the defaults removes the override. */
 export async function setModelAccess(prisma: PrismaClient, actor: ModelActor, groupId: string, changes: ReadonlyMap<string, AccessPerms>) {
-  if (!knownGroup(groupId)) throw new AccessError("DENIED");
+  const group = knownGroup(groupId);
+  if (!group) throw new AccessError("DENIED");
   const catalog = accessCatalog();
-  for (const model of changes.keys()) if (!catalog.models.has(model)) throw new Error("Modelo inexistente.");
+  for (const model of changes.keys()) {
+    if (!catalog.models.has(model)) throw new Error("Modelo inexistente.");
+    if (model.split(".")[0] !== group.module) throw new AccessError("DENIED");
+  }
   await prisma.$transaction(async tx => {
     await assertAdmin(tx, actor);
     for (const [model, perms] of changes) {

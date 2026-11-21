@@ -5,7 +5,9 @@ import { AccessError } from "../auth/policy";
 import type { ModelActor } from "../orm/context";
 import { prisma } from "../prisma";
 import { createModelService } from "../orm/service";
-import { authorizeModel, userGroups } from "../access/engine";
+import { authorizeModel, userGroups, withRelationRead, readActorElementPolicies } from "../access/engine";
+import { projectElementAccess } from "./element-access";
+import { emptyElementPolicies, hasPrivateFields } from "../access/element-policy";
 import { allowsActionGroups, type CapabilityActor } from "../access/capabilities";
 import { projectModelAccess } from "./access";
 import { createModelImageSigner } from "../uploads/model-image.server";
@@ -62,6 +64,8 @@ export async function creatorLookup(id: string, actor: ModelActor, input: unknow
   const request = parsed.data;
   return prisma.$transaction(async tx => {
     const scope = await authorizeModel(tx, actor, found.entry.id, "read");
+    const policy = projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models));
+    if (!policy.canRead(["createByUser.partner.name"])) throw new AccessError("DENIED");
     const inverse = `${found.entry.contract.name[0].toLowerCase()}${found.entry.contract.name.slice(1)}CreatedRecords`;
     const ids = request.id ? [request.id] : request.ids;
     const where = {
@@ -98,6 +102,11 @@ export async function relationQuickCreate(model: string, field: string, actor: M
   const found = getModuleModel(model);
   const descriptor = found && Object.hasOwn(found.entry.contract.many2manyFields, field) ? found.entry.contract.many2manyFields[field] : undefined;
   if (!found || !descriptor?.many2many.create) throw new Error("Relación no publicada.");
+  await prisma.$transaction(async tx => {
+    await authorizeModel(tx, actor, model, "read");
+    const access = projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models));
+    if (!access.canRead([field]) || access.fields[field]?.noWrite) throw new AccessError("DENIED");
+  });
   const target = byPrismaName.get(descriptor.many2many.target);
   if (!target) throw new Error("Relación no publicada.");
   const name = typeof input === "string" ? input.trim().replace(/\s+/g, " ") : "";
@@ -118,12 +127,13 @@ export async function relationLookup(model: string, field: string, actor: ModelA
   const found = getModuleModel(model);
   if (!found || !Object.hasOwn(lookupTargets(found.entry), field)) throw new Error("Relación no publicada.");
   const relation = relationDomains(found.entry).find(relation => relation.field === field);
-  const envelope = z.strictObject({ request: modelLookupSchema, draft: z.record(z.string(), z.unknown()) }).parse(input);
-  if (!relation) throw new Error("La relación no declara dominio.");
-  const target = byPrismaName.get(relation.target)!;
-  const where = relationDomainWhere(found.entry, target, relation.domain, envelope.draft);
-  return prisma.$transaction(async tx => {
-    await authorizeModel(tx, actor, found.entry.id, "read");
+  const envelope = z.strictObject({ request: modelLookupSchema, draft: z.record(z.string(), z.unknown()), filter: z.boolean().default(false) }).parse(input);
+  if (envelope.filter && !found.entry.list.fields.includes(field)) throw new Error("Filtro no publicado.");
+  const target = getModuleModel(lookupTargets(found.entry)[field])!.entry;
+  const where = relation && !envelope.filter ? relationDomainWhere(found.entry, target, relation.domain, envelope.draft) : undefined;
+  return prisma.$transaction(tx => withRelationRead(tx, actor, found.entry.id, target.id, async () => {
+    const policy = projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models));
+    if (!policy.canRead([field, ...(relation && !envelope.filter ? domainDependencies(relation.domain) : [])])) throw new AccessError("DENIED");
     const service = modelService(target.id);
     const candidates = await service.lookupInTransaction(tx, actor, envelope.request, where);
     if (!envelope.request.id && !envelope.request.ids) return candidates;
@@ -131,7 +141,24 @@ export async function relationLookup(model: string, field: string, actor: ModelA
     const selections = await service.lookupInTransaction(tx, actor, envelope.request);
     const matches = new Set(candidates.items.map(item => item.value));
     return { ...selections, items: selections.items.map(item => ({ ...item, domainValid: matches.has(item.value) })) };
-  }, { isolationLevel: "RepeatableRead" });
+  }), { isolationLevel: "RepeatableRead" });
+}
+
+/** Parameter targets are fixed by the published action, never by a client target id. */
+export async function parameterLookup(model: string, actionName: string, parameter: string, actor: ModelActor, input: unknown): Promise<Many2OneResult> {
+  const found = getModuleModel(model);
+  const action = found?.entry.contract.actions?.find(action => action.name === actionName);
+  const field = action?.params && Object.hasOwn(action.params, parameter) ? action.params[parameter] : undefined;
+  const target = field?.kind === "many2one" ? byPrismaName.get(field.target) : undefined;
+  if (!found || !action || !target) throw new AccessError("DENIED");
+  return prisma.$transaction(tx => withRelationRead(tx, actor, model, target.id, async () => {
+    await authorizeModel(tx, actor, model, "write");
+    const access = projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models));
+    if (access.blockedActions.includes(actionName) || access.privateDocument || hasPrivateFields(access.fields)) throw new AccessError("DENIED");
+    const user = await tx.user.findUnique({ where: { id: actor.id }, select: { isAdmin: true } });
+    if (!user?.isAdmin && !allowsActionGroups({ isAdmin: false, groups: await userGroups(tx, actor.id) }, found.module.id, action.groups)) throw new AccessError("DENIED");
+    return modelService(target.id).lookupInTransaction(tx, actor, input);
+  }), { isolationLevel: "RepeatableRead" });
 }
 
 export function modelService(id: string): Service {
@@ -147,7 +174,7 @@ export function modelService(id: string): Service {
     if (entry.list.fields.includes(field) || Object.hasOwn(entry.contract.many2manyFields, field)) relations[field] = async request => {
       const actor = operationActor.getStore();
       if (!actor) throw new AccessError("UNAUTHENTICATED");
-      return modelService(target).lookup(prisma, actor, request);
+      return prisma.$transaction(tx => withRelationRead(tx, actor, entry.id, target, () => modelService(target).lookupInTransaction(tx, actor, request)), { isolationLevel: "RepeatableRead" });
     };
   }
   if (!module.native && entry.list.fields.includes("createBy")) relations.createBy = async request => {
@@ -166,15 +193,17 @@ export function modelService(id: string): Service {
     })),
     owners: module.models.flatMap(parent => Object.values(parent.contract.one2manyFields).filter(field => field.one2many.target === entry.contract.name).map(field => ({ inverse: field.one2many.inverse, parent: () => modelService(parent.id).transaction }))),
     list: entry.list, audit: true, defaultSort: entry.defaultSort, domain: entry.declaration.domain,
+    elementAccess: async (tx, actor) => projectElementAccess(entry, await readActorElementPolicies(tx, actor), runtimeModels),
     validateRelations: async (tx, actor, values) => {
-      for (const relation of relationDomains(entry)) {
-        const selected = relation.many ? values[relation.field] as string[] : values[relation.field] ? [String(values[relation.field])] : [];
+      for (const [field, targetId] of Object.entries(lookupTargets(entry))) {
+        const relation = relationDomains(entry).find(relation => relation.field === field);
+        const selected = Object.hasOwn(entry.contract.many2manyFields, field) ? (values[field] as string[] | undefined) ?? [] : values[field] ? [String(values[field])] : [];
         if (!selected.length) continue;
-        const target = byPrismaName.get(relation.target)!;
-        const draft = Object.fromEntries(domainDependencies(relation.domain).map(name => [name, values[name]]));
-        const where = relationDomainWhere(entry, target, relation.domain, draft);
-        const result = await modelService(target.id).lookupInTransaction(tx, actor, { ids: selected }, where);
-        if (result.total !== selected.length) throw new ModelValidationError("Revisa las relaciones seleccionadas.", { [relation.field]: "La selección no cumple el dominio vigente o no está disponible." });
+        const target = getModuleModel(targetId)!.entry;
+        const draft = Object.fromEntries((relation ? domainDependencies(relation.domain) : []).map(name => [name, values[name]]));
+        const where = relation ? relationDomainWhere(entry, target, relation.domain, draft) : undefined;
+        const result = await withRelationRead(tx, actor, entry.id, target.id, () => modelService(target.id).lookupInTransaction(tx, actor, { ids: selected }, where));
+        if (result.total !== selected.length) throw new ModelValidationError("Revisa las relaciones seleccionadas.", { [field]: "La selección no cumple el dominio vigente o no está disponible." });
       }
     },
     collectionNullable: entry.extensions.flatMap(extension => extension.fields),
@@ -185,7 +214,7 @@ export function modelService(id: string): Service {
       // Unregistered/manual targets have no declarative read contract. Do not query them.
       if (!related) return new Map<string, string>();
       try {
-        const result = await modelService(related.id).lookupInTransaction(tx, actor, { ids });
+        const result = await withRelationRead(tx, actor, entry.id, related.id, () => modelService(related.id).lookupInTransaction(tx, actor, { ids }));
         return new Map(result.items.map(item => [item.value, item.label]));
       } catch (error) {
         if (error instanceof AccessError && error.code === "DENIED") return new Map<string, string>();
@@ -198,7 +227,7 @@ export function modelService(id: string): Service {
       // Infrastructure/manual models (User, Partner) carry no module record rules.
       if (!related) return new Set(ids);
       let scope: Record<string, unknown> | undefined;
-      try { scope = await authorizeModel(tx, actor, related.id, "read"); }
+      try { scope = await withRelationRead(tx, actor, entry.id, related.id, () => authorizeModel(tx, actor, related.id, "read")); }
       catch (error) { if (error instanceof AccessError && error.code === "DENIED") return new Set<string>(); throw error; }
       const delegate = (tx as unknown as Record<string, { findMany(args: unknown): Promise<{ id: string }[]> }>)[related.delegate];
       const rows = await delegate.findMany({ where: { AND: [{ id: { in: [...ids] } }, ...(scope ? [scope] : [])] }, select: { id: true } });
@@ -208,6 +237,8 @@ export function modelService(id: string): Service {
     authorizeAction: async (tx, actor, action) => {
       const user = await tx.user.findUnique({ where: { id: actor.id }, select: { isAdmin: true } });
       if (user?.isAdmin) return;
+      const policy = projectElementAccess(entry, await readActorElementPolicies(tx, actor), runtimeModels);
+      if (policy.blockedActions.includes(action.name) || policy.privateDocument || hasPrivateFields(policy.fields)) throw new AccessError("DENIED");
       const groups = await userGroups(tx, actor.id);
       if (!allowsActionGroups({ isAdmin: false, groups }, module.id, action.groups)) throw new AccessError("DENIED");
     },
@@ -223,6 +254,7 @@ function lookupTargets(entry: ModuleModel): Record<string, string> {
   const targets: Record<string, string> = {};
   for (const [field, metadata] of Object.entries(entry.metadata)) {
     if (metadata.kind !== "many2one" || metadata.sensitive) continue;
+    if (!entry.clientFields.includes(field) && !entry.list.fields.includes(field)) continue;
     const target = byPrismaName.get(metadata.target);
     if (target) targets[field] = target.id;
   }
@@ -250,7 +282,16 @@ export function imageSigner(id: string) {
         catch (error) { if (error instanceof AccessError && error.code === "DENIED") await authorizeModel(tx, actor, id, "create"); else throw error; }
       });
     };
-    signer = createModelImageSigner({ authorize }, { metadata: found.entry.metadata }, images);
+    const uploadSigner = createModelImageSigner({ authorize }, { metadata: found.entry.metadata }, images);
+    signer = async field => {
+      if (typeof field !== "string") throw new AccessError("DENIED");
+      const actor = await (await import("../auth/access")).requireUser();
+      await prisma.$transaction(async tx => {
+        const policy = projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models));
+        if (policy.fields[field]?.noRead || policy.fields[field]?.noWrite) throw new AccessError("DENIED");
+      }, { isolationLevel: "RepeatableRead" });
+      return uploadSigner(field);
+    };
     signers.set(id, signer);
   }
   return signer;
@@ -261,9 +302,16 @@ function lineConfigs(module: ModuleDefinition, owner: ModuleModel, access?: Capa
   return Object.fromEntries(Object.entries(owner.contract.one2manyFields).map(([name, field]) => {
     const child = module.models.find(model => model.contract.name === field.one2many.target)!;
     const nested = lineConfigs(module, child, access);
+    const fieldAccess = projectElementAccess(child, { fieldAccess: access?.fieldAccess ?? {}, blockedActions: access?.blockedActions ?? {} }, modules.flatMap(module => module.models)).fields;
     return [name, {
+      fieldAccess,
       metadata: field.one2many, model: child.id,
-      fields: Object.fromEntries(Object.entries(child.metadata).filter(([key]) => key !== field.one2many.inverse)),
+      fields: Object.fromEntries(Object.entries(child.metadata).filter(([key]) => key !== field.one2many.inverse).map(([key, field]) => {
+        if (!fieldAccess[key]?.noRead) return [key, field];
+        const { defaultValue: _defaultValue, ...safe } = field;
+        void _defaultValue;
+        return [key, { ...safe, defaultKind: "empty" as const }];
+      })),
       lookups: Object.fromEntries(Object.entries(lookupTargets(child)).filter(([key]) => key !== field.one2many.inverse)),
       capabilities: access?.modelAccess[child.id] ?? { read: false, create: false, write: false, unlink: false },
       ...(Object.keys(nested).length ? { lines: nested } : {}),
@@ -280,6 +328,10 @@ export async function childCollectionList(parentModel: string, field: string, pa
   const found = getModuleModel(parentModel);
   const collection = found && Object.hasOwn(found.entry.contract.childCollections, field) ? found.entry.contract.childCollections[field] : undefined;
   if (!found || !collection || typeof parentId !== "string" || !parentId.trim() || parentId.length > 100) throw new Error("MODEL_NOT_FOUND");
+  await prisma.$transaction(async tx => {
+    await authorizeModel(tx, actor, found.entry.id, "read");
+    if (!projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models)).canRead([field])) throw new AccessError("DENIED");
+  }, { isolationLevel: "RepeatableRead" });
   const parent = await modelService(found.entry.id).read(prisma, actor, parentId);
   if (!parent.ok) return { ok: false as const, error: parent.error };
   const child = byPrismaName.get(collection.target)!;
@@ -292,22 +344,30 @@ export function modelClientConfig(id: string, access?: CapabilityActor, nested =
   if (!found) throw new Error("MODEL_NOT_FOUND");
   const { module, entry } = found;
   const { contract } = entry;
+  const elements = projectElementAccess(entry, access ? { fieldAccess: access.fieldAccess ?? {}, blockedActions: access.blockedActions ?? {} } : emptyElementPolicies, modules.flatMap(module => module.models));
   const published = (entry.contract.actions ?? []) as readonly ModelAction[];
   const config: ModelClientConfig = {
+    fieldAccess: elements.fields,
     ...(entry.declaration.transfer ? { transfer: { key: entry.declaration.transfer.key, fields: transferHeaders(entry.declaration.transfer), collections: transferCollections(entry.declaration.transfer),
       canImport: Boolean(access?.isAdmin || (access?.modelAccess[id]?.read && access.modelAccess[id]?.import && (access.modelAccess[id]?.create || access.modelAccess[id]?.write))),
       canExport: Boolean(access?.isAdmin || (access?.modelAccess[id]?.read && access.modelAccess[id]?.export)),
     } } : {}),
     id: entry.id, module: module.id, moduleName: module.application.name, key: entry.key, name: contract.name, label: entry.label, route: entry.route,
-    fields: Object.fromEntries(entry.clientFields.map(name => [name, entry.metadata[name]])),
+    fields: Object.fromEntries(entry.clientFields.map(name => {
+      const field = entry.metadata[name];
+      if (!elements.fields[name]?.noRead) return [name, field];
+      const { defaultValue: _defaultValue, ...safe } = field;
+      void _defaultValue;
+      return [name, { ...safe, defaultKind: "empty" as const }];
+    })),
     preview: Object.fromEntries(Object.entries((contract.previewFields ?? {}) as Readonly<Record<string, { metadata: FieldMetadata }>>).map(([name, field]) => [name, field.metadata])),
     related: Object.keys(contract.relatedFields ?? {}),
-    reactionRules: contract.reactionRules ?? [],
+    reactionRules: (contract.reactionRules ?? []).filter(rule => elements.canRead([...rule.fields, ...rule.reads, ...rule.preview]) && rule.writes.every(name => !elements.fields[name]?.noWrite)),
     lookups: lookupTargets(entry),
     many2many: Object.fromEntries(Object.entries(contract.many2manyFields).map(([name, field]) => [name, field.many2many])),
     lines: lineConfigs(module, entry, access),
     // Names and labels only; the server validates the name and re-checks permissions on every call.
-    actions: published.map(({ name, label, params }) => ({ name, label, ...(params ? { params, lookups: Object.fromEntries(Object.entries(params).filter(([, field]) => field.kind === "many2one").map(([name, field]) => {
+    actions: published.map(({ name, label, params }) => ({ name, label, ...(params ? { params, sourceModel: entry.id, lookups: Object.fromEntries(Object.entries(params).filter(([, field]) => field.kind === "many2one").map(([name, field]) => {
       const target = field.kind === "many2one" && byPrismaName.get(field.target);
       if (!target) throw new Error(`${entry.id}: parámetro Many2one sin destino declarativo registrado.`);
       return [name, target.id];

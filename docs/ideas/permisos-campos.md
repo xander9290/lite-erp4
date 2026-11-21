@@ -1,78 +1,98 @@
-# Permisos por campo y presentación por grupo
+# Restricciones de campos y acciones por grupo
 
-Pendiente solicitado y ampliado el 2026-11-14. El usuario confirmó mantenerlo como
-pendiente de diseño; esta nota no autoriza implementación ni cambios en Flota.
+Implementación del 2026-11-21. Código y migración preparados; comprobar en
+[Estado del proyecto](../estado-proyecto.md) si el SQL está aplicado en esta máquina.
+Contrato de pertenencia y entrada en [Grupos por módulo](access-manager.md).
 
-Actualización del 2026-11-20: forma parte del siguiente pendiente de
-[Grupos y separación de entrada/consulta relacional](access-manager.md).
-Se mantienen grupos declarados en manifests y varios grupos por usuario,
-asignables mediante tags. Las excepciones de campos/acciones omitidas conservan
-el comportamiento normal del modelo; la composición entre grupos y su contrato
-final siguen pendientes. La decisión de un solo grupo por usuario fue descartada.
+## Configuración
 
-## Objetivo y alcance
+Ajustes → Grupos → grupo muestra Modelos, Campos, Acciones y Reglas de registro.
+Campos y acciones proceden del registro compuesto de modelos del módulo dueño;
+no se aceptan nombres arbitrarios ni elementos de otro módulo. Los permisos base
+CRUD/import/export y los grupos continúan en los manifests. Las excepciones nuevas
+se guardan en AccessFieldRestriction y AccessActionRestriction; no hay nueva sintaxis
+field/action en el manifest. Sólo un administrador activo puede administrarlas.
 
-Ampliar el sistema actual de grupos, permisos por modelo y reglas de registro
-para admitir restricciones de lectura/escritura por campo y condiciones de
-interfaz por grupo: invisible, readOnly, required y visibilidad de NotebookPage.
-La futura administración se haría desde el módulo de **Accesos**, incluyendo
-presentaciones disponibles (Lista/Card/Kanban), Fields de formularios y columnas
-de colecciones. El núcleo compartido consumiría las capacidades una vez para
-evitar condiciones y consultas de permisos repetidas en cada presentación.
-Buscar una declaración coherente con Fields/modelos y manifest, conservando TSX
-personalizable. La sintaxis y la distribución exacta de responsabilidades están
-por diseñar; no hay una API nueva disponible.
+| Restricción | Efecto |
+| --- | --- |
+| No leer | Omite el valor de las respuestas y del formulario. Implica no escribir. |
+| No escribir | Rechaza cambios del cliente; admite el valor actual sin modificarlo. |
+| Invisible | Oculta el control/columna estándar; conserva valor y validación. |
+| Sólo lectura | Bloquea el control estándar. No sustituye No escribir en servidor. |
+| Acción bloqueada | Oculta el botón y deniega el método y su transición Kanban. |
 
-Distinguir permisos sobre datos de presentación: ocultar un Field o una pestaña
-no impide leer su payload ni escribirlo desde una petición. El invisible actual
-conserva valores y validación. La obligatoriedad de negocio debe comprobarse en
-el servidor, sin que una prop de UI relaje constraints o reglas del modelo.
+Sin marcar conserva las condiciones habituales; no concede permisos. Se acumulan
+las restricciones positivas del grupo efectivo y sus grupos implicados; desmarcar
+no cancela una restricción heredada. El administrador conserva bypass. Una opción
+TSX como invisible=false o readOnly=false no anula una restricción del grupo.
+Eliminar todas las marcas retira únicamente esa fila de política. No se borran
+miembros, overrides, reglas ni políticas no incluidas en la petición.
 
-## Diseño pendiente y criterios de aceptación
+## Lectura, edición y derivados
 
-- Separar en Accesos las políticas de datos (leer/escribir un campo) de las de
-  presentación (vistas disponibles, campos/columnas visibles y sólo lectura).
-  La habilitación visual de una vista no concede acceso a los datos del modelo.
-  Definir cómo se guardan/configuran reglas por grupo y se combinan con Fields,
-  manifest y personalizaciones TSX; no hay sintaxis ni interfaz decididas todavía.
-- Extender la [proyección de capacidades por modelo ya implementada](../capacidades-modelos.md)
-  a los contratos de campos/presentación que se acuerden. Menús, Nuevo/Eliminar,
-  formularios y colecciones ya comparten CRUD por actor; no duplicar ese motor
-  ni crear cachés privadas compartidas entre usuarios.
-- Respetar esta precedencia: invisible=false puede anular ocultación por diseño,
-  pero no un permiso de lectura denegado; readOnly=false tampoco puede conceder
-  escritura. Campos sin lectura no llegan al navegador ni a renderCard/renderCell.
-- Definir composición de grupos, herencia, overrides, superusuario y políticas
-  por defecto, preservando los contratos actuales cuando no se declaren opciones.
-- Revalidar permisos por campo junto con sesión, modelo y reglas de registro en
-  las transacciones. No enviar valores sin lectura ni aceptar cambios sin
-  escritura, incluyendo peticiones construidas fuera de la UI.
-- Diseñar contratos parciales, defaults y esquemas de guardado: omitir un campo
-  restringido no debe borrarlo ni causar una escritura involuntaria. Resolver
-  creación y required sin generar formularios imposibles de guardar ni relajar
-  restricciones SQL; no prometer que bastará con modificar componentes.
-- Revisar todos los canales de salida/entrada: formularios, colecciones,
-  búsqueda/filtros/orden/grupos, lookups, displayName/título de pestaña, related,
-  compute, reacciones, historial/notas y acciones del modelo. Las dependencias y
-  resultados derivados no deben revelar datos restringidos. Definir explícitamente
-  cómo operan hooks y acciones autorizadas sobre campos no editables por el actor.
-- Publicar al cliente sólo capacidades y metadatos autorizados para adaptar los
-  Fields y NotebookPage. Conservar RHF/Zod, navegación, revisión, auditoría y vistas
-  personalizadas; condiciones React siguen siendo presentación.
-- Probar con cuentas/grupos de fixture lectura denegada, escritura falsificada,
-  combinaciones de grupos, cambios de asignación, required, pestañas y borradores;
-  incluir demo ficticia y documentación. No aplicar cambios a Flota por anticipación.
+El servicio revalida sesión, permisos y políticas en cada transacción, sin caché
+por usuario compartida. Las respuestas de lectura, guardado, listas y acciones
+eliminan propiedades sin lectura, también en líneas anidadas. ID y revisión siguen
+siendo metadatos. El contrato cliente excluye esos campos de defaults/RHF/Zod;
+no publica su default literal. Los tipos estáticos del modelo describen su esquema
+completo; el DTO efectivo puede omitir propiedades por actor.
 
-No se presupone una migración SQL de los modelos de negocio; evaluar durante el
-diseño si hacen falta cambios en el almacenamiento de políticas u overrides.
+Al editar, los valores protegidos se recuperan del snapshot autorizado, antes de
+normalizar, validar y ejecutar hooks. Un valor enviado para No leer se rechaza,
+incluso si coincide: no se ofrece un oráculo para adivinarlo. No escribir admite
+el valor actual o su omisión. Al crear se usa el default del servidor; si un campo
+required protegido no tiene un default válido, la creación falla. No se relaja
+la validación de negocio. Las líneas conservan sus identidades, revisiones,
+propiedad y relación inversa controlada por servidor.
 
-Siguiente paso al retomar: diseñar un caso pequeño con ejemplos de declaración,
-payload autorizado y guardado antes/después, y acordar el contrato antes de
-implementar. Beneficio esperado: evitar condiciones/permisos duplicados entre
-vistas y servidor sin ocultar los límites de autorización.
+No leer excluye búsqueda, filtros, orden y agrupación sobre el campo. Un orden
+predeterminado restringido usa ID; un orden explícito restringido se rechaza.
+DisplayName y etiquetas lookup usan ID si dependen de un campo sin lectura.
+Related y compute siguen sus dependencias declaradas; los resultados no legibles
+no se publican. Las reacciones con entradas, lecturas o previews no legibles no
+se ejecutan. También se comprueban relaciones, dominios del borrador, creación
+rápida, firma de imágenes y colecciones hijas. Invisible no protege datos enviados.
 
-## Referencias
+El historial elimina cambios de campos sin lectura y protege el autor cuando sus
+dependencias no son legibles. No reescribe eventos almacenados ni analiza texto
+libre de notas. Los hooks y constraints mantienen el snapshot completo y operan
+como lógica confiable del servidor; los errores de validación al guardar con
+campos privados son genéricos para no revelar valores en mensajes.
 
-- [Control de accesos actual](../modulos-declarativos.md#5-control-de-accesos).
-- [Estado y siguiente ejercicio](../estado-proyecto.md).
-- [Plan de módulos declarativos](modulos-declarativos.md).
+## Límites explícitos
+
+Las acciones actuales no declaran dependencias de lectura. Por seguridad, cualquier
+campo efectivo sin lectura del documento, incluidas sus líneas, bloquea sus acciones y movimientos
+Kanban, además de las acciones bloqueadas expresamente. No escribir impide cambiar
+el estado mediante arrastre; un método de negocio autorizado sí puede modificar
+campos no editables como lógica del servidor. No se añadió una API de dependencias
+de acciones por anticipación.
+
+Las transferencias son conservadoras: se deniegan si un modelo tocado por el
+contrato (dueño, líneas o destinos de referencias) tiene campos sin lectura.
+Importar también se deniega si el dueño o sus líneas tienen campos sin escritura.
+No se exportan archivos parciales ni se eluden permisos al revisar/aplicar un plan.
+La comprobación del servidor prevalece sobre botones de una pantalla anterior.
+
+Este contrato se integra en los servicios y vistas declarativos estándar. Consultas
+Prisma, proveedores y pantallas manuales deben adaptar explícitamente su contrato;
+no se interceptan consultas arbitrarias ni se analizan los métodos del modelo.
+Perfil propio conserva su servicio específico. No se configuran políticas reales
+ni nuevos grupos para probarlo. Required por grupo, visibilidad de NotebookPage y
+restricciones por presentación completa siguen pendientes.
+
+## Migración y comprobaciones
+
+20261121220000_field_action_restrictions crea dos tablas vacías y sus claves
+primarias compuestas; no cambia datos de negocio ni asignaciones. Generar Prisma
+no aplica SQL. Aplicarla en una base existente requiere la aprobación del usuario.
+
+Demo ficticia RHF/Zod: /sample#field-action-access. Pruebas de políticas,
+administración, DTOs, inputs falsificados, defaults, dependencias y controles;
+integraciones PostgreSQL en proyectos/esquemas temporales comprueban capacidades,
+guardado parcial, acciones, líneas y transferencias. Evidencia y limitaciones
+actuales en [Estado del proyecto](../estado-proyecto.md).
+
+Oportunidad de simplificación: compartir una proyección de políticas por actor y
+transacción para evitar lecturas repetidas en documentos grandes. Aceptación:
+misma revalidación y aislamiento, sin cachés globales ni pérdida de revocaciones.

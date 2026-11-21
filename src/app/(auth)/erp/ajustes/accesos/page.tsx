@@ -28,8 +28,8 @@ async function Overview() {
 
 export default function AccessPage() {
   return <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-2 sm:p-3">
-    <Breadcrumbs items={[{ label: "Aplicaciones", href: "/erp" }, { label: "Ajustes", href: "/erp/ajustes" }, { label: "Accesos" }]} />
-    <h1 className="sr-only">Control de accesos</h1>
+    <Breadcrumbs items={[{ label: "Aplicaciones", href: "/erp" }, { label: "Ajustes", href: "/erp/ajustes" }, { label: "Grupos" }]} />
+    <h1 className="sr-only">Grupos por módulo</h1>
     <p className="text-sm text-base-content/70">Los grupos, permisos y reglas se declaran en el manifest de cada módulo. Aquí se asignan usuarios y se ajustan permisos y reglas. Los administradores tienen acceso total.</p>
     <Suspense fallback={<p role="status" className="text-sm text-base-content/60">Cargando grupos…</p>}><Overview /></Suspense>
   </div>;

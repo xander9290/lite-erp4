@@ -3,6 +3,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypt
 import { z } from "zod";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { AccessError } from "../auth/policy";
+import { assertTransferElementAccess } from "./transfer-relations";
 import { authorizeModel, modelPerms, userGroups } from "../access/engine";
 import { ModelValidationError, type ModelActor } from "../orm/context";
 import { transferColumns, transferHeaders, transferKeyFields } from "./transfer-contract";
@@ -30,6 +31,8 @@ export function transferContract(model: string) {
 /** Transfer grants never replace CRUD or record rules. Revalidated in each transaction. */
 export async function authorizeTransfer(tx: Prisma.TransactionClient, actor: ModelActor, model: string, operation: "import" | "export") {
   await authorizeModel(tx, actor, model, "read");
+  const { entry, spec } = transferContract(model);
+  await assertTransferElementAccess(tx, actor, entry, spec, operation);
   const user = await tx.user.findUnique({ where: { id: actor.id }, select: { isAdmin: true } });
   if (!user?.isAdmin && !(await modelPerms(tx, await userGroups(tx, actor.id), model))[operation]) throw new AccessError("DENIED");
 }

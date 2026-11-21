@@ -1,5 +1,10 @@
 # Nombres de presentación de modelos
 
+Desde 2026-11-21 las relaciones publicadas resuelven etiquetas y dependencias
+mediante lectura relacional autorizada desde el origen, conservando reglas del
+destino. No requieren entrada directa a su aplicación ni la conceden. Ver
+[Grupos por módulo](ideas/access-manager.md).
+
 Los modelos declarativos definen una presentación canónica en el servidor:
 `displayName` personalizado → `name` Text no sensible y no vacío → ID.
 Un método vacío también usa esa cadena de fallback; uno que devuelve otro tipo

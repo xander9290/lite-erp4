@@ -10,10 +10,11 @@ const users = defineApplication({ ...contacts, id: "usuarios", name: "Usuarios",
 test("applications presenting core models follow native read capabilities and fail closed without a snapshot", () => {
   const app = defineApplication({ ...contacts, accessModels: ["core.partner"], menus: [{ id: "contacts", label: "Contactos", href: "/erp/contactos", model: "core.partner" }] });
   assert.equal(canOpenApplication(app, { isAdmin: false }), false);
-  const allowed = { isAdmin: false, modelAccess: { "core.partner": { read: true, create: false, write: false, unlink: false } } };
+  const allowed = { isAdmin: false, directGroups: new Set(["core.contacts"]), modelAccess: { "core.partner": { read: true, create: false, write: false, unlink: false } } };
   assert.equal(canOpenApplication(app, allowed), true);
   assert.equal(applicationNavigation(app, allowed)?.menus.length, 1);
   assert.equal(canOpenApplication(app, { ...allowed, modelAccess: {} }), false);
+  assert.equal(canOpenApplication(app, { ...allowed, directGroups: new Set(), groups: new Set(["core.contacts"]) }), false, "inherited read does not grant direct entry");
   assert.throws(() => defineApplication({ ...app, accessModels: ["other.partner"] }), /Modelos de acceso inválidos/);
 });
 
@@ -24,7 +25,7 @@ test("effective model reads control declarative apps/menus, overrides and empty 
   ] });
   const read = { read: true, create: false, write: false, unlink: false };
   const denied = { ...read, read: false };
-  const actor = { isAdmin: false, groups: new Set(["override.group"]), modelAccess: { "contactos.item": read, "contactos.catalog": denied } };
+  const actor = { isAdmin: false, groups: new Set(["contactos.custom"]), modelAccess: { "contactos.item": read, "contactos.catalog": denied } };
   assert.equal(canOpenApplication(app, actor), true, "effective override can grant read without a default reader group");
   assert.deepEqual(applicationNavigation(app, actor)?.menus.map(item => item.id), ["items"]);
   const inverse = { ...actor, modelAccess: { "contactos.item": denied, "contactos.catalog": read } };
@@ -139,8 +140,9 @@ test("dependency model menus keep application access separate and follow destina
   const registry = createApplicationRegistry([app, locations]);
   assert.deepEqual(registry.all().map(item => item.id), ["ubicaciones", "contactos"]);
   const read = { read: true, create: false, write: false, unlink: false };
-  const actor = { isAdmin: false, modelAccess: { "core.partner": read, "ubicaciones.pais": read } };
+  const actor = { isAdmin: false, directGroups: new Set(["core.contacts", "ubicaciones.reader"]), modelAccess: { "core.partner": read, "ubicaciones.pais": read } };
   assert.deepEqual(applicationNavigation(app, actor)?.menus.map(item => item.id), ["contacts", "settings"]);
+  assert.deepEqual(applicationNavigation(app, { ...actor, directGroups: new Set(["core.contacts"]) })?.menus.map(item => item.id), ["contacts"], "relational read never shows the dependency menu");
   assert.deepEqual(applicationNavigation(app, { ...actor, modelAccess: { "core.partner": read } })?.menus.map(item => item.id), ["contacts"]);
   assert.equal(applicationNavigation(app, { ...actor, modelAccess: { "ubicaciones.pais": read } }), null, "catalog read alone does not open Contactos");
   assert.equal(applicationNavigation(app, { isAdmin: true }), null, "model capabilities must be supplied even for admin presentation");

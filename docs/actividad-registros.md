@@ -4,6 +4,11 @@ Implementado el 2026-11-10. El alcance inicial del chatter es registrar creació
 cambios guardados y notas internas. No incluye correos, adjuntos, actividades,
 menciones, edición/borrado de notas ni seguimiento de cada pulsación del formulario.
 
+Desde 2026-11-21 los servicios declarativos filtran los cambios de campos sin
+lectura y protegen la identidad del autor según sus dependencias autorizadas;
+no reescriben eventos ni analizan texto libre de notas. Ver
+[Restricciones por grupo](ideas/permisos-campos.md).
+
 ## Por defecto en los servicios declarativos
 
 Cada `createModelService` captura la creación y expone `activity` y `addNote`.
@@ -63,8 +68,9 @@ Funciona también con eventos antiguos que sólo almacenan IDs, sin reescribirlo
 
 Las etiquetas Many2one son **nombres actuales**, no snapshots: renombrar una
 categoría cambia su presentación en eventos anteriores. Los nulos permanecen
-«Sin valor». Destinos eliminados, fuera de las reglas de lectura, sin permiso
-de lectura del modelo o sin contrato declarativo se muestran como «Registro no
+«Sin valor». Desde 2026-11-21 las relaciones publicadas utilizan lectura relacional
+autorizada desde el origen, sin exigir entrada directa al catálogo. Destinos
+eliminados, fuera de las reglas de lectura o sin contrato declarativo se muestran como «Registro no
 disponible», sin publicar su ID ni una etiqueta histórica. Un fallo de consulta
 o de sesión se conserva como error de actividad; no se oculta con ese mensaje.
 La lectura no cambia revisión, valores ni historial almacenado. No hay consultas

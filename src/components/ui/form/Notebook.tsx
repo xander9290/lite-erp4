@@ -8,7 +8,9 @@ import { renderInsertions, useInsertionAnchors } from "./insertions/Insertions";
 import type { InsertionEntry, InsertionSlot } from "./insertions/resolve";
 
 export type NotebookProps = {
-  children: ReactNode;
+  children?: ReactNode;
+  /** Server Components pass page descriptors; elements are created in this client boundary. */
+  pages?: readonly NotebookPageProps[];
   label?: string;
   id?: string;
   defaultPage?: string;
@@ -51,10 +53,16 @@ function withInsertedPages(own: ReactElement<NotebookPageProps>[], slots: Readon
   });
 }
 
-export default function Notebook({ children, label = "Secciones del formulario", id: providedId, defaultPage, activePage, onPageChange, className = "" }: NotebookProps) {
+export default function Notebook({ children, pages: declaredPages, label = "Secciones del formulario", id: providedId, defaultPage, activePage, onPageChange, className = "" }: NotebookProps) {
   const generatedId = useId();
   const id = providedId ?? generatedId;
-  const own = useMemo(() => pagesFrom(children), [children]);
+  const own = useMemo(() => {
+    if (declaredPages !== undefined) {
+      if (children != null) throw new Error("Notebook admite pages o children, no ambos.");
+      return declaredPages.map(page => <NotebookPage key={page.name} {...page} />);
+    }
+    return pagesFrom(children);
+  }, [children, declaredPages]);
   // With `id`, the notebook and its pages are insertion anchors for extensions.
   const anchorTargets = useMemo(() => providedId ? [`notebook:${providedId}`, ...own.map(page => `page:${providedId}/${page.props.name}`)] : [], [providedId, own]);
   const { slots, scope } = useInsertionAnchors(anchorTargets);

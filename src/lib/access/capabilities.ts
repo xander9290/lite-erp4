@@ -1,8 +1,9 @@
 import type { AccessPerms } from "./declare";
+import type { ElementPolicies } from "./element-policy";
 
 /** UI hints by model, never a substitute for transactional authorization. */
 export type ModelCapabilities = AccessPerms & { readonly move: boolean };
-export type CapabilityActor = {
+export type CapabilityActor = Partial<ElementPolicies> & {
   readonly isAdmin: boolean;
   readonly groups: ReadonlySet<string>;
   readonly modelAccess: Readonly<Record<string, AccessPerms>>;

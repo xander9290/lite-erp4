@@ -25,6 +25,8 @@ function fixture({ groups = ["unit.writer"], overrides = [] as Override[], activ
   const tx = {
     user: { findUnique: async () => { queries.push("user"); return { active, isAdmin: admin, sessionVersion: version }; } },
     accessUserGroup: { findMany: async () => { queries.push("groups"); return groups.map(groupId => ({ groupId })); } },
+    accessFieldRestriction: { findMany: async () => [] },
+    accessActionRestriction: { findMany: async () => [] },
     accessModelOverride: { findMany: async ({ where }: { where: { model: { in: string[] }; groupId: { in: string[] } } }) => {
       queries.push("overrides");
       assert.deepEqual(where.model.in, [...catalog.models.keys()]);
@@ -77,6 +79,16 @@ test("UI capabilities fail closed and cannot turn a read denial into writable na
   assert.equal(allowsActionGroups(actor, "unit", ["reader"]), true);
   assert.equal(allowsActionGroups(actor, "unit", ["unit.writer"]), false);
   assert.equal(allowsActionGroups({ ...actor, isAdmin: true }, "unit", ["writer"]), true);
+});
+
+test("inherited groups of another module do not publish direct CRUD or quick-create capabilities", async () => {
+  const groups = new Map(catalog.groups);
+  groups.set("foreign.role", { id: "foreign.role", module: "foreign", label: "Otro módulo", implies: ["unit.writer"] });
+  const f = fixture({ groups: ["foreign.role"] });
+  const value = await readAccessCapabilities(f.tx, { id: "a", sessionVersion: 1 }, { ...catalog, groups });
+  assert.deepEqual([...value.directGroups], ["foreign.role"]);
+  assert.equal(value.groups.has("unit.writer"), true);
+  assert.deepEqual(value.modelAccess["unit.item"], denied);
 });
 
 test("transfer permissions default closed, combine grants across groups and honor per-group overrides", async () => {

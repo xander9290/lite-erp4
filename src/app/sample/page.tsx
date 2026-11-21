@@ -1,4 +1,5 @@
 import ModelFieldsSample from "./ModelFieldsSample";
+import FieldAccessSample from "./FieldAccessSample";
 import DomainSample from "./DomainSample";
 import InsertionsSample from "./InsertionsSample";
 import CollectionInsertionsSample from "./CollectionInsertionsSample";
@@ -56,6 +57,7 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#model-reactions">Reacciones de modelo</a>
             <a className="btn btn-sm btn-outline" href="#related-image">Imagen relacionada</a>
             <a className="btn btn-sm btn-outline" href="#model-fields">Contrato del modelo</a>
+            <a className="btn btn-sm btn-outline" href="#field-action-access">Restricciones de acceso</a>
             <a className="btn btn-sm btn-outline" href="#list-view">ListView</a>
             <a className="btn btn-sm btn-outline" href="#list-selection">Selección de listas</a>
             <a className="btn btn-sm btn-outline" href="#list-grouping">Agrupación anidada</a>
@@ -105,6 +107,7 @@ export default function PageSample() {
         <ModelReactionsSample rules={sampleReactionModel.reactionRules} />
         <RelatedImageSample rules={relatedImageModel.reactionRules} />
         <ModelFieldsSample />
+        <FieldAccessSample />
         <ListViewSample />
         <ListGroupingSample />
         <CollectionViewsSample />

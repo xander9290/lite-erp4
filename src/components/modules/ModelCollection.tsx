@@ -6,7 +6,7 @@ import ListView, { type ListViewProps } from "@/components/ui/list/ListView";
 import CardView from "@/components/ui/card/CardView";
 import KanbanView from "@/components/ui/kanban/KanbanView";
 import type { CollectionProps } from "@/components/ui/collection/types";
-import { modelCreators, modelLookup, modelDelete, modelKanban, modelList, modelMove, modelTransferReview, modelTransferApply, modelTransferExport } from "@/lib/modules/actions";
+import { modelCreators, modelRelationLookup, modelDelete, modelKanban, modelList, modelMove, modelTransferReview, modelTransferApply, modelTransferExport } from "@/lib/modules/actions";
 import type { CollectionView, ModelClientConfig } from "@/lib/modules/config";
 import { modelCollection, type CollectionSource, type ModelColumn } from "@/lib/modules/collection";
 import { modelUiCapabilities } from "@/lib/access/capabilities";
@@ -91,7 +91,7 @@ function CollectionBody({ config, columns: declared, view = config.view, title =
     ...modelCollection(config, columns),
     provider: provider ?? {
       filterLookups: {
-        ...Object.fromEntries(Object.entries(config.lookups).map(([field, target]) => [field, modelLookup.bind(null, target)])),
+        ...Object.fromEntries(Object.keys(config.lookups).map(field => [field, (request: import("@/lib/many2one/model-lookup").ModelLookupRequest) => modelRelationLookup(config.id, field, { request, draft: {}, filter: true })])),
         // «Creado por»: creators of readable records of this model, by contact name.
         ...(config.audit && config.list.fields.includes("createBy") ? { createBy: modelCreators.bind(null, config.id) } : {}),
       },

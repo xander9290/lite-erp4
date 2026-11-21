@@ -25,9 +25,6 @@ const core = defineModule({
       list: { fields: ["login", "name", "email", "avatarUrl", "active", "isAdmin", "lastLogin"], searchFields: ["login", "name", "email"], sortable: ["login", "name", "active", "isAdmin", "lastLogin"], filterable: ["login", "name", "active", "isAdmin", "lastLogin"], groupable: ["active", "isAdmin"] },
     },
   },
-  // Every active account belongs implicitly to «Usuario interno» (see access engine).
-  groups: { internal: "Usuario interno" },
-  access: [{ group: "internal", models: "partner", perms: "r" }],
 });
 
 // Links from other modules (extensions) resolve native names from this table: keep them aligned.

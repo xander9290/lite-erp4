@@ -311,8 +311,10 @@ const unchanged=ok(await tareas.read(prisma,ana,wrongTarget.id),"read rolled bac
 assert.equal(unchanged.estado,"pendiente");assert.equal(unchanged.revision,wrongTarget.revision);
 assert.equal(await prisma.recordActivity.count({where:{model:"EnsayoTarea",recordId:wrongTarget.id}}),wrongEvents,"target mismatch also rolls back activity");
 // Related records follow the target model rules: unreadable ones are presented empty.
-const archivada = ok(await categorias.save(prisma, actor, { name: "Archivada", active: false }), "categoría inactiva").values;
-const enArchivada = ok(await tareas.save(prisma, ana, { ...base, categoria: archivada.id, name: "En archivada" }), "tarea con categoría inactiva").values;
+const archivada = ok(await categorias.save(prisma, actor, { name: "Archivada", active: true }), "categoría inicialmente legible").values;
+const enArchivada = ok(await tareas.save(prisma, ana, { ...base, categoria: archivada.id, name: "En archivada" }), "tarea antes de archivar categoría").values;
+ok(await categorias.save(prisma, actor, { ...archivada, active: false }), "archivar destino de referencia existente");
+assert.equal((await tareas.save(prisma, ana, { ...base, categoria: archivada.id, name: "Referencia falsificada" })).ok, false, "new references must obey target rules");
 const preview = async (who: typeof ana, categoria: unknown) => { const result = await tareas.react(prisma, who, { field: "categoria", values: { categoria } }); assert.equal(result.ok, true, JSON.stringify(result)); return result.ok ? result.preview.categoriaNombre : undefined; };
 assert.equal(await preview(ana, archivada.id), null, "form related hides an unreadable category");
 assert.equal(await preview(ana, trabajo.values.id), "Trabajo", "form related shows a readable category");
@@ -354,7 +356,7 @@ assert.equal((await relationHistory(jefa)).afterLabel, "Historial renombrado");
 await prisma.accessModelOverride.create({ data: { groupId: "ensayo.usuario", model: "ensayo.categoria", read: false, create: false, write: false, unlink: false } });
 try {
   const deniedHistory = await relationHistory(ana);
-  assert.equal(deniedHistory.beforeLabel, "Registro no disponible");
+  assert.equal(deniedHistory.beforeLabel, "Historial anterior", "relational labels remain available without direct catalog read");
   assert.equal(deniedHistory.afterLabel, "Registro no disponible");
 } finally {
   await prisma.accessModelOverride.delete({ where: { groupId_model: { groupId: "ensayo.usuario", model: "ensayo.categoria" } } });

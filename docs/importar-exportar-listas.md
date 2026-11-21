@@ -6,6 +6,11 @@ Pilotos habilitados: País, Estado y Municipio de Ubicaciones. Sólo la ListView
 estándar ofrece estas acciones; Card, Kanban, formularios y colecciones embebidas
 no las muestran. Los endpoints revalidan acceso en servidor.
 
+Desde 2026-11-21 también revalidan las [restricciones por campo](ideas/permisos-campos.md).
+Un modelo tocado con campos sin lectura deniega la transferencia; para importar,
+también se comprueba escritura de campos del dueño y líneas. No se generan archivos
+parciales como alternativa a esas restricciones.
+
 ## Habilitar un modelo
 
 En su manifest:
@@ -258,7 +263,9 @@ municipio: {
   destino. Las columnas de una referencia van juntas: todas vacías la vacían,
   parcialmente vacías es error de celda. Referencia inexistente: error en
   `estadoId.paisId.codigo + estadoId.codigo` (o en la columna del salto que
-  falle), sin nombres ni IDs. Sin lectura del modelo destino: error de acceso.
+  falle), sin nombres ni IDs. Desde 2026-11-21 las referencias declaradas usan
+  lectura relacional autorizada desde el origen y reglas de cada destino, sin
+  exigir entrada directa a su aplicación. No concede CRUD sobre el destino.
   Nunca crea Estados ni Países.
 - Confirmar: la firma incluye identidad/revisión de cada salto; si un Estado o
   País cambió o se renombró su clave, el plan se rechaza.

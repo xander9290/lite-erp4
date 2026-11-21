@@ -1,3 +1,10 @@
+> Contrato de grupos actualizado el 2026-11-21: los grupos se declaran aquí y se
+> asignan desde Ajustes → Grupos; máximo uno explícito por usuario y módulo.
+> `implies` reutiliza permisos, sin conceder entrada a otro módulo. Relaciones
+> publicadas tienen consulta mínima independiente de esa entrada. Se retiraron
+> los grupos iniciales del ERP para configurarlos desde cero. Ver
+> [Grupos por módulo](ideas/access-manager.md).
+
 # Módulos declarativos
 
 Guía para crear aplicaciones con `defineModule` (fases 2–4 del

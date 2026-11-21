@@ -1,12 +1,253 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-20.
+Última actualización: 2026-11-21.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Campos y acciones por grupo (2026-11-21)
+
+Código implementado por autorización del usuario. Grupos incorpora Campos
+(No leer/No escribir/Invisible/Sólo lectura) y Acciones (bloqueo de métodos
+publicados), sólo para elementos del módulo dueño. Revalida administrador,
+sesión y nombres publicados al guardar políticas; no cambia asignaciones ni
+overrides existentes. No leer implica No escribir; restricciones positivas
+se acumulan con implies; admin conserva bypass. Invisible/Sólo lectura son UI.
+Contrato completo y límites en [Campos y acciones](ideas/permisos-campos.md).
+
+El servicio elimina valores privados de DTOs, listas e historial, protege
+lookups/displayName, related/compute, reacciones, referencias y líneas anidadas.
+El cliente omite esos campos de defaults/RHF/Zod. Guardar un campo protegido
+omitido recupera su snapshot/default del servidor; no acepta adivinar un valor
+sin lectura. Conserva validaciones, propiedad de líneas, revisiones y rollback.
+Corregidos durante integración el descarte prematuro de una inversa falsificada
+y el orden seguro por ID cuando el nombre no es legible.
+
+Límites deliberados: acciones sin contrato de dependencias se bloquean si hay
+campos sin lectura en el documento o sus líneas. Transferencias se deniegan ante
+campos privados de modelos tocados y, al importar, sin escritura del dueño/líneas.
+Servicios Prisma/manuales requieren su propia integración; notas libres no se
+analizan. Required por grupo y visibilidad de NotebookPage siguen pendientes.
+Demo ficticia RHF/Zod en /sample#field-action-access; sin datos ni persistencia real.
+
+Verificación en Windows: test:access 19/19, test:form-model 28/28 y suite de módulos
+64/64 (incluido contrato cliente, seguida de la nueva regresión de líneas privadas
+aprobada). ORM final 120/121: la restante falla por EPERM de Windows al crear un
+symlink de archivo en generator.test.ts; no se presenta como suite aprobada ni se
+desactiva. Pruebas focalizadas de políticas, servicio, defaults privados y cliente
+aprobadas; TypeScript, ESLint de afectados y build aprobados. El build conserva
+tres avisos previos de trazado filesystem del gestor. Integraciones PostgreSQL
+capabilities, One2many y transferencias generales aprobadas en proyectos/esquemas
+temporales, eliminados al terminar, sin escrituras de negocio en la base del ERP.
+One2many repetida tras proteger acciones del padre con datos privados de hijos.
+Sin nueva revisión visual autenticada del asistente. Después de verificar la
+migración, el usuario confirmó el 2026-11-21 que la funcionalidad funciona bien
+en su prueba real. Esta confirmación valida el uso probado por el usuario;
+no acredita una revisión exhaustiva de todas las combinaciones de restricciones.
+
+**Migración verificada en desarrollo Windows (2026-11-21):** tras autorización
+explícita para aplicar 20261121220000_field_action_restrictions, la comprobación
+previa ya la encontró aplicada. No se ejecutó otro deploy. Prisma migrate status
+confirma 76 migraciones y esquema al día. Transacción RepeatableRead/READ ONLY:
+historial terminado sin rollback, ambas tablas y sus columnas presentes, y
+accessFieldRestriction.findMany/accessActionRestriction.findMany del cliente real
+ejecutadas sin error. La migración crea las dos tablas con PKs compuestas;
+Prisma Client ya generado. Esta verificación no modifica políticas, asignaciones
+ni registros de negocio. No acredita aplicación en otras máquinas o producción.
+
+Fase de Campos/Acciones cerrada con comprobaciones automatizadas y confirmación
+del usuario. No queda pendiente aplicar esta migración en la base local verificada.
+
+Pendientes de esta línea de trabajo, sin iniciarlos automáticamente:
+
+- Diseñar required por grupo, visibilidad de NotebookPage y restricciones por
+  presentación completa antes de implementarlos; no forman parte de esta fase.
+- Resolver la prueba de symlinks de archivos que falla con EPERM en Windows,
+  conservando la comprobación de seguridad del generador.
+- Evaluar dependencias explícitas para acciones si un caso real requiere
+  ejecutarlas con campos privados, manteniendo protección de entradas, salidas
+  y errores. El bloqueo conservador actual sigue vigente.
+- Al retomar en otra máquina, compartir código/documentación mediante Git cuando
+  se autorice y comprobar su historial de migraciones; la verificación local no
+  acredita su base. Los cambios del trabajo siguen locales, sin commit ni push.
+
+Siguiente paso: acordar con el usuario qué pendiente o ejercicio retomar; no
+adelantar cambios de aplicaciones, políticas ni asignaciones de negocio.
+Oportunidad de simplificación: reducir lecturas repetidas
+de políticas en documentos grandes mediante contexto por actor/transacción,
+sin caché global ni pérdida de revocaciones; criterio en el contrato enlazado.
+
+Este cierre de continuidad sólo actualiza documentación: git diff --check
+aprobado. No se repitieron suites, migraciones ni cambios de datos para guardarlo;
+la evidencia técnica anterior corresponde a las comprobaciones de esta fase.
+
+## Accesos limitados al módulo del grupo (2026-11-21, fase anterior)
+
+Implementado el siguiente paso acordado: groupDetail enumera sólo los modelos
+propios del módulo del grupo. Ubicaciones → Gestor muestra País, Estado, Municipio
+y Localidad; Base y Contactosextra ya no se incluyen. Los ajustes guardados de
+Ubicaciones se conservan. setModelAccess valida el módulo de todos los modelos
+del lote antes de escribir y rechaza íntegramente peticiones mixtas/ajenas.
+No se borraron overrides históricos ni se cambiaron asignaciones o permisos reales.
+
+Verificación: test:access 14/14, con regresiones de filtro, conservación de ajustes,
+rechazo de un lote mixto sin escrituras y guardado válido del módulo. TypeScript,
+ESLint de admin y su prueba y git diff --check aprobados. Sin SQL ni migraciones.
+La revisión visual no pudo completarse: Computer Use no pudo determinar la URL
+de Chrome con suficiente confianza y se detuvo, sin guardar desde el navegador.
+Las comprobaciones de navegador de las secciones anteriores son históricas.
+
+Fase siguiente acordada entonces: pestañas Campos y Acciones, con las restricciones
+(no leer/no escribir/invisible/sólo lectura; acción bloqueada oculta y denegada
+en servidor). Elementos sin configuración conservan su comportamiento normal.
+El contrato de payloads parciales, salidas derivadas y persistencia de políticas
+siguió por concretar en esta fase. La ampliación posterior está descrita arriba.
+Ver [permisos por campo](ideas/permisos-campos.md).
+
+## Guardado de miembros corregido (2026-11-21)
+
+Corregido `values.users.forEach` con users undefined al guardar desde MembersForm.
+El bloqueo usaba disabled=isSubmitting; RHF excluye los campos disabled del
+payload. Ahora usa readOnly durante el envío y conserva el valor registrado.
+Añadido esquema Zod estricto para la selección (vacía válida, ausente inválida)
+y manejo de excepciones de envío en FormLayout, sin perder selección/borrador.
+No sustituir un valor ausente por []: podría retirar miembros involuntariamente.
+
+Verificación: reproducida la omisión con createFormControl real de RHF al activar
+disabled durante isSubmitting, y comprobada la conservación sin disabled; envíos
+locales con cero, uno y varios IDs y rechazo de valor ausente. TypeScript, ESLint
+del componente y git diff --check aprobados. Sin peticiones de guardado ni cambios
+de miembros/permisos en la BD durante esas comprobaciones. Posteriormente el
+usuario confirmó que sus pruebas con una cuenta funcionaron; no equivale a una
+nueva prueba automatizada ni publica datos de esa cuenta.
+
+## Notebook de Grupos corregido (2026-11-21)
+
+Corregido el error de Notebook al abrir Gestor. La página servidor construía
+NotebookPage como hijos de un componente cliente que los compara por identidad;
+además no existía FormProvider alrededor de las pestañas con formularios nativos.
+Notebook admite ahora `pages` (descriptores con slots) y crea las NotebookPage en
+su propio límite cliente. NotebookPage permite uso sin RHF, sin inventar otro
+formulario; mantiene suscripciones, errores y revelado cuando existe provider.
+Contrato en [Notebook](../src/components/ui/form/Notebook.md).
+
+Verificado: `test:form-model` 27/27, incluidas páginas por datos sin provider,
+rechazo de children inválidos/entradas ambiguas y las regresiones de RHF e
+inserciones. Comprobación real en Edge sobre Gestor: pantalla renderizada sin
+excepción, tabla de permisos visible y cambio a Reglas mostrando su contenido.
+Sólo navegación de pestañas, sin guardar miembros/permisos ni escrituras de BD.
+TypeScript, ESLint de los cuatro archivos afectados y `git diff --check`
+aprobados. No se repitió build: la comprobación en navegador cubrió el límite
+RSC que la compilación anterior no había detectado.
+
+## Corrección local al abrir Grupos (2026-11-21)
+
+La conexión actual de `.env.local` usa desarrollo local y su tabla
+`access_model_overrides` no tiene `can_import`/`can_export`. Prisma migrate status
+confirma tres migraciones pendientes: `20261120210000_list_transfer_permissions`,
+`20261120223000_estado_country_code_unique` y `20261120223001_sync_ubicaciones`.
+Esto explica el error de groupDetail; no es un cambio requerido al manifest.
+El registro histórico de aplicación en Windows no acredita esta base actual.
+SQL revisado: dos columnas booleanas NOT NULL/default false y dos índices únicos
+(País+código de Estado, Estado+código de Municipio). Comprobación readonly actual:
+cero grupos duplicados en ambas claves. Tras autorización explícita del usuario,
+`npm run db:deploy` aplicó correctamente las tres migraciones. Verificado después:
+75 migraciones, historial al día y `accessModelOverride.findMany` para
+`ubicaciones.gestor` mediante el cliente real de la app en una transacción
+RepeatableRead/READ ONLY, sin error. No se asignaron usuarios ni se modificaron
+permisos o registros de negocio. Sin nueva revisión visual; recargar Grupos para
+comprobar la pantalla. No fue necesario cambiar código ni generar otra migración.
+
+## Primer grupo de Ubicaciones (2026-11-21)
+
+El usuario eligió Ubicaciones y el perfil Gestor. Declarado `ubicaciones.gestor`
+en su manifest: leer, crear, editar y eliminar País/Estado/Municipio/Localidad;
+importar/exportar sólo País/Estado/Municipio, que ya publican `transfer`.
+Localidad conserva CRUD sin habilitar transferencias. Sin usuarios asignados,
+cambios de BD, migraciones ni generación. Los cambios anteriores siguen sin commit.
+Verificación de este ajuste: TypeScript, ESLint del manifest, carga real de la
+declaración con comprobación de sus cuatro concesiones y `git diff --check`
+aprobados. Sin comprobación visual nueva. Las integraciones siguientes son históricas
+para ese alcance y no se repiten por esta declaración.
+
+Siguiente: abrir Ajustes → Grupos → Ubicaciones → Gestor y elegir sus usuarios.
+No asignarlos por anticipación. Los grupos iniciales retirados descritos abajo
+son antecedentes; éste es el primer perfil nuevo acordado.
+
+## Progreso guardado (2026-11-21, grupos por módulo)
+
+Implementación autorizada por el usuario tras revisar el diseño: grupos y permisos
+en manifests, miembros administrados desde Ajustes → Grupos, varios módulos por
+usuario y **máximo un grupo explícito por módulo**. Sustituye tanto el grupo único
+global como la propuesta anterior sin límite por módulo. Inicio en `main`,
+HEAD `beb68f8`, árbol limpio. Sin commit/push/pull ni despliegue.
+
+**Implementado:**
+
+- Retiradas las declaraciones iniciales de core.internal y sus concesiones de
+  lectura a Partner/Ubicaciones; retirada también la pertenencia implícita.
+  No se crearon perfiles de negocio de reemplazo. Por ahora sólo admin tiene
+  entrada a las apps; declarar/asignar los nuevos grupos con el usuario.
+- Grupos refleja el registro de manifests y conserva la ruta administrativa
+  `/erp/ajustes/accesos`. Usuarios mediante FieldRelationTag, guardado bloqueado,
+  protección de borradores y error del servidor sin perder selección. Permisos
+  y reglas en pestañas; overrides existentes conservados por compatibilidad.
+- Validación de pertenencia en servidor antes de escribir, bajo Serializable;
+  también al resolver permisos. Conflictos almacenados deniegan en vez de combinar
+  puestos. Cambiar exige quitar la asignación anterior; `implies` reutiliza
+  permisos sin conceder pertenencia explícita ni entrada a otros módulos.
+- Entrada directa requiere grupo explícito del dueño y permisos efectivos: cajón,
+  menús, rutas, metadatos, acciones y servicios transaccionales. Snapshot privado
+  por petición; grupos heredados de otro módulo no publican CRUD/quick-create
+  directos. Admin conserva bypass; Ajustes/core.user siguen administrativos.
+- Relaciones Many2one/Many2many publicadas consultan desde el origen autorizado,
+  aunque no exista entrada al destino. Lookup mínimo ID/etiqueta, reglas del
+  destino y del padre recursivo, dominios y validación de referencias al guardar.
+  Contexto interno limitado a actor/transacción/destino, sin escritura. Adaptados
+  formularios/líneas, filtros, etiquetas de listas, related/displayName, historial,
+  parámetros de acciones y claves externas de transferencias. Las relaciones
+  existentes no se borran si sus destinos quedan ocultos por reglas.
+- Corregida la proyección de acciones para conservar parámetros/lookups del
+  contrato permitido; antes los reducía a nombre/label al proyectar capacidades.
+
+**Datos y límites:** no se modificaron asignaciones, overrides ni reglas del ERP,
+ni se aplicaron migraciones al ERP. Las pruebas de integración sí aplican SQL en
+sus propios esquemas temporales. IDs de grupos sin declaración se ignoran;
+reutilizarlos requiere revisar sus filas antiguas, sin purgarlas automáticamente.
+La unicidad se garantiza en el servicio con Serializable, sin nueva restricción
+SQL; escritores Prisma/SQL externos deben respetarla. El selector compartido
+admite 100 usuarios seleccionados; la acción mantiene su límite anterior de 1.000.
+Sin permisos nuevos por campo, pestaña o acción; `invisible` no es seguridad.
+
+**Verificado en Windows para este alcance:** acceso 11/11, aplicaciones 14/14,
+módulos 62/62 (fuera de sandbox; dentro fallan fixtures de filesystem), transferencias
+16/16 y regresión de colección 8/8 (subconjunto de módulos), TypeScript, ESLint de
+los archivos afectados y `git diff --check`. Build Next aprobado fuera de sandbox
+con los tres avisos previos de tracing del gestor; el intento aislado se detuvo
+por falta de progreso. Integraciones temporales aprobadas: capacidades/servicios,
+parámetros de acciones, transferencias generales y Many2many. Capacidades verifica
+el rechazo del segundo grupo, una sola asignación confirmada en carrera real de
+PostgreSQL, consulta relacional mínima sin lectura directa y referencias/reglas.
+Actualizadas las regresiones para crear relaciones mientras son legibles y luego
+archivar el destino, y para separar bloqueo por regla de ausencia de entrada.
+Extensiones aprobada: permisos del base y reglas, Many2many, quick-create, vista
+Next/RSC, una sola instancia de RHF y retirada con respaldo sólo en el fixture.
+Todos los proyectos/esquemas temporales fueron eliminados.
+No se hizo revisión visual nueva en navegador. La evidencia antigua de otras
+máquinas permanece histórica.
+
+**Siguiente paso:** declarar desde cero el primer grupo real y sus accesos en el
+módulo que el usuario elija; después asignar una cuenta y comprobar la interfaz.
+No reintroducir lectura universal ni inventar perfiles por anticipación. Excepciones
+por campo/acción siguen como diseño pendiente. Oportunidad: reducir las
+revalidaciones repetidas dentro de una petición/transacción sin relajar revocación,
+reglas ni aislamiento; contrato en [Grupos por módulo](ideas/access-manager.md).
+
 ## Progreso guardado (2026-11-20, punto de continuación)
+
+Histórico: las decisiones y prioridades siguientes fueron sustituidas por el cierre del 2026-11-21.
+
 
 ### Siguiente pendiente: Grupos y acceso directo frente a relaciones (2026-11-20)
 
@@ -3293,13 +3534,11 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
   diagnosticado mediante lectura de permisos y código, sin corrección implementada.
 
 - **Permisos por campo y presentación por grupo**, solicitado el 2026-11-14:
-  lectura/escritura de campos en servidor y condiciones invisible/readOnly/required
-  y visibilidad de NotebookPage en UI. Propuesta sin implementación ni API decidida;
-  diseñar contratos parciales y composición de grupos, preservando validación,
-  datos y protección de salidas derivadas. Alcance, motivo y aceptación en
-  [el pendiente](ideas/permisos-campos.md). No cambia el siguiente ejercicio de
-  Flota. Nota documental comprobada con git diff --check;
-  sin nuevas suites, SQL ni cambios de aplicación.
+  lectura/escritura e invisible/readOnly implementados por autorización posterior
+  el 2026-11-21, con migración pendiente de aplicar (ver estado vigente arriba).
+  Required por grupo, visibilidad de NotebookPage y permisos por presentación
+  completa siguen pendientes. Alcance y aceptación en
+  [el contrato](ideas/permisos-campos.md); no añadirlos por anticipación.
 
 - **Unificar escrituras de eject:view:** el comando aún tiene su propia secuencia
   de creación/edición/restauración, mientras los nuevos generadores reutilizan

@@ -9,6 +9,17 @@ export default defineModule({
   id: "ubicaciones",
   name: "Ubicaciones",
   icon: "globe",
+  groups: { gestor: "Gestor" },
+  access: [
+    {
+      group: "gestor",
+      models: ["pais", "estado", "municipio"],
+      perms: "crud",
+      import: true,
+      export: true,
+    },
+    { group: "gestor", models: "localidad", perms: "crud" },
+  ],
   models: {
     pais: {
       model: Pais,
@@ -40,11 +51,4 @@ export default defineModule({
 
     localidad: Localidad,
   },
-  access: [
-    {
-      group: "core.internal",
-      models: ["pais", "estado", "municipio", "localidad"],
-      perms: "r",
-    },
-  ],
 });
