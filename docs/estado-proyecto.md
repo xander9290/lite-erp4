@@ -10,12 +10,20 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ### Cierre vigente: País, Estado y Municipio operativos (2026-11-20)
 
-Rama `codex/importexport`, HEAD `d48aef1` (Merge branch codex/partner). Todo lo de
-importación/exportación, Municipio y el arreglo de orm:sync sigue **sin commit**
-(~50 rutas), incluidas tres migraciones nuevas: `20261120210000_list_transfer_permissions`,
+Revisión de continuidad en Mac (2026-11-20): rama `main`, HEAD `ff970cd`
+(`primera fase de export e import`), árbol limpio al comenzar. Ese commit ya incluye
+importación/exportación, Municipio y el arreglo de orm:sync (50 rutas), incluidas
+las tres migraciones: `20261120210000_list_transfer_permissions`,
 `20261120223000_estado_country_code_unique` y `20261120223001_sync_ubicaciones`.
 Las tres están aplicadas en desarrollo Windows (`migrate status` al día); no asumirlas
 en otra máquina. Commit/push los hace el usuario. El maxRows 100 de País es suyo.
+Contrastados manifests/modelos de core, Contactos, contactosextra y Ubicaciones,
+inserciones de Contactos, límites de transferencias e historial Git. Esta revisión
+sólo corrige documentación y comprueba `git diff --check`; no ejecuta suites,
+servidor, consultas de BD, generación, migraciones ni importaciones. El estado de
+la BD y los procesos de esta Mac no se ha comprobado. Las referencias a ramas,
+cambios sin commit y siguientes ejercicios de secciones anteriores son históricas;
+este cierre determina el punto de continuación.
 
 **Completado:**
 
@@ -40,7 +48,9 @@ completo, `test:modules` 62, unique-indexes + sync.test 5/5, `test:orm:install` 
 
 **Pendientes, en orden propuesto:**
 
-1. Commit del usuario de todo lo anterior (con las tres migraciones juntas).
+1. Código y tres migraciones ya versionados juntos en `ff970cd`; no queda pendiente
+   aquel commit. Antes de operar en esta Mac, comprobar su configuración e historial
+   de migraciones sin asumir la aplicación registrada en Windows.
 2. Carga inicial de Municipios INEGI (~2.470; Oaxaca ~570): por CLI como Estados,
    porque la ListView admite 200 filas por archivo y 2.000 por exportación. Diseñar
    y presentar el importador antes de escribirlo; no ejecutar cargas reales por el
@@ -57,8 +67,9 @@ completo, `test:modules` 62, unique-indexes + sync.test 5/5, `test:orm:install` 
    One2many, Date/DateTime, mapeo de encabezados y lotes grandes con idempotencia.
 7. Planes firmados para varias instancias (hoy efímeros por proceso, 15 min); no
    habilitar multiworker sin contrato compartido. Estrategia de producción pendiente.
-8. Contactos: enlace «Etiquetas» en Configuración, `drawer: false` en Ubicaciones y
-   Notebook opcional (detalle en su sección).
+8. Contactos: enlace «Etiquetas» en Configuración y decidir `drawer: false` en
+   Ubicaciones. Notebook `extras` ya está insertado por la extensión, con páginas
+   Contactos/Venta/Compra; Contactos conserva contenido provisional.
 9. Portabilidad de pruebas: EPERM de symlinks en `test:orm`/`test:orm:install`; no
    omitir protecciones ni presentar esas suites como aprobadas por completo.
 
@@ -202,10 +213,11 @@ En código ya existen `tagIds` con `create: true`, FieldRelationTag en el formul
 Column en la lista, `drawer: false` en contactosextra y la migración
 `20261120174528_sync_contactosextra` de la tabla de vínculos. No se comprobó su
 aplicación en la BD ni el comportamiento visual/persistencia en esta revisión.
-El nombre PartnerTags se conserva. El menú Etiquetas de Contactos y su dependencia
-contactosextra se añadieron después en esta jornada: Configuración → Etiquetas
-abre `/erp/contactosextra/partnertags`, sujeto a lectura efectiva del catálogo,
-sin ampliar accessModels ni conceder permisos. Siguen pendientes la decisión
+El nombre PartnerTags se conserva. La revisión actual corrige aquella anotación:
+Contactos sí declara la dependencia contactosextra, pero su manifest no contiene el
+menú Etiquetas. Añadir el enlace a `/erp/contactosextra/partnertags` sigue pendiente,
+sujeto a lectura efectiva del catálogo, sin ampliar accessModels ni conceder
+permisos. Siguen pendientes la decisión
 de ocultar Ubicaciones y la guía de dirección. La lista siguiente conserva el plan
 anterior: no repetir los pasos ya presentes en código ni asumir SQL pendiente.
 Verificación del enlace: `test:applications` (14), ESLint del manifest y
@@ -235,13 +247,13 @@ Pendiente del usuario, a su ritmo:
 1. Enlace «Etiquetas» en Configuración de Contactos (`/erp/contactosextra/partnertags`, model
    `contactosextra.partnertags`): aún no está en el manifest de Contactos.
 2. Decidir `drawer: false` en Ubicaciones.
-3. Pestañas (opcional): Notebook con `id` estable en `ContactForm` (recomendado `id="extra"` si
-   varios módulos agregarán páginas) o insertado por la extensión tras `group:contacto`.
-   Destinos `notebook:<id>` (inside sólo NotebookPage) y `page:<id>/<name>`; las páginas
-   insertadas no son destino. Contrato en [inserciones](inserciones-vistas.md).
+3. Notebook ya presente en `PartnerInsertions`, tras `group:contacto`, con `id="extras"`
+   y páginas Contactos/Venta/Compra. La primera conserva «En construcción»; las otras
+   presentan `saleUserId`/`purchaseUserId`. No crear otro Notebook por anticipación.
+   Contrato en [inserciones](inserciones-vistas.md).
 
-La guía de dirección continúa con el cierre de importación/exportación de arriba (Municipio
-como siguiente piloto).
+La guía de dirección continúa con el cierre de importación/exportación de arriba:
+Municipio ya está habilitado; sigue diseñar su carga inicial por CLI.
 
 ## Many2many en colecciones: columnas y filtros (2026-11-20)
 

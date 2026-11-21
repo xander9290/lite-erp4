@@ -40,7 +40,7 @@ dominios: [contrato](docs/dominios-modelos.md); composición de vistas:
 [inserciones](docs/inserciones-vistas.md). Lectura de catálogos para usuarios internos y navegación desde Contactos ya
 completadas. Estados de México importados por el usuario; falta comprobar la
 repetición sin cambios, después importar Municipios y Localidades.
-[Estado y siguiente paso](docs/estado-proyecto.md#prioridad-actual-partneruser-nativos-y-app-ajustes-2026-11-18).
+[Estado y siguiente paso](docs/estado-proyecto.md#progreso-guardado-2026-11-20-punto-de-continuación).
 
 ## Comandos del scaffold anterior, en orden
 
@@ -127,9 +127,9 @@ El inicio de dev no sustituye las migraciones ni la generación del acceso a dat
 
 ## Comprobaciones
 
-País y Estado permiten importar/exportar Excel/CSV desde Acciones de ListView, con plantilla,
+País, Estado y Municipio permiten importar/exportar Excel/CSV desde Acciones de ListView, con plantilla,
 revisión antes de confirmar y permisos por grupo/modelo. Requiere aplicar primero
-las migraciones correspondientes: permisos y unicidad País+código de Estado ya
+las migraciones correspondientes: permisos, unicidad País+código de Estado y Estado+código de Municipio ya
 aplicados con aprobación en desarrollo Windows; no asumirlo en otras máquinas.
 [Contrato, claves externas y límites](docs/importar-exportar-listas.md).
 

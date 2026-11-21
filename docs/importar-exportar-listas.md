@@ -1,6 +1,6 @@
 # Importar y exportar desde ListView
 
-Fases 1–3 implementadas el 2026-11-20. Pilotos: País y Estado de Ubicaciones; Municipio listo para habilitarse. Sólo la ListView
+Fases 1–3 implementadas el 2026-11-20. Pilotos habilitados: País, Estado y Municipio de Ubicaciones. Sólo la ListView
 estándar ofrece estas acciones; Card, Kanban, formularios y colecciones embebidas
 no las muestran. Los endpoints revalidan acceso en servidor.
 
