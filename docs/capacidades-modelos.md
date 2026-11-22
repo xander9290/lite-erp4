@@ -71,12 +71,16 @@ FormView manual conserva el comportamiento anterior salvo esa opción explícita
 
 Los menús declarativos identifican su modelo y usan lectura efectiva, incluidos
 overrides y grupos heredados. Se ocultan grupos vacíos y aplicaciones sin modelos
-legibles. La entrada raíz elige el primer modelo legible. Las aplicaciones manuales
+legibles. Las excepciones de Menús por grupo ocultan enlaces por aplicación/ID,
+sin cambiar permisos ni acceso por URL. La raíz convencional elige el primer
+enlace visible/autorizado; si no hay ninguno muestra un mensaje. Las aplicaciones manuales
 conservan su contrato admin/authenticated/grupos cuando no declaran accessModels.
 No se ocultan menús por listas vacías ni por reglas que limitan algunos registros.
 
 Los cambios se reflejan al recargar o navegar con datos revalidados; no hay
 suscripción en tiempo real. Las acciones de Accesos ya invalidan el layout de ERP.
+Las políticas de [Menús](ideas/access-manager.md#menús-por-grupo-2026-11-21)
+requieren su migración aditiva y conservan el bypass de administrador.
 Una pantalla anterior nunca autoriza una operación: guardar, eliminar, acciones,
 lecturas y movimientos vuelven a comprobar sesión, permisos, revisión y reglas.
 

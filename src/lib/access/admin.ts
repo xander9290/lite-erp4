@@ -8,6 +8,8 @@ import { accessOperations, accessPermissionKeys, type AccessPerms } from "./decl
 import { assertUniqueModuleGroups } from "./membership";
 import { restrictionFields } from "../modules/element-access";
 import { fieldRestrictionKeys, type FieldRestriction } from "./element-policy";
+import { registeredGroupMenus } from "../applications/menu-catalog";
+import { menuKey } from "./menu-policy";
 
 /** Administration of access control. Every function revalidates an active superuser inside its transaction. */
 async function assertAdmin(tx: Prisma.TransactionClient, actor: ModelActor) {
@@ -44,13 +46,15 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
   return prisma.$transaction(async tx => {
     await assertAdmin(tx, actor);
     const catalog = accessCatalog();
-    const [users, members, overrides, states, fieldPolicies, actionPolicies] = await Promise.all([
+    const [users, members, overrides, states, fieldPolicies, actionPolicies, menus, hiddenMenus] = await Promise.all([
       tx.user.findMany({ select: { id: true, login: true, active: true, isAdmin: true, partner: { select: { name: true } } }, orderBy: { login: "asc" } }),
       tx.accessUserGroup.findMany({ where: { groupId }, select: { userId: true } }),
       tx.accessModelOverride.findMany({ where: { groupId } }),
       tx.accessRuleState.findMany(),
       tx.accessFieldRestriction.findMany({ where: { groupId } }),
       tx.accessActionRestriction.findMany({ where: { groupId } }),
+      registeredGroupMenus(group.module),
+      tx.accessMenuHidden.findMany({ where: { groupId } }),
     ]);
     const memberIds = new Set(members.map(row => row.userId));
     const models = modules.filter(definition => definition.id === group.module).flatMap(definition => definition.models.map(model => {
@@ -68,6 +72,7 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
       group: { id: group.id, label: group.label, module: group.module, implies: group.implies.map(id => catalog.groups.get(id)?.label ?? id), implicit: false },
       users: users.map(user => ({ id: user.id, login: user.login, name: user.partner?.name ?? user.login, active: user.active, isAdmin: user.isAdmin, member: memberIds.has(user.id) })),
       models, rules,
+      menus: menus.map(menu => ({ ...menu, hidden: hiddenMenus.some(row => row.application === menu.application && row.menu === menu.id) })),
       fields: modules.filter(module => module.id === group.module).flatMap(module => module.models.flatMap(model => Object.entries(restrictionFields(model)).map(([field, label]) => ({
         model: model.id, modelLabel: model.label, field, label,
         policy: Object.fromEntries(fieldRestrictionKeys.map(key => [key, fieldPolicies.find(row => row.model === model.id && row.field === field)?.[key] ?? false])) as FieldRestriction,
@@ -75,6 +80,26 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
       actions: modules.filter(module => module.id === group.module).flatMap(module => module.models.flatMap(model => (model.contract.actions ?? []).map(action => ({ model: model.id, modelLabel: model.label, name: action.name, label: action.label, blocked: actionPolicies.some(row => row.model === model.id && row.action === action.name) })))),
     };
   }, { isolationLevel: "RepeatableRead" });
+}
+
+/** Change only the posted menu exceptions; never memberships, CRUD or other saved policies. */
+export async function setMenuVisibility(prisma: PrismaClient, actor: ModelActor, groupId: string, changes: readonly { application: string; menu: string; hidden: boolean }[]) {
+  const group = knownGroup(groupId);
+  if (!group || changes.length > 1000) throw new AccessError("DENIED");
+  const available = new Set((await registeredGroupMenus(group.module)).map(menu => menuKey(menu.application, menu.id)));
+  const seen = new Set<string>();
+  for (const change of changes) {
+    const key = menuKey(change.application, change.menu);
+    if (!available.has(key) || seen.has(key) || typeof change.hidden !== "boolean") throw new AccessError("DENIED");
+    seen.add(key);
+  }
+  await prisma.$transaction(async tx => {
+    await assertAdmin(tx, actor);
+    for (const { application, menu, hidden } of changes) {
+      if (hidden) await tx.accessMenuHidden.upsert({ where: { groupId_application_menu: { groupId, application, menu } }, create: { groupId, application, menu }, update: {} });
+      else await tx.accessMenuHidden.deleteMany({ where: { groupId, application, menu } });
+    }
+  }, { isolationLevel: "Serializable" });
 }
 
 /** Opt-in policies only; deleting a policy restores normal model behavior. */

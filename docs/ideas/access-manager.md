@@ -80,7 +80,50 @@ No se configura un grupo único en User ni se duplican identidades.
 Campos y Acciones incorporan las excepciones por grupo descritas en
 [Restricciones de campos y acciones](permisos-campos.md), con validación de datos
 en servidor y migración aditiva propia. `invisible` sigue siendo presentación.
-La visibilidad de pestañas y required por grupo permanecen pendientes.
+La visibilidad de NotebookPage sigue pendiente. Required por grupo quedó fuera
+del alcance por decisión del usuario (2026-11-21); reconsiderarlo sólo ante un
+caso real, conservando la obligatoriedad y las validaciones del modelo.
+
+## Menús por grupo (2026-11-21)
+
+Ajustes → Grupos → grupo incorpora **Menús**: aplicación, menú, destino y Ocultar.
+El catálogo procede de los menús publicados de los módulos; no se introducen rutas
+o nombres arbitrarios desde el navegador. Para Contactos/core se comparte metadata
+sin React en `contactos/navigation.ts` con el manifest: los grupos de core
+administran los menús de esa presentación. Otras aplicaciones manuales/scaffold
+administrativas conservan su contrato; integrar explícitamente su metadata si en
+el futuro publican menús configurables por grupos.
+
+- Identidad: aplicación + ID de menú validado, no su etiqueta ni el modelo destino.
+  Los IDs deben conservarse al renombrar. Los grupos sólo administran menús de su
+  módulo/presentación; un enlace a un catálogo de dependencia pertenece a la app
+  que lo publica, no al módulo destino.
+- Marcado oculta el enlace o el contenedor y todos sus hijos. Sin configuración
+  conserva el comportamiento normal. Un contenedor sin hijos visibles desaparece.
+- Ocultar Países en Ubicaciones no oculta otro enlace a Países desde Contactos.
+  Las excepciones se acumulan mediante grupos implicados; desmarcar no levanta
+  una ocultación heredada. Admin conserva bypass.
+- No cambia CRUD, pertenencia a grupos, acceso por URL ni lectura de relaciones.
+  Desmarcar no concede acceso cuando falta grupo/lectura. El cajón conserva su
+  política de acceso y `drawer`; no desaparece una app sólo por ocultar sus menús.
+- La raíz convencional `/erp/<módulo>` elige el primer enlace visible/autorizado.
+  Si no hay ninguno muestra un mensaje, sin seleccionar un modelo oculto ni
+  entrar en un ciclo de redirecciones. Las rutas concretas y presentaciones
+  manuales como `/erp/contactos` conservan su acceso habitual.
+
+AccessMenuHidden guarda sólo excepciones positivas. El servidor revalida
+admin/sesión y el catálogo completo del lote antes de escribir, con Serializable.
+Desmarcar elimina sólo esa fila; no borra otras políticas, asignaciones ni ajustes.
+Los snapshots de navegación cargan las excepciones por actor; los servicios CRUD
+y las comprobaciones de campos no hacen esta consulta adicional. Guardar invalida
+el layout ERP, sin sondeo ni caché global privada.
+
+Migración aditiva `20261121233000_group_menu_visibility`: sólo crea
+`access_menu_hidden` con PK group_id/application/menu. Requiere aplicar ese SQL
+antes de usar esta fase; generar Prisma Client no lo aplica. No editar ni
+reutilizar las migraciones históricas de retirada del 2026-11-17. IDs de grupos
+retirados se ignoran; revisar políticas guardadas antes de reutilizar identidades.
+Evidencia y estado de aplicación en [continuidad](../estado-proyecto.md).
 
 Oportunidad de simplificación: compartir el contexto transaccional de entrada y
 operación para reducir revalidaciones, manteniendo revocaciones y sin confiar en

@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { groupMenus } from "./menu-catalog";
+import { firstApplicationMenu } from "./navigation";
 import test from "node:test";
 import { UsersRound } from "lucide-react";
 import { applicationHref, canOpenApplication, createApplicationRegistry, defineApplication, type ApplicationManifest } from "./manifest";
@@ -82,6 +84,35 @@ const withMenus = defineApplication({ ...contacts, menus: [
   ] },
   { id: "reports", label: "Reportes", href: "/erp/contactos/reportes", access: "admin" },
 ] });
+
+test("menu exceptions are scoped to an application, hide empty containers and preserve URL/model access", () => {
+  const application = defineApplication({ ...contacts, menus: [
+    { id: "first", label: "Primero", href: "/erp/contactos/primero" },
+    { id: "settings", label: "Configuración", items: [
+      { id: "second", label: "Segundo", href: "/erp/contactos/segundo" },
+      { id: "third", label: "Tercero", href: "/erp/contactos/tercero" },
+    ] },
+  ] });
+  const actor = { isAdmin: false, hiddenMenus: [{ application: "contactos", menu: "first" }, { application: "another", menu: "second" }] };
+  const navigation = applicationNavigation(application, actor)!;
+  assert.deepEqual(navigation.menus.map(menu => menu.id), ["settings"]);
+  assert.equal(firstApplicationMenu(navigation.menus)?.id, "second");
+  const inherited = { ...actor, hiddenMenus: [...actor.hiddenMenus, { application: "contactos", menu: "second" }, { application: "contactos", menu: "third" }] };
+  assert.deepEqual(applicationNavigation(application, inherited)?.menus, []);
+  assert.equal(firstApplicationMenu([]), undefined);
+  assert.equal(canOpenApplication(application, inherited), true, "menu exceptions do not revoke application or URL access");
+  assert.equal(applicationNavigation(application, { ...actor, hiddenMenus: [{ application: "contactos", menu: "settings" }] })?.menus.length, 1, "a hidden container removes its children");
+  assert.equal(applicationNavigation(application, { ...inherited, isAdmin: true })?.menus.length, 2);
+  assert.equal(application.menus.length, 2, "manifests are never mutated");
+});
+
+test("menu catalogue uses app/id and maps native presentations without treating dependency links as owned apps", () => {
+  const native = { ...contacts, accessModels: ["core.partner"], menus: [{ id: "countries", label: "Países", model: "ubicaciones.pais", href: "/erp/ubicaciones/pais" }] };
+  assert.equal(groupMenus([native], "core")[0].application, "contactos");
+  assert.equal(groupMenus([native], "ubicaciones").length, 0, "a foreign target does not change menu ownership");
+  const renamed = { ...native, menus: native.menus.map(menu => ({ ...menu, label: "Countries" })) };
+  assert.equal(groupMenus([renamed], "core")[0].id, groupMenus([native], "core")[0].id);
+});
 
 test("navigation only publishes permitted applications and hides empty groups without mutating manifests", () => {
   assert.equal(applicationNavigation(withMenus, null), null);

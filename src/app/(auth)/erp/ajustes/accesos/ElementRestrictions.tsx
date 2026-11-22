@@ -1,7 +1,7 @@
 import type { groupDetail } from "@/lib/access/admin";
 import { fieldRestrictionKeys } from "@/lib/access/element-policy";
 import ActionForm from "./ActionForm";
-import { saveFieldRestrictions, saveActionRestrictions } from "./actions";
+import { saveFieldRestrictions, saveActionRestrictions, saveMenuVisibility } from "./actions";
 
 type Detail = NonNullable<Awaited<ReturnType<typeof groupDetail>>>;
 const labels = { noRead: "No leer", noWrite: "No escribir", invisible: "Invisible", readOnly: "Sólo lectura" };
@@ -36,5 +36,20 @@ export function ActionRestrictions({ group, actions }: { group: string; actions:
         })}</tbody>
       </table></div>
     </ActionForm> : <p className="text-sm text-base-content/60">Este módulo no declara acciones de modelo.</p>}
+  </section>;
+}
+
+export function MenuVisibility({ group, menus }: { group: string; menus: Detail["menus"] }) {
+  return <section className="col-span-full space-y-3 p-3" aria-label="Visibilidad de menús">
+    <p className="text-sm text-base-content/70">Ocultar retira el enlace de la navegación. Conserva los permisos, el acceso por URL y las relaciones. Un contenedor sin menús visibles se oculta automáticamente.</p>
+    {menus.length ? <ActionForm action={saveMenuVisibility} label="Guardar menús">
+      <input type="hidden" name="group" value={group} />
+      <div className="overflow-x-auto"><table className="table table-sm"><thead><tr><th>Aplicación</th><th>Menú</th><th>Modelo / destino</th><th>Ocultar</th></tr></thead>
+        <tbody>{menus.map(menu => {
+          const identity = `${menu.application}|${menu.id}`;
+          return <tr key={identity}><td>{menu.applicationLabel}</td><td>{menu.parent ? `${menu.parent} → ` : ""}{menu.label}<input type="hidden" name="menu" value={identity} /></td><td>{menu.model ?? menu.href ?? "Contenedor"}</td><td><input type="checkbox" className="checkbox checkbox-sm" name={`${identity}|hidden`} defaultChecked={menu.hidden} aria-label={`Ocultar ${menu.applicationLabel}: ${menu.parent ? `${menu.parent} / ` : ""}${menu.label}`} /></td></tr>;
+        })}</tbody>
+      </table></div>
+    </ActionForm> : <p className="text-sm text-base-content/60">Este módulo no declara menús administrables.</p>}
   </section>;
 }

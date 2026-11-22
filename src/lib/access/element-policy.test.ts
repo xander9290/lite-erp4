@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { loadElementPolicies } from "./element-policy.server";
 import { prepareFieldInput, publicFieldValues } from "../orm/element-access";
 import { unrestrictedElements } from "../orm/element-access";
+import { loadHiddenMenus } from "./menu-policy.server";
 
 test("policies accumulate restrictions, ignore foreign models, and never grant writing from no-read", async () => {
   const tx = {
@@ -17,6 +18,15 @@ test("policies accumulate restrictions, ignore foreign models, and never grant w
   const policies = await loadElementPolicies(tx, new Set(["sample.reader", "sample.base", "other.role"]));
   assert.deepEqual(policies.fieldAccess["sample.item"], { secret: { noRead: true, noWrite: true, invisible: true, readOnly: false } });
   assert.deepEqual(policies.blockedActions["sample.item"], ["confirm"]);
+});
+
+test("navigation policies query effective groups only; no groups (admin bypass) needs no query", async () => {
+  const queries: unknown[] = [];
+  const tx = { accessMenuHidden: { findMany: async (args: unknown) => { queries.push(args); return [{ application: "sample", menu: "items" }]; } } } as unknown as Prisma.TransactionClient;
+  assert.deepEqual(await loadHiddenMenus(tx, new Set()), []);
+  assert.deepEqual(queries, []);
+  assert.deepEqual(await loadHiddenMenus(tx, new Set(["sample.reader", "sample.base"])), [{ application: "sample", menu: "items" }]);
+  assert.deepEqual(queries, [{ where: { groupId: { in: ["sample.reader", "sample.base"] } }, select: { application: true, menu: true } }]);
 });
 
 test("protected inputs preserve snapshots and reject guessed secrets or forged changes", () => {

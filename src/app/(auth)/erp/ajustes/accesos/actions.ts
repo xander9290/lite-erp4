@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/access";
 import { AccessError } from "@/lib/auth/policy";
 import { prisma } from "@/lib/prisma";
-import { setGroupMembers, setModelAccess, setRulesActive, setFieldRestrictions, setActionRestrictions } from "@/lib/access/admin";
+import { setGroupMembers, setModelAccess, setRulesActive, setFieldRestrictions, setActionRestrictions, setMenuVisibility } from "@/lib/access/admin";
 import { fieldRestrictionKeys, type FieldRestriction } from "@/lib/access/element-policy";
 import { accessPermissionKeys, type AccessPerms } from "@/lib/access/declare";
 import { GroupMembershipError } from "@/lib/access/membership";
@@ -49,6 +49,20 @@ export async function saveActionRestrictions(_state: AccessActionState, form: Fo
     await setActionRestrictions(prisma, await requireAdmin(), text(form.get("group")), changes);
     return done("Restricciones de acciones guardadas.");
   } catch (error) { return failure(error, "No se pudieron guardar las restricciones de acciones."); }
+}
+
+export async function saveMenuVisibility(_state: AccessActionState, form: FormData): Promise<AccessActionState> {
+  try {
+    const entries = form.getAll("menu").map(text);
+    if (entries.length > 1000) throw new Error("Selección inválida.");
+    const changes = entries.map(entry => {
+      const [application, menu, extra] = entry.split("|");
+      if (!application || !menu || extra !== undefined) throw new Error("Selección inválida.");
+      return { application, menu, hidden: form.get(`${entry}|hidden`) === "on" };
+    });
+    await setMenuVisibility(prisma, await requireAdmin(), text(form.get("group")), changes);
+    return done("Visibilidad de menús guardada.");
+  } catch (error) { return failure(error, "No se pudo guardar la visibilidad de menús."); }
 }
 
 /** Every listed model is posted; unchecked boxes mean no permission. Matching the defaults removes the override. */

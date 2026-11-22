@@ -93,7 +93,7 @@ export function applicationHref(manifest: ApplicationManifest): `/erp/${string}`
   return `/erp/${manifest.id}`;
 }
 
-export type ApplicationUser = { isAdmin: boolean; groups?: ReadonlySet<string>; directGroups?: ReadonlySet<string>; modelAccess?: Readonly<Record<string, AccessPerms>> } | null;
+export type ApplicationUser = { isAdmin: boolean; groups?: ReadonlySet<string>; directGroups?: ReadonlySet<string>; modelAccess?: Readonly<Record<string, AccessPerms>>; hiddenMenus?: readonly import("../access/menu-policy").HiddenMenu[] } | null;
 /** Presentation only: groups and admin flags decide visibility; every operation is authorized on the server. */
 export function memberOf(user: ApplicationUser, groups: readonly string[] | undefined) {
   return !groups || Boolean(user?.isAdmin) || groups.some(group => user?.groups?.has(group));

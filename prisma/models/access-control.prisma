@@ -1,6 +1,6 @@
 // Access control for declarative modules. Groups, model access and record rules are
 // declared in module manifests (code); these tables only store what an administrator
-// changes: user memberships, model access overrides and rule activation.
+// changes: user memberships, model access overrides, rule activation and opt-in policies.
 
 model AccessUserGroup {
   userId    String   @map("user_id")
@@ -58,4 +58,13 @@ model AccessActionRestriction {
   action String @db.VarChar(120)
   @@id([groupId, model, action])
   @@map("access_action_restrictions")
+}
+
+// Navigation exceptions. The module/app registry owns IDs; no business permission is changed.
+model AccessMenuHidden {
+  groupId String @map("group_id") @db.VarChar(120)
+  application String @db.VarChar(120)
+  menu String @db.VarChar(120)
+  @@id([groupId, application, menu])
+  @@map("access_menu_hidden")
 }

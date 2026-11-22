@@ -78,8 +78,10 @@ Este contrato se integra en los servicios y vistas declarativos estándar. Consu
 Prisma, proveedores y pantallas manuales deben adaptar explícitamente su contrato;
 no se interceptan consultas arbitrarias ni se analizan los métodos del modelo.
 Perfil propio conserva su servicio específico. No se configuran políticas reales
-ni nuevos grupos para probarlo. Required por grupo, visibilidad de NotebookPage y
-restricciones por presentación completa siguen pendientes.
+ni nuevos grupos para probarlo. Visibilidad de NotebookPage y restricciones por
+presentación completa siguen pendientes. Required por grupo quedó fuera del
+alcance el 2026-11-21; sólo reconsiderarlo ante un caso real. La obligatoriedad
+del modelo se conserva.
 
 ## Migración y comprobaciones
 

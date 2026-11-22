@@ -2,6 +2,7 @@ import "server-only";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { assertUniqueModuleGroups, hasModuleGroup } from "./membership";
 import { loadElementPolicies } from "./element-policy.server";
+import { loadHiddenMenus } from "./menu-policy.server";
 import type { Prisma } from "@/generated/prisma/client";
 import { registeredModules } from "../modules/installed";
 import { extensionWhere } from "../modules/storage";
@@ -123,9 +124,11 @@ export async function readAccessCapabilities(tx: Prisma.TransactionClient, actor
   if (!user.isAdmin) for (const [child, owner] of catalog.owners ?? []) {
     if (!permissions.get(owner.model)?.read) permissions.set(child, { read: false, create: false, write: false, unlink: false });
   }
+  const [elementPolicies, hiddenMenus] = await Promise.all([loadElementPolicies(tx, groups), loadHiddenMenus(tx, groups)]);
   return {
     isAdmin: user.isAdmin,
-    ...await loadElementPolicies(tx, groups),
+    ...elementPolicies,
+    hiddenMenus,
     directGroups: directGroups as ReadonlySet<string>,
     groups: groups as ReadonlySet<string>,
     modelAccess: Object.freeze(Object.fromEntries([...permissions].map(([model, perms]) => [model, Object.freeze(perms)]))),

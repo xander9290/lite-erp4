@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
-import { groupDetail, setModelAccess, setFieldRestrictions, setActionRestrictions } from "./admin";
+import { groupDetail, setModelAccess, setFieldRestrictions, setActionRestrictions, setMenuVisibility } from "./admin";
 
 const actor = { id: "admin", sessionVersion: 1 };
 const adjusted = { read: true, create: false, write: true, unlink: false, import: true, export: false };
@@ -14,6 +14,7 @@ function fixture(isAdmin = true) {
     accessRuleState: { findMany: async () => [] },
     accessFieldRestriction: { findMany: async () => [], upsert: async (args: unknown) => { updates.push(args); }, deleteMany: async (args: unknown) => { updates.push(args); } },
     accessActionRestriction: { findMany: async () => [] },
+    accessMenuHidden: { findMany: async () => [], upsert: async (args: unknown) => { updates.push(args); }, deleteMany: async (args: unknown) => { updates.push(args); } },
     accessModelOverride: {
       findMany: async () => [
         { groupId: "ubicaciones.gestor", model: "ubicaciones.pais", ...adjusted, canImport: true, canExport: false },
@@ -72,4 +73,19 @@ test("permissions of the owning module remain editable", async () => {
   assert.deepEqual((f.updates[0] as { update: unknown }).update, {
     read: true, create: false, write: true, unlink: false, canImport: true, canExport: false,
   });
+});
+
+test("menu administration accepts registered own menus only, rejects mixed batches and requires admin", async () => {
+  const f = fixture();
+  const own = { application: "ubicaciones", menu: "pais-list", hidden: true };
+  for (const changes of [[own, { ...own, application: "contactos", menu: "contacts" }], [own, own], [{ ...own, menu: "invented" }]]) {
+    await assert.rejects(setMenuVisibility(f.prisma, actor, "ubicaciones.gestor", changes), /No tienes permiso/);
+  }
+  assert.deepEqual(f.updates, []);
+  await assert.rejects(setMenuVisibility(fixture(false).prisma, actor, "ubicaciones.gestor", [own]), /administrador/);
+  await setMenuVisibility(f.prisma, actor, "ubicaciones.gestor", [own]);
+  assert.deepEqual(f.updates, [{ where: { groupId_application_menu: { groupId: "ubicaciones.gestor", application: "ubicaciones", menu: "pais-list" } }, create: { groupId: "ubicaciones.gestor", application: "ubicaciones", menu: "pais-list" }, update: {} }]);
+  await setMenuVisibility(f.prisma, actor, "ubicaciones.gestor", [{ ...own, hidden: false }]);
+  assert.deepEqual(f.updates[1], { where: { groupId: "ubicaciones.gestor", application: "ubicaciones", menu: "pais-list" } });
+  assert.ok((await groupDetail(f.prisma, actor, "ubicaciones.gestor"))?.menus.some(menu => menu.id === "pais-list"));
 });

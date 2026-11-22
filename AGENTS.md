@@ -21,6 +21,16 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Cajón de aplicaciones
 
+- Menús por grupo (2026-11-21): Ajustes → Grupos → Menús oculta por aplicación+ID
+  estable, con excepciones positivas en AccessMenuHidden. Sin configurar conserva
+  navegación actual; contenedores vacíos desaparecen; admin conserva bypass.
+  Sólo presentación: no bloquea URL, CRUD ni relaciones, ni modifica el cajón.
+  Raíz de módulos elige primer enlace visible/autorizado; sin enlaces muestra
+  mensaje. Contactos/core comparte metadata de menús sin React con el manifest.
+  Migración aditiva 20261121233000_group_menu_visibility aplicada con aprobación
+  en desarrollo Mac el 2026-11-21; no asumir otras máquinas/producción. Contrato
+  en docs/ideas/access-manager.md.
+
 - Transferencias generales (2026-11-20): `transfer` continúa opt-in manual en el
   manifest; create:model no lo activa. Clave Text simple: unique:true; clave
   compuesta: uniqueTogether (no obligatorio para todos los modelos). Reutilizar
@@ -146,6 +156,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - La distribución como paquete npm es una dirección futura, conservando Next.js y Prisma. Primero consolidar el framework mediante aplicaciones reales y contratos estables. Idea documentada en [docs/ideas/aplicaciones-modulares.md](docs/ideas/aplicaciones-modulares.md).
 
 ## Ideas pendientes
+
+- Required por grupo queda fuera del alcance actual por decisión del usuario
+  (2026-11-21). Sólo reconsiderarlo ante una necesidad real; required y validación
+  de negocio continúan en el modelo. Visibilidad de NotebookPage es independiente.
 
 - **Grupos por módulo (2026-11-21):** sustituye las propuestas anteriores de
   grupo único global y pertenencia múltiple dentro del mismo módulo. Manifests

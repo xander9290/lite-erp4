@@ -6,17 +6,23 @@ export type ApplicationNavigation = { id: string; name: string; href: string; me
 
 export function applicationNavigation(application: ApplicationManifest, actor: ApplicationUser): ApplicationNavigation | null {
   if (!canOpenApplication(application, actor)) return null;
+  const hidden = (id: string) => !actor?.isAdmin && actor?.hiddenMenus?.some(item => item.application === application.id && item.menu === id);
   const visible = (item: { access?: "authenticated" | "admin"; groups?: readonly string[]; model?: string }) =>
     item.model ? Boolean(actor?.modelAccess?.[item.model]?.read === true && (actor.isAdmin || hasModuleGroup(item.model.split(".")[0], actor.directGroups ?? actor.groups))) : (item.access !== "admin" || Boolean(actor?.isAdmin)) && memberOf(actor, item.groups);
   const menus: ApplicationMenu[] = [];
   for (const item of application.menus ?? []) {
+    if (hidden(item.id)) continue;
     if ("items" in item) {
       if (!(actor?.modelAccess && item.items.some(child => child.model)) && !visible(item)) continue;
-      const items = item.items.filter(visible);
+      const items = item.items.filter(child => !hidden(child.id) && visible(child));
       if (items.length) menus.push({ ...item, items });
     } else if (visible(item)) menus.push(item);
   }
   return { id: application.id, name: application.name, href: applicationHref(application), menus };
+}
+
+export function firstApplicationMenu(menus: readonly ApplicationMenu[]) {
+  return menus.flatMap(item => "items" in item ? item.items : [item])[0];
 }
 
 export function activeApplication(applications: readonly ApplicationNavigation[], pathname: string) {

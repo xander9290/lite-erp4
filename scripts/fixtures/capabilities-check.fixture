@@ -4,8 +4,8 @@ config({ path: ".env.local", quiet: true });
 const { prisma } = await import("./src/lib/prisma");
 const { readAccessCapabilities } = await import("./src/lib/access/engine");
 const { modelClientConfig, modelService, getModuleModel, withActor, relationLookup } = await import("./src/lib/modules/registry");
-const { setGroupMembers, setFieldRestrictions, setActionRestrictions } = await import("./src/lib/access/admin");
-const { applicationNavigation } = await import("./src/lib/applications/navigation");
+const { setGroupMembers, setFieldRestrictions, setActionRestrictions, setMenuVisibility, groupDetail } = await import("./src/lib/access/admin");
+const { applicationNavigation, firstApplicationMenu } = await import("./src/lib/applications/navigation");
 const { canOpenApplication } = await import("./src/lib/applications/manifest");
 const { hashPassword } = await import("./src/lib/auth/password");
 
@@ -38,6 +38,27 @@ const record = await tasks.save(prisma, reader, { ...entry.entry.contract.create
 assert.ok(record.ok);
 const application = { ...entry.module.application, icon: (() => null) as never };
 const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 10, filters: [] };
+
+// Menu visibility is an independent navigation policy: no loss of CRUD, references or URL access.
+const group = await groupDetail(prisma, admin, "ensayo.usuario");
+assert.ok(group?.menus.some(menu => menu.id === "tarea-list"));
+const beforeMenus = await snapshot(reader);
+await setMenuVisibility(prisma, admin, "ensayo.usuario", [{ application: "ensayo", menu: "tarea-list", hidden: true }]);
+const hiddenTask = await snapshot(reader);
+assert.deepEqual(hiddenTask.modelAccess, beforeMenus.modelAccess);
+assert.equal(firstApplicationMenu(applicationNavigation(application, hiddenTask)!.menus)?.id, "categoria-list");
+assert.equal((await tasks.read(prisma, reader, record.values.id)).ok, true);
+assert.equal((await relationLookup("ensayo.tarea", "categoria", reader, { request: { ids: [category.values.id] }, draft: {} })).ok, true);
+assert.equal(canOpenApplication(application, hiddenTask), true);
+assert.equal(applicationNavigation(application, await snapshot(admin))!.menus.length, 2, "admin bypasses hidden menus");
+assert.equal((await snapshot(manager)).hiddenMenus?.some(menu => menu.application === "ensayo" && menu.menu === "tarea-list"), true, "implication accumulates menu exceptions");
+await assert.rejects(setMenuVisibility(prisma, reader, "ensayo.usuario", [{ application: "ensayo", menu: "tarea-list", hidden: false }]), /administrador/);
+await assert.rejects(setMenuVisibility(prisma, admin, "ensayo.usuario", [{ application: "contactos", menu: "contacts", hidden: true }]), /permiso/);
+await setMenuVisibility(prisma, admin, "ensayo.usuario", [{ application: "ensayo", menu: "configuracion-group", hidden: true }]);
+assert.deepEqual(applicationNavigation(application, await snapshot(reader))!.menus, []);
+await setMenuVisibility(prisma, admin, "ensayo.usuario", [{ application: "ensayo", menu: "tarea-list", hidden: false }]);
+assert.deepEqual(applicationNavigation(application, await snapshot(reader))!.menus.map(menu => menu.id), ["tarea-list"], "unmarking does not delete other exceptions");
+await setMenuVisibility(prisma, admin, "ensayo.usuario", [{ application: "ensayo", menu: "configuracion-group", hidden: false }]);
 
 await prisma.accessModelOverride.create({ data: { groupId: "ensayo.usuario", model: "ensayo.tarea", read: true, create: false, write: false, unlink: false } });
 const readonlyAccess = await snapshot(reader);

@@ -9,7 +9,7 @@ export default defineModule({
   id: "ubicaciones",
   name: "Ubicaciones",
   icon: "globe",
-  groups: { gestor: "Gestor" },
+  groups: { gestor: "Gestor", admin: "Administrador" },
   access: [
     {
       group: "gestor",
@@ -19,6 +19,13 @@ export default defineModule({
       export: true,
     },
     { group: "gestor", models: "localidad", perms: "crud" },
+    {
+      group: "admin",
+      perms: "crud",
+      models: ["pais", "estado", "municipio", "localidad"],
+      import: true,
+      export: true,
+    },
   ],
   models: {
     pais: {

@@ -6,6 +6,48 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Menús por grupo (2026-11-21, cierre actual)
+
+Implementación autorizada en `codex/partner`, HEAD inicial `5422540`. Conservados
+los cambios locales del usuario: nuevo grupo Administrador en Ubicaciones y
+formato de la descripción de Contactos. No se configuran políticas ni miembros
+reales. Required por grupo quedó fuera del alcance salvo una necesidad real;
+la obligatoriedad del modelo permanece.
+
+Grupos incorpora Menús con catálogo de aplicación/ID/destino; ocultación opt-in
+de enlaces y contenedores, herencia por implies, bypass admin y eliminación de
+contenedores vacíos. No cambia acceso por URL, CRUD, lectura relacional ni cajón.
+La raíz convencional abre el primer menú visible/autorizado y muestra un mensaje
+si no hay ninguno. Contactos/core comparte metadata sin React para administración
+desde scripts/servidor; ID, dependencias y modelos permanecen literales en su
+manifest para conservar la inspección del gestor. Contrato en
+[Grupos por módulo](ideas/access-manager.md#menús-por-grupo-2026-11-21).
+
+Verificación actual en Mac: acceso 21/21, aplicaciones 16/16, gestor de módulos
+21/21, TypeScript y ESLint focalizado aprobados. Build aprobado fuera del sandbox
+con los tres avisos previos de tracing del gestor. Integración de capacidades
+aprobada en proyecto/esquema propios eliminados: guardado/retiro de excepciones,
+lotes ajenos rechazados, contenedores, herencia, bypass admin, lectura directa del
+registro y lookup conservados, permisos idénticos y ausencia de borrado de otras
+políticas. La carga de menús se limita al snapshot de navegación y no añade
+consultas a los servicios de campos/CRUD. Sin revisión visual nueva.
+
+Migración aditiva preparada: `20261121233000_group_menu_visibility`, una tabla
+vacía AccessMenuHidden con PK de grupo/aplicación/menú. Prisma Client generado;
+preflight de desarrollo local `liteerp4_dev` confirma 77 migraciones versionadas y
+únicamente esta pendiente. Tras aprobación, `db:deploy` aplicó sólo esa migración
+en desarrollo Mac el 2026-11-21. Verificación RepeatableRead/READ ONLY: historial
+terminado sin rollback y `accessMenuHidden.findMany` del cliente real ejecutado
+sin error. No se modificaron políticas, asignaciones, permisos ni registros de
+negocio. No acredita aplicación en Windows ni producción. Las integraciones usan
+su SQL en esquemas temporales propios.
+
+Siguiente: usuario configura Menús y comprueba con una cuenta no admin. No marcar
+políticas reales por anticipación. Cambios sin commit/push.
+Oportunidad de simplificación aplicada: reutilizar registro, IDs y navegación
+compartida, y separar la carga de políticas visuales de las verificaciones CRUD.
+`git diff --check` comprobado al cerrar; no se repiten suites históricas de Windows.
+
 ## Campos y acciones por grupo (2026-11-21)
 
 Código implementado por autorización del usuario. Grupos incorpora Campos
@@ -61,7 +103,7 @@ del usuario. No queda pendiente aplicar esta migración en la base local verific
 
 Pendientes de esta línea de trabajo, sin iniciarlos automáticamente:
 
-- Diseñar required por grupo, visibilidad de NotebookPage y restricciones por
+- Diseñar visibilidad de NotebookPage y restricciones por
   presentación completa antes de implementarlos; no forman parte de esta fase.
 - Resolver la prueba de symlinks de archivos que falla con EPERM en Windows,
   conservando la comprobación de seguridad del generador.

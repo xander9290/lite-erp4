@@ -30,6 +30,10 @@ Entrada directa y consulta relacional están separadas. Los grupos y concesiones
 iniciales se retiraron para declararlos desde cero; admin conserva acceso.
 Las [restricciones de campos y acciones](docs/ideas/permisos-campos.md) se
 administran desde Grupos; requieren su migración aditiva antes de usar esta fase.
+La pestaña [Menús](docs/ideas/access-manager.md#menús-por-grupo-2026-11-21) permite
+ocultar enlaces por grupo sin cambiar acceso por URL ni relaciones; requiere
+`20261121233000_group_menu_visibility`. La raíz del módulo abre el primer menú
+visible y autorizado; admin conserva bypass.
 
 ## Aprender desde cero
 
