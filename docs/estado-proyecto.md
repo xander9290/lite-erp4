@@ -6,7 +6,19 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Localidad: importar/exportar (2026-11-22, cierre actual)
+## Diagnóstico de autocomplete Many2one (2026-11-22)
+
+Revisión de código con árbol limpio al comenzar: FieldMany2One fuerza
+autoComplete="off" después de inputProps; FormLayout y el buscador del modal
+también lo declaran. El desplegable propio se abre por onFocus/onClick y consulta
+el lookup autorizado; aria-autocomplete="list" describe esa interacción accesible.
+No se encontró una omisión del atributo. Sin cambios de componentes ni pruebas
+de ejecución nuevas. Inspección de Chrome bloqueada por permisos de control del
+equipo; queda por identificar el desplegable observado por el usuario antes de
+atribuirlo al navegador o proponer un cambio de comportamiento. Mantener búsqueda
+relacional y la regla de no usar campos señuelo ni readonly temporal.
+
+## Localidad: importar/exportar (2026-11-22)
 
 Implementación solicitada en `codex/partner`, HEAD inicial `7abd557`, árbol limpio
 al comenzar. Localidad declara transfer con clave `[municipioId,codigo]` y
