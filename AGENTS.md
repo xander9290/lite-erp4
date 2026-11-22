@@ -56,13 +56,21 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   declara unicidad compuesta en el modelo dueño, genera @@unique y no es Field ni
   propiedad editable/de extensión. Estado conserva escritura/revisión del País por
   acceso heredado. Fase 3 (2026-11-20): referencias con clave compuesta del
-  destino y saltos anidados (máx. 2), Municipio habilitado por el usuario con
+  destino y saltos anidados (máx. 3 desde 2026-11-22), Municipio habilitado por el usuario con
   estadoId.paisId.codigo + estadoId.codigo. orm:sync prepara por sí mismo los diffs
   que sólo agregan índices únicos (comprobando duplicados) porque Prisma no responde
   su aviso sin terminal. No habilitar más modelos por anticipación. Migración
   aditiva de permisos aplicada en desarrollo Windows con aprobación el 2026-11-20;
   no asumir aplicación en otras máquinas. Contrato y límites en
   [Importar/exportar listas](docs/importar-exportar-listas.md).
+
+- Localidad habilita transfer por solicitud del usuario (2026-11-22), clave
+  [municipioId,codigo] con uniqueTogether e índice único; referencias de tres
+  saltos Municipio→Estado→País. Gestor y Administrador de Ubicaciones conceden
+  import/export por defecto, respetando overrides. No carga datos reales ni
+  implementa una carga masiva nacional; conserva 200 filas/12 columnas. Migración
+  aplicada con aprobación en desarrollo Mac el 2026-11-22; no asumir otras
+  máquinas/producción. Comprobaciones en docs/estado-proyecto.md.
 
 - País.estadoIds conserva One2many editable; el usuario aumentó maxRows de 50 a
   100 y confirmó la importación (2026-11-20). No convertirlo

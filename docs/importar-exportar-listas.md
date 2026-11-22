@@ -2,7 +2,7 @@
 
 Función compartida de módulos declarativos (2026-11-20), opt-in por modelo en el
 manifest. Admite escalares, fechas, Many2one, Many2many y una cadena One2many editable.
-Pilotos habilitados: País, Estado y Municipio de Ubicaciones. Sólo la ListView
+Habilitados: País, Estado, Municipio y Localidad de Ubicaciones. Sólo la ListView
 estándar ofrece estas acciones; Card, Kanban, formularios y colecciones embebidas
 no las muestran. Los endpoints revalidan acceso en servidor.
 
@@ -226,7 +226,7 @@ SQL y comprobar historial/duplicados antes de aplicarla.
 
 Implementada el 2026-11-20 en el framework. Una referencia puede identificar su
 destino con el grupo `uniqueTogether` del destino; cada Many2one de esa clave se
-resuelve con su propia referencia anidada (dos saltos como máximo):
+resuelve con su propia referencia anidada (hasta tres saltos desde 2026-11-22):
 
 ```ts
 // models/municipio.ts
@@ -284,6 +284,55 @@ CSV y XLSX, Estado inexistente, encabezados de clave faltantes y Estado renombra
 antes de confirmar. Si la referencia forma parte de la clave (como `estadoId`), sus
 columnas son encabezados obligatorios; el error «columnas juntas» aplica a
 referencias fuera de la clave y aún no tiene caso de integración propio.
+
+## Localidad: Municipio → Estado → País
+
+Habilitada el 2026-11-22 reutilizando el servicio general, sin acciones ni vistas
+nuevas. Localidad declara `uniqueTogether = [["municipioId", "codigo"]]`: un
+código puede repetirse en municipios distintos. El manifest configura:
+
+```ts
+localidad: {
+  model: Localidad,
+  transfer: {
+    key: ["municipioId", "codigo"],
+    fields: ["municipioId", "codigo", "name", "active"],
+    relations: {
+      municipioId: {
+        key: ["estadoId", "codigo"],
+        relations: {
+          estadoId: {
+            key: ["paisId", "codigo"],
+            relations: { paisId: { key: "codigo" } },
+          },
+        },
+      },
+    },
+  },
+},
+```
+
+La plantilla tiene seis columnas; el orden puede cambiar, conservando los nombres:
+
+```csv
+municipioId.estadoId.paisId.codigo,municipioId.estadoId.codigo,municipioId.codigo,codigo,name,active
+MX,01,001,0001,Localidad de ejemplo,true
+```
+
+Las cuatro columnas de identidad son obligatorias. Los códigos son texto para
+conservar ceros iniciales. País, Estado y Municipio deben existir y ser legibles
+por la relación publicada; cada salto aplica su normalización y queda firmado
+en el plan. No se crean referencias implícitas ni se admiten IDs. Un cuarto salto
+se rechaza al declarar el contrato. Importar Localidad no exige escritura de
+Municipio ni avanza su revisión: no es una línea editable de su documento.
+
+Gestor y Administrador de Ubicaciones conceden import/export sobre Localidad por
+defecto; los overrides vigentes de cada grupo/modelo siguen prevaleciendo.
+Requiere la migración `20261122000000_localidad_municipality_code_unique`, que
+sólo agrega el índice único Municipio+código. Consultar su aplicación y las
+verificaciones actuales en [el estado del proyecto](estado-proyecto.md).
+Se mantienen los límites de 200 filas de importación y 2.000 de exportación;
+la carga inicial masiva de localidades no se implementa con esta habilitación.
 
 ## Permisos por grupo y modelo
 

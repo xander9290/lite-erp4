@@ -12,7 +12,7 @@ async function worker(schema: string) {
   const { reviewTransfer, applyTransfer, exportTransfer } = await import("../src/lib/list/transfer");
   const { modelService, modelClientConfig, getModuleModel } = await import("../src/lib/modules/registry");
   const { readAccessCapabilities } = await import("../src/lib/access/engine");
-  const { setModelAccess } = await import("../src/lib/access/admin");
+  const { setModelAccess, setGroupMembers } = await import("../src/lib/access/admin");
   const { readTransferFile } = await import("../src/lib/list/transfer-file");
   try {
     const user = await prisma.user.create({ data: { login: "transfer-admin", password: "unused", isAdmin: true } });
@@ -89,16 +89,17 @@ async function worker(schema: string) {
     const municipioEnabled = Boolean(getModuleModel(municipioModel)!.entry.declaration.transfer);
     if (!municipioEnabled) await assert.rejects(reviewTransfer(prisma, actor, municipioModel, "municipio.csv", Buffer.from("codigo,name\n01,Municipio")), /habilita/);
 
-    await setModelAccess(prisma, actor, "core.internal", new Map([[model, { read: true, create: false, write: false, unlink: false, import: true, export: true }]]));
+    await setGroupMembers(prisma, actor, "ubicaciones.gestor", [other.id]);
+    await setModelAccess(prisma, actor, "ubicaciones.gestor", new Map([[model, { read: true, create: false, write: false, unlink: false, import: true, export: true }]]));
     const capabilities = await prisma.$transaction(tx => readAccessCapabilities(tx, other));
     assert.equal(capabilities.modelAccess[model].import, true); assert.equal(capabilities.modelAccess[model].export, true);
     const ui = modelClientConfig(model, capabilities);
     assert.equal(ui.transfer?.canImport, false, "import also needs create or write"); assert.equal(ui.transfer?.canExport, true);
     const deniedCrud = await reviewTransfer(prisma, other, model, "pais.csv", Buffer.from("codigo,name\nCA,Canadá"));
     assert.equal(deniedCrud.token, undefined);
-    await setModelAccess(prisma, actor, "core.internal", new Map([[model, { read: true, create: true, write: true, unlink: false, import: true, export: true }]]));
+    await setModelAccess(prisma, actor, "ubicaciones.gestor", new Map([[model, { read: true, create: true, write: true, unlink: false, import: true, export: true }]]));
     const allowed = await reviewTransfer(prisma, other, model, "pais.csv", Buffer.from("codigo,name\nCA,Canadá")); assert.ok(allowed.token);
-    await setModelAccess(prisma, actor, "core.internal", new Map([[model, { read: true, create: true, write: true, unlink: false, import: false, export: false }]]));
+    await setModelAccess(prisma, actor, "ubicaciones.gestor", new Map([[model, { read: true, create: true, write: true, unlink: false, import: false, export: false }]]));
     await assert.rejects(applyTransfer(prisma, other, model, allowed.token!), /permiso/);
     assert.equal(await prisma.ubicacionesPais.count({ where: { codigo: "CA" } }), 0);
 
@@ -254,22 +255,103 @@ async function worker(schema: string) {
       console.log("✓ Municipio: Estado by País+código (two hops), repeated codes across states, Excel+CSV reimport, partial/missing references and stale state keys.");
     } else console.log("• Municipio aún sin transfer en su manifest: sólo se verificó la resolución por saltos (decode/encode).");
 
+    // Localidad: three external reference hops and identity scoped to its municipality.
+    const localityModel = "ubicaciones.localidad";
+    const localityCsv = (text: string, who = actor) => reviewTransfer(prisma, who, localityModel, "localidad.csv", Buffer.from(text));
+    const localityHeader = "municipioId.estadoId.paisId.codigo,municipioId.estadoId.codigo,municipioId.codigo,codigo,name,active";
+    const localityInput = `${localityHeader}\nar,01,001,0001,Localidad AR,false\nCY,01,001,0001,Localidad CY,true`;
+    const localitySnapshot = async () => ({
+      rows: await prisma.ubicacionesLocalidad.findMany({ orderBy: { id: "asc" } }),
+      municipalities: await prisma.ubicacionesMunicipio.findMany({ orderBy: { id: "asc" } }),
+      history: await prisma.recordActivity.count(),
+    });
+    const beforeLocalities = await localitySnapshot();
+    const localityPlan = await localityCsv(localityInput);
+    assert.ok(localityPlan.token, JSON.stringify(localityPlan));
+    assert.deepEqual(await localitySnapshot(), beforeLocalities, "three-hop review rolls back all writes");
+    assert.deepEqual(await applyTransfer(prisma, actor, localityModel, localityPlan.token!), { created: 2, updated: 0, unchanged: 0 });
+    const localities = await prisma.ubicacionesLocalidad.findMany({ where: { codigo: "0001" } });
+    assert.equal(localities.length, 2, "locality codes repeat across municipalities and preserve leading zeros");
+    assert.notEqual(localities[0].municipioId, localities[1].municipioId);
+    assert.deepEqual((await localitySnapshot()).municipalities, beforeLocalities.municipalities, "query relations do not revise the municipality");
+    await assert.rejects(prisma.ubicacionesLocalidad.create({ data: { municipioId: localities[0].municipioId, codigo: "0001", name: "Duplicate" } }), (error: unknown) => (error as { code?: string }).code === "P2002");
+    const beforeLocalityRepeat = await localitySnapshot();
+    const localityRepeat = await localityCsv(localityInput);
+    assert.deepEqual(await applyTransfer(prisma, actor, localityModel, localityRepeat.token!), { created: 0, updated: 0, unchanged: 2 });
+    assert.deepEqual(await localitySnapshot(), beforeLocalityRepeat);
+    for (const format of ["csv", "xlsx"] as const) {
+      const file = await exportTransfer(prisma, actor, localityModel, { format, state: { ...state, query: "Localidad" }, selection: [], template: false });
+      const bytes = Buffer.from(file.base64, "base64");
+      const table = await readTransferFile(file.name, bytes);
+      assert.deepEqual(table[0], localityHeader.split(","));
+      assert.equal(table.length, 3);
+      const reimport = await reviewTransfer(prisma, actor, localityModel, file.name, bytes);
+      assert.ok(reimport.token && reimport.rows.every(row => row.operation === "unchanged"), JSON.stringify(reimport));
+      const selected = await exportTransfer(prisma, actor, localityModel, { format, state, selection: [localities[0].id], template: false });
+      assert.equal((await readTransferFile(selected.name, Buffer.from(selected.base64, "base64"))).length, 2);
+    }
+    const updatedLocality = await localityCsv("name,codigo,municipioId.codigo,municipioId.estadoId.codigo,municipioId.estadoId.paisId.codigo\nLocalidad AR actualizada,0001,001,01,AR");
+    assert.ok(updatedLocality.token, JSON.stringify(updatedLocality));
+    assert.deepEqual(await applyTransfer(prisma, actor, localityModel, updatedLocality.token!), { created: 0, updated: 1, unchanged: 0 });
+    assert.equal((await prisma.ubicacionesLocalidad.findFirstOrThrow({ where: { name: "Localidad AR actualizada" } })).active, false, "omitted optional columns preserve their values and header order is free");
+    const duplicateLocality = await localityCsv(`${localityHeader}\nar,01,001,0002,Uno,true\nAR,01,001,0002,Dos,true`);
+    assert.equal(duplicateLocality.token, undefined);
+    assert.ok(duplicateLocality.rows.every(row => row.operation === "error"));
+    await assert.rejects(localityCsv("municipioId,codigo,name\nforged,0002,Sin referencia"), /Encabezados/);
+    await assert.rejects(localityCsv("municipioId.estadoId.codigo,municipioId.codigo,codigo,name\n01,001,0002,Sin país"), /incluye/);
+    for (const [country, region, municipality] of [["ZZ", "01", "001"], ["AR", "99", "001"], ["AR", "01", "999"], ["AR", "", "001"]]) {
+      const missing = await localityCsv(`${localityHeader}\n${country},${region},${municipality},0002,Sin referencia,true`);
+      assert.equal(missing.token, undefined, JSON.stringify(missing));
+      assert.ok(Object.keys(missing.rows[0].errors ?? {}).some(key => key.startsWith("municipioId.")), JSON.stringify(missing));
+    }
+    const municipalityAR = await prisma.ubicacionesMunicipio.findFirstOrThrow({ where: { estadoId: arState.id, codigo: "001" } });
+    for (const [referenceModel, id, code] of [[model, countryAR.id, "AX"], [stateModel, arState.id, "09"], [municipioModel, municipalityAR.id, "009"]]) {
+      const staleLocality = await localityCsv(`${localityHeader}\nAR,01,001,0002,Localidad tardía,true`);
+      assert.ok(staleLocality.token, JSON.stringify(staleLocality));
+      const reference = await modelService(referenceModel).read(prisma, actor, id); assert.ok(reference.ok);
+      assert.ok((await modelService(referenceModel).save(prisma, actor, { ...reference.values, codigo: code })).ok);
+      await assert.rejects(applyTransfer(prisma, actor, localityModel, staleLocality.token!), /Fila 2/);
+      assert.equal(await prisma.ubicacionesLocalidad.count({ where: { codigo: "0002" } }), 0);
+      const current = await modelService(referenceModel).read(prisma, actor, id); assert.ok(current.ok);
+      assert.ok((await modelService(referenceModel).save(prisma, actor, { ...current.values, codigo: reference.values.codigo })).ok);
+    }
+    const permittedLocality = await localityCsv(`${localityHeader}\nAR,01,001,0002,Localidad autorizada,true`, other);
+    assert.ok(permittedLocality.token, JSON.stringify(permittedLocality));
+    await setModelAccess(prisma, actor, "ubicaciones.gestor", new Map([[localityModel, { read: true, create: true, write: true, unlink: false, import: false, export: false }]]));
+    await assert.rejects(applyTransfer(prisma, other, localityModel, permittedLocality.token!), /permiso/);
+    await assert.rejects(exportTransfer(prisma, other, localityModel, { format: "csv", state, selection: [], template: false }), /permiso/);
+    const lateLocalities = await localityCsv(`${localityHeader}\nAR,01,001,0002,Primera,true\nAR,01,001,0003,Segunda,true`);
+    assert.ok(lateLocalities.token, JSON.stringify(lateLocalities));
+    const { Localidad } = await import("../src/modules/ubicaciones/models/localidad");
+    const localityHook = Object.getOwnPropertyDescriptor(Localidad.prototype, "afterSave");
+    const beforeLateLocalities = await localitySnapshot();
+    try {
+      Object.defineProperty(Localidad.prototype, "afterSave", { configurable: true, value: async (record: { codigo: string }) => { if (record.codigo === "0003") throw new ModelValidationError("Fallo tardío de Localidad."); } });
+      await assert.rejects(applyTransfer(prisma, actor, localityModel, lateLocalities.token!), /Fila 3.*ninguna fila/);
+      assert.deepEqual(await localitySnapshot(), beforeLateLocalities, "late locality failure rolls back earlier rows and history");
+    } finally {
+      if (localityHook) Object.defineProperty(Localidad.prototype, "afterSave", localityHook);
+      else Reflect.deleteProperty(Localidad.prototype, "afterSave");
+    }
+    console.log("✓ Localidad: three hops, scoped DB uniqueness, leading zeros, review rollback, Excel/CSV roundtrip, updates, references, permissions and atomic late failure.");
+
     // A state remains an owned line: the importer must not bypass the parent's write access.
-    await setModelAccess(prisma, actor, "core.internal", new Map([
+    await setModelAccess(prisma, actor, "ubicaciones.gestor", new Map([
       [model, { read: true, create: false, write: false, unlink: false }],
       [stateModel, { read: true, create: true, write: true, unlink: false, import: true, export: true }],
     ]));
     const deniedParent = await stateCsv("paisId.codigo,codigo,name\nAR,03,Piloto sin acceso al padre", other);
     assert.equal(deniedParent.token, undefined);
-    await setModelAccess(prisma, actor, "core.internal", new Map([[model, { read: true, create: false, write: true, unlink: false }]]));
+    await setModelAccess(prisma, actor, "ubicaciones.gestor", new Map([[model, { read: true, create: false, write: true, unlink: false }]]));
     const allowedState = await stateCsv("paisId.codigo,codigo,name\nAR,03,Piloto autorizado", other);
     assert.ok(allowedState.token, JSON.stringify(allowedState));
-    await setModelAccess(prisma, actor, "core.internal", new Map([[model, { read: true, create: false, write: false, unlink: false }]]));
+    await setModelAccess(prisma, actor, "ubicaciones.gestor", new Map([[model, { read: true, create: false, write: false, unlink: false }]]));
     await assert.rejects(applyTransfer(prisma, other, stateModel, allowedState.token!), /permiso/);
     assert.equal(await prisma.ubicacionesEstado.count({ where: { paisId: countryAR.id, codigo: "03" } }), 0);
-    await setModelAccess(prisma, actor, "core.internal", new Map([[model, { read: false, create: false, write: false, unlink: false }]]));
+    await setModelAccess(prisma, actor, "ubicaciones.gestor", new Map([[model, { read: false, create: false, write: false, unlink: false }]]));
     await assert.rejects(stateCsv("paisId.codigo,codigo,name\nAR,03,No legible", other), /permiso/);
-    await assert.rejects(decodeMunicipio({ "paisId.codigo": "AR", codigo: "01" }, other), /permiso/, "each hop applies the destination's read access");
+    assert.equal((await decodeMunicipio({ "paisId.codigo": "AR", codigo: "01" }, other)).estadoId, arState.id, "published relation stays readable without direct country entry");
+    assert.equal((await modelService(model).read(prisma, other, countryAR.id)).ok, false);
     console.log("✓ Estado: composite DB uniqueness, external country keys, siblings in one batch, owner revisions/permissions, Excel+CSV reimport, duplicate/missing references and renamed/reassigned country keys.");
     await prisma.user.update({ where: { id: reader.id }, data: { active: false } });
     await assert.rejects(exportTransfer(prisma, other, model, { format: "csv", state, selection: [], template: false }), /sesión/);

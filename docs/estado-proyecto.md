@@ -1,12 +1,56 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-21.
+Última actualización: 2026-11-22.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Menús por grupo (2026-11-21, cierre actual)
+## Localidad: importar/exportar (2026-11-22, cierre actual)
+
+Implementación solicitada en `codex/partner`, HEAD inicial `7abd557`, árbol limpio
+al comenzar. Localidad declara transfer con clave `[municipioId,codigo]` y
+uniqueTogether correspondiente. Gestor y Administrador de Ubicaciones conceden
+import/export por defecto; los overrides se conservan. Se reutiliza la ListView
+y el servicio general, ampliando de dos a tres los saltos de referencias para
+Municipio→Estado→País; el cuarto se rechaza. Plantilla de seis columnas con
+códigos externos de texto, sin IDs ni creación implícita de destinos. Contrato y
+ejemplo en [Importar/exportar listas](importar-exportar-listas.md).
+Se mantienen los límites, la confirmación del plan y los permisos por campo,
+reglas de registro, transacciones y concurrencia existentes. No se cargaron datos
+reales, no se implementó CLI nacional ni se adelantaron cambios de otras apps.
+
+Artefactos gestionados actualizados mediante orm:install --update --write y
+Prisma Client generado. Migración preparada:
+`20261122000000_localidad_municipality_code_unique`, sólo un CREATE UNIQUE INDEX
+sobre municipio_id+codigo. Preflight de desarrollo Mac: cero grupos duplicados,
+diff de BD de sólo ese índice y 78 migraciones versionadas, únicamente ésta
+pendiente. Tras aprobación, db:deploy aplicó únicamente esta migración en
+desarrollo Mac el 2026-11-22. Verificación RepeatableRead/READ ONLY: historial
+terminado sin rollback, índice único/válido, cero duplicados y consulta del
+cliente real correcta sin publicar registros. migrate status confirma las 78
+migraciones al día. No asumir aplicación en otras máquinas ni producción.
+
+Verificaciones actuales: test:list-transfer 17/17, test:modules 64/64, TypeScript
+y ESLint focalizado aprobados. Integración PostgreSQL aprobada en esquema temporal
+propio eliminado: revisión sin escrituras, altas, unicidad por municipio en BD,
+ceros iniciales, repetir sin cambios ni historial, actualizaciones con columnas
+omitidas/reordenadas, filtro/selección y reimportación CSV/XLSX, duplicados,
+referencias faltantes, claves cambiadas en cualquiera de los tres saltos,
+revocación de permisos y rollback completo ante fallo tardío de hook. También
+comprueba que las revisiones de municipios no cambian al guardar localidades.
+Se ajustó el fixture histórico a grupos explícitos y lectura relacional vigente.
+Sin nueva revisión visual autenticada. Build aprobado fuera del sandbox, con los
+tres avisos previos de tracing del gestor. `git diff --check` aprobado.
+
+El usuario confirmó el 2026-11-22 que la funcionalidad de Localidades funciona
+en su prueba. No detalló operaciones ni formato; esta confirmación acredita el
+uso probado, sin extenderla a todas las combinaciones. Tarea cerrada, sin nuevas
+cargas ni pruebas del agente por esta confirmación. Sin commit/push.
+Simplificación aplicada: conservar un único contrato recursivo de referencias,
+sin crear otro importador ni duplicar acciones/vistas para Localidad.
+
+## Menús por grupo (2026-11-21)
 
 Implementación autorizada en `codex/partner`, HEAD inicial `5422540`. Conservados
 los cambios locales del usuario: nuevo grupo Administrador en Ubicaciones y

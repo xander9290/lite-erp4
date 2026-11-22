@@ -2,6 +2,7 @@ import "server-only";
 import { Fields, Model, type DisplayRecord } from "@/lib/orm";
 
 export class Localidad extends Model {
+  readonly uniqueTogether = [["municipioId", "codigo"]] as const;
   name = Fields.Text({ label: "Nombre", required: true, maxLength: 120, tracking: true });
   municipioId = Fields.Many2one("UbicacionesMunicipio", {
     label: "Municipio",

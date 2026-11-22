@@ -138,10 +138,13 @@ El inicio de dev no sustituye las migraciones ni la generación del acceso a dat
 
 ## Comprobaciones
 
-País, Estado y Municipio permiten importar/exportar Excel/CSV desde Acciones de ListView, con plantilla,
+País, Estado, Municipio y Localidad permiten importar/exportar Excel/CSV desde Acciones de ListView, con plantilla,
 revisión antes de confirmar y permisos por grupo/modelo. Requiere aplicar primero
 las migraciones correspondientes: permisos, unicidad País+código de Estado y Estado+código de Municipio ya
 aplicados con aprobación en desarrollo Windows; no asumirlo en otras máquinas.
+Localidad requiere además `20261122000000_localidad_municipality_code_unique`;
+su clave es Municipio+código y sus referencias alcanzan País en tres saltos.
+Estado de aplicación actual en [continuidad](docs/estado-proyecto.md).
 [Contrato, claves externas y límites](docs/importar-exportar-listas.md).
 La función es compartida: los modelos nuevos pueden declarar `transfer` manualmente
 en el manifest para escalares/DateTime, Many2one, Many2many con modo explícito y

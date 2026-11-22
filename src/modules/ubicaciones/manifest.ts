@@ -13,12 +13,11 @@ export default defineModule({
   access: [
     {
       group: "gestor",
-      models: ["pais", "estado", "municipio"],
+      models: ["pais", "estado", "municipio", "localidad"],
       perms: "crud",
       import: true,
       export: true,
     },
-    { group: "gestor", models: "localidad", perms: "crud" },
     {
       group: "admin",
       perms: "crud",
@@ -56,6 +55,23 @@ export default defineModule({
       },
     },
 
-    localidad: Localidad,
+    localidad: {
+      model: Localidad,
+      transfer: {
+        key: ["municipioId", "codigo"],
+        fields: ["municipioId", "codigo", "name", "active"],
+        relations: {
+          municipioId: {
+            key: ["estadoId", "codigo"],
+            relations: {
+              estadoId: {
+                key: ["paisId", "codigo"],
+                relations: { paisId: { key: "codigo" } },
+              },
+            },
+          },
+        },
+      },
+    },
   },
 });

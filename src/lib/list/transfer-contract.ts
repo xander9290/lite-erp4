@@ -5,7 +5,7 @@ import type { TransferCollection } from "./transfer-types";
 /**
  * How a Many2one is identified in a spreadsheet: a public unique Text key, or the
  * destination's `uniqueTogether` group. Many2one members of a compound key are
- * resolved by their own nested reference (two hops at most), never by IDs or names.
+ * resolved by their own nested reference (three hops at most), never by IDs or names.
  */
 export type TransferReference = {
   readonly key: string | readonly string[];
@@ -24,7 +24,7 @@ export type TransferSpec = {
 /** One spreadsheet column: owner field and the key path inside its reference (empty for scalars). */
 export type TransferColumn = { readonly header: string; readonly field: string; readonly path: readonly string[]; readonly document?: readonly string[] };
 
-const MAX_REFERENCE_HOPS = 2;
+const MAX_REFERENCE_HOPS = 3;
 const asKeys = (key: string | readonly string[]): readonly string[] => typeof key === "string" ? [key] : key;
 export const transferKeyFields = (spec: TransferSpec): readonly string[] => asKeys(spec.key);
 export const transferReferenceKeys = (reference: TransferReference): readonly string[] => asKeys(reference.key);

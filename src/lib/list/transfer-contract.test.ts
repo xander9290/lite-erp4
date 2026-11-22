@@ -57,7 +57,7 @@ class Municipality extends Model {
   name = Fields.Text({ required: true });
 }
 
-test("Many2one references accept a destination's compound key, resolved hop by hop (two at most)", () => {
+test("Many2one references accept a destination's compound key, resolved hop by hop", () => {
   const state = { key: ["paisId", "codigo"], relations: { paisId: { key: "codigo" } } } as const;
   const transfer = { key: ["estadoId", "codigo"], fields: ["estadoId", "codigo", "name"], relations: { estadoId: state } };
   const buildModule = (municipality: object, extra: object = {}) => defineModule({ id: "test", name: "Test", icon: "boxes", models: {
@@ -77,10 +77,31 @@ test("Many2one references accept a destination's compound key, resolved hop by h
   assert.throws(() => composeModules([buildModule({ relations: { estadoId: { key: ["paisId", "codigo"], relations: { paisId: { key: "name" } } } } })]), /Text única/);
   // A destination without that group cannot be referenced by a compound key.
   assert.throws(() => composeModules([buildModule({ relations: { estadoId: { key: "codigo" } } })]), /Text única/);
-  // Nested relations must name a member of the key; at most two hops.
+  // Nested relations must name a member of the key; at most three hops.
   assert.throws(() => buildModule({ relations: { estadoId: { key: ["paisId", "codigo"], relations: { name: { key: "codigo" } } } } }), /referencia Many2one inválida/);
   const tooDeep = { key: ["estadoId", "codigo"], relations: { estadoId: state } };
   assert.throws(() => buildModule({ relations: { estadoId: { key: ["paisId", "codigo"], relations: { paisId: tooDeep } } } }), /saltos/);
+});
+
+test("Localidad identifies Municipio through Estado and País in three hops, while a fourth hop is rejected", () => {
+  class Locality extends Model {
+    readonly uniqueTogether = [["municipioId", "codigo"]] as const;
+    municipioId = Fields.Many2one("TestMunicipality", { required: true });
+    codigo = Fields.Text({ required: true });
+    name = Fields.Text({ required: true });
+  }
+  const country = { key: "codigo" } as const;
+  const state = { key: ["paisId", "codigo"], relations: { paisId: country } } as const;
+  const municipality = { key: ["estadoId", "codigo"], relations: { estadoId: state } } as const;
+  const transfer = { key: ["municipioId", "codigo"], fields: ["municipioId", "codigo", "name"], relations: { municipioId: municipality } };
+  const define = (spec = transfer) => defineModule({ id: "test", name: "Test", icon: "boxes", models: {
+    country: Country, state: State, municipality: Municipality, locality: { model: Locality, transfer: spec },
+  } });
+  assert.ok(composeModules([define()]));
+  assert.deepEqual(transferHeaders(transfer), ["municipioId.estadoId.paisId.codigo", "municipioId.estadoId.codigo", "municipioId.codigo", "codigo", "name"]);
+  const fourth = { key: ["paisId", "codigo"], relations: { paisId: municipality } };
+  assert.throws(() => define({ ...transfer, relations: { municipioId: fourth } } as unknown as typeof transfer), /saltos/);
+  assert.throws(() => transferHeaders({ ...transfer, relations: { municipioId: fourth } }), /saltos/);
 });
 
 test("compound uniqueness only accepts required persistent fields and cannot silently disappear from generated schemas", () => {

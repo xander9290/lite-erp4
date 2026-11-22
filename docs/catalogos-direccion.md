@@ -6,12 +6,16 @@ y revisa un paso a la vez. Este documento no crea módulos, modelos ni datos.
 
 ## Estructura de trabajo
 
-**Punto vigente (2026-11-19):** catálogos, dominios encadenados, inserciones,
-permisos de lectura para usuarios internos y navegación desde Configuración de
-Contactos completados. Importador de estados INEGI terminado y carga real
-confirmada por el usuario. Guía pausada: falta comprobar repetición sin --aplicar,
-después continuar Municipios. Ver [estado y siguiente paso](#estado-y-siguiente-paso)
-y [uso del importador](importar-estados.md). El recorrido inferior explica la
+**Punto vigente (2026-11-22):** catálogos, dominios encadenados, inserciones y
+navegación desde Configuración de Contactos completados. País, Estado, Municipio
+y Localidad declaran importación/exportación general Excel/CSV con revisión previa;
+Localidad identifica por Municipio+código y llega a País mediante tres saltos.
+Aplicación del índice y pruebas actuales en [el estado del proyecto](estado-proyecto.md).
+La lectura automática para usuarios internos se retiró el 2026-11-21: entrada por
+grupo del módulo y lectura de referencias publicadas desde modelos autorizados.
+No se presupone carga real nueva ni repetición del importador de Estados.
+Ver [transferencias](importar-exportar-listas.md) y [uso del importador](importar-estados.md).
+El recorrido inferior explica la
 construcción; no son tareas para volver a ejecutar sobre módulos ya creados.
 
 Usar un módulo declarativo compartido `ubicaciones`, independiente de Contactos.
@@ -60,8 +64,9 @@ una dirección única sólo a partir del código postal sin revisar la fuente po
 
 ## Estado y siguiente paso
 
-**Avance guardado a petición del usuario (2026-11-19).** Rama codex/partner,
-HEAD 7e6d64b, cambios locales sin commit. No avanzar mientras dure la pausa.
+El resumen siguiente conserva las comprobaciones históricas del 2026-11-19.
+La habilitación de transferencias posteriores se describe arriba; no repetir
+cargas reales para comprobar el código.
 
 Completados:
 
@@ -69,23 +74,21 @@ Completados:
 - PartnerExtra con dirección/RFC y relaciones geográficas opcionales, dominios
   País→Estado→Municipio→Localidad y constraint País–Estado conservada.
 - Inserciones propias de formulario/lista sin duplicar el formulario base.
-- Lectura de Ubicaciones para todos los usuarios internos; modificación sólo admin.
-  Prueba de permisos y navegación desde Contactos confirmadas por el usuario.
+- Lectura automática para usuarios internos y modificación sólo admin verificadas
+  históricamente; sustituidas por grupos y lectura relacional el 2026-11-21.
 - Importador local de estados con plan/confirmación, servicios y lote atómico.
   Aplicación real confirmada por el usuario; el agente no la repitió en su BD.
   Prueba aislada de altas/cambios/repetición/rollback/concurrencia/CLI aprobada y
   esquema temporal eliminado. Detalles en [Importar estados](importar-estados.md).
 
-**Lo primero al retomar:** pedir el resultado de
+**Comprobación histórica aún no reportada:** resultado de
 `npm run ubicaciones:import -- TU_LOGIN`, sin --aplicar. Debe mostrar 32 sinCambios
 y ninguna alta, actualización o conflicto si no hubo cambios posteriores. El
 usuario todavía no reportó esa comprobación; no asumirla por la pausa.
 
-Después preparar la importación de Municipios, inicialmente con alcance por
-Estado y revisión antes de aplicar; luego Localidades. Todavía no existen esos
-importadores. Reutilizar lo útil sin copiar autorización/transacciones de manera
-indiscriminada: revisar simplificaciones del framework a partir de este caso real.
-Considerar identidad por padre+clave, fuentes, actualización, volumen e idempotencia.
+Las transferencias de mantenimiento de Municipios y Localidades ya están
+declaradas en el manifest. La carga inicial masiva por CLI sigue pendiente:
+revisar fuentes, actualización, volumen e idempotencia antes de implementarla.
 Las claves SAT se homologarán aparte; no hay integración fiscal implementada.
 
 La lista Contactos mantiene límite de 12 columnas; Localidad no se publica por

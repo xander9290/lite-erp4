@@ -73,6 +73,7 @@ model UbicacionesLocalidad {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   @@index([municipioId])
+  @@unique([municipioId, codigo])
   @@index([createBy])
   @@map("ubicaciones_localidad")
 
