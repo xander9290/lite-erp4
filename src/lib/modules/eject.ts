@@ -2,23 +2,26 @@ import ts from "typescript";
 import type { FieldMetadata } from "../orm/fields";
 import { object, sourceFile, unwrap } from "../scaffold/source-edit";
 
-export type EjectKind = "form" | "list" | "card" | "kanban";
+export type EjectKind = "form" | "modal" | "list" | "card" | "kanban";
 export type EjectModel = {
   readonly key: string;
   /** Declaration class name as imported in the manifest. */
-  readonly className: string;
+  readonly className?: string;
   /** Module-relative import of the class, e.g. "./models/tarea". */
-  readonly classImport: string;
+  readonly classImport?: string;
   readonly fields: Readonly<Record<string, FieldMetadata>>;
   readonly preview: Readonly<Record<string, FieldMetadata>>;
   readonly many2many?: readonly string[];
   readonly listFields: readonly string[];
   /** Many2one fields with an authorized lookup (targets inside registered modules). */
   readonly lookups: readonly string[];
+  readonly lines?: readonly string[];
+  readonly collections?: readonly string[];
+  readonly excludeExtensionFields?: readonly string[];
 };
 
 const pascal = (value: string) => value[0].toUpperCase() + value.slice(1);
-export const viewName = (key: string, kind: EjectKind) => `${pascal(key)}${pascal(kind)}`;
+export const viewName = (key: string, kind: EjectKind) => `${key.split(".").map(pascal).join("")}${pascal(kind)}`;
 
 function control(name: string, field: FieldMetadata, lookups: readonly string[]): [string, string] | null {
   const attr = `<Values> name=${JSON.stringify(name)}`;
@@ -34,7 +37,7 @@ function control(name: string, field: FieldMetadata, lookups: readonly string[])
 }
 
 /** Editable form layout with the same controls as the default view; ModelForm keeps the wiring. */
-export function formViewSource(model: EjectModel): string {
+export function formViewSource(model: EjectModel, kind: "form" | "modal" = "form"): string {
   const imports = new Set<string>();
   const lines: string[] = [];
   for (const [name, field] of Object.entries(model.fields)) {
@@ -52,30 +55,34 @@ export function formViewSource(model: EjectModel): string {
     imports.add(component);
     lines.push(`<${component} mode="display" name=${JSON.stringify(name)}${field.kind === "integer" ? ' type="integer"' : ""} direction="inline" />`);
   }
-  const name = viewName(model.key, "form");
+  if (model.lines?.length) imports.add("FieldOne2many");
+  const name = viewName(model.key, kind);
+  const hasClass = Boolean(model.className && model.classImport);
+  const helpers = ["ModelExtensions", ...(model.collections?.length ? ["ModelChildCollections"] : [])];
+  const exclude = model.excludeExtensionFields?.length ? ` excludeFields={${JSON.stringify(model.excludeExtensionFields)}}` : "";
   return `"use client";
 
-import ModelForm, { ModelExtensions } from "@/components/modules/ModelForm";
+import ModelForm, { ${helpers.join(", ")} } from "@/components/modules/ModelForm";
 import FormGroup from "@/components/ui/form/FormGroup";
 ${[...imports].sort().map(component => `import ${component} from "@/components/ui/form/${component}";`).join("\n")}
 import type { ModelClientConfig } from "@/lib/modules/config";
-import type { FormValues } from "@/lib/orm/model";
-import type { ${model.className} } from "../${model.classImport.replace(/^\.\//, "")}";
+${hasClass ? `import type { FormValues } from "@/lib/orm/model";\nimport type { ${model.className} } from "../${model.classImport!.replace(/^\.\//, "")}";` : ""}
 
-type Values = FormValues<typeof ${model.className}>;
+type Values = ${hasClass ? `FormValues<typeof ${model.className}>` : "Record<string, unknown>"};
 
 /**
  * Vista expulsada con eject:view: edita libremente la maquetación.
- * ModelForm aporta carga, guardado, recarga, breadcrumbs, historial y eliminación.
+ * ${kind === "modal" ? "Vista modal independiente: ModelForm conserva carga, guardado, permisos y cierre protegido." : "ModelForm aporta carga, guardado, recarga, breadcrumbs, historial y eliminación."}
  */
 export default function ${name}({ config, id }: { config: ModelClientConfig; id?: string }) {
   return (
     <ModelForm config={config} id={id}>
-      <FormGroup legend="Datos generales">
+      <FormGroup${kind === "modal" ? ' id="general"' : ""} legend="Datos generales">
         ${lines.join("\n        ")}
       </FormGroup>
       {/* Campos que otros módulos añaden a este modelo (extensiones). */}
-      <ModelExtensions />
+      <ModelExtensions${exclude} />
+${(model.lines ?? []).map(field => `      <FormGroup fullWidth><FieldOne2many name=${JSON.stringify(field)} /></FormGroup>\n`).join("")}${(model.collections ?? []).map(field => `      <ModelChildCollections name=${JSON.stringify(field)}${kind === "modal" ? ' openIn="modal"' : ""} />\n`).join("")}
     </ModelForm>
   );
 }
@@ -83,7 +90,7 @@ export default function ${name}({ config, id }: { config: ModelClientConfig; id?
 }
 
 /** Editable column list. Columns only present; the server list policy still decides what is allowed. */
-export function listViewSource(model: EjectModel, kind: Exclude<EjectKind, "form"> = "list"): string {
+export function listViewSource(model: EjectModel, kind: Exclude<EjectKind, "form" | "modal"> = "list"): string {
   const name = viewName(model.key, kind);
   return `import ModelCollection from "@/components/modules/ModelCollection";
 import type { ModelClientConfig } from "@/lib/modules/config";
@@ -143,7 +150,8 @@ export function manifestModel(text: string, key: string) {
 
 /** Register a lazy view in the manifest: `views: { form: () => import("./views/TareaForm") }`. */
 export function registerView(text: string, key: string, kind: EjectKind): string {
-  const { file, value, className } = manifestModel(text, key);
+  if (key.includes(".") && kind !== "modal") throw new Error("El eject de un modelo extendido admite sólo modal.");
+  const { file, value, className } = key.includes(".") ? manifestExtension(text, key) : manifestModel(text, key);
   const loader = `${kind}: () => import("./views/${viewName(key, kind)}")`;
   const indentOf = (node: ts.Node) => /[ \t]*$/.exec(text.slice(0, node.getStart(file)))![0];
   if (!ts.isObjectLiteralExpression(value)) {
@@ -156,7 +164,7 @@ export function registerView(text: string, key: string, kind: EjectKind): string
     const container = object(views.initializer);
     const existing = propertyNamed(container, kind);
     if (existing) {
-      if (kind !== "form" && ts.isPropertyAssignment(existing) && unwrap(existing.initializer).kind === ts.SyntaxKind.TrueKeyword) {
+      if (kind !== "form" && kind !== "modal" && ts.isPropertyAssignment(existing) && unwrap(existing.initializer).kind === ts.SyntaxKind.TrueKeyword) {
         return text.slice(0, existing.getStart(file)) + loader + text.slice(existing.end);
       }
       throw new Error(`${key} ya registra una vista ${kind}; no se sobrescribe.`);
@@ -164,6 +172,20 @@ export function registerView(text: string, key: string, kind: EjectKind): string
     return insert(text, file, container, loader, indentOf);
   }
   return insert(text, file, value, `views: { ${loader} }`, indentOf);
+}
+
+/** The extending module owns the view file; the base manifest is never edited. */
+export function manifestExtension(text: string, target: string) {
+  const file = sourceFile(text, "manifest.ts");
+  const extensions = propertyNamed(defineModuleObject(file), "extends");
+  if (!extensions || !ts.isPropertyAssignment(extensions)) throw new Error("El manifest necesita extends como objeto literal.");
+  const entry = propertyNamed(object(extensions.initializer), target);
+  if (!entry || !ts.isPropertyAssignment(entry)) throw new Error(`${target} no está declarado en extends.`);
+  const value = unwrap(entry.initializer);
+  const model = ts.isObjectLiteralExpression(value) ? propertyNamed(object(value), "model") : undefined;
+  const identifier = model ? (ts.isShorthandPropertyAssignment(model) ? model.name : unwrap(model.initializer)) : value;
+  if (!ts.isIdentifier(identifier)) throw new Error(`${target}: model debe ser un identificador de extensión.`);
+  return { file, entry, value, className: identifier.text };
 }
 
 function insert(text: string, file: ts.SourceFile, node: ts.ObjectLiteralExpression, entry: string, indentOf: (node: ts.Node) => string) {

@@ -1,7 +1,9 @@
 /** Serializable domain declarations. No database, React or server-only imports. */
 export type DomainScalar = string | number | boolean | null;
 export type DraftReference = { readonly draft: string };
-type Operand = DomainScalar | DraftReference;
+export type RecordReference = { readonly record: "id" };
+export type DomainRecord = Readonly<{ id?: string }>;
+type Operand = DomainScalar | DraftReference | RecordReference;
 export type DomainExpression<F extends string = string> =
   | { readonly field: F; readonly operator: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "contains" | "startsWith" | "endsWith"; readonly value: Operand }
   | { readonly field: F; readonly operator: "in" | "notIn"; readonly value: readonly Exclude<DomainScalar, null>[] }
@@ -17,6 +19,7 @@ export type DomainBuilder<F extends string = string> = {
   any(...nodes: readonly DomainExpression<F>[]): DomainExpression<F>;
   not(node: DomainExpression<F>): DomainExpression<F>;
   draft(field: string): DraftReference;
+  readonly record: { readonly id: RecordReference };
 };
 export type RelationDomain = (d: DomainBuilder) => DomainExpression;
 const comparisons = Object.fromEntries(["eq", "neq", "gt", "gte", "lt", "lte", "contains", "startsWith", "endsWith", "in", "notIn"].map(operator => [operator, (field: string, value: unknown) => ({ field, operator, value })]));
@@ -25,6 +28,7 @@ export const domainBuilder: DomainBuilder = Object.freeze({ ...comparisons,
   any: (...nodes: DomainExpression[]) => ({ any: nodes }),
   not: (node: DomainExpression) => ({ not: node }),
   draft: (field: string) => ({ draft: field }),
+  record: Object.freeze({ id: Object.freeze({ record: "id" as const }) }),
 }) as unknown as DomainBuilder;
 
 /** Narrow field names when a service already knows its record type. */
@@ -52,8 +56,10 @@ export function snapshotDomain(input: unknown): DomainExpression {
       if (!Array.isArray(operand) || operand.length > 100 || operand.some(v => v === null || !scalar(v))) throw invalid();
       operand = Object.freeze([...operand]);
     } else if (!scalar(operand)) {
-      if (!operand || typeof operand !== "object" || Object.keys(operand).length !== 1 || !Object.hasOwn(operand, "draft") || Object.values(Object.getOwnPropertyDescriptors(operand)).some(p => p.get || p.set) || !safeName((operand as DraftReference).draft)) throw invalid();
-      operand = Object.freeze({ draft: (operand as DraftReference).draft });
+      if (!operand || typeof operand !== "object" || ![Object.prototype, null].includes(Object.getPrototypeOf(operand)) || Object.keys(operand).length !== 1 || Object.values(Object.getOwnPropertyDescriptors(operand)).some(p => p.get || p.set)) throw invalid();
+      if (Object.hasOwn(operand, "draft") && safeName((operand as DraftReference).draft)) operand = Object.freeze({ draft: (operand as DraftReference).draft });
+      else if (Object.hasOwn(operand, "record") && (operand as RecordReference).record === "id" && node.field === "id" && ["eq", "neq"].includes(node.operator)) operand = Object.freeze({ record: "id" });
+      else throw invalid();
     }
     return Object.freeze({ field: node.field, operator: node.operator, value: operand }) as DomainExpression;
   }
@@ -78,14 +84,25 @@ export function domainDependencies(expression: DomainExpression): readonly strin
   return Object.freeze([...result]);
 }
 
+export function domainUsesRecordId(expression: DomainExpression): boolean {
+  if ("all" in expression) return expression.all.some(domainUsesRecordId);
+  if ("any" in expression) return expression.any.some(domainUsesRecordId);
+  if ("not" in expression) return domainUsesRecordId(expression.not);
+  return Boolean(expression.value && !Array.isArray(expression.value) && typeof expression.value === "object" && "record" in expression.value);
+}
+
 /** Missing dependencies disable the whole domain, including OR/NOT branches. */
-export function resolveDomain(expression: DomainExpression, values: Readonly<Record<string, unknown>>): DomainExpression {
+export function resolveDomain(expression: DomainExpression, values: Readonly<Record<string, unknown>>, record: DomainRecord = {}): DomainExpression {
   if (domainDependencies(expression).some(name => !Object.hasOwn(values, name) || values[name] === null || values[name] === undefined || values[name] === "")) return { any: [] };
   const walk = (node: DomainExpression): DomainExpression => {
     if ("all" in node) return { all: node.all.map(walk) };
     if ("any" in node) return { any: node.any.map(walk) };
     if ("not" in node) return { not: walk(node.not) };
     if (node.value && !Array.isArray(node.value) && typeof node.value === "object" && "draft" in node.value) return { ...node, value: values[node.value.draft] } as DomainExpression;
+    if (node.value && !Array.isArray(node.value) && typeof node.value === "object" && "record" in node.value) {
+      if (!record.id) return node.operator === "neq" ? { all: [] } : { any: [] };
+      return { ...node, value: record.id } as DomainExpression;
+    }
     return node;
   };
   return walk(expression);

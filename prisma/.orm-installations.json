@@ -3,7 +3,7 @@
   "modules": {
     "contactosextra": {
       "file": "orm-contactosextra.prisma",
-      "hash": "91a70f51c55b69e644adfe37d300746a62d4be4a91aed0ecde23c211263b6a94",
+      "hash": "37d28849c18ec4f953f82c15096e0608c511b11214887ba39409b453501ded86",
       "inverses": [
         {
           "file": "user.prisma",
@@ -13,7 +13,7 @@
         {
           "file": "partner.prisma",
           "target": "Partner",
-          "text": "\n  // BEGIN lite-erp:contactosextra:Partner\n  contactosextraCorePartnerRecordIdRecords ContactosextraCorePartner? @relation(\"ContactosextraCorePartner_recordId\")\n  // END lite-erp:contactosextra:Partner\n"
+          "text": "\n  // BEGIN lite-erp:contactosextra:Partner\n  contactosextraCorePartnerRecordIdRecords ContactosextraCorePartner? @relation(\"ContactosextraCorePartner_recordId\")\n  contactosextraCorePartnerParentIdRecords ContactosextraCorePartner[] @relation(\"ContactosextraCorePartner_parentId\")\n  // END lite-erp:contactosextra:Partner\n"
         },
         {
           "file": "orm-ubicaciones.prisma",

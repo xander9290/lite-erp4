@@ -123,6 +123,7 @@ try {
     await writeFile(join(root, "prisma/migrations/20990206000000_parameters/migration.sql"), sql);
     prisma(["migrate", "deploy"]); prisma(["generate"]);
     await writeFile(join(root, "src/modules/index.ts"), `import "server-only";\nimport parametros from "./parametros/manifest";\nexport const modules = [parametros];\n`);
+    tsx(join(root, "scripts/orm-generate.ts"), ["parametros", "--actions-only", "--write"], "typed parameter action contracts");
     await cp(join(project, "scripts/fixtures/action-parameters-check.fixture"), join(root, "action-parameters-check.ts"));
     console.log(tsx(join(root, "action-parameters-check.ts"), [], "action parameter service check").trim());
     command("next", ["typegen"], "Next route types");

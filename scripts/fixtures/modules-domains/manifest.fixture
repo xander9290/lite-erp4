@@ -10,11 +10,19 @@ class Estado extends Model {
   active = Fields.Boolean({ default: true });
 }
 const states = () => Fields.Many2one("DominiosEstado", { domain: d => d.all(d.eq("paisId", d.draft("paisId")), d.any(d.eq("active", true), d.not(d.eq("active", false)))) });
+class Linea extends Model {
+  name = Fields.Text({ required: true });
+  documentoId = Fields.Many2one("DominiosDocumento", { required: true, onDelete: "Restrict" });
+  parentId = Fields.Many2one("DominiosLinea", { domain: d => d.neq("id", d.record.id) });
+}
 class Documento extends Model {
   name = Fields.Text({ required: true });
   paisId = Fields.Many2one("DominiosPais");
   estadoId = states();
   estados = Fields.Many2many("DominiosEstado", { domain: d => d.eq("paisId", d.draft("paisId")) });
+  parentId = Fields.Many2one("DominiosDocumento", { domain: d => d.neq("id", d.record.id) });
+  pares = Fields.Many2many("DominiosDocumento", { domain: d => d.neq("id", d.record.id) });
+  lineaIds = Fields.One2many("DominiosLinea", { inverse: "documentoId", maxRows: 5 });
   active = Fields.Boolean({ default: true });
   status = Fields.Selection([{ value: "draft", label: "Borrador" }, { value: "done", label: "Hecho" }], { required: true, default: "draft" });
   beforeSave(values: Record<string, unknown>) {
@@ -22,19 +30,26 @@ class Documento extends Model {
   }
   async afterSave(record: Record<string, unknown>, context: ModelContext) {
     if (record.name === "late") await context.tx.dominiosDocumento.update({ where: { id: String(record.id) }, data: { paisId: null } });
+    if (record.name === "self-late") await context.tx.dominiosDocumento.update({ where: { id: String(record.id) }, data: { parentId: String(record.id) } });
   }
   @action({ label: "Invalidar país" })
   invalidar() { return { paisId: null }; }
+  @action({ label: "Autorreferencia" })
+  autorreferencia(record: { id: string }) { return { parentId: record.id }; }
 }
 const PartnerExtra = extendModel(Partner, Base => {
-  class Extra extends Base { paisId = Fields.Many2one("DominiosPais"); estadoId = states(); }
+  class Extra extends Base {
+    paisId = Fields.Many2one("DominiosPais"); estadoId = states();
+    parentId = Fields.Many2one("Partner", { domain: d => d.neq("id", d.record.id) });
+    childIds = Fields.One2many("Partner", { inverse: "parentId", readonly: true });
+  }
   return Extra;
 });
 export default defineModule({ id: "dominios", name: "Dominios", icon: "boxes",
-  models: { pais: Pais, estado: Estado, documento: { model: Documento, kanban: "status", views: { list: true, card: true, kanban: true }, domain: d => d.eq("active", true) } },
+  models: { pais: Pais, estado: Estado, linea: Linea, documento: { model: Documento, kanban: "status", views: { list: true, card: true, kanban: true }, domain: d => d.eq("active", true) } },
   extends: { "core.partner": PartnerExtra },
   groups: { editor: "Editor" },
-  access: [{ group: "editor", models: "documento", perms: "crud" }, { group: "editor", models: ["pais", "estado"], perms: "r" }],
+  access: [{ group: "editor", models: ["documento", "linea"], perms: "crud" }, { group: "editor", models: ["pais", "estado"], perms: "r" }],
   rules: [
     { id: "own", label: "Propios", models: "documento", groups: ["editor"], domain: ({ actor }) => [{ field: "createBy", operator: "eq", value: actor.id }] },
     { id: "visible", label: "Visibles", models: "estado", groups: ["editor"], domain: [{ field: "active", operator: "eq", value: true }] },

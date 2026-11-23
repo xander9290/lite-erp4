@@ -58,6 +58,8 @@ export type FormViewProps<TValues extends FieldValues, TContext = unknown, TOutp
     deletion?: FormDeletion;
     /** Executes named business actions for FormButton (e.g. ModelForm → modelAction). */
     runAction?: FormActionRunner<TValues>;
+    /** Contract name used to scope typed FormButton references. ModelForm supplies it. */
+    actionModel?: string;
     /** Published action labels, so FormButton can default its text. */
     actions?: readonly ClientModelAction[];
   };
@@ -70,7 +72,7 @@ const serverErrorTypes = ["server"];
 export default function FormView<TValues extends FieldValues, TContext = unknown, TOutput = TValues>({
   title, width = "normal", layout = "content", breadcrumbs, audit, activity, methods, mode = "edit", disabled = false, readOnly = false, busy: actionBusy = false,
   headerActions, menuActions, statebar, footer, saveLabel = "Guardar", revertLabel = "Revertir", newLabel = "Nuevo", onNew, onSubmit, onSaved, onRevert, deletion, runAction, actions: publishedActions,
-  children, id, className = "", onSubmitCapture, ...formProps
+  children, id, className = "", onSubmitCapture, actionModel, ...formProps
 }: FormViewProps<TValues, TContext, TOutput>) {
   const generatedId = useId();
   const alerts = useAlerts();
@@ -224,10 +226,11 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
     }
   }
 
-  return <FormActionsContext.Provider value={{ header: headerSlot, locked, readOnly, actions: publishedActions, run: runAction ? runFormAction : null, running: acting }}>
+  return <FormActionsContext.Provider value={{ model: actionModel, header: headerSlot, locked, readOnly, actions: publishedActions, run: runAction ? runFormAction : null, running: acting }}>
   <FormLayout {...formProps} id={id} methods={methods} aria-labelledby={titleId} aria-busy={busy} silentErrorTypes={serverErrorTypes}
     className={`card w-full ${pageLayout ? "flex min-h-0 flex-1 flex-col" : `mx-auto shrink-0 ${width === "wide" ? "max-w-7xl" : "max-w-5xl"}`} rounded-2xl border border-base-300 bg-base-100 shadow-sm ${className}`} contentClassName={`flex min-w-0 flex-col ${pageLayout ? "min-h-0 flex-1" : ""}`}
     onSubmitCapture={event => {
+      if (event.target !== event.currentTarget) return;
       onSubmitCapture?.(event);
       if (actionSubmit.current && !event.defaultPrevented) { submitter.current = null; return; }
       if (event.defaultPrevented || locked || inFlight.current || readOnly || (mode === "edit" && !isDirty)) {

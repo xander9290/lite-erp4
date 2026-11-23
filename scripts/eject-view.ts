@@ -5,13 +5,35 @@ import type { ModuleDefinition } from "../src/lib/modules/define";
 import { formViewSource, listViewSource, manifestModel, registerView, viewName, type EjectKind } from "../src/lib/modules/eject";
 import { assertNoSymlinks } from "../src/lib/orm/generator/write";
 import { assertNoOtherModuleOperation } from "../src/lib/module-manager/operation-lock";
+import { composeModules } from "../src/lib/modules/compose";
+import core from "../src/lib/core/manifest";
+import { sourceFile } from "../src/lib/scaffold/source-edit";
 
-const usage = "Uso: npm run eject:view -- modulo modelo form|list|card|kanban [--dry-run]";
+const usage = "Uso: npm run eject:view -- modulo modelo form|modal|list|card|kanban [--dry-run]. Para una extensión: modulo propietario.modelo modal.";
+
+/** Load only the selected module's dependency graph, including the implicit native core. */
+async function dependencies(root: string, definition: ModuleDefinition) {
+  const found = new Map<string, ModuleDefinition>([[core.id, core]]);
+  const visit = async (module: ModuleDefinition) => {
+    if (found.has(module.id)) return;
+    found.set(module.id, module);
+    for (const id of module.application.depends ?? []) {
+      if (found.has(id)) continue;
+      const path = join(root, "src/modules", id, "manifest.ts");
+      await assertNoSymlinks(path);
+      const next: ModuleDefinition | undefined = (await import(pathToFileURL(path).href)).default;
+      if (!next || next.id !== id) throw new Error(`Dependencia inválida: ${id}.`);
+      await visit(next);
+    }
+  };
+  await visit(definition);
+  return [...found.values()];
+}
 
 /** Copy a default view into src/modules/<id>/views and register it lazily in the manifest. Never overwrites. */
 async function main() {
   const [id, key, kind, flag, ...extra] = process.argv.slice(2);
-  if (!id || !key || !["form", "list", "card", "kanban"].includes(kind) || extra.length || (flag && flag !== "--dry-run") || !/^[a-z][a-z0-9]*$/.test(id) || !/^[a-z][a-z0-9]*$/.test(key)) throw new Error(usage);
+  if (!id || id === "core" || !key || !["form", "modal", "list", "card", "kanban"].includes(kind) || extra.length || (flag && flag !== "--dry-run") || !/^[a-z][a-z0-9]*$/.test(id) || !/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)?$/.test(key) || (key.includes(".") && kind !== "modal")) throw new Error(usage);
   const root = process.cwd();
   await assertNoOtherModuleOperation(root);
   const manifestPath = join(root, "src/modules", id, "manifest.ts");
@@ -22,21 +44,36 @@ async function main() {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   });
   const definition: ModuleDefinition | undefined = (await import(pathToFileURL(manifestPath).href)).default;
-  const entry = definition?.models.find(model => model.key === key);
-  if (!definition || definition.id !== id || !entry) throw new Error(`No existe el modelo ${id}.${key} en src/modules/${id}/manifest.ts.`);
+  if (!definition || definition.id !== id) throw new Error(`Manifest inválido: ${id}.`);
+  const extension = key.includes(".") ? definition.extensions.find(extension => extension.target === key) : undefined;
+  if (key.includes(".") && !extension) throw new Error(`${key} no está declarado en extends de ${id}.`);
+  const declared = await dependencies(root, definition);
+  const modelId = extension ? key : `${id}.${key}`;
+  const modules = composeModules(declared);
+  const entry = modules.flatMap(module => module.models).find(model => model.id === modelId);
+  const base = declared.flatMap(module => module.models).find(model => model.id === modelId);
+  if (!entry || !base) throw new Error(`No existe el modelo ${modelId}.`);
   if (kind === "kanban" && !entry.kanban) throw new Error("Configura kanban en el modelo antes de expulsar su presentación.");
   const text = await readFile(manifestPath, "utf8");
-  const { className, classImport } = manifestModel(text, key);
-  const lookups = Object.entries(entry.metadata).filter(([, field]) => field.kind === "many2one" && !field.sensitive && definition.models.some(model => model.contract.name === field.target)).map(([name]) => name);
+  const classInfo = extension ? {} : manifestModel(text, key);
+  // An existing modal insertion file owns the extender's controls; keep them out
+  // of the generated layout so the same field never mounts twice.
+  const ownExtensionFields = extension && !extension.insertions?.modal ? [...extension.fields, ...extension.computed, ...extension.many2many] : [];
+  const rendered = new Set([...base.clientFields, ...Object.keys(base.contract.previewFields), ...Object.keys(base.contract.many2manyFields), ...ownExtensionFields]);
+  const fields = Object.fromEntries(Object.entries(entry.metadata).filter(([name, field]) => rendered.has(name) && (!field.sensitive || ("writeOnly" in field && field.writeOnly))));
+  const preview = Object.fromEntries(Object.entries(entry.contract.previewFields).filter(([name]) => rendered.has(name)).map(([name, field]) => [name, field.metadata]));
+  const many2many = Object.keys(entry.contract.many2manyFields).filter(name => rendered.has(name));
+  const targets = new Set(modules.flatMap(module => module.models.map(model => model.contract.name)));
+  const lookups = Object.entries(fields).filter(([, field]) => field.kind === "many2one" && !field.sensitive && targets.has(field.target)).map(([name]) => name);
   const model = {
-    many2many: Object.keys(entry.contract.many2manyFields),
-    key, className, classImport, lookups, listFields: entry.list.fields,
-    fields: Object.fromEntries(entry.clientFields.map(name => [name, entry.metadata[name]])),
-    preview: Object.fromEntries(Object.entries((entry.contract.previewFields ?? {}) as Record<string, { metadata: (typeof entry.metadata)[string] }>).map(([name, field]) => [name, field.metadata])),
+    many2many, key, ...classInfo, lookups, listFields: entry.list.fields, fields, preview,
+    lines: Object.keys(entry.contract.one2manyFields), collections: Object.keys(entry.contract.childCollections),
+    ...(kind === "modal" ? { excludeExtensionFields: [...Object.keys(fields), ...Object.keys(preview), ...many2many] } : {}),
   };
-  const source = kind === "form" ? formViewSource(model) : listViewSource(model, kind as Exclude<EjectKind, "form">);
+  const source = kind === "form" || kind === "modal" ? formViewSource(model, kind) : listViewSource(model, kind as Exclude<EjectKind, "form" | "modal">);
+  sourceFile(source, "view.tsx");
   const updated = registerView(text, key, kind as EjectKind);
-  console.log(`${flag ? "Plan" : "Vista expulsada"}: ${id}.${key} ${kind}`);
+  console.log(`${flag ? "Plan" : "Vista expulsada"}: ${modelId} ${kind}${extension ? ` en ${id}` : ""}`);
   console.log(`  create ${relative(root, viewPath)}`);
   console.log(`  update ${relative(root, manifestPath)}`);
   if (flag) return;

@@ -18,17 +18,17 @@ model User {
 
     @@map("users")
 
-  // BEGIN lite-erp:contactosextra:User
-  contactosextraPartnertagsCreatedRecords ContactosextraPartnertags[] @relation("ContactosextraPartnertags_createBy")
-  contactosextraCorePartnerSaleUserIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_saleUserId")
-  contactosextraCorePartnerPurchaseUserIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_purchaseUserId")
-  contactosextraCorePartnerCreatedRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_createBy")
-  // END lite-erp:contactosextra:User
-
   // BEGIN lite-erp:ubicaciones:User
   ubicacionesPaisCreatedRecords UbicacionesPais[] @relation("UbicacionesPais_createBy")
   ubicacionesEstadoCreatedRecords UbicacionesEstado[] @relation("UbicacionesEstado_createBy")
   ubicacionesMunicipioCreatedRecords UbicacionesMunicipio[] @relation("UbicacionesMunicipio_createBy")
   ubicacionesLocalidadCreatedRecords UbicacionesLocalidad[] @relation("UbicacionesLocalidad_createBy")
   // END lite-erp:ubicaciones:User
+
+  // BEGIN lite-erp:contactosextra:User
+  contactosextraPartnertagsCreatedRecords ContactosextraPartnertags[] @relation("ContactosextraPartnertags_createBy")
+  contactosextraCorePartnerSaleUserIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_saleUserId")
+  contactosextraCorePartnerPurchaseUserIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_purchaseUserId")
+  contactosextraCorePartnerCreatedRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_createBy")
+  // END lite-erp:contactosextra:User
 }

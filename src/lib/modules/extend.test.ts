@@ -144,7 +144,7 @@ test("insertions: deferred loaders per view, form exclusive with views.form, tra
   const loader = async () => ({ default: () => null });
   const Extra = extendModel(Equipo, Base => class extends Base { serie = Fields.Text({ label: "Serie" }); });
   const declare = (spec: Record<string, unknown>) => defineModule({ id: "inserta", name: "Inserta", icon: "eye", depends: ["soporte", "basex"], models: {}, extends: { "basex.equipo": { model: Extra, ...spec } as never } });
-  assert.throws(() => declare({ insertions: { pivot: loader } }), /insertions sólo registra form, list, card o kanban/);
+  assert.throws(() => declare({ insertions: { pivot: loader } }), /insertions sólo registra form, modal, list, card o kanban/);
   assert.throws(() => declare({ insertions: { list: "./views/Lista" } }), /loader diferido/);
   // Collection insertions are compatible with a whole-block views.form.
   assert.equal(declare({ insertions: { list: loader, kanban: loader }, views: { form: loader } }).extensions[0].insertions?.list, loader);

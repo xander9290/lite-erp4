@@ -148,6 +148,11 @@ class Estado extends Model {
   deban aparecer; las colecciones ya no usan `<form>` propios, así que caben dentro del
   formulario del registro sin que Enter lo envíe.
 
+Desde 2026-11-22, `openIn="modal"` abre «Nuevo» y las filas en el formulario
+del hijo sin salir del principal. También se admite la consulta en extensiones,
+incluida una inversa añadida por esa extensión. Guardado independiente y cierre
+protegido: [Formularios en modal](formularios-modal.md).
+
 ## Permisos y límites
 
 ## Líneas anidadas (2026-11-19)

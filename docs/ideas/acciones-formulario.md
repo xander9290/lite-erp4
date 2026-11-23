@@ -12,10 +12,12 @@ from/to/action. Comparte la ejecución autorizada y persistencia de la acción
 con el botón, dentro de la transacción del movimiento. No hay borrador de
 formulario que guardar en ese flujo. [Contrato Kanban](../modulos-declarativos.md#kanban-mediante-acciones-publicadas).
 
-Decisión del usuario: **nombre validado**. La vista escribe
-`<FormButton action="confirmar">`; el navegador sólo envía ese nombre con ID y
-revisión a una Server Action fija (`modelAction`), y el servidor lo compara con la
-lista publicada por `@action`. No se aceptan referencias a funciones ni campos.
+Actualización del 2026-11-22: la vista usa una **referencia tipada generada**,
+`<FormButton action={ventaActions.confirmar} />`. El botón resuelve su nombre sólo
+si la referencia corresponde al modelo del formulario y la acción sigue publicada
+en el snapshot efectivo. El navegador envía ese nombre con ID/revisión a la Server
+Action fija (`modelAction`); el servidor conserva su whitelist y autorización.
+La referencia es un dato `{model, name}`, no una función ejecutable ni un permiso.
 
 ```ts
 @action({ label: "Confirmar", groups: ["gerente"] }) // groups opcional
@@ -46,9 +48,66 @@ confirmar(record: ActionRecord<Venta>, context: ActionContext): ActionPatch<Vent
   guardada. El fallo de la acción conserva lo guardado y llama `onSaved` con ello;
   un error de red no presenta éxito ni reintenta.
 - ModelForm conecta `runAction` y `actions` desde `ModelClientConfig`
-  automáticamente. Demo ficticia en `/sample#form-actions`.
+  automáticamente, incluyendo `actionModel={config.name}` para limitar las referencias.
+  Demo ficticia en `/sample#form-actions`.
 
-## Problema y objetivo
+## Referencias tipadas y generación (2026-11-22)
+
+Después de declarar/renombrar/eliminar un método `@action`, generar sus referencias:
+
+```bash
+npm run orm:generate -- ventas --actions-only --write
+```
+
+El ejemplo supone un modelo `ventas.venta` con nombre de contrato `VentasVenta`:
+
+```tsx
+import { VentasVentaActions as ventaActions } from "@/generated/orm/actions/ventas/VentasVenta.actions";
+
+<FormHeader>
+  <FormButton action={ventaActions.confirmar} />
+</FormHeader>
+```
+
+`ventaActions.confimar` produce error de TypeScript y autocompletado de las acciones
+publicadas al generar. `FormButton` exige `ModelActionReference`: ya no admite
+strings ni objetos escritos a mano. La marca es sólo de tipos; cada referencia
+es inmutable y serializable. No importa la clase server-only en el navegador.
+Las referencias sólo contienen el nombre del contrato del modelo y el método:
+sin cuerpos, campos privados, labels, grupos, parámetros ni concesiones estáticas.
+El label, parámetros y disponibilidad continúan viniendo del snapshot efectivo.
+
+Salida: `src/generated/orm/actions/<modulo>/<NombreContrato>.actions.ts`, export
+`<NombreContrato>Actions`. Incluye acciones heredadas publicadas. Las extensiones
+generan `<NombreCompañera>Actions` en su propio módulo, pero cada referencia apunta
+al contrato base (p. ej. `Partner`), no a la fila compañera. Los modelos sin acciones
+generan un mapa vacío. En core se admite `orm:generate -- core --actions-only` para
+las referencias nativas; no instala ni sincroniza tablas de infraestructura.
+
+`orm:sync` genera estas referencias al sincronizar contratos, también para módulos
+declarativos runtime. `orm:generate` completo también las incluye. `--actions-only`
+evita Prisma, instalación y acceso a BD: sin --write revisa; con --check devuelve 2
+si hay diferencias, sin escribir. Conserva hashes, rechazo de symlinks y protección
+contra cambios manuales mediante el writer existente. Regenerar tras cambios del
+modelo; el servidor permanece seguro aunque un contrato cliente quede desactualizado.
+Los archivos generados deben compartirse en Git junto con sus consumidores, como
+los demás contratos versionados; no asumir que existen en otra máquina.
+
+Para FormView manual con FormButton, declarar explícitamente `actionModel` con el
+nombre del contrato, `actions` autorizado y `runAction`. Una demo/servicio manual
+puede usar `defineActionReferences("SampleSale", ["confirmar", "cancelar"])` de
+`@/lib/orm/action-reference` para su conjunto finito; no registrar de nuevo los
+métodos de modelos declarativos en TSX. Sin modelo/snapshot, referencia ajena,
+acción omitida o formulario de consulta, el botón se oculta. La pertenencia al modelo
+se comprueba en ejecución; TypeScript comprueba las claves de la referencia, pero
+no deduce el modelo del provider React padre.
+
+Migración: sustituir `action="nombre"` por el miembro del contrato generado y,
+en formularios manuales, añadir `actionModel`. Las demos y pruebas existentes ya
+están adaptadas. `runAction` interno y endpoints siguen recibiendo el nombre como
+string validado; grupos, parámetros, revisión y transacción no cambian.
+
+## Antecedentes históricos: problema y objetivo
 
 FormView ya ofrece headerActions, menuActions, statebar y un ciclo de guardado.
 ModelForm todavía no expone esos slots a las vistas expulsadas. Una acción como
@@ -68,25 +127,25 @@ vigentes, lectura del registro, comprobación de ID/revisión, transacción, val
 y persistencia del resultado, avance de revisión, historial y respuesta canónica.
 El método comprueba la transición de negocio y expresa sus cambios.
 
-FormButton se conecta a ese método mediante una Server Action adaptadora explícita,
-generada o declarada con poco código y sin duplicar reglas de negocio. Sólo se
+ModelForm conecta FormButton con ese método mediante la Server Action fija
+modelAction, sin duplicar reglas de negocio. Sólo se
 pueden ejecutar métodos publicados como acciones; normalize, beforeSave, afterSave
 y auxiliares permanecen internos. No permitir invocación arbitraria de métodos
 ni escritura libre de campos desde el navegador.
 
-El decorador @action, ActionRecord y la firma record/context comentados en el chat
-son ejemplos de diseño, no APIs disponibles ni sintaxis definitiva. Al retomar,
-definir primero el contrato del método, su publicación y adaptador, permisos,
-resultado y relación con hooks/constraints; después implementar la coordinación
-FormHeader/FormButton. Reutilizar el ciclo existente sin duplicar hooks.
-Este pendiente no autoriza crear Ventas ni añadir estados/acciones a Flota.
+@action, ActionRecord y la firma record/context ya están implementados según el
+contrato superior (record/params/context cuando hay parámetros declarados).
+La coordinación FormHeader/FormButton reutiliza el ciclo existente. Ventas y
+estados/acciones de Flota no se crean por documentar este ejemplo.
 
-## API ilustrativa acordada
+## Ejemplo de composición
 
 ```tsx
+import { VentasVentaActions as ventaActions } from "@/generated/orm/actions/ventas/VentasVenta.actions";
+
 <ModelForm config={config} id={id}>
   <FormHeader>
-    <FormButton action={confirmarVenta}>
+    <FormButton action={ventaActions.confirmar}>
       Confirmar
     </FormButton>
 
@@ -99,7 +158,7 @@ Este pendiente no autoriza crear Ventas ni añadir estados/acciones a Flota.
 </ModelForm>
 ```
 
-Es una propuesta de consumo, no código disponible. Ventas todavía no existe.
+Es la API vigente aplicada a un modelo hipotético; Ventas todavía no existe.
 Preferencia por componentes independientes FormHeader/FormButton, coherentes con
 FormGroup/Stack, en lugar de exigir Form.Header. FormHeader coloca botones y el
 Field de estado en la cabecera dentro del contexto RHF. Preservar la distribución

@@ -92,3 +92,31 @@ test("las plantillas usan los mismos controles que la vista por defecto y tipan 
   assert.doesNotMatch(list, /use client/);
   assert.match(list, /\{ field: "categoria" \},/);
 });
+
+test("modal eject preserves the page and collection views, including extension short and literal declarations", () => {
+  const own = registerView(manifest('    tarea: { model: Tarea, views: { form: () => import("./Page") } },'), "tarea", "modal");
+  parses(own);
+  assert.match(own, /form: \(\) => import\("\.\/Page"\), modal: \(\) => import\("\.\/views\/TareaModal"\)/);
+  for (const declaration of ["Extra", "{ model: Extra }", '{ model: Extra, insertions: { form: () => import("./Insert"), list: () => import("./List") }, views: { form: () => import("./Partial") } }', "{ model }"]) {
+    const before = `export default defineModule({models:{}, extends:{ "core.partner": ${declaration} }});`;
+    const after = parses(registerView(before, "core.partner", "modal"));
+    assert.match(after, /modal: \(\) => import\("\.\/views\/CorePartnerModal"\)/);
+    if (declaration.includes("insertions:")) {
+      assert.match(after, /insertions: \{ form: \(\) => import\("\.\/Insert"\), list: \(\) => import\("\.\/List"\) \}/);
+      assert.match(after, /form: \(\) => import\("\.\/Partial"\)/);
+    }
+    assert.throws(() => registerView(after, "core.partner", "modal"), /no se sobrescribe/);
+  }
+  assert.throws(() => registerView('export default defineModule({models:{}, extends:{ ...others }});', "core.partner", "modal"), /sin spreads/);
+  assert.throws(() => registerView('export default defineModule({models:{}});', "core.partner", "modal"), /extends/);
+  assert.throws(() => registerView(own, "core.partner", "form"), /sólo modal/);
+});
+
+test("modal templates keep the shared runtime, extension fields, inline lines and independent child collections", () => {
+  const source = formViewSource({ key: "core.partner", fields: { name: Fields.Text().metadata, parentId: Fields.Many2one("Partner").metadata }, preview: {}, listFields: ["name"], lookups: ["parentId"], many2many: ["tagIds"], lines: ["lineIds"], collections: ["childIds"], excludeExtensionFields: ["name", "parentId", "tagIds"] }, "modal");
+  sourceFile(source, "CorePartnerModal.tsx");
+  assert.match(source, /function CorePartnerModal/);
+  assert.match(source, /type Values = Record<string, unknown>/);
+  assert.doesNotMatch(source, /import.*models\/|FormDialog|useForm|onSubmit/);
+  for (const text of ['<ModelForm config={config} id={id}>', '<ModelExtensions excludeFields={["name","parentId","tagIds"]} />', '<FieldMany2One<Values> name="parentId"', '<FieldRelationTag<Values> name="tagIds"', '<FieldOne2many name="lineIds" />', '<ModelChildCollections name="childIds" openIn="modal" />']) assert.ok(source.includes(text), text);
+});

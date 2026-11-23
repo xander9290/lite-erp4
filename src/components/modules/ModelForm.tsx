@@ -28,8 +28,11 @@ import FieldVisibility from "@/components/ui/form/FieldVisibility";
 import type { ListState } from "@/lib/list/types";
 import { modelChildren, modelRelationLookup, modelAction, modelActivity, modelDelete, modelNote, modelRead, modelSave } from "@/lib/modules/actions";
 import { modelUiCapabilities } from "@/lib/access/capabilities";
-import { useModelExtensionInsertions, useModelExtensionViews } from "./ModelExtensionViews";
+import { useModelExtensionInsertions, useModelExtensionViews, useModelFormViewKind } from "./ModelExtensionViews";
 import { InsertionProvider, useInsertionFallback } from "@/components/ui/form/insertions/Insertions";
+import { FormDialogLock } from "@/components/ui/form/FormDialog";
+import ModelFormModal from "./ModelFormModal";
+import { useModelFormPresentation } from "./ModelFormPresentation";
 
 type Values = Record<string, unknown>;
 
@@ -58,17 +61,38 @@ const ModelUIContext = createContext<ModelUI | null>(null);
  * authorized collection per relation, filtered by the server to this record. Ejected forms
  * place `<ModelChildCollections />` (or `name` for one relation) where they should appear.
  */
-export function ModelChildCollections({ name }: { name?: string }) {
+export function ModelChildCollections({ name, openIn = "page" }: { name?: string; openIn?: "page" | "modal" }) {
   const ui = useContext(ModelUIContext);
   const recordId = useWatch({ name: "id" }) as string | undefined;
   const collections = Object.entries(ui?.config.collections ?? {}).filter(([field]) => !name || field === name);
   if (!ui || !collections.length) return null;
   return <>{collections.map(([field, collection]) => <FieldVisibility key={field} name={field} invisible={collection.invisible}><FormGroup fullWidth legend={collection.label}>
-    {recordId ? <ModelCollection embedded config={collection.config} view="list" title={collection.label} paramPrefix={field}
-      createDefaults={{ [collection.inverse]: recordId }}
-      source={{ load: (state: ListState) => modelChildren(ui.config.id, field, recordId, state), filterLookups: Object.fromEntries(Object.keys(collection.config.lookups).map(lookup => [lookup, (request: import("@/lib/many2one/model-lookup").ModelLookupRequest) => modelRelationLookup(collection.config.id, lookup, { request, draft: {}, filter: true })])) }} />
+    {recordId ? <ChildCollection parent={ui.config.id} field={field} recordId={recordId} collection={collection} openIn={openIn} />
       : <p className="text-sm text-base-content/60">Guarda el registro para ver {collection.label.toLowerCase()}.</p>}
   </FormGroup></FieldVisibility>)}</>;
+}
+
+function ChildCollection({ parent, field, recordId, collection, openIn }: {
+  parent: string; field: string; recordId: string;
+  collection: NonNullable<ModelClientConfig["collections"]>[string]; openIn: "page" | "modal";
+}) {
+  const [editing, setEditing] = useState<{ id?: string } | null>(null);
+  const [version, setVersion] = useState(0);
+  const source = useMemo(() => ({
+    load: (state: ListState) => modelChildren(parent, field, recordId, state),
+    filterLookups: Object.fromEntries(Object.keys(collection.config.lookups).map(lookup => [lookup, (request: import("@/lib/many2one/model-lookup").ModelLookupRequest) => modelRelationLookup(collection.config.id, lookup, { request, draft: {}, filter: true })])),
+    // Replacing this provider after a confirmed save reloads the current query/page.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [parent, field, recordId, collection, version]);
+  const defaults = { [collection.inverse]: recordId };
+  const inverse = collection.config.fields[collection.inverse];
+  return <><ModelCollection embedded config={collection.config} view="list" title={collection.label} paramPrefix={field}
+    createDefaults={defaults} create={inverse?.kind === "many2one" && !inverse.readOnly} source={source} delete={false}
+    onCreate={openIn === "modal" ? () => setEditing({}) : undefined}
+    onOpen={openIn === "modal" ? record => setEditing({ id: record.id }) : undefined} />
+    {editing && <ModelFormModal config={collection.config} id={editing.id} defaults={defaults}
+      onClose={() => setEditing(null)} onSaved={() => setVersion(value => value + 1)} />}
+  </>;
 }
 
 /** Content of an insertion file whose target is missing or rejected (never lost). */
@@ -85,10 +109,12 @@ function InsertionFallback({ module, label }: { module: string; label: string })
  */
 export function ModelExtensions({ excludeFields = [] }: { excludeFields?: readonly string[] } = {}) {
   const ui = useContext(ModelUIContext);
-  const views = useModelExtensionViews();
+  const views = useModelExtensionViews(ui?.config.id);
+  const kind = useModelFormViewKind(ui?.config.id);
+  const insertions = useModelExtensionInsertions(kind, ui?.config.id ?? "");
   if (!ui?.config.extensions?.length) return null;
   return <>{ui.config.extensions.map(extension => {
-    if (extension.insertions?.includes("form")) return <InsertionFallback key={extension.module} module={extension.module} label={extension.label} />;
+    if (Object.hasOwn(insertions, extension.module)) return <InsertionFallback key={extension.module} module={extension.module} label={extension.label} />;
     // Custom forms may lay out inherited fields themselves; keep other extensions automatic.
     const fields = extension.fields.filter(name => !excludeFields.includes(name));
     if (!fields.length) return null;
@@ -112,17 +138,19 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
   const router = useRouter();
   const params = useSearchParams();
   const { config } = ui;
+  const modal = useModelFormPresentation(config.id);
   const capabilities = modelUiCapabilities(config.capabilities);
   const returnHref = formDeleteReturnHref(params.get("returnTo"), config.route);
   const returnQuery = `?returnTo=${encodeURIComponent(returnHref)}`;
   const [savedId, setSavedId] = useState(record.id as string | undefined);
   const [savedName, setSavedName] = useState(displayName);
   const methods = useForm<Values>({ resolver: zodResolver(ui.schema as never), defaultValues: record });
-  const insertions = useModelExtensionInsertions("form", config.id);
+  const kind = useModelFormViewKind(config.id);
+  const insertions = useModelExtensionInsertions(kind, config.id);
   const insertionModules = useMemo(() => (config.extensions ?? []).map(extension => ({ module: extension.module, depends: extension.depends ?? [] })), [config.extensions]);
   return <ModelUIContext.Provider value={ui}><FormView
-    layout="page"
-    breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: config.label, href: returnHref }, { label: savedId ? savedName || "Registro" : "Nuevo registro" }]}
+    layout={modal ? "content" : "page"}
+    breadcrumbs={modal ? [] : [{ label: "Aplicaciones", href: "/erp" }, { label: config.label, href: returnHref }, { label: savedId ? savedName || "Registro" : "Nuevo registro" }]}
     title={savedId ? "Editar registro" : "Nuevo registro"}
     methods={methods}
     model={ui.recordUI as never}
@@ -130,20 +158,23 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
     mode={savedId ? "edit" : "create"}
     readOnly={savedId ? !capabilities.write : !capabilities.create}
     onSubmit={values => modelSave(config.id, values)}
-    deletion={capabilities.unlink ? { action: selection => modelDelete(config.id, selection), returnHref: config.route, allowReadOnly: true } : undefined}
+    deletion={!modal && capabilities.unlink ? { action: selection => modelDelete(config.id, selection), returnHref: config.route, allowReadOnly: true } : undefined}
     // FormButton: published @action names only; the server validates them and re-authorizes.
     runAction={(action, target, params) => modelAction(config.id, { action, ...target, ...(params !== undefined ? { params } : {}) })}
     actions={config.actions}
-    onNew={savedId && capabilities.create ? () => router.push(`${config.route}/nuevo${returnQuery}`) : undefined}
+    actionModel={config.name}
+    onNew={!modal && savedId && capabilities.create ? () => router.push(`${config.route}/nuevo${returnQuery}`) : undefined}
     onSaved={(values, _audit, name) => {
       setSavedId(values.id as string);
       setSavedName(name);
+      if (modal) { modal.onSaved(values); return; }
       if (!record.id && values.id) router.replace(`${config.route}/${encodeURIComponent(values.id as string)}${returnQuery}`);
       router.refresh();
     }}
     menuActions={onReload ? [{ id: "reload", label: "Recargar registro", icon: <RefreshCw size={16} />, onSelect: onReload }] : undefined}
     footer={<p className="text-xs text-base-content/55">Los cambios se guardan al presionar Guardar.</p>}
   >
+    <FormDialogLock />
     <InsertionProvider modules={insertionModules} collectors={insertions}>{children ?? <ModelFields ui={ui} />}</InsertionProvider>
   </FormView></ModelUIContext.Provider>;
 }
@@ -152,7 +183,9 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
  * Form wiring shared by every module model: loader, reload guard, routing, breadcrumbs,
  * activity and deletion. Custom views pass only their field layout as children.
  */
-export default function ModelForm({ config, id, children }: { config: ModelClientConfig; id?: string; children?: ReactNode }) {
+export default function ModelForm({ config, id: routeId, children }: { config: ModelClientConfig; id?: string; children?: ReactNode }) {
+  const modal = useModelFormPresentation(config.id);
+  const id = modal ? modal.id : routeId;
   const ui = useMemo(() => buildModelUI(config), [config]);
   const router = useRouter();
   const navigation = useFormNavigation();
@@ -161,7 +194,7 @@ export default function ModelForm({ config, id, children }: { config: ModelClien
   const load = useCallback(() => modelRead(config.id, id!), [config.id, id]);
   // `default_<field>` proposes a Many2one value for a new record; the server validates it on save.
   const query = useSearchParams();
-  const proposed = Object.fromEntries(Object.entries(config.fields).flatMap(([name, field]) => {
+  const proposed = modal ? Object.fromEntries(Object.entries(modal.defaults ?? {}).filter(([name]) => Object.hasOwn(config.fields, name) && !config.fields[name].readOnly && !config.fields[name].sequence && !config.fields[name].sensitive)) : Object.fromEntries(Object.entries(config.fields).flatMap(([name, field]) => {
     const value = field.kind === "many2one" ? query.get(`default_${name}`) : null;
     return value && value.length <= 100 ? [[name, value]] : [];
   }));

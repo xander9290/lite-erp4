@@ -51,13 +51,19 @@ entregan como snapshots inmutables. `groups` conserva su política actual.
 En el formulario personalizado bajo ModelForm:
 
 ```tsx
+// Ejemplo para un modelo soporte.ticket con contrato SoporteTicket.
+import { SoporteTicketActions as ticketActions } from "@/generated/orm/actions/soporte/SoporteTicket.actions";
+
 <FormHeader>
-  <FormButton action="cerrar" />
+  <FormButton action={ticketActions.cerrar} />
 </FormHeader>
 ```
 
 No se escribe otro esquema ni un modal por aplicación. ModelForm transmite el
 contrato autorizado; FormButton abre el diálogo con los Fields existentes.
+Las referencias se generan con `orm:sync` o
+`npm run orm:generate -- soporte --actions-only --write`, sin BD en este último caso.
+[Tipado y formularios manuales](ideas/acciones-formulario.md#referencias-tipadas-y-generación-2026-11-22).
 
 1. Se solicitan y validan los parámetros con su propio RHF/Zod. Cancelar, Escape o
    cerrar no ejecuta guardado ni acción. Los lookups pueden hacer lecturas autorizadas.

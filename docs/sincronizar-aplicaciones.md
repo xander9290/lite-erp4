@@ -32,6 +32,9 @@ vistas ni acciones nuevas en aplicaciones existentes.
    otra mezcla de cambios sigue por migrate dev.
 5. Comprueba que la base y el esquema coincidan.
 6. Genera Prisma Client, sincroniza contratos y genera/compila los adaptadores.
+   Incluye referencias tipadas de acciones en `src/generated/orm/actions/<id>`
+   también para módulos declarativos. Si sólo cambian métodos `@action`, se pueden
+   regenerar sin BD con `npm run orm:generate -- id --actions-only --write`.
 7. Comprueba TypeScript y recuerda reiniciar dev si estaba abierto.
 
 Ejemplo con nombre de migración opcional:

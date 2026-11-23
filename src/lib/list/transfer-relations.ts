@@ -208,7 +208,7 @@ async function checkDomain(tx: Prisma.TransactionClient, actor: ModelActor, entr
   if (!domain) return;
   const target = targetFor(entry, field);
   const draft = Object.fromEntries(domainDependencies(domain).map(name => [name, record[name]]));
-  const candidates = await withRelationRead(tx, actor, entry.id, target.id, () => modelService(target.id).lookupInTransaction(tx, actor, { ids: [id] }, relationDomainWhere(entry, target, domain, draft)));
+  const candidates = await withRelationRead(tx, actor, entry.id, target.id, () => modelService(target.id).lookupInTransaction(tx, actor, { ids: [id] }, relationDomainWhere(entry, target, domain, draft, { id: typeof record.id === "string" ? record.id : undefined })));
   if (!candidates.items.some(item => item.value === id)) throw new ModelValidationError("La referencia no cumple el dominio.", { [field]: "Selecciona una referencia compatible con los datos de la fila." });
 }
 

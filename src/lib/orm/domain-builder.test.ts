@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { domainBuilder as d, snapshotDomain, declareRelationDomain, domainDependencies, resolveDomain } from "./domain-builder";
+import { domainBuilder as d, snapshotDomain, declareRelationDomain, domainDependencies, domainUsesRecordId, resolveDomain } from "./domain-builder";
 import { compileListDomain, compileRelationDomain, validateRelationDomain, compileCollectionDomain } from "./domain";
 import { Fields } from "./fields";
 import { defineModule } from "../modules/define";
@@ -29,6 +29,31 @@ test("empty dependencies deny the entire domain even under OR/NOT; false and zer
   assert.deepEqual(resolveDomain(d.eq("active", d.draft("enabled")), { enabled: false }), d.eq("active", false));
   assert.deepEqual(resolveDomain(d.eq("quantity", d.draft("quantity")), { quantity: 0 }), d.eq("quantity", 0));
   assert.deepEqual(compileListDomain({ optional: Fields.Text().metadata }, [d.eq("optional", null)]), { AND: [{ optional: { equals: null } }] });
+});
+
+test("record identity is a separate bounded operand: editing excludes self and creation preserves other predicates", () => {
+  const expression = snapshotDomain(d.all(d.eq("active", true), d.neq("id", d.record.id)));
+  assert.deepEqual(domainDependencies(expression), []);
+  assert.equal(domainUsesRecordId(expression), true);
+  assert.ok(Object.isFrozen(d.record) && Object.isFrozen(d.record.id));
+  assert.deepEqual(compileRelationDomain(expression, target, owner, {}, { id: "current" }), { AND: [{ AND: [{ active: { equals: true } }, { id: { not: "current" } }] }] });
+  assert.deepEqual(compileRelationDomain(expression, target, owner, {}), { AND: [{ AND: [{ active: { equals: true } }] }] });
+  assert.deepEqual(compileRelationDomain(d.eq("id", d.record.id), target, owner, {}), { id: { in: [] } });
+  assert.deepEqual(compileRelationDomain(d.not(d.neq("id", d.record.id)), target, owner, {}), { id: { in: [] } });
+  assert.deepEqual(compileRelationDomain(d.any(d.eq("id", d.record.id), d.eq("active", true)), target, owner, {}), { AND: [{ OR: [{ active: { equals: true } }] }] });
+  assert.deepEqual(compileRelationDomain(d.all(expression, d.eq("paisId", d.draft("paisId"))), target, owner, {}, { id: "current" }), { id: { in: [] } });
+  assert.deepEqual(compileRelationDomain(d.neq("id", d.record.id), target, owner, { id: "forged" }, { id: "actual" }), { AND: [{ id: { not: "actual" } }] });
+  for (const id of [null, "", " ", 12, "x".repeat(101)]) assert.throws(() => compileRelationDomain(expression, target, owner, {}, { id } as never));
+});
+
+test("record operands reject arbitrary paths/operators and cannot be used as collection or draft identity", async () => {
+  for (const value of [{ record: "revision" }, { record: "id", extra: true }, { record: "id", draft: "name" }, Object.create({ record: "id" })]) assert.throws(() => snapshotDomain(d.neq("id", value as never)));
+  for (const expression of [d.eq("active", d.record.id), d.contains("id", d.record.id), d.in("id", [d.record.id as never]), d.gt("id", d.record.id)]) assert.throws(() => snapshotDomain(expression));
+  assert.throws(() => validateRelationDomain(d.neq("id", d.draft("id")), target, owner));
+  await assert.rejects(compileCollectionDomain(target, d => d.neq("id", d.record.id), { actor: { id: "actor", sessionVersion: 0 }, tx: {} as Prisma.TransactionClient }), /registro actual/);
+  const field = Fields.Many2one("GeoEstado", { domain: d => d.neq("id", d.record.id) });
+  assert.deepEqual(fieldFromMetadata(field.metadata).metadata, field.metadata);
+  assert.deepEqual(Function("Fields", `return ${fieldExpression(field.metadata)}`)(Fields).metadata, field.metadata);
 });
 
 test("domain rejects invalid structure, cycles, unknown names, private fields and incompatible dependencies before values", () => {

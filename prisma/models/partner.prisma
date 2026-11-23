@@ -15,5 +15,6 @@ model Partner {
 
   // BEGIN lite-erp:contactosextra:Partner
   contactosextraCorePartnerRecordIdRecords ContactosextraCorePartner? @relation("ContactosextraCorePartner_recordId")
+  contactosextraCorePartnerParentIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_parentId")
   // END lite-erp:contactosextra:Partner
 }

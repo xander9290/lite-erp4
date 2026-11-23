@@ -79,10 +79,13 @@ export type ModelCollectionProps = Pick<CollectionProps, "renderCard" | "titleFi
   embedded?: boolean;
   /** Values proposed to a new record (`default_<field>` in the URL; the server validates them). */
   createDefaults?: Readonly<Record<string, string>>;
+  /** List-only callbacks for an embedded form, instead of route navigation. */
+  onCreate?: () => void;
+  onOpen?: (record: import("@/lib/list/types").ListRecord) => void;
 };
 
 /** Presentation only: shared publication, navigation and authorized data providers. */
-function CollectionBody({ config, columns: declared, view = config.view, title = config.label, create = true, open = true, delete: canDelete = true, movable = true, source: provider, renderCell, pageSize = 25, embedded = false, createDefaults, ...presentation }: ModelCollectionProps) {
+function CollectionBody({ config, columns: declared, view = config.view, title = config.label, create = true, open = true, delete: canDelete = true, movable = true, source: provider, renderCell, pageSize = 25, embedded = false, createDefaults, onCreate, onOpen, ...presentation }: ModelCollectionProps) {
   const pathname = usePathname();
   const params = useSearchParams().toString();
   const returnTo = `${pathname}${params ? `?${params}` : ""}`;
@@ -128,5 +131,5 @@ function CollectionBody({ config, columns: declared, view = config.view, title =
     apply: modelTransferApply.bind(null, config.id),
     download: (format: import("@/lib/list/transfer-types").TransferFormat, state: unknown, selection: readonly string[], template: boolean) => modelTransferExport(config.id, { format, state, selection, template }),
   } : undefined;
-  return <ListView {...common} transfer={transfer} load={source.provider.load} delete={canDelete && capabilities.unlink} onDelete={source.provider.remove} renderCell={renderCell} />;
+  return <ListView {...common} onCreate={create && capabilities.create ? onCreate : undefined} onOpen={open ? onOpen : undefined} transfer={transfer} load={source.provider.load} delete={canDelete && capabilities.unlink} onDelete={source.provider.remove} renderCell={renderCell} />;
 }

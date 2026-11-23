@@ -17,6 +17,7 @@ import { bindRepositories } from "./bind";
 import { moduleRegistration } from "../../modules/scaffold";
 import { writeResource } from "../../scaffold/resource-write";
 import { assertNoOtherModuleOperation } from "../../module-manager/operation-lock";
+import { actionReferenceFiles } from "./action-references";
 
 export type MigrationFile = { name: string; sql: string };
 export type AppliedMigration = { migration_name: string; checksum: string; finished_at: unknown; rolled_back_at: unknown };
@@ -86,6 +87,9 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   if (profile.runtime && !profile.module.models.length) throw new Error(`Añade primero un modelo: npm run create:model -- ${id} NombreDelModelo.`);
   // Preflight before touching the schema or the database. Reject ambiguous source indexes early.
   const registration = profile.runtime ? await moduleRegistration(root, id) : [];
+  const actionDirectory = join(root, "src/generated/orm/actions", id);
+  const actions = actionReferenceFiles(profile.module);
+  const actionPlan = await artifactPlan(actionDirectory, `actions-${id}`, actions);
   if (options.plan) {
     const plan = await installModels(root, profile, false, true, options.force);
     const uploadDirectory = join(root, "src/generated/orm/uploads", id);
@@ -94,6 +98,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     for (const change of plan.changes) options.log(relative(root, change.path));
     for (const change of registration) options.log(`update: ${relative(root, change.path)}`);
     for (const change of uploads.changes.filter(change => change.action !== "unchanged")) options.log(`${change.action}: ${relative(root, join(uploadDirectory, change.name))}`);
+    for (const change of actionPlan.changes.filter(change => change.action !== "unchanged")) options.log(`${change.action}: ${relative(root, join(actionDirectory, change.name))}`);
     options.log(plan.sql);
     if (options.force) options.log("--force: plan de restricciones; los datos se comprobarán al sincronizar con la base.");
     options.log("Sin escrituras ni SQL aplicado. El enlace se comprueba en la sincronización completa.");
@@ -137,7 +142,9 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     return directory;
   };
   const generate = async () => {
-    // Declarative modules build client contracts, uploads and repositories at runtime.
+    // Actions need a static contract for TypeScript, even on runtime declarative models.
+    await writeArtifacts(actionDirectory, `actions-${id}`, actions);
+    // Declarative modules build other client contracts, uploads and repositories at runtime.
     if (profile.runtime) return;
     const files = await prepareModuleArtifacts(root, profile.module, profile.externalOwners);
     const directory = join(root, "src/generated/orm/apps", id);

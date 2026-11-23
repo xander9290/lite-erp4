@@ -39,6 +39,8 @@ export type ListViewProps = ({ model: ListModel; load?: never } | { model: strin
   defaultSort?: ListConfig["defaultSort"];
   paramPrefix?: string;
   createHref?: string;
+  onCreate?: () => void;
+  onOpen?: (record: ListRecord) => void;
   create?: boolean;
   delete?: boolean;
   onDelete?: (selection: readonly ListDeleteTarget[]) => Promise<ListDeleteResult>;
@@ -58,7 +60,7 @@ const alignmentClasses = { left: "text-left", center: "text-center", right: "tex
 export default function ListViewClient({
   model, load, filterLookups, title, columns, queryColumns, searchFields = Object.hasOwn(listModels, model) ? listModels[model as ListModel].searchFields : [],
   pageSize = 25, defaultSort, paramPrefix = "",
-  createHref, create = true, delete: deleteEnabled = true, onDelete, transfer, createLabel = "Nuevo", recordHref, breadcrumbs, headerActions, footer, className = "", renderCell,
+  createHref, onCreate, onOpen, create = true, delete: deleteEnabled = true, onDelete, transfer, createLabel = "Nuevo", recordHref: routeHref, breadcrumbs, headerActions, footer, className = "", renderCell,
 }: ListViewProps) {
   const titleId = useId();
   const config = { model, columns: queryColumns ?? columns, searchFields, defaultSort };
@@ -79,11 +81,13 @@ export default function ListViewClient({
   const first = data?.total ? (page - 1) * data.pageSize + 1 : 0;
   const last = data ? Math.min(page * data.pageSize, data.total) : 0;
   const sizes = [...new Set([10, 25, 50, state.pageSize])].sort((a, b) => a - b);
-  const canCreate = create && internalHref(createHref);
+  const canCreate = create && (onCreate || internalHref(createHref));
+  const recordHref = onOpen ? undefined : routeHref;
   const filterCount = state.filters.length + (state.query ? 1 : 0) + (state.invalidFilters ? 1 : 0);
   const displayColumns = columns.map(column => listDisplayColumn(model, column));
 
   function openRecord(record: ListRecord, element: HTMLElement) {
+    if (onOpen) { onOpen(record); return; }
     trigger.current = element;
     setPreview({ model, record });
   }
@@ -106,7 +110,7 @@ export default function ListViewClient({
           deleteDisabled={!deleteAction || !parsedSelection.success} deleteUnavailable={!deleteAction}
           onDelete={() => { if (deleteAction && parsedSelection.success) void deletion.run(parsedSelection.data, deleteAction, list.refresh); }} />}
         <button type="button" className="btn btn-ghost btn-sm gap-2" disabled={loading || deletion.busy} onClick={list.refresh} aria-label={`Actualizar ${title}`}><RefreshCw size={15} className={loading ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" /><span>Actualizar</span></button>
-        {canCreate && <Link href={createHref!} className="btn btn-primary btn-sm gap-1.5"><Plus size={16} aria-hidden="true" />{createLabel}</Link>}
+        {canCreate && (onCreate ? <button type="button" className="btn btn-primary btn-sm gap-1.5" onClick={onCreate}><Plus size={16} aria-hidden="true" />{createLabel}</button> : <Link href={createHref!} className="btn btn-primary btn-sm gap-1.5"><Plus size={16} aria-hidden="true" />{createLabel}</Link>)}
       </div>
     </header>
 

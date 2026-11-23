@@ -11,6 +11,7 @@ import FieldNumber from "./FieldNumber";
 import FormGroup from "./FormGroup";
 import Stack from "./Stack";
 import { FormActionsContext, FormButton } from "./formActions";
+import { defineActionReferences, type ModelActionReference } from "@/lib/orm/action-reference";
 const fields={name:Fields.Text({label:"Nombre heredado",required:true,maxLength:12}),state:Fields.Selection([{value:"draft",label:"Borrador"}],{label:"Estado",required:true}),ownerId:Fields.Many2one("Owner")};
 const load=async()=>({ok:false as const,error:"sample"});
 
@@ -122,13 +123,21 @@ test("invisible inherits metadata, permits explicit overrides and keeps register
 });
 
 test("FormButton hides actions outside the published capability snapshot and all actions in consultation", () => {
-  const context = { header: null, locked: false, readOnly: false, actions: [{ name: "allowed", label: "Permitida" }], run: async () => true, running: null };
-  const buttons = <><FormButton action="allowed" /><FormButton action="denied">No permitida</FormButton></>;
+  const context = { model: "SamplePolicy", header: null, locked: false, readOnly: false, actions: [{ name: "allowed", label: "Permitida" }], run: async () => true, running: null };
+  const actions = defineActionReferences("SamplePolicy", ["allowed", "denied"]);
+  const buttons = <><FormButton action={actions.allowed} /><FormButton action={actions.denied}>No permitida</FormButton></>;
   const html = renderToStaticMarkup(<FormActionsContext.Provider value={context}>{buttons}</FormActionsContext.Provider>);
   assert.match(html, /Permitida/);
   assert.doesNotMatch(html, /No permitida/);
   const readonly = renderToStaticMarkup(<FormActionsContext.Provider value={{ ...context, readOnly: true }}>{buttons}</FormActionsContext.Provider>);
   assert.doesNotMatch(readonly, /<button/);
+  const other = defineActionReferences("OtherModel", ["allowed"]);
+  for (const action of [other.allowed, "allowed" as unknown as ModelActionReference]) {
+    assert.doesNotMatch(renderToStaticMarkup(<FormActionsContext.Provider value={context}><FormButton action={action} /></FormActionsContext.Provider>), /<button/);
+  }
+  for (const value of [{ ...context, model: undefined }, { ...context, actions: undefined }]) {
+    assert.doesNotMatch(renderToStaticMarkup(<FormActionsContext.Provider value={value}>{buttons}</FormActionsContext.Provider>), /<button/);
+  }
 });
 
 test("declarative One2many columns inherit child metadata and preserve persisted IDs", async () => {

@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     agentUpgrade: "security",
   },
   outputFileTracingIncludes: {
+    "/documentation": ["./docs/crear-modulos.md"],
     "/erp/ajustes/modulos{,/**}": [
       "./src/modules/*/manifest.ts",
       "./src/app/\\(auth\\)/erp/*/manifest.ts",

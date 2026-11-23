@@ -31,6 +31,21 @@ export default function FormNavigationProvider({ children }: { children: ReactNo
   return <NavigationGuardProvider><FormNavigation>{children}</FormNavigation></NavigationGuardProvider>;
 }
 
+/** Closing a dialog discards only its draft; leaving the page still protects all forms. */
+export function FormNavigationScope({ children }: { children: ReactNode }) {
+  const parent = useFormNavigation();
+  const alerts = useAlerts();
+  const [guard] = useState(() => new UnsavedChanges(() => alerts.confirm({
+    title: "Cambios sin guardar",
+    message: "Los cambios de este formulario se perderán si lo cierras.",
+    confirmLabel: "Cerrar sin guardar",
+    cancelLabel: "Seguir editando",
+    danger: true,
+  })));
+  useLayoutEffect(() => parent.register(guard.blocked, guard.discard), [parent, guard]);
+  return <Context.Provider value={guard}>{children}</Context.Provider>;
+}
+
 export function useFormLeaveGuard(blocked: boolean, reset: () => void) {
   const guard = useFormNavigation();
   const dirty = useRef(false);

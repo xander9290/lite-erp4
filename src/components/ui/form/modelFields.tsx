@@ -19,7 +19,7 @@ export type FormLineModel = {
   /** Sub-lines of this line (nested documents). */
   lines?: Readonly<Record<string, FormLineModel>>;
 };
-export type RelationDomainLookup = { dependencies: readonly string[]; load: (request: import("@/lib/many2one/model-lookup").ModelLookupRequest, draft: Record<string, unknown>) => ReturnType<Many2OneLoader> };
+export type RelationDomainLookup = { dependencies: readonly string[]; usesRecordId?: boolean; load: (request: import("@/lib/many2one/model-lookup").ModelLookupRequest, draft: Record<string, unknown>, record?: import("@/lib/orm/domain-builder").DomainRecord) => ReturnType<Many2OneLoader> };
 export type FormModel = { fieldAccess?: import("@/lib/access/element-policy").FieldRestrictions; creators?: Readonly<Record<string, import("@/lib/many2one/types").Many2OneCreator>>; domainLookups?: Readonly<Record<string, RelationDomainLookup>>; many2many?: Readonly<Record<string, import("@/lib/orm/fields").Many2manyField>>; lines?: Readonly<Record<string, FormLineModel>>; readFields?:PublishedFields; reactions?:FormReactions; reactionState?:ReactionState; retryReaction?:()=>void; fields: PublishedFields; lookups?: Readonly<Record<string, Many2OneLoader>>; uploads?: Readonly<Record<string, ImageUploader>> };
 export const FormModelContext = createContext<FormModel | undefined>(undefined);
 

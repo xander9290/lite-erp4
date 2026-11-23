@@ -14,6 +14,9 @@ import FormButton from "@/components/ui/form/FormButton";
 import FieldText from "@/components/ui/form/FieldText";
 import type { FormViewResult } from "@/components/ui/form/formView.types";
 import type { FormActionTarget } from "@/components/ui/form/formActions";
+import { defineActionReferences } from "@/lib/orm/action-reference";
+
+const ticketActions = defineActionReferences("SampleParameterTicket", ["cerrar"]);
 
 const parameters = compileActionParameters({ nota: Fields.Text({ label: "Nota de resolución", required: true, maxLength: 1000 }), avisar: Fields.Boolean({ label: "Solicitar aviso", default: false }) })!;
 const actions = [{ name: "cerrar", label: "Cerrar ticket", params: parameters.metadata }];
@@ -47,8 +50,8 @@ function Editor() {
     }
   };
   return <>
-    <FormView title="Ticket ficticio con parámetros" methods={methods} actions={actions} onSubmit={save} runAction={run}>
-      <FormHeader><FormButton action="cerrar" invisible={estado === "cerrado"} /></FormHeader>
+    <FormView title="Ticket ficticio con parámetros" methods={methods} actionModel="SampleParameterTicket" actions={actions} onSubmit={save} runAction={run}>
+      <FormHeader><FormButton action={ticketActions.cerrar} invisible={estado === "cerrado"} /></FormHeader>
       <FormGroup legend="Datos del ticket">
         <FieldText<Values> name="name" label="Título del ticket" />
         <FieldText<Values> name="resolucion" label="Resolución guardada" widget="long" readOnly />

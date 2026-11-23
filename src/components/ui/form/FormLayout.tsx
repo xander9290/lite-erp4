@@ -89,6 +89,9 @@ export default function FormLayout<
         className={`@container/form min-w-0 ${className}`}
         noValidate={noValidate}
         onSubmit={async (submitEvent) => {
+          // A form in a portal is a React descendant, but owns an independent submission.
+          if (submitEvent.target !== submitEvent.currentTarget) return;
+          submitEvent.stopPropagation();
           // Synchronously: the awaits below would let the native GET submit run first
           // (programmatic requestSubmit from FormButton, or a pending reaction).
           submitEvent.preventDefault();

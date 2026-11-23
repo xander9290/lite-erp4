@@ -19,6 +19,7 @@ import { declaredNames, extensionFields, extensionMany2many, isModelExtension, t
 import { relationFieldName } from "../orm/display";
 import type { CollectionDomain } from "../orm/domain";
 import { validateTransferSpec, type TransferSpec } from "../list/transfer-contract";
+import { decoratedMethods } from "../orm/decorators";
 
 type ModelClass = new () => Model;
 export type ModuleModelSpec = ModelClass | {
@@ -61,12 +62,18 @@ export type ModuleModelOptions = Exclude<ModuleModelSpec, ModelClass>;
 export type ModelFormView = ComponentType<{ config: ModelClientConfig; id?: string }>;
 export type ModelListView = ComponentType<{ config: ModelClientConfig }>;
 /** Insertion files of an extension, one per view of the base model (`<Inserter>`). */
-export const insertionViewKinds = ["form", "list", "card", "kanban"] as const;
+export const insertionViewKinds = ["form", "modal", "list", "card", "kanban"] as const;
 export type InsertionViewKind = (typeof insertionViewKinds)[number];
 export type ModelInsertions = { readonly [K in InsertionViewKind]?: () => Promise<{ default: ModelListView }> };
+export type ExtensionViews = {
+  /** Content block inside the page form. */
+  readonly form?: () => Promise<{ default: ModelListView }>;
+  /** Complete independent form layout, used only in dialogs. */
+  readonly modal?: () => Promise<{ default: ModelFormView }>;
+};
 export type ModuleExtensionSpec = ModelExtension | {
   readonly model: ModelExtension;
-  readonly views?: { readonly form?: () => Promise<{ default: ModelListView }> };
+  readonly views?: ExtensionViews;
   /**
    * Insertions into the base form (`<Inserter target position>`), instead of a whole block.
    * Exclusive with `views.form`. Design: docs/ideas/inserciones-vistas.md.
@@ -79,6 +86,7 @@ export type ModuleExtensionSpec = ModelExtension | {
  */
 export type ModelViews = {
   readonly form?: () => Promise<{ default: ModelFormView }>;
+  readonly modal?: () => Promise<{ default: ModelFormView }>;
   readonly list?: true | (() => Promise<{ default: ModelListView }>);
   readonly card?: true | (() => Promise<{ default: ModelListView }>);
   readonly kanban?: true | (() => Promise<{ default: ModelListView }>);
@@ -118,7 +126,7 @@ export type ModelExtensionInfo = {
   readonly fields: readonly string[];
   /** Virtual compute/related fields declared by the extension. */
   readonly computed: readonly string[];
-  readonly views?: { readonly form?: () => Promise<{ default: ModelListView }> };
+  readonly views?: ExtensionViews;
   readonly insertions?: ModelInsertions;
   /** Transitive dependencies of the extending module (insertion order and published targets). */
   readonly depends?: readonly string[];
@@ -142,7 +150,7 @@ export type ModuleExtension = {
   readonly computed: readonly string[];
   /** Many2many declared by the extension (links stored through the companion row). */
   readonly many2many: readonly string[];
-  readonly views?: { readonly form?: () => Promise<{ default: ModelListView }> };
+  readonly views?: ExtensionViews;
   readonly insertions?: ModelInsertions;
   readonly companion?: { readonly name: string; readonly table: string; readonly relation: string };
 };
@@ -288,7 +296,7 @@ export function compileModuleModel(id: string, modelKey: string, options: Module
   if (!collectionViews.includes(view)) throw new Error(`${id}.${modelKey}: vista de lista inválida.`);
   for (const [kind, loader] of Object.entries(options.views ?? {})) {
     if (loader === undefined) continue;
-    if (![...collectionViews, "form"].includes(kind) || (typeof loader !== "function" && !(kind !== "form" && loader === true))) throw new Error(`${id}.${modelKey}: registro de vista inválido: ${kind}.`);
+    if (![...collectionViews, "form", "modal"].includes(kind) || (typeof loader !== "function" && !(collectionViews.includes(kind as CollectionView) && loader === true))) throw new Error(`${id}.${modelKey}: registro de vista inválido: ${kind}.`);
   }
   const presentations = availableCollectionViews(view, options.views ?? {}, Boolean(kanban));
   return Object.freeze({
@@ -314,8 +322,8 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
     const extension = isModelExtension(declaration) ? declaration : declaration?.model;
     const views = isModelExtension(declaration) ? undefined : declaration?.views;
     const insertions = isModelExtension(declaration) ? undefined : declaration?.insertions;
-    if (views && Object.entries(views).some(([kind, loader]) => kind !== "form" || typeof loader !== "function")) throw new Error(`${id}: la extensión sólo registra views.form con un loader diferido.`);
-    if (insertions && (!Object.keys(insertions).length || Object.entries(insertions).some(([kind, loader]) => !(insertionViewKinds as readonly string[]).includes(kind) || typeof loader !== "function"))) throw new Error(`${id}: insertions sólo registra form, list, card o kanban con un loader diferido (() => import("./views/...")).`);
+    if (views && Object.entries(views).some(([kind, loader]) => !["form", "modal"].includes(kind) || typeof loader !== "function")) throw new Error(`${id}: la extensión sólo registra views.form o views.modal con un loader diferido.`);
+    if (insertions && (!Object.keys(insertions).length || Object.entries(insertions).some(([kind, loader]) => !(insertionViewKinds as readonly string[]).includes(kind) || typeof loader !== "function"))) throw new Error(`${id}: insertions sólo registra form, modal, list, card o kanban con un loader diferido (() => import("./views/...")).`);
     if (insertions?.form && views?.form) throw new Error(`${id}: ${target} declara views.form e insertions.form; usa sólo uno.`);
     if (!modelIdPattern.test(target)) throw new Error(`${id}: extends usa identificadores <módulo>.<modelo>: ${target}.`);
     const [baseModule, baseKey] = target.split(".");
@@ -347,14 +355,17 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
     {
       const name = `${pascal(id)}${pascal(baseModule)}${pascal(baseKey)}`;
       const table = `${id}_${baseModule}_${baseKey}`;
-      const link = Fields.Many2one(nativeModelNames[target] ?? `${pascal(baseModule)}${pascal(baseKey)}`, { label: "Registro", required: true, unique: true });
+      const actionModel = nativeModelNames[target] ?? `${pascal(baseModule)}${pascal(baseKey)}`;
+      const link = Fields.Many2one(actionModel, { label: "Registro", required: true, unique: true });
       // Internal policy: the companion row belongs to its base record and goes with it.
       const cascade = Object.freeze({ ...link, metadata: Object.freeze({ ...link.metadata, onDelete: "Cascade" as const }) }) as Field;
       // Many2many links reference the companion row: the generator creates their table here.
       const own = Object.fromEntries([[companionLink, cascade], ...persistent.map(field => [field, fields[field]]), ...Object.entries(many)]);
       class Companion extends Model { constructor() { super(); Object.assign(this, own); } }
       const contract = defineModel(Companion, { name, table });
-      companions.push({ model: contract, clientFields: Object.keys(contract.metadata) });
+      const Extended = extension.apply(extension.base);
+      const actions = decoratedMethods(new Extended()).actions.map(action => action.method);
+      companions.push({ model: contract, clientFields: Object.keys(contract.metadata), ...(actions.length ? { actionReferences: { model: actionModel, names: actions } } : {}) });
       companion = Object.freeze({ name, table, relation: `${lowerFirst(name)}${pascal(companionLink)}Records` });
     }
     extensions.push(Object.freeze({ target, module: id, label: spec.name, extension, fields: Object.freeze(persistent), computed: Object.freeze(computed), many2many: Object.freeze(Object.keys(many)), ...(views ? { views } : {}), ...(insertions ? { insertions } : {}), ...(companion ? { companion } : {}) }));

@@ -7,6 +7,9 @@
 
 # Módulos declarativos
 
+Para empezar paso a paso: [Crear módulos](crear-modulos.md), también disponible
+en `/documentation`, con los ejemplos Notas y Biblioteca.
+
 Guía para crear aplicaciones con `defineModule` (fases 2–4 del
 [plan](ideas/modulos-declarativos.md)). Un módulo se compone de un manifest y clases
 de modelo; rutas, acciones, servicios, repositorio y vistas salen por convención.
@@ -184,7 +187,7 @@ Lista, Tarjetas y Kanban comparten ahora ModelCollection y el contrato de colecc
 Registrar views.list/card/kanban como true o loader permite alternarlas sin sustituir
 vistas. `view` elige la inicial; Kanban necesita su configuración del modelo.
 [API, URL, proveedores, personalización y ejemplos](colecciones-modelos.md).
-`eject:view` admite también card y kanban y conserva cada loader por separado.
+`eject:view` admite también modal, card y kanban y conserva cada loader por separado.
 
 ```bash
 npm run eject:view -- demo tarea form
@@ -205,6 +208,13 @@ vistas ya registradas; `--dry-run` sólo muestra el plan.
 - **Lista**: ordena, renombra o restringe columnas (`{ field: "vence", label: "Fecha
   límite", filterable: false }`). Sólo campos publicados por la política del
   servidor; una columna puede quitar capacidades, nunca añadirlas.
+
+Para personalizar únicamente el formulario que abre una colección One2many de
+consulta con `openIn="modal"`, usa `npm run eject:view -- demo tarea modal`.
+Registra `views.modal`, con fallback a `views.form`. Desde un módulo extensor:
+`npm run eject:view -- contactosextra core.partner modal`. Genera el formulario
+completo dentro del extensor y conserva la vista de página y sus inserciones.
+[Sintaxis, precedencia e inserciones independientes](formularios-modal.md#vista-modal-independiente-y-eject).
 
 ## 5. Control de accesos
 
@@ -334,9 +344,14 @@ confirmar(record: ActionRecord<Venta>) {
 
 En la vista (por defecto o expulsada):
 
+Genera las referencias con `orm:sync` o, si sólo cambian acciones,
+`npm run orm:generate -- ventas --actions-only --write` (ejemplo del módulo ventas).
+
 ```tsx
+import { VentasVentaActions as ventaActions } from "@/generated/orm/actions/ventas/VentasVenta.actions";
+
 <FormHeader>
-  <FormButton action="confirmar" />
+  <FormButton action={ventaActions.confirmar} />
   <FieldSelect<Values> name="estado" widget="statebar" />
 </FormHeader>
 ```
@@ -532,6 +547,11 @@ y desplegar mediante el build normal de Next.js. No está implementado ni permit
 instalación dinámica en producción. [Alcance acordado](ideas/modulos-distribuibles.md).
 
 ## Documentos con líneas
+
+Para registros independientes, `Fields.One2many(..., { inverse, readonly: true })`
+y `<ModelChildCollections openIn="modal" />` muestran una colección paginada con
+creación/edición en el formulario propio del hijo. Disponible también en
+extensiones: [Formularios en modal](formularios-modal.md).
 
 `Fields.One2many("ModuloDetalle", { inverse: "documentoId" })` declara una colección
 del hijo; ModelForm la incorpora y FieldOne2many.Column personaliza sus columnas.

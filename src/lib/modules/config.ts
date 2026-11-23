@@ -96,7 +96,7 @@ export type ModelClientConfig = {
     /** Transitive dependencies of the extending module (insertion order and published targets). */
     readonly depends?: readonly string[];
     /** Views where the module places its fields with `<Inserter>` (with "form": no automatic group). */
-    readonly insertions?: readonly ("form" | "list" | "card" | "kanban")[];
+    readonly insertions?: readonly ("form" | "modal" | "list" | "card" | "kanban")[];
   }[];
 };
 

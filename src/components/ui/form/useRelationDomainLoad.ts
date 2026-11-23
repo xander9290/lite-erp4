@@ -12,7 +12,12 @@ export function useRelationDomainLoad(name: string, fallback?: Many2OneLoader): 
   const owner = lineField(model, name);
   const source = owner.line ? owner.line.domainLookups?.[owner.key] : model?.domainLookups?.[name];
   const names = (source?.dependencies ?? []).map(field => owner.row ? `${owner.row}.${field}` : field);
+  if (source?.usesRecordId) names.push(owner.row ? `${owner.row}.id` : "id");
   const watched = useWatch({ control, name: names, disabled: !names.length, exact: true });
-  const key = JSON.stringify((source?.dependencies ?? []).map((field, index) => [field, watched[index] ?? null]));
-  return useMemo(() => source ? request => source.load(request, Object.fromEntries(JSON.parse(key))) : fallback, [source, key, fallback]);
+  const id = source?.usesRecordId ? watched[source.dependencies.length] : undefined;
+  const key = JSON.stringify({ draft: Object.fromEntries((source?.dependencies ?? []).map((field, index) => [field, watched[index] ?? null])), record: typeof id === "string" && id ? { id } : {} });
+  return useMemo(() => source ? request => {
+    const { draft, record } = JSON.parse(key);
+    return source.load(request, draft, record);
+  } : fallback, [source, key, fallback]);
 }

@@ -37,6 +37,12 @@ visible y autorizado; admin conserva bypass.
 
 ## Aprender desde cero
 
+La documentación web comienza en [`/documentation`](http://localhost:3000/documentation),
+con **Crear módulos** y dos ejemplos completos: Notas (un modelo) y Biblioteca
+(libros/autores con Many2one). Incluye **Acciones de formulario tipadas**:
+Archivar una nota con `@action`, generar referencias y conectar FormButton en TSX.
+Su fuente única es [Crear módulos](docs/crear-modulos.md).
+
 La tutoría de **Tickets** está pausada y el módulo se retiró el 2026-11-18.
 Su [guía](docs/tutorial-tickets.md) conserva el recorrido histórico y se retomará
 desde cero cuando el usuario lo indique. La prioridad actual es consolidar
@@ -52,6 +58,22 @@ publicadas desde un modelo autorizado. Estados de México importados por el
 usuario; falta comprobar la
 repetición sin cambios, después importar Municipios y Localidades.
 [Estado y siguiente paso](docs/estado-proyecto.md#progreso-guardado-2026-11-21-grupos-por-módulo).
+
+Los dominios de relaciones pueden excluir el registro actual con
+`d.neq("id", d.record.id)`, también en extensiones; sin ID al crear no excluyen
+candidatos por esa condición. [Contrato y ejemplo](docs/dominios-modelos.md#identidad-del-registro-actual).
+
+Las colecciones de consulta admiten `<ModelChildCollections openIn="modal" />`:
+creación y edición independientes con el formulario y extensiones del hijo,
+cierre protegido y refresco de la lista. Para un layout independiente:
+`npm run eject:view -- contactosextra core.partner modal` (ya generado en este
+proyecto; editar `views/CorePartnerModal.tsx`). `views.modal` conserva `views.form`
+y sus inserciones de página. [Formularios en modal](docs/formularios-modal.md).
+
+Los botones de negocio usan referencias tipadas: `action={ventaActions.confirmar}`.
+`orm:sync` las genera; para actualizar sólo acciones sin consultar la BD, usar
+`npm run orm:generate -- id --actions-only --write`.
+[Contrato y migración de FormButton](docs/ideas/acciones-formulario.md#referencias-tipadas-y-generación-2026-11-22).
 
 ## Comandos del scaffold anterior, en orden
 

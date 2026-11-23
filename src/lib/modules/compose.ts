@@ -1,4 +1,5 @@
 import "server-only";
+import { resolveFormView } from "./form-view";
 import { compileModuleModel, nativeModule, type ModuleDefinition, type ModuleExtension, type ModuleModel } from "./define";
 import { extensionFields, extensionMany2many } from "./extend";
 import { many2manyStorage } from "../orm/many2many";
@@ -82,6 +83,7 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       ...(extension.companion ? { relation: extension.companion.relation, delegate: extension.companion.name[0].toLowerCase() + extension.companion.name.slice(1) } : {}),
     })), byId.get(entry.module)?.native === true);
     if (Object.keys(compiled.contract.many2manyFields).length > 4) throw new Error(`${entry.id}: máximo cuatro relaciones Many2many, sumando el modelo base y sus extensiones.`);
+    resolveFormView(compiled, "modal");
     for (const action of compiled.contract.actions) for (const [name, field] of Object.entries(action.params ?? {})) {
       if (field.kind !== "many2one") continue;
       const owner = methodOwners.get(action.name) ?? entry.module;

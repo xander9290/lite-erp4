@@ -86,6 +86,20 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Preferencias de diseño de formularios
 
+- Formularios modales declarativos (2026-11-22): `ModelChildCollections openIn="modal"`
+  opt-in para colecciones readonly; usa `ModelFormModal`, ModelForm y vistas e
+  inserciones resueltas en servidor. `views.modal` es un layout completo independiente
+  (también en extensiones); fallback a views.form. `eject:view -- extensor dueño.modelo
+  modal` genera el layout dentro del extensor, sin cambiar la página; conflicto entre
+  overrides sin dependencia es error. insertions.modal independiente, con fallback
+  por extensión a form sólo cuando no hay layout modal. Guardado/revisión del hijo independientes; sin
+  navegación, eliminación ni Nuevo interno. `FormDialog`/`FormNavigationScope`
+  protegen sólo el borrador modal al cerrar y todos al salir de la página;
+  `FormDialogLock` comparte el bloqueo de FormView. Mantener submits de portales
+  separados del principal. Extensiones admiten One2many readonly, no líneas
+  editables. Contrato [docs/formularios-modal.md](docs/formularios-modal.md), demo
+  ficticia /sample#form-dialog. Contactosextra ya conectado por acuerdo con el usuario.
+
 - FieldMany2One sin lupas decorativas en el input ni en «Buscar más…» (2026-11-20).
   Usar padding izquierdo estándar; conservar búsqueda, sugerencias, teclado,
   limpieza y flecha de apertura del modal.
@@ -122,7 +136,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Modelo de contactos
 
-- Fase 5 de core iniciada el 2026-11-18: Contactos presenta core.partner mediante ModelRoute/ModelForm/ModelCollection, con permisos efectivos y ModelExtensions. Campos compartidos siguen en Partner; el usuario eligió añadir campos propios pero aún debe indicar cuáles antes de crear extendModel/tabla/migración. Partner.afterSave avanza la revisión del User vinculado sin revocar sesión; escrituras delegadas/Perfil avanzan ambas revisiones monotónicamente. Servicios manuales antiguos quedan por regresiones y proveedores user/partner por consumidores de /sample; no confundirlos con el flujo de Contactos. Avance y límites en docs/ideas/core-ajustes.md y docs/estado-proyecto.md.
+- Fase 5 de core iniciada el 2026-11-18: Contactos presenta core.partner mediante ModelRoute/ModelForm/ModelCollection, con permisos efectivos y ModelExtensions. Campos compartidos siguen en Partner; los campos propios ya se implementan en contactosextra mediante extendModel, incluidos dirección y subcontactos. No añadir nuevos campos por anticipación. Partner.afterSave avanza la revisión del User vinculado sin revocar sesión; escrituras delegadas/Perfil avanzan ambas revisiones monotónicamente. Servicios manuales antiguos quedan por regresiones y proveedores user/partner por consumidores de /sample; no confundirlos con el flujo de Contactos. Avance y límites en docs/ideas/core-ajustes.md y docs/estado-proyecto.md.
 
 - Partner es la entidad base compartida para empresas, usuarios, clientes y proveedores. Los datos de contacto y `avatarUrl` pertenecen a Partner; User aporta acceso, credenciales y permisos mediante su relación `partnerId`. Reutilizar ese contacto en aplicaciones futuras en lugar de duplicar sus datos. Esto define la dirección del ERP; no implica que los módulos de empresas/clientes/proveedores ya existan.
 - Las validaciones comunes de nombre, correo, teléfono y avatar están en `partnerContactShape` de `src/schemas/partner.schema.ts`; Contactos, Usuarios y Perfil las reutilizan. El contrato del formulario piloto está en `src/app/(auth)/erp/contactos/schemas/contact.schema.ts` y sus conversiones/select del servidor en `models/partner.ts`, dentro de esa misma aplicación. `id` y `revision` son metadatos de control; las futuras acciones deben validar permisos y concurrencia antes de guardar.
@@ -141,6 +155,19 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Maduración continua del framework
 
+- Acciones de formulario tipadas (2026-11-22): FormButton exige ModelActionReference
+  generada (`action={ModeloActions.confirmar}`), no strings. Contratos en
+  src/generated/orm/actions/<módulo>/<NombreContrato>.actions.ts, generados por
+  orm:sync/orm:generate; --actions-only admite plan/--write/--check sin Prisma/BD.
+  Core sólo se genera por ese modo; referencias de extensión apuntan al modelo base.
+  ModelForm aporta actionModel=config.name; FormView manual lo declara junto con
+  actions/runAction y puede usar defineActionReferences para un conjunto finito.
+  Sin modelo/snapshot, referencia ajena o acción no publicada, el botón se oculta.
+  TypeScript comprueba miembros; correspondencia con el provider es runtime.
+  Endpoints siguen recibiendo un nombre validado y reautorizan. Mantener decoradores
+  e inserciones actuales por decisión del usuario, sin reestructurarlos por parecido
+  a Odoo. [Contrato](docs/ideas/acciones-formulario.md#referencias-tipadas-y-generación-2026-11-22).
+
 - Acciones con parámetros (2026-11-17): `@action({label,params:{nota:Fields.Text(...)}})` deriva esquema estricto y metadatos; tipo ActionParams<typeof params>. Nuevas firmas `(record,params,context)` y antiguas `(record,context)` intactas. FormButton/ModelForm abren ActionParametersDialog con RHF separado, antes de guardar; cancelar no escribe. Confirmar: guardar si nuevo/dirty y ejecutar con ID/revisión persistidos bajo un lock. Servidor revalida actor/write/reglas/grupos/revisión y parámetros/referencias antes del método; patch por el pipeline habitual. ActionParameterError/parameterErrors separados de fieldErrors; reintento conserva argumentos en memoria de la instancia, sin persistencia ni reintentos automáticos de acciones. Escalares/Many2one a destinos declarativos registrados (depends); sin User/Partner, uploads, arrays, virtuales, sequence ni defaults de función. Máximo 8 parámetros/16.000 caracteres JSON; sin transiciones Kanban con params. No requiere SQL por sí mismo. [Contrato](docs/acciones-parametros.md), demo /sample#action-parameters e integración temporal test:action-parameters:integration.
 
 - Folios (2026-11-17): Text admite `sequence:{prefix,padding,reset:"none"|"year"}`; servidor asigna al crear, obligatorio/unique, default vacío y placeholder Nuevo. Desde 2026-11-18 sequence no impone readOnly ni bloquea consultas: el folio permite búsqueda/filtro/orden; los campos con secuencia usan FieldText widget="header" en formularios, sin input editable; ModelForm y nuevos eject:view lo eligen por convención. FieldText conserva readOnly explícito para otras presentaciones. Servidor conserva el rechazo de cambios manuales. `formSchema`/fieldInputSchema admiten borrador vacío; schema persistido estricto. Contador central ModelSequence con BIGINT/clave modelo.campo+período y hash de formato, en la transacción Serializable del registro. Crear acepta sólo vacío/omitido; editar/hooks/actions conservan el folio. Hasta cinco intentos sólo de altas con secuencia abortadas con P2034; nunca red/commit desconocido ni efectos externos en hooks. Año UTC y reset anual exige {year}; no reservar desde onchange. No sequence nuevo en extensiones/bindings legacy ni asignación al confirmar, UI de reset o series por empresa todavía. Migración core 20261117233000_add_model_sequences preparada, no aplicada al ERP: en la Mac también están pendientes las de Flota, incluida su retirada destructiva. Demo ficticia /sample#model-sequences y [contrato](docs/folios-secuencias.md).
@@ -149,7 +176,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Fields.Integer/Text/Image admiten compute con nombre de método y dependencias @depends("campo", ...) o declaración de lectura explícita. Se excluyen de persistencia/defaults/ModelInput/Zod de guardado/clientFields y publican en PreviewFields/readFields. Un método de un Field devuelve el escalar; varios Fields comparten método y devuelven objeto completo. FieldText/Number/Image mode=display presentan sin RHF; scaffold genera estos controles. Sólo dependencias locales persistentes no sensibles, sin cadenas/ciclos, store ni inverse; las colecciones los proyectan por página autorizada, sin incorporarlos automáticamente a read/lookup. Contrato y demo en docs/campos-calculados.md y /sample#model-reactions. Conservar constraints definitivas y transacciones readonly; no añadir cálculos a Flota por adelantado.
 
-- Dirección acordada: reglas de negocio, métodos, cálculos y resolución de relaciones en modelos/servicios del backend; React para presentación, interacción y validación rápida sin sustituir la del servidor. Adoptar ergonomía de Odoo gradualmente, conservando TS/Prisma y TSX explícito. Cada mejora debe reducir lógica repetida con un caso real; no reescribir todo ni esconder permisos/transacciones.
+- Dirección acordada: reglas de negocio, métodos, cálculos y resolución de relaciones en modelos/servicios del backend; React para presentación, interacción y validación rápida sin sustituir la del servidor. Priorizar ergonomía propia de TypeScript/Prisma y composición React/TSX explícita; incorporar patrones de otros ERP sólo ante una necesidad real, sin copiar su arquitectura por inercia (decisión del 2026-11-22). Se conservan decoradores e inserciones por elección del usuario. Cada mejora debe reducir lógica repetida con un caso real; no reescribir todo ni esconder permisos/transacciones.
 - Fields.Image/Text con related son virtuales de lectura y se excluyen de fields persistentes, defaults, valores/tipos RHF, SQL y clientFields. Se publican como PreviewFields/readFields y reutilizan reacciones readonly. Rutas Many2one de hasta tres saltos del mismo perfil, publicadas y no sensibles; generación/binding con delegates explícitos y proyecciones mínimas agrupadas por raíz. FieldImage mode=display los presenta sin registrar RHF ni subir archivos. No son computed almacenados; la proyección related en colecciones usa CollectionFields y relatedMany, según las reglas de colecciones. Contrato y pendientes en docs/campos-relacionados.md; demo /sample#related-image. El caso anterior de Vehicle era un ejemplo de related; no recrearlo por anticipación ni restaurar los componentes retirados.
 
 - Metodología vigente para modelos nuevos dentro de apps: create:model -- app Modelo, personalizar clase/reglas y clientFields explícitos, create:views -- app Modelo, orm:sync -- app. create:model registra declaración/import/perfil/manifest; create:views genera TSX editable (list/form por defecto, card/kanban y form modal opcionales), servicio, acciones, reexports, rutas y menús. No SQL ni hashes gestionados desde esos create; ambos admiten --dry-run, preflight y rechazo de colisiones/symlinks/configuración ambigua. No --force ni regeneración de vistas personalizadas. Guía [docs/modelos-y-vistas.md](docs/modelos-y-vistas.md).
@@ -164,6 +191,25 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - La distribución como paquete npm es una dirección futura, conservando Next.js y Prisma. Primero consolidar el framework mediante aplicaciones reales y contratos estables. Idea documentada en [docs/ideas/aplicaciones-modulares.md](docs/ideas/aplicaciones-modulares.md).
 
 ## Ideas pendientes
+
+- **Vista modal independiente/eject implementados (2026-11-22).** Contrato en
+  [Formularios en modal](docs/formularios-modal.md#vista-modal-independiente-y-eject).
+  CorePartnerModal.tsx generado en contactosextra por autorización del usuario;
+  conservar sus personalizaciones. No regenerar ni aplicar SQL para cambiar el layout.
+
+- **Siguiente pendiente reformulado (2026-11-22): apertura de formularios desde TSX.**
+  Componente explícito y tipado (nombre
+  provisional `ModelFormButton`) con modelo/vista, ID opcional y defaults de creación.
+  Manifest para registro/dependencias/permisos/vistas; React para interacción;
+  modelos/servicios para negocio y validaciones. Reutilizar ModelFormModal, validar
+  referencias y permisos en servidor, conservar borradores y refrescar colecciones
+  tras éxito; defaults no sobrescriben edición ni imponen relaciones inmutables.
+  Ejemplo conceptual: saleOrderId desde sale.order; no crear Ventas por anticipación.
+  Sustituye el registro inicial `windowActions`/`FormOpen`: reconsiderarlo sólo con
+  una necesidad real que la composición TSX no cubra. No copiar arquitectura de Odoo
+  por inercia ni reescribir contratos existentes por este cambio de plan. Sólo
+  documentado, props por concretar y sin implementación. Plan y aceptación en
+  [Apertura de formularios desde TSX](docs/formularios-modal.md#pendiente-posterior-apertura-de-formularios-desde-tsx).
 
 - Required por grupo queda fuera del alcance actual por decisión del usuario
   (2026-11-21). Sólo reconsiderarlo ante una necesidad real; required y validación
@@ -202,6 +248,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - **Capacidades restantes del ORM:** compute persistido continúa pendiente; las restricciones por campo se incorporaron por autorización posterior el 2026-11-21, con migración verificada en desarrollo Windows. No adelantar mejoras independientes durante la tutoría.
 
+- Identidad en dominios de relación (2026-11-22): `d.neq("id", d.record.id)`
+  excluye el registro dueño al editar; al crear sin ID es verdadero (`eq` es
+  falso), preservando AND/OR/NOT y bloqueo por draft vacío. Sólo eq/neq sobre id,
+  fuera de campos/defaults/SQL; no colecciones ni d.draft("id"). Lookup verifica
+  lectura/reglas del dueño y servidor usa identidad real al guardar, también
+  después de hooks/altas. En líneas toma su propio ID. Activado en parentId de
+  PartnerExtra con autorización expresa; constraints de ciclos permanecen.
+  Sin SQL nuevo. Contrato docs/dominios-modelos.md y demo /sample#record-domain.
+
 - **Pendiente urgente (2026-11-17): estrategia para distribuir módulos entre proyectos.** ZIP de fuentes para llevar un módulo a otro proyecto (no aplica dentro del mismo: ahí va por Git). Exportar/importar en el desarrollo del destino con validación de compatibilidad del framework, dependencias entre módulos, choque de ID/reservas, limpieza del paquete, datos iniciales opcionales y extracción segura; el destino genera su propia migración. Nunca viajan datos, asignaciones, historial, migraciones ni secretos. Diseñar y presentar antes de implementar. [Estrategia](docs/ideas/modulos-distribuibles.md).
 
 - Siguiente guía planeada (2026-11-17): **Tickets de servicio interno**, segundo piloto para dependencias entre módulos, folios, Date, acciones con parámetros, Many2many y reglas por rol. No inicia todavía: el usuario quiere afinar antes otros módulos. No crear el módulo ni piezas del framework por anticipación; no modificar Flota. Orden, ritmo y límites en [Tickets de servicio](docs/ideas/tickets-servicio.md).
@@ -216,7 +271,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Colecciones unificadas implementadas el 2026-11-14 a petición del usuario: ModelCollection comparte publicación, queryColumns, proveedores autorizados, navegación y carga de list/card/kanban. Manifest view elige inicial y views.list/card/kanban admite true (convención) o loader independiente. Selector en URL conserva búsqueda/filtros/orden/tamaño, reinicia página/grupos/selección y mantiene retorno seguro desde ModelForm. Kanban conserva carga por columna y transiciones @action. Vistas sólo personalizan presentación/renderCard/renderCell; no duplicar acciones ni ampliar políticas desde TSX. Flota conserva VehicleList, simplifica VehicleKanban y añade VehicleCard; Modelo mantiene Card inicial y Lista disponible. Contrato en [Colecciones de modelos](docs/colecciones-modelos.md); demo ficticia /sample#collection-core.
 
-- eject:view admite form/list/card/kanban; card y kanban generan sólo ModelCollection con presentación/columnas. Registra la clave propia sin sustituir otra vista; puede reemplazar true por loader, nunca un archivo/loader personalizado. Kanban requiere configuración válida; conservar dry-run, preflight/symlinks/colisiones y restauración del manifest ante fallos. Sin SQL ni regeneración de vistas de Flota para probarlo. [Contrato](docs/colecciones-modelos.md#expulsar-una-presentación).
+- eject:view admite form/modal/list/card/kanban; modal también permite destinos extendidos (contrato en docs/formularios-modal.md). Card y kanban generan sólo ModelCollection con presentación/columnas. Registra la clave propia sin sustituir otra vista; puede reemplazar true por loader, nunca un archivo/loader personalizado. Kanban requiere configuración válida; conservar dry-run, preflight/symlinks/colisiones y restauración del manifest ante fallos. Sin SQL ni regeneración de vistas de Flota para probarlo. [Contrato](docs/colecciones-modelos.md#expulsar-una-presentación).
 
 - Capacidades efectivas por modelo implementadas el 2026-11-14: getCurrentAccessUser proyecta CRUD por petición con sesión revalidada, herencia y overrides en lote. La ruta entrega config.capabilities a ModelForm/ModelCollection; consulta bloquea campos y FormHeader, Nuevo/Eliminar/acciones/movimientos respetan permisos. Menús/cajón usan lectura efectiva y ocultan grupos vacíos; raíz elige primer modelo legible. Sin snapshot la UI compartida deniega; no cachear permisos privados en registros/servicios globales. Mantener autorización transaccional, reglas por registro, grafo vacío sin fallback y dirty guard aun al pasar a consulta. Permisos por campo siguen pendientes. Contrato y pruebas en [Capacidades](docs/capacidades-modelos.md).
 

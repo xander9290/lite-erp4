@@ -19,6 +19,7 @@ export default defineModule({
         form: () => import("./views/PartnerInsertions"),
         list: () => import("./views/PartnerListInsertions"),
       },
+      views: { modal: () => import("./views/CorePartnerModal") },
     },
   },
 });

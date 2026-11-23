@@ -1,12 +1,8 @@
 import "server-only";
-import {
-  Fields,
-  constraint,
-  ModelValidationError,
-  type ModelContext,
-} from "@/lib/orm";
+import { Fields, constraint, ModelValidationError, type ModelContext } from "@/lib/orm";
 import { extendModel } from "@/lib/modules/extend";
 import { Partner } from "@/lib/core/models/partner";
+import type { ModelTypes } from "@/types/model-types";
 
 export const PartnerExtra = extendModel(Partner, (Base) => {
   class PartnerExtra extends Base {
@@ -77,24 +73,67 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
       tracking: true,
       domain: (d) => d.eq("active", true),
     });
+    partnerType = Fields.Selection(
+      [
+        { value: "contact", label: "Contacto" },
+        { value: "delivery", label: "Entrega" },
+        { value: "invoice", label: "Facturación" },
+      ],
+      {
+        label: "Tipo de contacto",
+        required: true,
+        default: "contact",
+        tracking: true,
+      },
+    );
+    parentId = Fields.Many2one("Partner", {
+      label: "Contacto principal",
+      onDelete: "Restrict",
+      tracking: true,
+      domain: (d) => d.neq("id", d.record.id),
+    });
+    childIds = Fields.One2many("Partner", {
+      label: "Subcontactos",
+      inverse: "parentId",
+      readonly: true,
+    });
 
     normalize(values: Readonly<Record<string, unknown>>) {
       const normalized = super.normalize?.(values) ?? values;
 
       return {
         ...normalized,
-        curp:
-          typeof normalized.curp === "string"
-            ? normalized.curp.trim().toUpperCase()
-            : normalized.curp,
+        curp: typeof normalized.curp === "string" ? normalized.curp.trim().toUpperCase() : normalized.curp,
       };
     }
 
+    @constraint("parentId")
+    async validarContactoPrincipal(values: ModelTypes["values"], context: ModelTypes["context"]) {
+      let actualId = typeof values.parentId === "string" ? values.parentId : null;
+
+      const visitados = new Set<string>();
+      if (context.id) visitados.add(context.id);
+
+      while (actualId) {
+        if (visitados.has(actualId)) {
+          throw new ModelValidationError("Revisa el contacto principal.", {
+            parentId: "La relación entre contactos no puede formar un ciclo.",
+          });
+        }
+
+        visitados.add(actualId);
+
+        const contacto: { parentId: string | null } | null = await context.tx.contactosextraCorePartner.findUnique({
+          where: { recordId: actualId },
+          select: { parentId: true },
+        });
+
+        actualId = contacto?.parentId ?? null;
+      }
+    }
+
     @constraint("paisId", "estadoId")
-    async validarPaisEstado(
-      values: Readonly<Record<string, unknown>>,
-      context: ModelContext,
-    ) {
+    async validarPaisEstado(values: Readonly<Record<string, unknown>>, context: ModelContext) {
       if (!values.estadoId) return;
 
       if (!values.paisId) {
@@ -105,12 +144,7 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
 
       const { authorizeModel } = await import("@/lib/access/engine");
 
-      const scope = await authorizeModel(
-        context.tx,
-        context.actor,
-        "ubicaciones.estado",
-        "read",
-      );
+      const scope = await authorizeModel(context.tx, context.actor, "ubicaciones.estado", "read");
 
       const estado = await context.tx.ubicacionesEstado.findFirst({
         where: {
@@ -141,11 +175,7 @@ export const PartnerExtra = extendModel(Partner, (Base) => {
     validarRFC(values: Readonly<Record<string, unknown>>) {
       const vat = values.vat;
 
-      if (
-        typeof vat === "string" &&
-        vat !== "" &&
-        !/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(vat)
-      ) {
+      if (typeof vat === "string" && vat !== "" && !/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/.test(vat)) {
         throw new ModelValidationError("Revisa el RFC.", {
           vat: "Introduce un RFC de 12 o 13 caracteres en mayúsculas.",
         });

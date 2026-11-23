@@ -71,3 +71,21 @@ test("concurrent side effects are blocked and failed effects do not discard the 
   finish(); await first;
   assert.equal(actions, 1); assert.equal(dirty, false);
 });
+
+test("dialog scope closes only its draft; page navigation includes both scopes", async () => {
+  let parentDirty = true, childDirty = true, accepted = false, prompts = 0;
+  const page = new UnsavedChanges(async () => { prompts++; return accepted; });
+  const child = new UnsavedChanges(async () => { prompts++; return accepted; });
+  page.register(() => parentDirty, () => { parentDirty = false; });
+  page.register(child.blocked, child.discard);
+  child.register(() => childDirty, () => { childDirty = false; });
+  assert.equal(await child.leave(), false);
+  assert.equal(parentDirty, true); assert.equal(childDirty, true);
+  accepted = true;
+  assert.equal(await child.leave(), true);
+  assert.equal(parentDirty, true); assert.equal(childDirty, false);
+  childDirty = true;
+  assert.equal(await page.leave(), true);
+  assert.equal(parentDirty, false); assert.equal(childDirty, false);
+  assert.equal(prompts, 3);
+});

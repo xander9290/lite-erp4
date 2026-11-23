@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ModuleDefinition, ModuleModel } from "./define";
 import { nativeModule } from "./define";
 import { compileRelationDomain, validateRelationDomain } from "../orm/domain";
-import { domainDependencies, type DomainExpression } from "../orm/domain-builder";
+import { domainDependencies, type DomainExpression, type DomainRecord } from "../orm/domain-builder";
 import { ModelValidationError } from "../orm/context";
 
 export function relationDomains(entry: ModuleModel): readonly { field: string; target: string; domain: DomainExpression; many: boolean }[] {
@@ -27,13 +27,13 @@ export function validateModuleDomains(definitions: readonly ModuleDefinition[]) 
   return definitions;
 }
 
-export function relationDomainWhere(entry: ModuleModel, target: ModuleModel, domain: DomainExpression, input: unknown) {
+export function relationDomainWhere(entry: ModuleModel, target: ModuleModel, domain: DomainExpression, input: unknown, record: DomainRecord = {}) {
   const dependencies = domainDependencies(domain);
   const fields = entry.contract.fields as Readonly<Record<string, import("../orm/fields").Field>>;
   const schema = z.strictObject(Object.fromEntries(dependencies.map(name => [name, z.preprocess(value => value === "" ? null : value, fields[name].schema.nullable().optional())])));
   const values = schema.parse(input);
   if (JSON.stringify(values).length > 16000) throw new ModelValidationError("El borrador del dominio supera el tamaño permitido.");
-  return compileRelationDomain(domain, queryDomainMetadata(target), entry.metadata, values);
+  return compileRelationDomain(domain, queryDomainMetadata(target), entry.metadata, values, record);
 }
 
 function queryDomainMetadata(entry: ModuleModel) {

@@ -55,12 +55,18 @@ Demo RHF/Zod reversible, con cancelación/rechazo/consulta, en `/sample#form-del
 
 ## Acciones de formulario
 
-`runAction(name, {id, revision})` y `actions` (nombres y labels publicados) habilitan
+`actionModel` (nombre del contrato), `runAction(name, {id, revision})` y `actions`
+(nombres y labels publicados) habilitan
 `FormHeader` y `FormButton`. FormHeader se monta en la cabecera mediante portal,
 dentro del contexto RHF. FormButton (`type="button"`) se oculta en consulta y comparte
 un único bloqueo síncrono con Guardar y los demás botones. Si se proporciona
 `actions`, sólo muestra/ejecuta nombres publicados; una lista vacía no habilita
-acciones. FormHeader deshabilita sus controles en consulta, incluido statebar:
+acciones. Desde 2026-11-22, FormButton exige referencias generadas como
+`action={ventaActions.confirmar}`, ya no strings. Sin actionModel/snapshot o con
+una referencia de otro modelo, se oculta. ModelForm conecta el nombre del contrato
+automáticamente; los formularios manuales lo declaran. Tipado y generación en
+[Acciones de formulario](../../../../docs/ideas/acciones-formulario.md#referencias-tipadas-y-generación-2026-11-22).
+FormHeader deshabilita sus controles en consulta, incluido statebar:
 
 
 1. Registro nuevo o con cambios: envía el formulario y espera el ciclo normal
@@ -226,7 +232,10 @@ autoguardado.
 Las acciones que abandonan la vista después de un efecto deben confirmar **antes**
 del efecto. Por ejemplo, LogoutButton usa `useFormNavigation().run(async () => { ... })`
 para confirmar antes de cerrar la sesión y evitar una segunda pregunta al navegar.
-Usa ese mismo método al cerrar manualmente un modal con un formulario. Las llamadas
+Para un modal anidado, usa `FormDialog` y `<FormDialogLock />` dentro de FormView:
+su scope confirma y descarta sólo ese borrador, preservando el del principal.
+`ModelFormModal` lo conecta automáticamente. [Contrato y ejemplos](../../../../docs/formularios-modal.md).
+Las llamadas
 directas a `history.pushState`/`replaceState` y las redirecciones impuestas por el
 servidor quedan fuera de la navegación cliente interceptada. Si un Link necesita
 `replace`, `scroll` o callbacks propios, usa `NavigationGuardLink` de `nextjs-nav-guard`

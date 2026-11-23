@@ -12,6 +12,9 @@ import FieldText from "@/components/ui/form/FieldText";
 import FieldSelect from "@/components/ui/form/FieldSelect";
 import { recordIdentityShape, validateRecordIdentity } from "@/lib/orm/record";
 import type { FormViewResult } from "@/components/ui/form/FormView";
+import { defineActionReferences } from "@/lib/orm/action-reference";
+
+const saleActions = defineActionReferences("SampleSale", ["confirmar", "cancelar"]);
 
 const estados = [{ value: "borrador", label: "Borrador" }, { value: "confirmada", label: "Confirmada" }, { value: "cancelada", label: "Cancelada" }] as const;
 const schema = z.object({ ...recordIdentityShape, name: z.string().trim().min(1, "Escribe el cliente."), estado: z.enum(["borrador", "confirmada", "cancelada"]) }).superRefine(validateRecordIdentity);
@@ -58,13 +61,13 @@ function Editor({ creating }: { creating: boolean }) {
       <label className="flex items-center gap-2"><input autoComplete="off" type="checkbox" className="checkbox checkbox-sm" checked={failAction} onChange={event => setFailAction(event.target.checked)} />Simular fallo de la acción</label>
       <label className="flex items-center gap-2"><input autoComplete="off" type="checkbox" className="checkbox checkbox-sm" checked={readOnly} onChange={event => setReadOnly(event.target.checked)} />Formulario en consulta</label>
     </div>
-    <FormView title="Venta ficticia" methods={methods} readOnly={readOnly}
+    <FormView title="Venta ficticia" methods={methods} readOnly={readOnly} actionModel="SampleSale"
       onSubmit={save} runAction={runAction}
       actions={[{ name: "confirmar", label: "Confirmar" }, { name: "cancelar", label: "Cancelar venta" }]}>
       <FormHeader>
         <div className="flex flex-wrap gap-2">
-          <FormButton action="confirmar" />
-          <FormButton action="cancelar" variant="secondary" />
+          <FormButton action={saleActions.confirmar} />
+          <FormButton action={saleActions.cancelar} variant="secondary" />
         </div>
         <FieldSelect<Values> name="estado" widget="statebar" options={estados} />
       </FormHeader>

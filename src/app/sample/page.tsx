@@ -22,6 +22,7 @@ import Many2manySample from "./Many2manySample";
 import RelationTagSample from "./RelationTagSample";
 import ListViewSample from "./ListViewSample";
 import FormViewSample from "./FormViewSample";
+import FormDialogSample from "./FormDialogSample";
 import AlertsSample from "./AlertsSample";
 import One2manySample from "./One2manySample";
 import One2manyDeclarativeSample from "./One2manyDeclarativeSample";
@@ -66,6 +67,7 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#computed-collections">Cálculos en colecciones</a>
             <a className="btn btn-sm btn-outline" href="#kanban-view">KanbanView</a>
             <a className="btn btn-sm btn-outline" href="#form-view">FormView</a>
+            <a className="btn btn-sm btn-outline" href="#form-dialog">Formularios en modal</a>
             <a className="btn btn-sm btn-outline" href="#form-deletion">Eliminar desde formulario</a>
             <a className="btn btn-sm btn-outline" href="#form-actions">Acciones de formulario</a>
             <a className="btn btn-sm btn-outline" href="#action-parameters">Parámetros de acciones</a>
@@ -118,6 +120,7 @@ export default function PageSample() {
         <BadgeCollectionsSample />
         <AlertsSample />
         <FormViewSample />
+        <FormDialogSample />
         <FormDeletionSample />
         <FormActionsSample />
         <ActionParametersSample />

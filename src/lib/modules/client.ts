@@ -10,7 +10,7 @@ import type { ReactionRequest } from "../orm/reactions.types";
 import { collectionFieldMetadata, type ModelClientConfig, type ModelLineConfig } from "./config";
 import type { FormLineModel } from "@/components/ui/form/modelFields";
 import { modelRelationLookup, modelReact, modelSignImage, modelQuickCreate } from "./actions";
-import { domainDependencies, type DomainExpression } from "../orm/domain-builder";
+import { domainDependencies, domainUsesRecordId, type DomainExpression, type DomainRecord } from "../orm/domain-builder";
 
 const mapValues = <T, R>(source: Readonly<Record<string, T>>, map: (value: T, key: string) => R) =>
   Object.fromEntries(Object.entries(source).map(([key, value]) => [key, map(value, key)])) as Record<string, R>;
@@ -63,5 +63,5 @@ function domainLookups(model: string, fields: ModelClientConfig["fields"], many:
     ...Object.entries(fields).flatMap(([name, field]) => field.kind === "many2one" && field.domain ? [[name, field.domain] as const] : []),
     ...Object.entries(many).flatMap(([name, field]) => field.domain ? [[name, field.domain] as const] : []),
   ]);
-  return mapValues(domains, (domain, field) => ({ dependencies: domainDependencies(domain), load: (request: ModelLookupRequest, draft: Record<string, unknown>) => modelRelationLookup(model, field, { request, draft }) }));
+  return mapValues(domains, (domain, field) => ({ dependencies: domainDependencies(domain), usesRecordId: domainUsesRecordId(domain), load: (request: ModelLookupRequest, draft: Record<string, unknown>, record?: DomainRecord) => modelRelationLookup(model, field, { request, draft, ...(domainUsesRecordId(domain) ? { record: record ?? {} } : {}) }) }));
 }

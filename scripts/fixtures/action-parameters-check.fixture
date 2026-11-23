@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
 import { config } from "dotenv";
+import type { FormButtonProps } from "./src/components/ui/form/formActions";
 config({ path: ".env.local", quiet: true });
 const { prisma } = await import("./src/lib/prisma");
 const { modelService, modelClientConfig } = await import("./src/lib/modules/registry");
 const { hashPassword } = await import("./src/lib/auth/password");
 const { executionCount } = await import("./src/modules/parametros/models/ticket");
+const { ParametrosTicketActions } = await import("./src/generated/orm/actions/parametros/ParametrosTicket.actions");
+const typedButton: FormButtonProps = { action: ParametrosTicketActions.cerrar };
+// @ts-expect-error Generated contracts reject misspelled action names.
+const typoButton: FormButtonProps = { action: ParametrosTicketActions.cerra };
+// @ts-expect-error FormButton rejects arbitrary text.
+const rawButton: FormButtonProps = { action: "cerrar" };
+void [typedButton, typoButton, rawButton];
 const password = await hashPassword("params-test-only");
 const root = await prisma.user.create({ data: { login: "params-root", password, isAdmin: true } });
 const operator = await prisma.user.create({ data: { login: "params-operator", password } });
@@ -18,7 +26,7 @@ const saved = await service.save(prisma, actor, { name: "Ticket", estado: "draft
 let row = saved.values;
 const params = (nota = " Listo ") => ({ nota, tecnicoId: technician.id });
 const run = (input: unknown, who = actor) => service.action(prisma, who, input);
-const request = (input: unknown) => ({ action: "cerrar", id: row.id, revision: row.revision, params: input });
+const request = (input: unknown) => ({ action: ParametrosTicketActions.cerrar.name, id: row.id, revision: row.revision, params: input });
 const fail = async (input: unknown, who = actor, methodRuns = false) => {
   const before = await prisma.parametrosTicket.findMany({ orderBy: { id: "asc" } }), logs = await prisma.recordActivity.count(), calls = executionCount();
   const result = await run(input, who); assert.equal(result.ok, false, JSON.stringify(result));
@@ -28,6 +36,8 @@ const fail = async (input: unknown, who = actor, methodRuns = false) => {
 for (const input of [undefined, null, [], { ...params(), nota: "" }, { ...params(), cantidad: 0 }, { ...params(), urgente: "yes" }, { ...params(), resultado: "forged" }, { ...params(), fecha: "tomorrow" }, { ...params(), actor: "forged" }, params("x".repeat(17000)), { ...params(), tecnicoId: "missing" }, { ...params(), tecnicoId: hidden.id }]) {
   const result = await fail(request(input)); assert.ok(!result.ok && result.kind === "validation");
 }
+await fail({ ...request(params()), action: ParametrosTicketActions.cerrar });
+await fail({ ...request(params()), action: "normalize" });
 await fail({ ...request(params()), revision: "2000-01-01T00:00:00.000Z" });
 await fail(request(params()), readonly); await fail(request({ nota: "" }), noAction);
 const outsider = await service.save(prisma, admin, { name: "Admin", estado: "draft", resolucion: null, tecnicoId: null }); assert.ok(outsider.ok);
@@ -41,6 +51,7 @@ assert.equal(row.estado, "closed"); assert.equal(row.resolucion, "Listo"); asser
 assert.equal((await prisma.parametrosTicket.findUniqueOrThrow({ where: { id: row.id } })).resolucion, "Listo");
 assert.equal(await prisma.recordActivity.count({ where: { recordId: row.id, body: "Cerrar" } }), 1);
 const client = modelClientConfig("parametros.ticket");
+assert.equal(ParametrosTicketActions.cerrar.model, client.name);
 assert.equal(client.actions.find(action => action.name === "cerrar")?.lookups?.tecnicoId, "parametros.tecnico");
 assert.ok(!JSON.stringify(client.actions).includes('"schema"'));
 await fail({ action: "legacy", id: row.id, revision: row.revision, params: { nota: "unexpected" } });

@@ -41,6 +41,46 @@ TypeScript automática entre clases por su nombre Prisma. Operadores y métodos
 del constructor sí tienen autocompletado y tipos; `defineListAction` además limita
 los nombres por el tipo conocido del servicio.
 
+### Identidad del registro actual
+
+Desde 2026-11-22, `d.record.id` referencia el ID del registro dueño del formulario,
+separado de los campos de `draft`. Por ejemplo, para excluir el propio contacto:
+
+```ts
+parentId = Fields.Many2one("Partner", {
+  label: "Contacto principal",
+  onDelete: "Restrict",
+  domain: d => d.neq("id", d.record.id),
+});
+```
+
+Se admite sólo en relaciones Many2one/Many2many, comparando el `id` del destino
+mediante `eq` o `neq`. No admite otras propiedades de record, listas `in/notIn`,
+operaciones de texto ni dominios de colecciones (que no tienen registro actual).
+`d.draft("id")` sigue siendo inválido: no se añade un Field ID ni un campo SQL.
+
+- Al editar, `neq` excluye el ID propio del buscador rápido, modal y paginación.
+- Al crear sin ID, esa condición `neq` es verdadera; `eq` es falsa. AND/OR/NOT
+  mantienen sus reglas booleanas y los demás filtros no desaparecen. Una
+  dependencia de draft vacía sigue dejando todo el dominio sin candidatos.
+- El proveedor observa el metadato ID de la propia fila al trabajar con líneas
+  One2many, incluso anidadas. Cambiar/resetear la identidad invalida su caché igual
+  que cambiar las dependencias. Formularios manuales deben conservar ese metadato
+  de identidad para ofrecer la experiencia de edición.
+- El endpoint admite `record: {id?: string}` separado de `draft` sólo si la
+  declaración lo utiliza. Rechaza claves extras/IDs inválidos y comprueba lectura
+  y reglas del registro dueño dentro de la misma transacción antes de consultar
+  el destino. No basta con conocer un ID ajeno.
+- Al guardar, el servidor toma la identidad validada del servicio, independiente
+  de la petición del lookup. Revalida también después de hooks, con el ID asignado
+  al crear; un hook que introduzca una autorreferencia revierte el guardado.
+- Resolver una selección histórica por ID conserva su etiqueta legible y señala
+  `domainValid: false` si es incompatible; no se borra automáticamente.
+
+No requiere migración por sí mismo. Excluir el propio registro no impide ciclos
+entre varios registros: esa regla de negocio permanece en la constraint del
+modelo. Demo ficticia RHF/Zod: `/sample#record-domain`.
+
 ### Consultas y selecciones
 
 - La vista sigue usando `<FieldMany2One name="estadoId" />`. Metadatos y proveedor

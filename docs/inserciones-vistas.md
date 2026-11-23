@@ -36,11 +36,18 @@ export default function PartnerInsertions() {
 }
 ```
 
-- `insertions` sólo admite `form`, con loader diferido. No convive con `views.form` en la
-  misma entrada `extends` (error al definir el módulo).
+- En formularios, `insertions.form` y `insertions.modal` admiten un loader diferido.
+  `insertions.form` no convive con `views.form` en la misma entrada `extends`.
+  Las claves de colecciones son `list`, `card` y `kanban`.
 - Un `<Inserter>` por combinación destino + posición en el archivo; puede tener varios hijos.
 - `<Inserter>` no pinta nada donde se escribe; fuera de un archivo de inserciones es error.
 - El archivo es sólo presentación: permisos, validación y guardado siguen en el servidor.
+
+Desde 2026-11-22, un layout `views.modal` carga sólo `insertions.modal`; conserva
+las inserciones de página por separado. Sin layout modal, el fallback conserva
+el contenido form de cada extensión, salvo que ésta publique insertions.modal.
+Los campos de extensiones sin contenido modal se presentan automáticamente en
+ModelExtensions. [Contrato completo y eject](formularios-modal.md#vista-modal-independiente-y-eject).
 
 ## Destinos
 

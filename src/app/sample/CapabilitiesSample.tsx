@@ -14,6 +14,9 @@ import { modelUiCapabilities } from "@/lib/access/capabilities";
 import { projectModelAccess } from "@/lib/modules/access";
 import type { ModelClientConfig } from "@/lib/modules/config";
 import { capabilitiesSampleSchema, type CapabilitiesSampleValues as Values } from "./capabilities.schema";
+import { defineActionReferences } from "@/lib/orm/action-reference";
+
+const capabilityActions = defineActionReferences("CapabilitiesDemo", ["activate", "reset"]);
 
 const options = [{ value: "draft", label: "Borrador" }, { value: "active", label: "Activo" }];
 const declarations = [{ name: "activate", label: "Activar" }, { name: "reset", label: "Volver a borrador", groups: ["responsable"] }];
@@ -27,7 +30,7 @@ const initialValues: Values = { id: "demo", revision: "2026-11-14T00:00:00.000Z"
 function Header() {
   const state = useWatch<Values>({ name: "state" });
   return <FormHeader>
-    <div className="flex flex-wrap gap-2"><FormButton action="activate" invisible={state !== "draft"} /><FormButton action="reset" invisible={state !== "active"} /></div>
+    <div className="flex flex-wrap gap-2"><FormButton action={capabilityActions.activate} invisible={state !== "draft"} /><FormButton action={capabilityActions.reset} invisible={state !== "active"} /></div>
     <FieldSelect<Values> name="state" label="Estado de demostración" widget="statebar" readOnly={false} options={options} />
   </FormHeader>;
 }
@@ -51,7 +54,7 @@ export default function CapabilitiesSample() {
         <option value="consulta">Consulta</option><option value="operador">Operador</option><option value="responsable">Responsable</option><option value="eliminador">Eliminador</option>
       </select>
     </label>
-    <FormView methods={methods} title="Registro de capacidades ficticio" mode="edit" readOnly={!caps.write} actions={access.actions}
+    <FormView methods={methods} title="Registro de capacidades ficticio" mode="edit" readOnly={!caps.write} actionModel={config.name} actions={access.actions}
       onNew={caps.create ? async () => { await alerts.info({ title: "Nuevo", message: "En un módulo se abriría su formulario de creación. Esta demo no crea registros." }); } : undefined}
       deletion={caps.unlink ? { allowReadOnly: true, returnHref: "/sample", action: async () => ({ ok: false as const, kind: "validation" as const, error: "Demostración: no se eliminan registros." }) } : undefined}
       onSubmit={async values => ({ ok: true, values: { ...values, revision: revision() } })}

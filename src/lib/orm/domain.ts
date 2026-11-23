@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ModelActor } from "./context";
 import { INTEGER_MAX, INTEGER_MIN, type FieldMetadata } from "./fields";
-import { domainBuilder, snapshotDomain, domainDependencies, resolveDomain, type DomainBuilder, type DomainExpression } from "./domain-builder";
+import { domainBuilder, snapshotDomain, domainDependencies, domainUsesRecordId, resolveDomain, type DomainBuilder, type DomainExpression, type DomainRecord } from "./domain-builder";
 
 export type DomainValue = string | number | boolean | null;
 export type DomainField<T> = Extract<keyof T, string> | "id" | "createBy" | "createdAt" | "updatedAt";
@@ -24,6 +24,7 @@ export type CollectionDomain = (d: DomainBuilder, context: ListDomainContext) =>
 export async function compileCollectionDomain(metadata: Readonly<Record<string, FieldMetadata>>, source: CollectionDomain, context: ListDomainContext) {
   const expression = snapshotDomain(await source(domainBuilder, context));
   if (domainDependencies(expression).length) throw new Error("Las colecciones no tienen borrador: usa constantes o contexto del servidor.");
+  if (domainUsesRecordId(expression)) throw new Error("Las colecciones no tienen registro actual.");
   return compileListDomain(metadata, [expression]);
 }
 
@@ -42,14 +43,18 @@ export function validateRelationDomain(expression: DomainExpression, target: Rea
       // Validate operator and destination even when the dependency is empty.
       const example = destination.kind === "boolean" ? false : destination.kind === "integer" ? 0 : destination.kind === "datetime" ? "2026-01-01T00:00:00.000Z" : destination.kind === "selection" ? destination.choices[0].value : "domain-value";
       compileListDomain(target, [{ ...node, value: example }]);
+    } else if (node.value && !Array.isArray(node.value) && typeof node.value === "object" && "record" in node.value) {
+      // snapshotDomain restricts this operand to eq/neq on the destination ID.
+      compileListDomain(target, [{ ...node, value: "domain-record-id" }]);
     } else compileListDomain(target, [node]);
   }
   walk(snapshotDomain(expression));
 }
 
-export function compileRelationDomain(expression: DomainExpression, target: Readonly<Record<string, FieldMetadata>>, owner: Readonly<Record<string, FieldMetadata>>, values: Readonly<Record<string, unknown>>) {
+export function compileRelationDomain(expression: DomainExpression, target: Readonly<Record<string, FieldMetadata>>, owner: Readonly<Record<string, FieldMetadata>>, values: Readonly<Record<string, unknown>>, record: DomainRecord = {}) {
   validateRelationDomain(expression, target, owner);
-  return compileListDomain(target, [resolveDomain(expression, values)]);
+  if (record.id !== undefined && (typeof record.id !== "string" || !record.id.trim() || record.id.length > 100)) throw new Error("Identidad del dominio inválida.");
+  return compileListDomain(target, [resolveDomain(expression, values, record)]);
 }
 
 type Predicate = Record<string, unknown>;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
 const { prisma } = await import("./src/lib/prisma");
-const { modelService, relationLookup, modelClientConfig, withActor } = await import("./src/lib/modules/registry");
+const { modelService, relationLookup, modelClientConfig, childCollectionList, withActor } = await import("./src/lib/modules/registry");
 const { hashPassword } = await import("./src/lib/auth/password");
 const password = await hashPassword("domains-test-only");
 const adminUser = await prisma.user.create({ data: { login: "domain-admin", password, isAdmin: true } });
@@ -30,7 +30,7 @@ await assert.rejects(lookup("estadoId", { paisId: mx.id }, { domain: [] }));
 await assert.rejects(lookup("missing", {}));
 await assert.rejects(lookup("estadoId", { paisId: mx.id }, {}, denied));
 await assert.rejects(lookup("estadoId", { paisId: mx.id }, {}, { ...editor, sessionVersion: 999 }));
-const base = { name: "Valid", paisId: mx.id, estadoId: jal.id, estados: [jal.id], active: true, status: "draft" };
+const base = { name: "Valid", paisId: mx.id, estadoId: jal.id, estados: [jal.id], parentId: null, pares: [], lineaIds: [], active: true, status: "draft" };
 const saved = await service.save(prisma, editor, base); assert.ok(saved.ok, JSON.stringify(saved));
 const before = await prisma.dominiosDocumento.count(), links = await prisma.dominiosDocumentoEstadosLink.count(), activity = await prisma.recordActivity.count();
 for (const patch of [{ paisId: ca.id }, { paisId: null }, { estadoId: ont.id }, { estados: [ont.id] }, { estadoId: hidden.id }, { name: "forge" }, { name: "late" }]) {
@@ -45,7 +45,7 @@ const old = await service.read(prisma, editor, saved.values.id); assert.ok(old.o
 assert.equal((await service.save(prisma, editor, old.values)).ok, false);
 assert.equal(await prisma.dominiosDocumentoEstadosLink.count(), links);
 const partnerService = modelService("core.partner");
-const extra = { name: "Extra", email: null, phone: null, avatarUrl: null, paisId: mx.id, estadoId: jal.id };
+const extra = { name: "Extra", email: null, phone: null, avatarUrl: null, paisId: mx.id, estadoId: jal.id, parentId: null };
 const partner = await partnerService.save(prisma, admin, extra); assert.ok(partner.ok, JSON.stringify(partner));
 assert.equal((await partnerService.save(prisma, admin, { ...partner.values, paisId: ca.id })).ok, false);
 assert.ok(modelClientConfig("core.partner").fields.estadoId.kind === "many2one");
@@ -53,10 +53,74 @@ assert.ok(modelClientConfig("core.partner").fields.estadoId.kind === "many2one")
 await service.save(prisma, editor, { ...base, name: "Inactive", active: false });
 await service.save(prisma, admin, { ...base, name: "Other owner" });
 const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 1, filters: [] };
+// Read-only One2many from an extension, whose inverse lives in the companion row.
+assert.equal(modelClientConfig("core.partner").collections?.childIds.inverse, "parentId");
+assert.equal(Object.hasOwn(partner.values, "childIds"), false);
+const child = await partnerService.save(prisma, admin, { ...extra, name: "Child", parentId: partner.values.id });
+assert.ok(child.ok, JSON.stringify(child));
+const children = await childCollectionList("core.partner", "childIds", partner.values.id, admin, state);
+assert.ok(children.ok, JSON.stringify(children)); assert.equal(children.data.total, 1); assert.equal(children.data.rows[0].id, child.values.id);
+const unrelated = await childCollectionList("core.partner", "childIds", child.values.id, admin, state);
+assert.ok(unrelated.ok); assert.equal(unrelated.data.total, 0);
+const filtered = await childCollectionList("core.partner", "childIds", partner.values.id, admin, { ...state, filters: [{ field: "id", operator: "eq", value: partner.values.id }] });
+assert.ok(!filtered.ok || filtered.data.total === 0, "client filters cannot widen the fixed parent scope");
+await assert.rejects(childCollectionList("core.partner", "missing", partner.values.id, admin, state));
+assert.equal((await childCollectionList("core.partner", "childIds", "missing", admin, state)).ok, false);
+await assert.rejects(childCollectionList("core.partner", "childIds", partner.values.id, denied, state));
+const unchangedParent = await partnerService.read(prisma, admin, partner.values.id);
+assert.ok(unchangedParent.ok); assert.equal(unchangedParent.values.revision, partner.values.revision);
+const editedChild = await partnerService.save(prisma, admin, { ...child.values, name: "Child edited" });
+assert.ok(editedChild.ok);
+const editedParent = await partnerService.save(prisma, admin, { ...unchangedParent.values, name: "Parent edited" });
+assert.ok(editedParent.ok);
+const retainedChild = await partnerService.read(prisma, admin, child.values.id);
+assert.ok(retainedChild.ok); assert.equal(retainedChild.values.name, "Child edited"); assert.equal(retainedChild.values.parentId, partner.values.id);
+console.log("✓ Extension child collection: companion inverse, parent scope, denied/missing parent, independent revisions/saves, omitted children preserved.");
 for (const load of [() => service.list(prisma, editor, state), () => service.kanban(prisma, editor, { group: "draft", state }), () => service.defineListAction({ domain: d => d.any(d.eq("active", true), d.not(d.eq("active", true))) })(prisma, editor, state)]) {
   const page = await withActor(editor, load); assert.ok(page.ok, JSON.stringify(page)); assert.equal(page.data.total, 1); assert.equal(page.data.rows.length, 1);
 }
 const grouped = await withActor(editor, () => service.list(prisma, editor, { ...state, groupBy: ["status"] })); assert.ok(grouped.ok); assert.equal(grouped.data.total, 1); assert.equal(grouped.data.groups?.[0].count, 1);
+
+// Identity is metadata, not a draft field; browser identity is scoped before target access.
+const first = await service.save(prisma, editor, { ...base, name: "Identity A" }); assert.ok(first.ok, JSON.stringify(first));
+const second = await service.save(prisma, editor, { ...base, name: "Identity B" }); assert.ok(second.ok, JSON.stringify(second));
+const recordLookup = (record: unknown, request: Record<string, unknown> = {}, field = "parentId", who = editor) => relationLookup("dominios.documento", field, who, { request, draft: {}, record });
+for (const field of ["parentId", "pares"]) {
+  const editing = await recordLookup({ id: first.values.id }, { pageSize: 1, query: "Identity" }, field);
+  assert.ok(editing.ok); assert.equal(editing.total, 1); assert.equal(editing.items[0].value, second.values.id);
+  const creation = await recordLookup({}, { query: "Identity" }, field);
+  assert.ok(creation.ok); assert.equal(creation.total, 2);
+  const self = await recordLookup({ id: first.values.id }, { id: first.values.id }, field);
+  assert.ok(self.ok); assert.equal(self.items[0].domainValid, false, "readable saved selections retain labels but cannot be chosen");
+  const batch = await recordLookup({ id: first.values.id }, { ids: [first.values.id, second.values.id] }, field);
+  assert.ok(batch.ok); assert.equal(batch.items.find(item => item.value === second.values.id)?.domainValid, true);
+}
+const inaccessible = await prisma.dominiosDocumento.findFirstOrThrow({ where: { name: "Other owner" } });
+for (const record of [{ id: "missing-record" }, { id: inaccessible.id }, { id: first.values.id, revision: first.values.revision }, { id: "" }, { id: 5 }]) await assert.rejects(recordLookup(record));
+await assert.rejects(recordLookup({ id: first.values.id }, {}, "parentId", denied));
+await assert.rejects(relationLookup("dominios.documento", "parentId", editor, { request: {}, draft: { id: first.values.id } }));
+await assert.rejects(relationLookup("dominios.documento", "estadoId", editor, { request: {}, draft: { paisId: mx.id }, record: { id: first.values.id } }));
+const beforeIdentity = { count: await prisma.dominiosDocumento.count(), history: await prisma.recordActivity.count() };
+for (const patch of [{ parentId: first.values.id }, { pares: [first.values.id] }, { parentId: first.values.id, record: { id: second.values.id } }]) {
+  const rejected = await service.save(prisma, editor, { ...first.values, ...patch }); assert.equal(rejected.ok, false, JSON.stringify(rejected));
+}
+assert.equal((await service.action(prisma, editor, { id: first.values.id, revision: first.values.revision, action: "autorreferencia" })).ok, false);
+const lateSelf = await service.save(prisma, editor, { ...base, name: "self-late" }); assert.equal(lateSelf.ok, false, JSON.stringify(lateSelf));
+assert.deepEqual({ count: await prisma.dominiosDocumento.count(), history: await prisma.recordActivity.count() }, beforeIdentity, "post-create allocated identity prevents late hook self-links and rolls back history");
+const linked = await service.save(prisma, editor, { ...first.values, parentId: second.values.id, pares: [second.values.id] }); assert.ok(linked.ok, JSON.stringify(linked));
+const ownPartner = await relationLookup("core.partner", "parentId", admin, { request: {}, draft: {}, record: { id: partner.values.id } });
+assert.ok(ownPartner.ok); assert.ok(ownPartner.items.every(item => item.value !== partner.values.id));
+assert.equal((await partnerService.save(prisma, admin, { ...partner.values, parentId: partner.values.id })).ok, false, "extension domains use the base Partner identity, not the companion row ID");
+const lineDocument = await service.save(prisma, editor, { ...base, name: "Line identities", lineaIds: [{ name: "Line A", parentId: null }, { name: "Line B", parentId: null }] });
+assert.ok(lineDocument.ok, JSON.stringify(lineDocument));
+const lineRows = lineDocument.values.lineaIds as { id: string; revision: string; name: string; parentId: string | null }[];
+const lineLookup = await relationLookup("dominios.linea", "parentId", editor, { request: {}, draft: {}, record: { id: lineRows[0].id } });
+assert.ok(lineLookup.ok); assert.deepEqual(lineLookup.items.map(item => item.value), [lineRows[1].id]);
+const selfLine = await service.save(prisma, editor, { ...lineDocument.values, lineaIds: lineRows.map((row, index) => index ? row : { ...row, parentId: row.id }) });
+assert.equal(selfLine.ok, false, JSON.stringify(selfLine));
+const validLine = await service.save(prisma, editor, { ...lineDocument.values, lineaIds: lineRows.map((row, index) => index ? row : { ...row, parentId: lineRows[1].id }) });
+assert.ok(validLine.ok, JSON.stringify(validLine));
+console.log("✓ Record domains: creation/editing, paging, ID batches, source scope, forged envelopes, Many2many, native extensions, actions and late-hook rollback.");
 await prisma.user.update({ where: { id: editorUser.id }, data: { active: false } });
 await assert.rejects(lookup("estadoId", { paisId: mx.id }));
 console.log("✓ Domains: authorized candidates/IDs, empty dependencies, tampering, many selections, legacy values, extension storage, hooks/actions rollback and collection totals/groups/kanban verified.");

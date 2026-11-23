@@ -8,6 +8,8 @@ import FieldMany2One from "@/components/ui/form/FieldMany2One";
 import FieldRelationTag from "@/components/ui/form/FieldRelationTag";
 import NotebookPage from "@/components/ui/form/NotebookPage";
 import Notebook from "@/components/ui/form/Notebook";
+import FieldSelect from "@/components/ui/form/FieldSelect";
+import { ModelChildCollections } from "@/components/modules/ModelForm";
 
 export default function PartnerInsertions() {
   return (
@@ -34,7 +36,7 @@ export default function PartnerInsertions() {
         </FormGroup>
         <Notebook id="extras" defaultPage="contacts">
           <NotebookPage name="contacts" label="Contactos">
-            <h1>En construcción</h1>
+            <ModelChildCollections name="childIds" openIn="modal" />
           </NotebookPage>
           <NotebookPage name="sales" label="Venta" className="p-2">
             <FormGroup legend="Ventas">
@@ -50,6 +52,8 @@ export default function PartnerInsertions() {
       </Inserter>
 
       <Inserter target="group:contacto" position="inside">
+        <FieldSelect name="partnerType" />
+        <FieldMany2One name="parentId" />
         <FieldRelationTag name="tagIds" direction="inline" />
       </Inserter>
     </>

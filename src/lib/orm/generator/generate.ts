@@ -8,7 +8,9 @@ import { relationFieldName } from "../display";
 import { relatedProjectionPlan } from "./related";
 
 export type GenerationModel = {
-  model: { readonly name: string; readonly table: string; readonly uniqueTogether?: readonly (readonly string[])[]; readonly many2manyFields?: Readonly<Record<string, Many2manyField>>; readonly fields: Readonly<Record<string, Field>>; readonly metadata: Readonly<Record<string, FieldMetadata>>; readonly relatedFields?: Readonly<Record<string,Field>>; readonly computedFields?: Readonly<Record<string,Field>>; readonly reactionRules?: readonly import("../reactions.types").ReactionRule[]; readonly previewFields?: Readonly<Record<string,Field>>; readonly displayFields?: readonly string[] };
+  /** A companion publishes references for its extended model, never actions on itself. */
+  actionReferences?: { readonly model: string; readonly names: readonly string[] };
+  model: { readonly name: string; readonly table: string; readonly actions?: readonly { readonly name: string }[]; readonly uniqueTogether?: readonly (readonly string[])[]; readonly many2manyFields?: Readonly<Record<string, Many2manyField>>; readonly fields: Readonly<Record<string, Field>>; readonly metadata: Readonly<Record<string, FieldMetadata>>; readonly relatedFields?: Readonly<Record<string,Field>>; readonly computedFields?: Readonly<Record<string,Field>>; readonly reactionRules?: readonly import("../reactions.types").ReactionRule[]; readonly previewFields?: Readonly<Record<string,Field>>; readonly displayFields?: readonly string[] };
   /** Explicit publication boundary. Adding a private field must not publish it to the browser. */
   clientFields: readonly string[];
 };

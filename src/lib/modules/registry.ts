@@ -19,7 +19,7 @@ import { createRepository } from "./repository";
 import { modelIdPattern, type ModelClientConfig, type ModelLineConfig } from "./config";
 import type { InsertionViewKind, ModuleDefinition, ModuleModel } from "./define";
 import { relationDomains, relationDomainWhere } from "./relation-domains";
-import { domainDependencies } from "../orm/domain-builder";
+import { domainDependencies, domainUsesRecordId } from "../orm/domain-builder";
 import { ModelValidationError } from "../orm/context";
 import { z } from "zod";
 import { transferCollections, transferHeaders } from "../list/transfer-contract";
@@ -127,21 +127,30 @@ export async function relationLookup(model: string, field: string, actor: ModelA
   const found = getModuleModel(model);
   if (!found || !Object.hasOwn(lookupTargets(found.entry), field)) throw new Error("Relación no publicada.");
   const relation = relationDomains(found.entry).find(relation => relation.field === field);
-  const envelope = z.strictObject({ request: modelLookupSchema, draft: z.record(z.string(), z.unknown()), filter: z.boolean().default(false) }).parse(input);
+  const envelope = z.strictObject({ request: modelLookupSchema, draft: z.record(z.string(), z.unknown()), record: z.strictObject({ id: z.string().trim().min(1).max(100).optional() }).optional(), filter: z.boolean().default(false) }).parse(input);
   if (envelope.filter && !found.entry.list.fields.includes(field)) throw new Error("Filtro no publicado.");
+  const usesRecord = Boolean(relation && !envelope.filter && domainUsesRecordId(relation.domain));
+  if (envelope.record && !usesRecord) throw new Error("La relación no utiliza identidad de registro.");
   const target = getModuleModel(lookupTargets(found.entry)[field])!.entry;
-  const where = relation && !envelope.filter ? relationDomainWhere(found.entry, target, relation.domain, envelope.draft) : undefined;
-  return prisma.$transaction(tx => withRelationRead(tx, actor, found.entry.id, target.id, async () => {
-    const policy = projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models));
-    if (!policy.canRead([field, ...(relation && !envelope.filter ? domainDependencies(relation.domain) : [])])) throw new AccessError("DENIED");
-    const service = modelService(target.id);
-    const candidates = await service.lookupInTransaction(tx, actor, envelope.request, where);
-    if (!envelope.request.id && !envelope.request.ids) return candidates;
-    // Resolving saved selections preserves readable labels even when the domain changed.
-    const selections = await service.lookupInTransaction(tx, actor, envelope.request);
-    const matches = new Set(candidates.items.map(item => item.value));
-    return { ...selections, items: selections.items.map(item => ({ ...item, domainValid: matches.has(item.value) })) };
-  }), { isolationLevel: "RepeatableRead" });
+  const where = relation && !envelope.filter ? relationDomainWhere(found.entry, target, relation.domain, envelope.draft, envelope.record) : undefined;
+  return prisma.$transaction(async tx => {
+    // Resolve the source before entering the target's relational read scope.
+    if (envelope.record?.id) {
+      const source = await modelService(found.entry.id).lookupInTransaction(tx, actor, { id: envelope.record.id });
+      if (source.total !== 1) throw new ModelValidationError("El registro actual no está disponible.");
+    }
+    return withRelationRead(tx, actor, found.entry.id, target.id, async () => {
+      const policy = projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models));
+      if (!policy.canRead([field, ...(relation && !envelope.filter ? domainDependencies(relation.domain) : [])])) throw new AccessError("DENIED");
+      const service = modelService(target.id);
+      const candidates = await service.lookupInTransaction(tx, actor, envelope.request, where);
+      if (!envelope.request.id && !envelope.request.ids) return candidates;
+      // Resolving saved selections preserves readable labels even when the domain changed.
+      const selections = await service.lookupInTransaction(tx, actor, envelope.request);
+      const matches = new Set(candidates.items.map(item => item.value));
+      return { ...selections, items: selections.items.map(item => ({ ...item, domainValid: matches.has(item.value) })) };
+    });
+  }, { isolationLevel: "RepeatableRead" });
 }
 
 /** Parameter targets are fixed by the published action, never by a client target id. */
@@ -194,14 +203,14 @@ export function modelService(id: string): Service {
     owners: module.models.flatMap(parent => Object.values(parent.contract.one2manyFields).filter(field => field.one2many.target === entry.contract.name).map(field => ({ inverse: field.one2many.inverse, parent: () => modelService(parent.id).transaction }))),
     list: entry.list, audit: true, defaultSort: entry.defaultSort, domain: entry.declaration.domain,
     elementAccess: async (tx, actor) => projectElementAccess(entry, await readActorElementPolicies(tx, actor), runtimeModels),
-    validateRelations: async (tx, actor, values) => {
+    validateRelations: async (tx, actor, values, record) => {
       for (const [field, targetId] of Object.entries(lookupTargets(entry))) {
         const relation = relationDomains(entry).find(relation => relation.field === field);
         const selected = Object.hasOwn(entry.contract.many2manyFields, field) ? (values[field] as string[] | undefined) ?? [] : values[field] ? [String(values[field])] : [];
         if (!selected.length) continue;
         const target = getModuleModel(targetId)!.entry;
         const draft = Object.fromEntries((relation ? domainDependencies(relation.domain) : []).map(name => [name, values[name]]));
-        const where = relation ? relationDomainWhere(entry, target, relation.domain, draft) : undefined;
+        const where = relation ? relationDomainWhere(entry, target, relation.domain, draft, record) : undefined;
         const result = await withRelationRead(tx, actor, entry.id, target.id, () => modelService(target.id).lookupInTransaction(tx, actor, { ids: selected }, where));
         if (result.total !== selected.length) throw new ModelValidationError("Revisa las relaciones seleccionadas.", { [field]: "La selección no cumple el dominio vigente o no está disponible." });
       }

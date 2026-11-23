@@ -4,6 +4,7 @@ import { createContext, useContext, type ButtonHTMLAttributes, type ReactNode } 
 import { createPortal } from "react-dom";
 import type { FieldValues } from "react-hook-form";
 import type { FormViewResult } from "./formView.types";
+import { actionReferenceName, type ModelActionReference } from "@/lib/orm/action-reference";
 
 /** Saved identity the action runs on: always the revision persisted by the form cycle. */
 export type FormActionTarget = { id: string; revision: string };
@@ -11,6 +12,8 @@ export type FormActionTarget = { id: string; revision: string };
 export type FormActionRunner<TValues extends FieldValues = FieldValues> = (action: string, target: FormActionTarget, params?: Record<string, unknown>) => Promise<FormViewResult<TValues>>;
 
 type FormActionsContextValue = {
+  /** Model contract name (config.name for declarative forms). */
+  model?: string;
   /** Header slot rendered by FormView (portal target for FormHeader). */
   header: HTMLElement | null;
   locked: boolean;
@@ -39,9 +42,9 @@ export function FormHeader({ children }: { children: ReactNode }) {
   return header ? createPortal(<fieldset disabled={locked || readOnly} className="m-0 flex min-w-0 max-w-full flex-1 flex-wrap items-center justify-between gap-2 border-0 p-0 [&_[data-form-widget=statebar]]:ml-auto [&_[data-form-widget=statebar]]:w-auto [&_[data-form-widget=statebar]]:max-w-full">{children}</fieldset>, header) : null;
 }
 
-type FormButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "onClick" | "children"> & {
-  /** Name of an action published by the model with `@action`; the server validates it. */
-  action: string;
+export type FormButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "onClick" | "children"> & {
+  /** Generated reference to a published action; the server still authorizes every call. */
+  action: ModelActionReference;
   /** Defaults to the published label. */
   children?: ReactNode;
   variant?: "primary" | "secondary";
@@ -56,13 +59,15 @@ type FormButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "o
  * never runs the action, and a failed action keeps what was already saved.
  */
 export function FormButton({ action, children, variant = "primary", invisible = false, disabled, className = "", ...props }: FormButtonProps) {
-  const { locked, readOnly, actions, run, running } = useFormActions("FormButton");
-  const label = children ?? actions?.find(item => item.name === action)?.label ?? action;
-  if (invisible || readOnly || !run || (actions && !actions.some(item => item.name === action))) return null;
+  const { model, locked, readOnly, actions, run, running } = useFormActions("FormButton");
+  const name = actionReferenceName(action, model);
+  const published = name ? actions?.find(item => item.name === name) : undefined;
+  if (invisible || readOnly || !run || !published || !name) return null;
+  const label = children ?? published.label;
   return <button {...props} type="button" disabled={disabled || locked}
     className={`btn btn-sm ${variant === "primary" ? "btn-primary" : "btn-soft"} gap-1.5 ${className}`}
-    onClick={() => { void run(action); }}>
-    {running === action && <span className="loading loading-spinner loading-xs" aria-hidden="true" />}
+    onClick={() => { void run(name); }}>
+    {running === name && <span className="loading loading-spinner loading-xs" aria-hidden="true" />}
     {label}
   </button>;
 }

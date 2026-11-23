@@ -128,7 +128,7 @@ export type ServiceAuthorizer = (tx: Prisma.TransactionClient, actor: ModelActor
 type ServicePresentation = {
   elementAccess?: (tx: Prisma.TransactionClient, actor: ModelActor) => Promise<ModelElementAccess>;
   domain?: CollectionDomain;
-  validateRelations?: (tx: Prisma.TransactionClient, actor: ModelActor, values: Readonly<Record<string, unknown>>) => Promise<void>;
+  validateRelations?: (tx: Prisma.TransactionClient, actor: ModelActor, values: Readonly<Record<string, unknown>>, record: Readonly<{ id?: string }>) => Promise<void>;
   /** Fields whose storage row may be absent (declarative extensions only). */
   collectionNullable?: readonly string[];
   lines?: LineRelations;
@@ -324,7 +324,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     assertSequences(values, sequence.locked);
     validateLines(values, current as Document | null, lines);
     await validateMany2many(values, many, relationAccessFor(tx, actor));
-    await presentation.validateRelations?.(tx, actor, values);
+    await presentation.validateRelations?.(tx, actor, values, { id: metadata.id });
     for (const owner of presentation.owners ?? []) if (values[owner.inverse] !== normalized[owner.inverse]) throw new ModelValidationError("La lógica del hijo no puede cambiar su documento padre.");
     if (!Object.keys(lines).length) await model.constrain?.(values, context);
     const scalars = Object.fromEntries([...Object.keys(model.metadata), ...Object.keys(many)].map(name => [name, values[name]])) as T;
@@ -337,7 +337,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (!finalScalar) throw new ModelValidationError("El registro no está disponible después de guardar.");
     const final = await loadDocument(tx, actor, finalScalar) as Values & Document;
     assertSequences(final, sequence.locked);
-    await presentation.validateRelations?.(tx, actor, final);
+    await presentation.validateRelations?.(tx, actor, final, { id: final.id });
     if (!await inScope(tx, final.id, scope)) throw new AccessError("DENIED");
     const relationsChanged = current && Object.keys(many).some(name => JSON.stringify([...(current[name] as string[])].sort()) !== JSON.stringify([...(final[name] as string[])].sort()));
     await recordActivity(tx, model.name, actor.id, model.metadata, current, final, activityLabel ?? (aggregate.changed ? "Líneas actualizadas" : relationsChanged ? "Relaciones actualizadas" : undefined));
@@ -347,7 +347,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       const canonical = await repository.read(tx, final.id);
       if (!canonical || !await inScope(tx, canonical.id, scope)) throw new ModelValidationError("La línea ya no está disponible después de validar su documento.");
       const refreshed = await loadDocument(tx, actor, canonical) as Values & Document;
-      await presentation.validateRelations?.(tx, actor, refreshed);
+      await presentation.validateRelations?.(tx, actor, refreshed, { id: refreshed.id });
       return refreshed;
     }
     return final;
