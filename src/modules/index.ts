@@ -1,3 +1,4 @@
+import directoryModule from "./directory/manifest";
 import ubicacionesModule from "./ubicaciones/manifest";
 
 
@@ -13,4 +14,6 @@ import type { ModuleDefinition } from "@/lib/modules/define";
  */
 export const modules: readonly ModuleDefinition[] = [
   
-    ubicacionesModule,];
+    ubicacionesModule,
+    directoryModule,
+  ];

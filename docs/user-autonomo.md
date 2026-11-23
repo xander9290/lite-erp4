@@ -2,8 +2,9 @@
 
 Cambio del 2026-11-23 autorizado por el usuario. Sólo `core.user` es nativo;
 Contactos y `core.partner` se retiran. El piloto contactosextra fue desinstalado
-previamente por el usuario. Directorio queda como aplicación declarativa futura,
-sin crear modelos, tablas ni hooks por anticipación.
+previamente por el usuario. Directorio se desarrolla aparte como módulo declarativo;
+su avance está en [continuidad](estado-proyecto.md). La retirada del núcleo no
+creó sus modelos, tablas ni hooks por anticipación.
 
 ## Contrato actual
 

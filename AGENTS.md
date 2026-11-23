@@ -141,8 +141,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   búsquedas no dependen de Partner. `core.partner`, la app Contactos y sus
   proveedores manuales fueron retirados; contactosextra fue desinstalado por el
   usuario como piloto. No recrearlos ni asumir disponibles sus campos/vistas.
-- Directorio es una aplicación declarativa futura, todavía no creada. Sus contactos
-  y relación opcional con User pertenecen a la app. La creación automática desde
+- Directorio es una aplicación declarativa de negocio separada del núcleo; su
+  avance está en docs/estado-proyecto.md. Sus contactos y relación opcional con
+  User pertenecen a la app. La creación automática desde
   una extensión/hook requiere definir permisos, atomicidad y duplicados con el caso
   real; no está implementada por esta retirada.
 - La migración `20261123220000_user_standalone_profile` copia los perfiles vinculados

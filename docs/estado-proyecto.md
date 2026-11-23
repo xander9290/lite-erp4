@@ -6,6 +6,69 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Punto de continuación: Directory (2026-11-23)
+
+Rama comprobada: codex/partner, HEAD 337af62. La retirada del Partner nativo y
+User autónomo ya están en ese commit. Permanecen sin commit las declaraciones
+nuevas de directory, su registro en src/modules/index.ts y la actualización de
+continuidad. Este guardado no ejecuta commit, push, pull, generación ni SQL.
+
+El usuario construye el módulo declarativo directory, mostrado como Directorio,
+con Partner → directory.partner / DirectoryPartner. La clase contiene name,
+emails, phones, street, crossStreets, streetNumber, unitNumber, zipNumber y active.
+Name es obligatorio, active inicia true y displayName devuelve name. Las nueve
+columnas se publicaban en la revisión inicial; no se ha alterado esa política.
+
+Ajustes posteriores hechos por el usuario y comprobados por lectura de fuentes:
+secondStreet pasó a crossStreets; zipNumber ahora es Text; números exterior e
+interior y código postal ya tienen tracking. Conservar el nombre zipNumber salvo
+que el usuario decida renombrarlo; postalCode fue una sugerencia, no un requisito.
+El ledger local aún no registra directory. No se acredita instalación, migración
+ni prueba persistente de este módulo por esta nota.
+
+Verificación histórica del primer alcance: TypeScript y ESLint focalizado pasaron;
+la declaración se cargó en memoria y se comprobaron required/defaults/publicación.
+Entonces zipNumber todavía era Integer. Las correcciones posteriores sólo se
+contrastaron con las fuentes; no atribuirles nuevas pruebas. Este guardado sólo
+comprueba git diff --check y no consulta BD ni modifica modelos o aplicaciones.
+
+Siguiente paso del ejercicio: continuar la declaración y reglas de negocio al
+ritmo del usuario. Acordar cómo almacenar/separar varios correos y teléfonos y
+validar cada valor cuando lo requiera el caso. Formato del código postal y reglas
+por persona/empresa corresponden al modelo, mediante normalize/constraints/hooks
+según la necesidad; el tipo Text y tracking son configuración de datos/auditoría.
+Tipo de contacto, RFC, ubicaciones y relación con User no se añaden por anticipación.
+Cuando el usuario dé por lista la declaración, revisar el plan de orm:sync y su
+SQL antes de instalar; el registro de grupos/permisos sigue siendo explícito.
+
+Pendientes vigentes separados del ejercicio:
+
+1. Acciones de modelo por selección de lista: referencias tipadas, recorrido por
+   registro en servidor, parámetros comunes y lote atómico. Sigue como propuesta;
+   [contrato](ideas/acciones-formulario.md#pendiente-acciones-de-modelo-por-selección-en-listas-2026-11-23).
+2. Tipado compuesto de vistas completas base+extensión, para sustituir
+   Record<string, unknown> sin alterar composición ni permisos.
+3. Revisar publicación de columnas cuando el límite de 12 y el orden excluyan
+   campos solicitados. Motivo: caso anterior de active/estadoId en el piloto;
+   aceptación: selección de campos predecible y explícita conservando límites y
+   política del servidor. Directory tiene nueve campos; no exige cambiarlo ahora.
+4. Vincular User y contactos de Directorio sólo cuando se concrete el caso.
+   La creación automática de contacto desde extensión/hook aún no está diseñada
+   ni implementada; definir atomicidad, permisos, duplicados y composición de hooks.
+5. Distribución de módulos entre proyectos, estrategia de entornos, visibilidad
+   de NotebookPage/presentaciones, limpieza segura de imágenes, agrupaciones por
+   relaciones/fechas y portabilidad de fixtures Windows conservan sus contratos.
+   Compute persistido y ampliaciones de índices se evalúan con un caso real;
+   actualmente no existe index:true para Fields ni índices normales declarables.
+6. Los cinco [conceptos de Django](ideas/conceptos-django.md) son sugerencias:
+   chequeos, efectos después del commit, consultas reutilizables, comandos por
+   módulo y aplicaciones distribuibles. No son implementaciones activas.
+
+FormButton confirm y apertura tipada desde TSX están implementados; no volver a
+listarlos como desarrollo pendiente. Evaluar su ergonomía al usarlos en una app
+real. La revisión del modal del antiguo contactosextra ya no aplica al piloto
+retirado. No recrear ese módulo ni adelantar Directorio por este guardado.
+
 ## Retirada de core.partner y User autónomo (2026-11-23)
 
 Autorizado por el usuario después de desinstalar contactosextra como piloto.
@@ -19,8 +82,9 @@ comprueban que ocultar su nombre no concede lectura por la ruta de auditoría.
 La migración 20261123220000_user_standalone_profile copia perfiles a users, avanza
 updatedAt y retira la FK a partners; no elimina datos. Conserva partners como
 LegacyPartner ignorado por Prisma Client y partner_id como legacyPartnerId
-histórico no publicado. Directorio aún no existe; no se añadieron sus modelos,
-relaciones ni automatismos. Contrato/activación en [User autónomo](user-autonomo.md).
+histórico no publicado. Al cerrar esa retirada, Directorio aún no existía; su
+declaración posterior se describe arriba. No se añadieron relaciones ni automatismos
+por la retirada. Contrato/activación en [User autónomo](user-autonomo.md).
 Esta decisión sustituye el diseño anterior de Partner compartido del núcleo y
 deja sin objeto la revisión pendiente del modal real del piloto retirado.
 Los ejemplos vigentes de /documentation usan Biblioteca; los diseños antiguos
