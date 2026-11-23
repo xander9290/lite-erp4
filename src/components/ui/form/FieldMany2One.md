@@ -31,9 +31,9 @@ const methods = useForm({
       name="userId"
       label="Usuario"
       model="user"
-      searchFields={["login", "partner.name"]}
-      displayName="[{login}] {partner.name}"
-      columns={[{ field: "partner.name", label: "Contacto" }]}
+      searchFields={["login", "name"]}
+      displayName="[{login}] {name}"
+      columns={[{ field: "name", label: "Nombre" }]}
       pageSize={10}
       onChange={(id, record) => console.log(id, record)}
     />
@@ -41,7 +41,7 @@ const methods = useForm({
 </FormLayout>
 ```
 
-- `model`: `user` o `partner`. Los valores predeterminados están en `src/lib/many2one/types.ts`.
+- `model`: `user` (proveedor manual). Los valores predeterminados están en `src/lib/many2one/types.ts`.
 - `searchFields`: campos de texto permitidos. Las palabras se combinan con AND; cada palabra puede coincidir con cualquiera de los campos (OR). Búsqueda sin distinguir mayúsculas; `%` y `_` se buscan como texto literal.
 - `displayName`: plantilla con `{campo}` o `{relacion.campo}`. Las relaciones opcionales vacías se muestran sin errores.
 - `columns`: columnas adicionales del modal, visibles desde `sm`; en móvil se conserva el nombre completo y la selección. Solo se pueden mostrar los datos públicos devueltos por el servidor; no amplía el `select`.

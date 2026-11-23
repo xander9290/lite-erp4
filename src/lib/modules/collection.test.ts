@@ -150,17 +150,17 @@ test("audit: true publishes the creator as a Many2one plus dates; groups by crea
     { field: "createdAt", label: "Creado el", type: "datetime", widget: undefined, sortable: true, filterable: true, groupable: false },
   ]);
   assert.equal(modelCollection(audited).columns.length, 5, "default presentation includes the audit columns");
-  assert.throws(() => modelCollection(audited, [{ field: "createByUser.partner.name" }]), /no está publicada/);
+  assert.throws(() => modelCollection(audited, [{ field: "createByUser.name" }]), /no está publicada/);
   assert.throws(() => modelCollection(audited, [{ field: "createdAt", type: "text" }]), /auditoría/);
   assert.throws(() => modelCollection({ ...audited, audit: undefined }, [{ field: "createdAt" }]), /no está publicada/);
   // Without audit: true the manifest cannot publish them; createBy is grouped, never sorted or searched.
   assert.throws(() => defineModule({ id: "notas", name: "Notas", icon: "boxes", models: { nota: { model: Nota, list: { fields: ["name", "createdAt"] } } } }), /audit: true/);
   assert.throws(() => defineModule({ id: "notas", name: "Notas", icon: "boxes", models: { nota: { model: Nota, audit: true, list: { groupable: ["createdAt"] } } } }), /no se busca/);
-  assert.throws(() => defineModule({ id: "notas", name: "Notas", icon: "boxes", models: { nota: { model: Nota, audit: true, list: { sortable: ["createBy"] } } } }), /createByUser.partner.name/);
+  assert.throws(() => defineModule({ id: "notas", name: "Notas", icon: "boxes", models: { nota: { model: Nota, audit: true, list: { sortable: ["createBy"] } } } }), /createByUser.name/);
   // Explicit list.fields decide placement, including the optional creator name column.
-  const placed = defineModule({ id: "notas", name: "Notas", icon: "boxes", models: { nota: { model: Nota, audit: true, list: { fields: ["createdAt", "name", "createByUser.partner.name"] } } } }).models[0];
-  assert.deepEqual(placed.list.fields, ["createdAt", "name", "createByUser.partner.name"]);
-  assert.deepEqual(placed.list.sortable, ["name", "createByUser.partner.name", "createdAt"]);
+  const placed = defineModule({ id: "notas", name: "Notas", icon: "boxes", models: { nota: { model: Nota, audit: true, list: { fields: ["createdAt", "name", "createByUser.name"] } } } }).models[0];
+  assert.deepEqual(placed.list.fields, ["createdAt", "name", "createByUser.name"]);
+  assert.deepEqual(placed.list.sortable, ["name", "createByUser.name", "createdAt"]);
 });
 
 test("Many2many columns are tags: filterable by membership, never sorted or grouped", () => {

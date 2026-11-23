@@ -64,8 +64,8 @@ test("generation rejects collisions, unknown relations, missing dependencies and
   assert.throws(() => generateModule(profile, { ...context, schema: schema.replace("model User {\n id String @id\n}\n", "") }), /auditoría createBy/);
   assert.throws(() => generateModule(profile, { ...context, schema: schema.replace("id String @id\n}", "id String @id\n fleetVehicleCreatedRecords String\n}") }), /auditoría en conflicto/);
   assert.throws(() => generateModule({ ...profile, depends: [] }, context), /dependencia/);
-  // Partner is a native core model: an implicit dependency, so no declared owner is needed.
-  assert.doesNotThrow(() => generateModule({ ...profile, depends: [] }, { ...context, owners: {} }));  assert.throws(() => generateModule({ ...profile, models: [...profile.models, ...profile.models] }, context), /conflicto/);
+  // Partner is no longer native: an external model needs its declared owner/dependency.
+  assert.throws(() => generateModule({ ...profile, depends: [] }, { ...context, owners: {} }), /dependencia/);  assert.throws(() => generateModule({ ...profile, models: [...profile.models, ...profile.models] }, context), /conflicto/);
   assert.throws(() => generateModule({ ...profile, models: [{ ...profile.models[0], clientFields: ["password"] }] }, context), /publicados/);
   assert.throws(() => generateModule(profile, { ...context, schema: schema + '\nmodel Old {\n id String @id\n @@map("fleet_vehicles")\n}\n' }), /ya pertenece/);
   const unknown = defineModel(class Unknown extends Model { targetId = Fields.Many2one("Missing"); }, { name: "Unknown", table: "unknown" });

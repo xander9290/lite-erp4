@@ -115,7 +115,7 @@ test("legacy Kanban moves stay compatible, while an explicit empty graph never w
 });
 
 test("audit presentation is opt-in and only accepts public paths and approved avatars", () => {
-  assert.doesNotThrow(() => createModelService(model, repository, { audit: true, columns: recordAuditColumns, searchFields: ["createByUser.login", "createByUser.partner.name"] }));
+  assert.doesNotThrow(() => createModelService(model, repository, { audit: true, columns: recordAuditColumns, searchFields: ["createByUser.login", "createByUser.name"] }));
   assert.throws(() => createModelService(model, repository, { columns: recordAuditColumns, searchFields: [] }), /auditoría habilitada/);
   for (const field of ["createByUser.password", "createByUser.sessionVersion", "createByUser.partner.email", "audit"]) {
     assert.throws(() => createModelService(model, repository, { audit: true, columns: [{ field, label: field }], searchFields: [] }), /auditoría habilitada/);

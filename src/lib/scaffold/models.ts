@@ -106,7 +106,7 @@ export async function createViews(root: string, app: string, name: string, optio
   // Resolve only the framework's explicit authorized action contract, never a class name alone.
   const lookups = { ...options.lookups };
   for (const [name, field] of Object.entries(entry.model.metadata)) {
-    if (field.kind !== "many2one" || lookups[name] || ["Partner", "User"].includes(field.target)) continue;
+    if (field.kind !== "many2one" || lookups[name] || field.target === "User") continue;
     const candidates: string[] = [];
     for (const directory of await readdir(join(root, "src/app/(auth)/erp"), { withFileTypes: true })) {
       if (!directory.isDirectory()) continue;

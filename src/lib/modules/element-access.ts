@@ -23,15 +23,11 @@ export function projectElementAccess(entry: ModuleModel, policies: ElementPolici
     const [head, ...tail] = path.split(".");
     if (["id", "revision"].includes(head)) return tail.length === 0;
     if (head === "createBy") {
-      const target = byName.get("Partner");
+      const target = byName.get("User");
       return Boolean(target && canReadPath(target, "name", next));
     }
     if (head === "createByUser") {
       const target = byName.get("User");
-      return Boolean(target && canReadPath(target, tail.join("."), next));
-    }
-    if (owner.id === "core.user" && head === "partner") {
-      const target = byName.get("Partner");
       return Boolean(target && canReadPath(target, tail.join("."), next));
     }
     const key = Object.hasOwn(owner.metadata, head) ? head : Object.entries(owner.metadata).find(([key, field]) => field.kind === "many2one" && relationFieldName(key) === head)?.[0] ?? head;

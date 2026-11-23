@@ -58,7 +58,7 @@ export default async function DocumentationPage() {
             <p className="px-3 text-xs font-semibold tracking-wider text-base-content/50 uppercase">Desarrollo de aplicaciones</p>
             <a href="#crear-modulos" aria-current="page" className="mt-4 flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2.5 text-sm font-semibold text-primary"><Layers size={16} aria-hidden="true" />Crear módulos</a>
             <nav aria-label="En esta guía" className="mt-3 space-y-1 border-l border-base-300 pl-3">{sectionLinks}</nav>
-            <p className="mt-8 px-3 text-xs leading-5 text-base-content/50">Ejemplos completos de modelos, acciones tipadas y apertura de formularios desde TSX.</p>
+            <p className="mt-8 px-3 text-xs leading-5 text-base-content/50">Ejemplos completos de modelos, acciones tipadas con confirmación y apertura de formularios desde TSX.</p>
           </aside>
 
           <main className="min-w-0 max-w-3xl pb-12">

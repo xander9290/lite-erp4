@@ -1,6 +1,6 @@
 import "server-only";
 import { Fields, Model, action, type ModelContext } from "@/lib/orm";
-import { Partner } from "@/lib/core/models/partner";
+import { User } from "@/lib/core/models/user";
 import { extendModel } from "@/lib/modules/extend";
 import { defineModule } from "@/lib/modules/define";
 class Pais extends Model { name = Fields.Text({ required: true }); }
@@ -37,17 +37,17 @@ class Documento extends Model {
   @action({ label: "Autorreferencia" })
   autorreferencia(record: { id: string }) { return { parentId: record.id }; }
 }
-const PartnerExtra = extendModel(Partner, Base => {
+const UserExtra = extendModel(User, Base => {
   class Extra extends Base {
     paisId = Fields.Many2one("DominiosPais"); estadoId = states();
-    parentId = Fields.Many2one("Partner", { domain: d => d.neq("id", d.record.id) });
-    childIds = Fields.One2many("Partner", { inverse: "parentId", readonly: true });
+    parentId = Fields.Many2one("User", { domain: d => d.neq("id", d.record.id) });
+    childIds = Fields.One2many("User", { inverse: "parentId", readonly: true });
   }
   return Extra;
 });
 export default defineModule({ id: "dominios", name: "Dominios", icon: "boxes",
   models: { pais: Pais, estado: Estado, linea: Linea, documento: { model: Documento, kanban: "status", views: { list: true, card: true, kanban: true }, domain: d => d.eq("active", true) } },
-  extends: { "core.partner": PartnerExtra },
+  extends: { "core.user": UserExtra },
   groups: { editor: "Editor" },
   access: [{ group: "editor", models: ["documento", "linea"], perms: "crud" }, { group: "editor", models: ["pais", "estado"], perms: "r" }],
   rules: [

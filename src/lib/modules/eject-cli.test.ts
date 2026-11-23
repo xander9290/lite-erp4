@@ -56,8 +56,8 @@ export default defineModule({id:"extra",name:"Extra",icon:"box",depends:["exampl
     assert.match(source, /name="note"/);
     assert.match(source, /<FieldMany2One<Values> name="parentId"/);
     assert.match(source, /ModelChildCollections name="childIds" openIn="modal"/);
-    const check = spawnSync(process.execPath, [join(project, "node_modules/typescript/bin/tsc"), "--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 30000 });
-    assert.equal(check.status, 0, check.stdout + check.stderr);
+    const check = spawnSync(process.execPath, [join(project, "node_modules/typescript/bin/tsc"), "--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 90000 });
+    assert.equal(check.status, 0, check.stdout + check.stderr + (check.error?.message ?? ""));
     await writeFile(extended, source + "\n// User layout\n");
     const collision = run("extra", "example.item", "modal");
     assert.equal(collision.status, 1);

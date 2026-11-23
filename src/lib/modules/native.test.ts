@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Fields, Model } from "../orm";
 import core from "../core/manifest";
-import { Partner } from "../core/models/partner";
+import { User } from "../core/models/user";
 import { defineModule } from "./define";
 import { composeModules } from "./compose";
 import { extendModel } from "./extend";
@@ -10,15 +10,15 @@ import { createRepository } from "./repository";
 import { generateModule } from "../orm/generator/generate";
 import { userGroups } from "../access/engine";
 
-test("core is a native module over the hand-written partners table, without an app of its own", () => {
+test("core registers only autonomous User accounts, without a business directory", () => {
   assert.equal(core.native, true);
-  const [partner] = core.models;
-  assert.equal(partner.id, "core.partner");
-  assert.equal(partner.contract.name, "Partner");
-  assert.equal(partner.contract.table, "partners");
-  assert.equal(partner.delegate, "partner");
+  assert.deepEqual(core.models.map(model => model.id), ["core.user"]);
+  const [user] = core.models;
+  assert.equal(user.contract.name, "User");
+  assert.equal(user.contract.table, "users");
+  assert.equal(user.delegate, "user");
+  assert.deepEqual(user.extensions, []);
   assert.deepEqual(core.application.menus, []);
-  assert.deepEqual(Object.keys(partner.metadata), ["name", "email", "phone", "avatarUrl"]);
   assert.deepEqual(core.access.groups, []);
 });
 
@@ -30,42 +30,23 @@ test("native options are reserved and core is an implicit dependency", () => {
   assert.throws(() => defineModule({ id: "nativo", name: "N", icon: "box", native: true, models: { item: Item }, menu: { Items: "item" } }), /no declara menús/);
 });
 
-test("modules relate to and extend Partner without declaring core; the schema links to partners", () => {
-  class Cliente extends Model {
-    name = Fields.Text({ label: "Nombre", required: true });
-    contactoId = Fields.Many2one("Partner", { label: "Contacto" });
-  }
-  const ventas = defineModule({ id: "ventas", name: "Ventas", icon: "store", models: { cliente: Cliente } });
-  const schema = `datasource db {\n  provider = "postgresql"\n}\n\nmodel User {\n  id String @id @default(cuid())\n}\n\nmodel Partner {\n  id String @id @default(cuid())\n  name String\n  @@map("partners")\n}\n`;
-  const files = generateModule(ventas.profile.module, { schema, owners: {} });
-  assert.match(files["models.prisma"], /contacto Partner\? @relation\("VentasCliente_contactoId", fields: \[contactoId\], references: \[id\], onDelete: Restrict\)/);
-  const review = JSON.parse(files["review.json"]) as { relations: { target: string; owner: string }[] };
-  assert.ok(review.relations.some(relation => relation.target === "Partner" && relation.owner === "@core"));
-
-  const PartnerCrm = extendModel(Partner, Base => { class PartnerCrm extends Base { empresa = Fields.Text({ label: "Empresa", maxLength: 80 }); } return PartnerCrm; });
-  const crm = defineModule({ id: "crm", name: "CRM", icon: "users", models: {}, extends: { "core.partner": PartnerCrm } });
-  assert.equal(crm.extensions[0].companion?.name, "CrmCorePartner");
-  const companion = generateModule(crm.profile.module, { schema, owners: {} });
-  assert.match(companion["models.prisma"], /record Partner @relation\("CrmCorePartner_recordId", fields: \[recordId\], references: \[id\], onDelete: Cascade\)/);
+test("modules relate to and extend User without declaring core", () => {
+  class Item extends Model { responsableId = Fields.Many2one("User"); }
+  const app = defineModule({ id: "ventas", name: "Ventas", icon: "store", models: { item: Item } });
+  const schema = `datasource db {
+ provider = "postgresql"
+}
+model User {
+ id String @id
+}
+`;
+  const files = generateModule(app.profile.module, { schema, owners: {} });
+  assert.match(files["models.prisma"], /responsable User\? @relation/);
+  const Extra = extendModel(User, Base => { class Extra extends Base { empresa = Fields.Text(); } return Extra; });
+  const crm = defineModule({ id: "crm", name: "CRM", icon: "users", models: {}, extends: { "core.user": Extra } });
   const [composed] = composeModules([core, crm]);
-  assert.deepEqual(Object.keys(composed.models[0].metadata), ["name", "email", "phone", "avatarUrl", "empresa"]);
-});
-
-test("native repository writes no creator column and reads only dates as audit", async () => {
-  const calls: Record<string, unknown>[] = [];
-  const updatedAt = new Date("2026-11-18T10:00:00.000Z");
-  const row = { id: "p1", updatedAt, createdAt: updatedAt, name: "Ana", email: null, phone: null, avatarUrl: null };
-  const delegate = {
-    findMany: async () => [],
-    findUnique: async (args: Record<string, unknown>) => { calls.push(args); return row; },
-    create: async (args: Record<string, unknown>) => { calls.push(args); return row; },
-  };
-  const [partner] = core.models;
-  const repository = createRepository(partner, core.profile.module, core.models, { creator: false });
-  await repository.create({ partner: delegate } as never, { name: "Ana", email: null, phone: null, avatarUrl: null } as never, "u1");
-  assert.equal(Object.hasOwn(calls[0].data as object, "createBy"), false);
-  assert.deepEqual(await repository.audit!({ partner: delegate } as never, "p1"), { createdAt: updatedAt.toISOString(), updatedAt: updatedAt.toISOString(), createBy: null });
-  assert.deepEqual(calls[1].select, { createdAt: true, updatedAt: true });
+  assert.ok(composed.models[0].metadata.empresa);
+  assert.throws(() => generateModule(defineModule({ id: "otro", name: "Otro", icon: "box", models: { item: class extends Model { contactoId = Fields.Many2one("Partner"); } } }).profile.module, { schema, owners: {} }), /Partner/);
 });
 
 test("accounts receive no implicit group or contact grant", async () => {
@@ -74,10 +55,10 @@ test("accounts receive no implicit group or contact grant", async () => {
   assert.deepEqual(core.access.grants, []);
 });
 
-test("core.user delegates contact fields to its Partner and keeps the password write-only", async () => {
+test("core.user stores its own profile and keeps the password write-only", async () => {
   const user = core.models.find(model => model.id === "core.user")!;
   assert.equal(user.contract.name, "User");
-  assert.deepEqual(user.extensions.map(({ label, fields, relation, inherits }) => ({ label, fields, relation, inherits })), [{ label: "Contacto", fields: ["name", "email", "phone", "avatarUrl"], relation: "partner", inherits: true }]);
+  assert.deepEqual(user.extensions, []);
   const password = user.metadata.password;
   assert.equal(password.kind === "text" && password.writeOnly, true);
   assert.equal(password.sensitive, true);
@@ -88,7 +69,7 @@ test("core.user delegates contact fields to its Partner and keeps the password w
 
   const calls: [string, Record<string, unknown>][] = [];
   const updatedAt = new Date("2026-11-18T10:00:00.000Z");
-  const stored = { id: "u1", updatedAt, login: "ana", password: "$2b$hash", active: true, isAdmin: false, lastLogin: null, partner: { name: "Ana", email: null, phone: null, avatarUrl: null, updatedAt } };
+  const stored = { id: "u1", updatedAt, login: "ana", password: "$2b$hash", active: true, isAdmin: false, lastLogin: null, name: "Ana", email: null, phone: null, avatarUrl: null };
   const tx = { user: {
     findMany: async () => [],
     findUnique: async (args: Record<string, unknown>) => { calls.push(["findUnique", args]); return stored; },
@@ -104,15 +85,17 @@ test("core.user delegates contact fields to its Partner and keeps the password w
   await repository.create(tx, values as never, "admin");
   const created = calls[1][1].data as Record<string, unknown>;
   assert.match(String(created.password), /^\$2[aby]\$/);
-  assert.deepEqual(created.partner, { create: { name: "Ana", email: null, phone: null, avatarUrl: null } }, "crea su contacto en la misma sentencia, sin createBy");
+  assert.equal(created.name, "Ana");
+  assert.equal(Object.hasOwn(created, "partner"), false);
+  assert.equal(Object.hasOwn(created, "createBy"), false);
   assert.equal(Object.hasOwn(created, "lastLogin"), false, "lastLogin lo mantiene la autenticación");
   await repository.update(tx, "u1", updatedAt.toISOString(), { ...values, password: null, isAdmin: true } as never);
   const updated = calls.find(([kind]) => kind === "update")![1].data as Record<string, unknown>;
   assert.equal(Object.hasOwn(updated, "password"), false, "contraseña vacía conserva la guardada");
   assert.deepEqual(updated.sessionVersion, { increment: 1 }, "cambiar el rol revoca las sesiones");
-  const contactData = { name: "Ana", email: null, phone: null, avatarUrl: null, updatedAt: updated.updatedAt };
-  assert.deepEqual(updated.partner, { upsert: { create: contactData, update: contactData } });
-  assert.ok((updated.updatedAt as Date).getTime() > stored.partner.updatedAt.getTime());
+  assert.equal(updated.name, "Ana");
+  assert.equal(Object.hasOwn(updated, "partner"), false);
+  assert.ok((updated.updatedAt as Date).getTime() > stored.updatedAt.getTime());
 });
 
 test("core.user business rules: password on create, last admin and self-protection", async () => {

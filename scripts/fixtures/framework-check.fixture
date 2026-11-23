@@ -21,18 +21,18 @@ const service = createModelService(recordModel, EnsayoFrameworkRecordRepository,
     { field: "status", label: "Estado", type: "text", sortable: true, groupable: true },
     { field: "notes", label: "Notas", type: "text", sortable: true, groupable: true },
     { field: "partnerId", label: "Contacto", type: "text", sortable: true },
-    { field: "createByUser.login", label: "Creado por", type: "text", widget: "partner", avatarField: "createByUser.partner.avatarUrl", sortable: true },
-    { field: "createByUser.partner.name", label: "Nombre del creador", type: "text", sortable: true },
+    { field: "createByUser.login", label: "Creado por", type: "text", widget: "partner", avatarField: "createByUser.avatarUrl", sortable: true },
+    { field: "createByUser.name", label: "Nombre del creador", type: "text", sortable: true },
     { field: "createdAt", label: "Creado el", type: "datetime", sortable: true },
     { field: "updatedAt", label: "Actualizado el", type: "datetime", sortable: true },
-  ], searchFields: ["name", "notes", "createByUser.login", "createByUser.partner.name"], kanban: { field: "status" }, audit: true,
+  ], searchFields: ["name", "notes", "createByUser.login", "createByUser.name"], kanban: { field: "status" }, audit: true,
 });
 const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 10, filters: [] };
 try {
   const admin = await prisma.user.findUniqueOrThrow({ where: { login: "fixture-admin" } });
   const reader = await prisma.user.create({ data: { login: "fixture-reader", password: await hashPassword("framework-test-only"), isAdmin: false } });
   const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
-  const partner = await prisma.partner.create({ data: { name: "Contacto del ensayo" } });
+  const partner = await prisma.user.create({ data: { login: "fixture-reference", password: await hashPassword("framework-test-only"), name: "Referencia del ensayo" } });
   const before = await prisma.ensayoFrameworkRecord.findFirstOrThrow({ where: { name: "Registro anterior" } });
   assert.equal(before.quantity, 0); assert.equal(before.notes, null); assert.equal(before.status, "draft");
   const defaults = createEnsayoFrameworkRecordDefaults();
@@ -75,12 +75,12 @@ try {
   assert.ok(plainRead.ok); assert.equal(plainRead.audit, undefined);
   const auditList = await service.list(prisma, actor, { ...state, query: admin.login, sort: "createByUser.login", filters: [{ field: "createdAt", operator: "gte", value: created.audit!.createdAt, precision: "instant" }] });
   assert.ok(auditList.ok, JSON.stringify(auditList)); assert.equal(auditList.data.total, 1);
-  const author = auditList.data.rows[0].createByUser as { id: string; login: string; partner: unknown };
-  assert.deepEqual(Object.keys(author).sort(), ["id", "login", "partner"]);
+  const author = auditList.data.rows[0].createByUser as { id: string; login: string; name: string; avatarUrl: string | null };
+  assert.deepEqual(Object.keys(author).sort(), ["avatarUrl", "id", "login", "name"]);
   assert.equal(author.id, admin.id);
   const plainList = await recordService.list(prisma, actor, state); assert.ok(plainList.ok);
   assert.ok(plainList.data.rows.every(row => !Object.hasOwn(row, "createByUser") && !Object.hasOwn(row, "createdAt")));
-  const auditFiltered = await service.list(prisma, actor, { ...state, sort: "createByUser.partner.name", filters: [{ field: "createByUser.login", operator: "eq", value: admin.login }] });
+  const auditFiltered = await service.list(prisma, actor, { ...state, sort: "createByUser.name", filters: [{ field: "createByUser.login", operator: "eq", value: admin.login }] });
   assert.ok(auditFiltered.ok, JSON.stringify(auditFiltered)); assert.equal(auditFiltered.data.total, 2);
   assert.equal((await prisma.ensayoFrameworkRecord.findUniqueOrThrow({ where: { id: created.values.id } })).createBy, admin.id);
   assert.ok(created.values.id); assert.ok(created.values.revision);
@@ -258,14 +258,7 @@ try {
   const raceTarget = [{ id: raceRecord.values.id, revision: raceRecord.values.revision }];
   const deleteRace = await Promise.all([service.remove(prisma, actor, raceTarget), service.remove(prisma, actor, raceTarget)]);
   assert.equal(deleteRace.filter(result => result.ok).length, 1);
-  const freePartner = await prisma.partner.create({ data: { name: "Contacto eliminable" } });
-  const linkedPartner = await prisma.partner.findUniqueOrThrow({ where: { id: partner.id } });
-  const contactBatch = [{ id: freePartner.id, revision: freePartner.updatedAt.toISOString() }, { id: linkedPartner.id, revision: linkedPartner.updatedAt.toISOString() }];
-  assert.equal((await deleteRegisteredRecords(prisma, actor, "partner", contactBatch)).ok, false);
-  assert.equal(await prisma.partner.count({ where: { id: freePartner.id } }), 1); // rollback after first deletion
-  assert.deepEqual(await deleteRegisteredRecords(prisma, actor, "partner", [contactBatch[0]]), { ok: true, deleted: 1 });
-  const keptContact = await prisma.partner.create({ data: { name: "Contacto compartido conservado" } });
-  const disposableUser = await prisma.user.create({ data: { login: "fixture-delete", password: await hashPassword("framework-test-only"), partnerId: keptContact.id } });
+  const disposableUser = await prisma.user.create({ data: { login: "fixture-delete", password: await hashPassword("framework-test-only"), name: "Usuario eliminable" } });
   const userTarget = { id: disposableUser.id, revision: disposableUser.updatedAt.toISOString() };
   const currentAdmin = await prisma.user.findUniqueOrThrow({ where: { id: actor.id } });
   assert.equal((await deleteRegisteredRecords(prisma, actor, "user", [userTarget, { id: actor.id, revision: currentAdmin.updatedAt.toISOString() }])).ok, false);
@@ -273,7 +266,6 @@ try {
   assert.equal((await deleteRegisteredRecords(prisma, actor, "user", [userTarget, { id: editor.id, revision: editor.updatedAt.toISOString() }])).ok, false);
   assert.equal(await prisma.user.count({ where: { id: disposableUser.id } }), 1); // audit FK rejects entire batch
   assert.deepEqual(await deleteRegisteredRecords(prisma, actor, "user", [userTarget]), { ok: true, deleted: 1 });
-  assert.equal(await prisma.partner.count({ where: { id: keptContact.id } }), 1);
   // Default model activity: persisted snapshots, permissions, notes, pagination and rollback.
   const tracked = await service.save(prisma, actor, { ...defaults, name: "Actividad inicial", notes: "VALOR PRIVADO NO AUDITAR" });
   assert.ok(tracked.ok, JSON.stringify(tracked));

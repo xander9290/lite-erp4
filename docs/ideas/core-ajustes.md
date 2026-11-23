@@ -1,3 +1,7 @@
+> Actualización 2026-11-23: core.partner y la app Contactos fueron retirados.
+> Sólo core.user permanece nativo y almacena su perfil. Los ejemplos de Partner
+> siguientes son históricos; ver [User autónomo](../user-autonomo.md).
+
 # Partner/User nativos (`core`) y app Ajustes
 
 **Plan iniciado el 2026-11-18.** Enfoque A aprobado y fases 1–4 implementadas en

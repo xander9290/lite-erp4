@@ -8,7 +8,7 @@ import { useMany2OneSearch } from "../form/useMany2OneSearch";
 export default function RelationFilterValue({ label, load, value, onChange }: { label: string; load: Many2OneLoader; value: string; onChange: (id: string) => void }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const request = { model: "partner" as const, searchFields: [], displayName: "{id}" };
+  const request = { model: "user" as const, searchFields: [], displayName: "{id}" };
   const search = useMany2OneSearch({ ...request, query, page, pageSize: 5 }, true, 250, load);
   const selected = useMany2OneSearch({ ...request, id: value, pageSize: 1 }, Boolean(value), 0, load);
   const data = search.data;

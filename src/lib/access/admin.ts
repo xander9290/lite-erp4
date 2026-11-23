@@ -47,7 +47,7 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
     await assertAdmin(tx, actor);
     const catalog = accessCatalog();
     const [users, members, overrides, states, fieldPolicies, actionPolicies, menus, hiddenMenus] = await Promise.all([
-      tx.user.findMany({ select: { id: true, login: true, active: true, isAdmin: true, partner: { select: { name: true } } }, orderBy: { login: "asc" } }),
+      tx.user.findMany({ select: { id: true, login: true, active: true, isAdmin: true, name: true }, orderBy: { login: "asc" } }),
       tx.accessUserGroup.findMany({ where: { groupId }, select: { userId: true } }),
       tx.accessModelOverride.findMany({ where: { groupId } }),
       tx.accessRuleState.findMany(),
@@ -70,7 +70,7 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
       .map(rule => ({ id: rule.id, label: rule.label, scope: rule.groups ? "grupo" as const : "global" as const, models: rule.models, operations: rule.operations, active: states.find(state => state.ruleId === rule.id)?.active ?? true }));
     return {
       group: { id: group.id, label: group.label, module: group.module, implies: group.implies.map(id => catalog.groups.get(id)?.label ?? id), implicit: false },
-      users: users.map(user => ({ id: user.id, login: user.login, name: user.partner?.name ?? user.login, active: user.active, isAdmin: user.isAdmin, member: memberIds.has(user.id) })),
+      users: users.map(user => ({ id: user.id, login: user.login, name: user.name || user.login, active: user.active, isAdmin: user.isAdmin, member: memberIds.has(user.id) })),
       models, rules,
       menus: menus.map(menu => ({ ...menu, hidden: hiddenMenus.some(row => row.application === menu.application && row.menu === menu.id) })),
       fields: modules.filter(module => module.id === group.module).flatMap(module => module.models.flatMap(model => Object.entries(restrictionFields(model)).map(([field, label]) => ({

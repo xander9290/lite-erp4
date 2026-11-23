@@ -8,8 +8,12 @@ model User {
     darkMode Boolean @default(false) @map("dark_mode")
     sessionVersion Int @default(0) @map("session_version")
 
-    partnerId String?  @unique @map("partner_id")
-    partner   Partner? @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+    name String @default("")
+    email String?
+    phone String?
+    avatarUrl String? @map("avatar_url")
+    // Historical link only. Not a relation or an editable/published model field.
+    legacyPartnerId String? @unique(map: "users_partner_id_key") @map("partner_id")
     recordActivities RecordActivity[] @relation("RecordActivity_actor")
     accessGroups AccessUserGroup[] @relation("AccessUserGroup_user")
 
@@ -24,11 +28,4 @@ model User {
   ubicacionesMunicipioCreatedRecords UbicacionesMunicipio[] @relation("UbicacionesMunicipio_createBy")
   ubicacionesLocalidadCreatedRecords UbicacionesLocalidad[] @relation("UbicacionesLocalidad_createBy")
   // END lite-erp:ubicaciones:User
-
-  // BEGIN lite-erp:contactosextra:User
-  contactosextraPartnertagsCreatedRecords ContactosextraPartnertags[] @relation("ContactosextraPartnertags_createBy")
-  contactosextraCorePartnerSaleUserIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_saleUserId")
-  contactosextraCorePartnerPurchaseUserIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_purchaseUserId")
-  contactosextraCorePartnerCreatedRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_createBy")
-  // END lite-erp:contactosextra:User
 }

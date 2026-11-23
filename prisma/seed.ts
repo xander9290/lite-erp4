@@ -9,7 +9,7 @@ try {
   const password = await hashPassword("1234");
   await prisma.user.upsert({
     where: { login: "admin" }, update: {},
-    create: { login: "admin", password, active: true, isAdmin: true, partner: { create: { name: "Administrador" } } },
+    create: { login: "admin", password, active: true, isAdmin: true, name: "Administrador" },
   });
   console.log("Seed completado: admin existe. Las credenciales y los permisos de una cuenta existente se conservan.");
 } finally { await prisma.$disconnect(); }

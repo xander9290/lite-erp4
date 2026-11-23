@@ -31,6 +31,8 @@ const next = (revision: string) => new Date(Date.parse(revision) + 1000).toISOSt
 function Editor({ creating }: { creating: boolean }) {
   const stored = useRef<Stored | null>(creating ? null : existing);
   const [failAction, setFailAction] = useState(false);
+  const [failSave, setFailSave] = useState(false);
+  const [requireConfirmation, setRequireConfirmation] = useState(true);
   const [readOnly, setReadOnly] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const note = (line: string) => setLog(lines => [...lines.slice(-5), line]);
@@ -38,6 +40,7 @@ function Editor({ creating }: { creating: boolean }) {
 
   async function save(values: Values): Promise<FormViewResult<Values>> {
     await new Promise(resolve => setTimeout(resolve, 300));
+    if (failSave) { note("Guardado rechazado"); return { ok: false, kind: "validation", error: "Simulación: no se pudo guardar; la acción no se ejecuta." }; }
     const current = stored.current;
     if (current && values.revision !== current.revision) return { ok: false, kind: "validation", error: "El registro cambió. Recárgalo." };
     stored.current = { ...values, id: current?.id ?? "venta-nueva", revision: current ? next(current.revision) : "2026-11-14T12:00:00.000Z" };
@@ -58,6 +61,8 @@ function Editor({ creating }: { creating: boolean }) {
 
   return <>
     <div className="flex flex-wrap gap-4 text-sm">
+      <label className="flex items-center gap-2"><input autoComplete="off" type="checkbox" className="checkbox checkbox-sm" checked={requireConfirmation} onChange={event => setRequireConfirmation(event.target.checked)} />Pedir confirmación</label>
+      <label className="flex items-center gap-2"><input autoComplete="off" type="checkbox" className="checkbox checkbox-sm" checked={failSave} onChange={event => setFailSave(event.target.checked)} />Simular fallo del guardado</label>
       <label className="flex items-center gap-2"><input autoComplete="off" type="checkbox" className="checkbox checkbox-sm" checked={failAction} onChange={event => setFailAction(event.target.checked)} />Simular fallo de la acción</label>
       <label className="flex items-center gap-2"><input autoComplete="off" type="checkbox" className="checkbox checkbox-sm" checked={readOnly} onChange={event => setReadOnly(event.target.checked)} />Formulario en consulta</label>
     </div>
@@ -66,8 +71,8 @@ function Editor({ creating }: { creating: boolean }) {
       actions={[{ name: "confirmar", label: "Confirmar" }, { name: "cancelar", label: "Cancelar venta" }]}>
       <FormHeader>
         <div className="flex flex-wrap gap-2">
-          <FormButton action={saleActions.confirmar} />
-          <FormButton action={saleActions.cancelar} variant="secondary" />
+          <FormButton action={saleActions.confirmar} confirm={requireConfirmation ? "¿Quieres confirmar esta venta ficticia?" : undefined} />
+          <FormButton action={saleActions.cancelar} confirm={requireConfirmation ? "¿Quieres cancelar esta venta ficticia?" : undefined} variant="secondary" />
         </div>
         <FieldSelect<Values> name="estado" widget="statebar" options={estados} />
       </FormHeader>
@@ -83,7 +88,7 @@ export default function FormActionsSample() {
   return <section id="form-actions" className="min-w-0 scroll-mt-6 space-y-3">
     <header className="space-y-1">
       <h2 className="text-xl font-semibold">Acciones de formulario</h2>
-      <p className="text-sm text-base-content/60">FormHeader y FormButton con datos ficticios en memoria. El botón valida y guarda si el registro es nuevo o tiene cambios; sólo entonces ejecuta la acción con la revisión guardada. Sin cambios, ejecuta la acción directamente. Si la acción falla, lo guardado se conserva.</p>
+      <p className="text-sm text-base-content/60">Datos ficticios en memoria. Con Pedir confirmación, cancelar no guarda ni ejecuta y conserva el borrador. Aceptar continúa con guardado si corresponde y después acción. Prueba fallos de guardado/acción o desactiva la confirmación para comparar el flujo directo.</p>
     </header>
     <div className="flex flex-wrap gap-2">
       <button type="button" className="btn btn-sm btn-soft" onClick={() => { setCreating(false); setVersion(value => value + 1); }}>Venta existente</button>

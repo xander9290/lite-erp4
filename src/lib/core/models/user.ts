@@ -5,24 +5,22 @@ import type { Prisma } from "@/generated/prisma/client";
 import { newPasswordSchema } from "@/schemas/password.schema";
 import { assertUserChange } from "../../auth/policy";
 import { hashPassword } from "../../auth/password";
-import { Partner, assertContactEmail } from "./partner";
+import { z } from "zod";
 
-const contact = new Partner();
 const loginPattern = /^[a-z0-9._-]+$/;
 const activeAdmins = (tx: Prisma.TransactionClient) => tx.user.count({ where: { active: true, isAdmin: true } });
 
 /**
- * Account of the ERP (Odoo res.users) over the hand-written `users` table. Name, email, phone
- * and avatar live in its Partner (delegated, Odoo _inherits): creating a user creates its
- * contact in the same statement. Session, credentials and login timestamps stay with the
- * authentication code; the password is write-only and hashed by the repository.
+ * Autonomous framework account over the hand-written `users` table.
+ * Identity and profile belong to User; business directories are optional applications.
+ * The password is write-only and hashed by the repository.
  */
 export class User extends Model {
   login = Fields.Text({ label: "Usuario", required: true, unique: true, maxLength: 64, tracking: true, searchable: true });
-  name = contact.name;
-  email = contact.email;
-  phone = contact.phone;
-  avatarUrl = contact.avatarUrl;
+  name = Fields.Text({ label: "Nombre", required: true, trim: true, minLength: 2, maxLength: 120, tracking: true, searchable: true });
+  email = Fields.Text({ label: "Correo", trim: true, maxLength: 254, tracking: true, searchable: true });
+  phone = Fields.Text({ label: "Teléfono", trim: true, maxLength: 40, tracking: true });
+  avatarUrl = Fields.Image({ label: "Avatar", folder: "avatars" });
   password = Fields.Text({ label: "Contraseña", writeOnly: true, trim: false, maxLength: 200 });
   active = Fields.Boolean({ label: "Activo", default: true, tracking: true });
   isAdmin = Fields.Boolean({ label: "Administrador", default: false, tracking: true });
@@ -38,7 +36,9 @@ export class User extends Model {
   }
 
   @constraint("email")
-  validEmail(values: ReactionValues) { assertContactEmail(values.email); }
+  validEmail(values: ReactionValues) {
+    if (typeof values.email === "string" && values.email && !z.email().safeParse(values.email).success) throw new ModelValidationError("Revisa el correo.", { email: "Escribe un correo válido." });
+  }
 
   @constraint("password")
   validPassword(values: ReactionValues) {

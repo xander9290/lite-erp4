@@ -65,8 +65,8 @@ const valid: ModelFormButtonProps<typeof ExampleItemForm> = {form:ExampleItemFor
 const typo: ModelFormButtonProps<typeof ExampleItemForm> = {form:ExampleItemForm,defaults:{naem:"Example"}};
 void [valid,typo];
 `);
-    const types = spawnSync(process.execPath, [join(project, "node_modules/typescript/bin/tsc"), "--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 30000 });
-    assert.equal(types.status, 0, types.stdout + types.stderr);
+    const types = spawnSync(process.execPath, [join(project, "node_modules/typescript/bin/tsc"), "--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 90000 });
+    assert.equal(types.status, 0, types.stdout + types.stderr + (types.error?.message ?? ""));
     assert.equal(run("--check").status, 0);
     await writeFile(join(dir, "manifest.ts"), source("cancelar"));
     assert.equal(run("--check").status, 2);

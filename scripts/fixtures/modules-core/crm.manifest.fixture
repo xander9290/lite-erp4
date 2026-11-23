@@ -2,14 +2,14 @@ import "server-only";
 import { Fields } from "@/lib/orm";
 import { defineModule } from "@/lib/modules/define";
 import { extendModel } from "@/lib/modules/extend";
-import { Partner } from "@/lib/core/models/partner";
+import { User } from "@/lib/core/models/user";
 
-/** Extends the native Partner: its fields live in crm_core_partner, owned by this module. */
-const PartnerCrm = extendModel(Partner, Base => {
-  class PartnerCrm extends Base {
+/** Extends the native User: its fields live in crm_core_user, owned by this module. */
+const UserCrm = extendModel(User, Base => {
+  class UserCrm extends Base {
     empresa = Fields.Text({ label: "Empresa", maxLength: 80, tracking: true });
   }
-  return PartnerCrm;
+  return UserCrm;
 });
 
-export default defineModule({ id: "crm", name: "CRM", icon: "users", models: {}, extends: { "core.partner": PartnerCrm } });
+export default defineModule({ id: "crm", name: "CRM", icon: "users", models: {}, extends: { "core.user": UserCrm } });

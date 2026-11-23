@@ -141,7 +141,7 @@ test("relational bindings compile against an isolated real Prisma client without
   const project = process.cwd(), root = await mkdtemp(join(await realpath(tmpdir()), "display-binding-"));
   try {
     await symlink(join(project, "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
-    const baseline = `generator client {\n provider = "prisma-client"\n output = "./src/generated/prisma"\n}\ndatasource db {\n provider = "postgresql"\n}\nmodel User {\n id String @id\n login String\n partnerId String?\n partner Partner? @relation(fields: [partnerId], references: [id])\n}\nmodel Partner {\n id String @id\n name String\n avatarUrl String?\n users User[]\n}\n`;
+    const baseline = `generator client {\n provider = "prisma-client"\n output = "./src/generated/prisma"\n}\ndatasource db {\n provider = "postgresql"\n}\nmodel User {\n id String @id\n login String\n name String\n avatarUrl String?\n}\n`;
     const files = generateModule(profile, { schema: baseline, owners: {} });
     await writeFile(join(root, "schema.prisma"), 'generator client {\n provider = "prisma-client"\n output = "./src/generated/prisma"\n}\n' + files["schema.preview.prisma"]);
     await writeFile(join(root, "package.json"), '{"type":"module"}');

@@ -64,7 +64,7 @@ async function renderIndex(ids: readonly string[]) {
 try {
   await database.connect();
   await database.query(`CREATE SCHEMA "${schema}"`); created = true;
-  for (const directory of ["src", "scripts", "public", "prisma/models", "prisma/migrations"]) await cp(join(project, directory), join(root, directory), { recursive: true });
+  for (const directory of ["src", "scripts", "public", "docs", "prisma/models", "prisma/migrations"]) await cp(join(project, directory), join(root, directory), { recursive: true });
   for (const file of ["package.json", "package-lock.json", "tsconfig.json", "next-env.d.ts", "prisma7.config.ts", "prisma/.orm-installations.json", ".gitignore"]) await cp(join(project, file), join(root, file));
   await symlink(join(project, "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
   await writeFile(join(root, ".env.local"), `DATABASE_URL=${JSON.stringify(url.toString())}\nAUTH_SECRET=${randomBytes(32).toString("hex")}\nAUTH_TRUST_HOST=true\nAUTH_URL=http://127.0.0.1:3032\n`, { mode: 0o600 });
@@ -199,28 +199,23 @@ try {
     await cp(join(project, "scripts/fixtures/anidados-check.fixture"), join(root, "anidados-check.ts"));
     console.log(tsx(join(root, "anidados-check.ts"), [], "nested lines check").trim());
   } else if (process.argv.includes("--core-only")) {
-    // Native core: modules relate to and extend Partner without touching the partners table.
+    // Only User is native; modules may relate to and extend it.
     const fixture = join(project, "scripts/fixtures/modules-core");
-    const partnerBefore = await readFile(join(root, "prisma/models/partner.prisma"), "utf8");
     for (const id of ["ventas", "crm"]) {
       await mkdir(join(root, "src/modules", id), { recursive: true });
       await cp(join(fixture, `${id}.manifest.fixture`), join(root, "src/modules", id, "manifest.ts"));
       tsx(join(root, "scripts/orm-install.ts"), [id, "--write"], `orm:install ${id}`);
     }
-    const partnerAfter = await readFile(join(root, "prisma/models/partner.prisma"), "utf8");
-    assert.match(partnerAfter, /BEGIN lite-erp:ventas:Partner[\s\S]*ventasClienteContactoIdRecords VentasCliente\[\]/);
-    assert.match(partnerAfter, /BEGIN lite-erp:crm:Partner[\s\S]*crmCorePartnerRecordIdRecords CrmCorePartner\?/);
-    assert.equal(partnerAfter.replace(/\n  \/\/ BEGIN lite-erp:(ventas|crm):Partner[\s\S]*?\/\/ END lite-erp:\1:Partner\n/g, ""), partnerBefore, "partner.prisma sólo recibe inversas marcadas");
     const sql = command("prisma", ["migrate", "diff", "--from-config-datasource", "--to-schema", join(root, "prisma/models"), "--script", "--config", join(root, "prisma7.config.ts")], "core migration diff");
     assert.match(sql, /CREATE TABLE "ventas_cliente"/);
-    assert.match(sql, /CREATE TABLE "crm_core_partner"/);
-    assert.match(sql, /REFERENCES "partners"\("id"\) ON DELETE CASCADE/);
+    assert.match(sql, /CREATE TABLE "crm_core_user"/);
+    assert.match(sql, /REFERENCES "users"\("id"\) ON DELETE CASCADE/);
     assert.doesNotMatch(sql, /ALTER TABLE "partners"|ALTER TABLE "users"|\bDROP\b|\bTRUNCATE\b/i);
     await mkdir(join(root, "prisma/migrations/20990204000000_core_fixture"));
     await writeFile(join(root, "prisma/migrations/20990204000000_core_fixture/migration.sql"), sql);
     prisma(["migrate", "deploy"]); prisma(["generate"]);
     await writeFile(join(root, "src/modules/index.ts"), `import "server-only";\nimport type { ModuleDefinition } from "@/lib/modules/define";\nimport ventas from "./ventas/manifest";\nimport crm from "./crm/manifest";\nexport const modules: readonly ModuleDefinition[] = [ventas, crm];\n`);
-    console.log("✓ Módulos sobre core instalados: sólo tablas propias; partners/users sin ALTER y con inversas marcadas.");
+    console.log("✓ Módulos sobre core instalados: sólo tablas propias; users sin ALTER y con inversas marcadas.");
     command("next", ["typegen"], "Next route types");
     command("tsc", ["--noEmit", "--incremental", "false"], "core fixture types");
     await cp(join(project, "scripts/fixtures/core-check.fixture"), join(root, "core-check.ts"));
@@ -331,7 +326,7 @@ try {
   if (process.argv.includes("--serve")) {
     const credentials = randomBytes(9).toString("base64url");
     // Disposable admin in the temporary schema only, for manual review of the default views.
-    await writeFile(join(root, "serve-admin.ts"), `import { config } from "dotenv"; config({ path: ".env.local", quiet: true });\nconst { prisma } = await import("./src/lib/prisma");\nconst { hashPassword } = await import("./src/lib/auth/password");\nawait prisma.user.create({ data: { login: "serve-admin", password: await hashPassword(process.argv[2]), isAdmin: true, partner: { create: { name: "Revisión visual" } } } });\nawait prisma.$disconnect();\n`);
+    await writeFile(join(root, "serve-admin.ts"), `import { config } from "dotenv"; config({ path: ".env.local", quiet: true });\nconst { prisma } = await import("./src/lib/prisma");\nconst { hashPassword } = await import("./src/lib/auth/password");\nawait prisma.user.create({ data: { login: "serve-admin", password: await hashPassword(process.argv[2]), isAdmin: true, name: "Revisión visual" } });\nawait prisma.$disconnect();\n`);
     tsx(join(root, "serve-admin.ts"), [credentials], "serve admin");
     await writeFile(join(root, ".serve-login"), `usuario: serve-admin\ncontraseña: ${credentials}\n`, { mode: 0o600 });
     const launch = () => spawn(process.execPath, [join(root, "node_modules/next/dist/bin/next"), "dev", "-p", "3032", "-H", "127.0.0.1"], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });

@@ -9,7 +9,7 @@ const pageSize = 20;
 export type ActivityLabelResolver = (target: string, ids: readonly string[]) => Promise<ReadonlyMap<string, string>>;
 const publicSelect = {
   id: true, kind: true, createdAt: true, body: true, changes: true,
-  actor: { select: { id: true, login: true, partner: { select: { name: true, avatarUrl: true } } } },
+  actor: { select: { id: true, login: true, name: true, avatarUrl: true } },
 } satisfies Prisma.RecordActivitySelect;
 
 export async function recordActivity(tx: Prisma.TransactionClient, model: string, actorId: string, metadata: Readonly<Record<string, FieldMetadata>>, before: Record<string, unknown> | null, after: { id: string; [key: string]: unknown }, label?: string) {
@@ -37,7 +37,7 @@ export async function readActivity(tx: Prisma.TransactionClient, model: string, 
     const changes = parsed.success ? parsed.data.filter(change => Object.hasOwn(metadata, change.field) && metadata[change.field].tracking && !metadata[change.field].sensitive) : [];
     if (record.kind === "update" && !changes.length && !record.body) return [];
     return [{ id: record.id, kind: record.kind as ActivityEntry["kind"], createdAt: record.createdAt.toISOString(),
-      author: { id: record.actor.id, login: record.actor.login, name: record.actor.partner?.name ?? record.actor.login, avatarUrl: record.actor.partner?.avatarUrl ?? null },
+      author: { id: record.actor.id, login: record.actor.login, name: record.actor.name || record.actor.login, avatarUrl: record.actor.avatarUrl ?? null },
       // Update entries carry the action label (business actions); notes carry their text.
       body: record.kind === "note" || record.kind === "update" ? record.body : null, changes: record.kind === "update" ? changes : [] }];
   });

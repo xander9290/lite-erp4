@@ -125,10 +125,11 @@ test("invisible inherits metadata, permits explicit overrides and keeps register
 test("FormButton hides actions outside the published capability snapshot and all actions in consultation", () => {
   const context = { model: "SamplePolicy", header: null, locked: false, readOnly: false, actions: [{ name: "allowed", label: "Permitida" }], run: async () => true, running: null };
   const actions = defineActionReferences("SamplePolicy", ["allowed", "denied"]);
-  const buttons = <><FormButton action={actions.allowed} /><FormButton action={actions.denied}>No permitida</FormButton></>;
+  const buttons = <><FormButton action={actions.allowed} confirm="¿Ejecutar permitida?" /><FormButton action={actions.denied}>No permitida</FormButton></>;
   const html = renderToStaticMarkup(<FormActionsContext.Provider value={context}>{buttons}</FormActionsContext.Provider>);
   assert.match(html, /Permitida/);
   assert.doesNotMatch(html, /No permitida/);
+  assert.doesNotMatch(html, /confirm=|¿Ejecutar permitida\?/);
   const readonly = renderToStaticMarkup(<FormActionsContext.Provider value={{ ...context, readOnly: true }}>{buttons}</FormActionsContext.Provider>);
   assert.doesNotMatch(readonly, /<button/);
   const other = defineActionReferences("OtherModel", ["allowed"]);

@@ -51,7 +51,7 @@ function Editor() {
   };
   return <>
     <FormView title="Ticket ficticio con parámetros" methods={methods} actionModel="SampleParameterTicket" actions={actions} onSubmit={save} runAction={run}>
-      <FormHeader><FormButton action={ticketActions.cerrar} invisible={estado === "cerrado"} /></FormHeader>
+      <FormHeader><FormButton action={ticketActions.cerrar} confirm="¿Quieres iniciar el cierre de este ticket ficticio?" invisible={estado === "cerrado"} /></FormHeader>
       <FormGroup legend="Datos del ticket">
         <FieldText<Values> name="name" label="Título del ticket" />
         <FieldText<Values> name="resolucion" label="Resolución guardada" widget="long" readOnly />
@@ -66,7 +66,7 @@ export default function ActionParametersSample() {
   const [version, setVersion] = useState(0);
   return <section id="action-parameters" className="min-w-0 scroll-mt-6 space-y-3">
     <h2 className="text-xl font-semibold">Acciones con parámetros</h2>
-    <p className="text-sm">Demo en memoria, sin BD ni avisos reales. Cerrar ticket pide una nota; Cancelar no guarda ni ejecuta. Modifica el título para probar guardado → acción. La nota «rechazar» simula un error del servidor; al reintentar conserva los argumentos confirmados.</p>
+    <p className="text-sm">Demo en memoria, sin BD ni avisos reales. Cerrar ticket primero pide confirmación y después una nota; cancelar cualquiera no guarda ni ejecuta. Modifica el título para probar guardado → acción. La nota «rechazar» simula un error del servidor; al reintentar conserva los argumentos confirmados.</p>
     <button type="button" className="btn btn-soft btn-sm" onClick={() => setVersion(value => value + 1)}>Restablecer parámetros de ejemplo</button>
     <Editor key={version} />
   </section>;

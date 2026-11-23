@@ -1,3 +1,7 @@
+> Actualización 2026-11-23: core.partner y la app Contactos fueron retirados.
+> Sólo core.user permanece nativo y almacena su perfil. Los ejemplos de Partner
+> siguientes son históricos; ver [User autónomo](user-autonomo.md).
+
 # Desarrollo de aplicaciones: manifests, datos y operaciones de Contactos
 
 La primera convención del ERP ya está implementada: cada aplicación tiene un

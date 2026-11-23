@@ -9,8 +9,8 @@ export default function RelationFilterLabel({ filter, load }: { filter: ListFilt
   const single = filter.operator === "eq" || filter.operator === "neq";
   const multiple = filter.operator === "any" || filter.operator === "all";
   const ids = multiple ? many2manyFilterIds(filter.value) : [];
-  const one = useMany2OneSearch({ model: "partner", searchFields: [], displayName: "{id}", id: filter.value, pageSize: 1 }, single && Boolean(filter.value), 0, load);
-  const many = useMany2OneSearch({ model: "partner", searchFields: [], displayName: "{id}", ids, pageSize: Math.max(1, Math.min(25, ids.length)) }, multiple && ids.length > 0, 0, load);
+  const one = useMany2OneSearch({ model: "user", searchFields: [], displayName: "{id}", id: filter.value, pageSize: 1 }, single && Boolean(filter.value), 0, load);
+  const many = useMany2OneSearch({ model: "user", searchFields: [], displayName: "{id}", ids, pageSize: Math.max(1, Math.min(25, ids.length)) }, multiple && ids.length > 0, 0, load);
   const names = multiple ? ids.map(id => many.data?.items.find(item => item.value === id)?.label ?? "Registro").join(", ") : "";
   return <>{filterOperatorLabels[filter.operator]}{single ? `: ${one.data?.items.find(item => item.value === filter.value)?.label ?? "Registro seleccionado"}` : multiple ? `: ${names}` : ""}</>;
 }

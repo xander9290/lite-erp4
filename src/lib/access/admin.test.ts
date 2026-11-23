@@ -18,7 +18,7 @@ function fixture(isAdmin = true) {
     accessModelOverride: {
       findMany: async () => [
         { groupId: "ubicaciones.gestor", model: "ubicaciones.pais", ...adjusted, canImport: true, canExport: false },
-        { groupId: "ubicaciones.gestor", model: "core.partner", ...adjusted, canImport: true, canExport: false },
+        { groupId: "ubicaciones.gestor", model: "core.user", ...adjusted, canImport: true, canExport: false },
       ],
       upsert: async (args: unknown) => { updates.push(args); },
       deleteMany: async (args: unknown) => { updates.push(args); },
@@ -41,7 +41,7 @@ test("field policies reject foreign, unknown and duplicate fields before writing
   const f = fixture();
   const policy = { noRead: true, noWrite: false, invisible: false, readOnly: false };
   const valid = { model: "ubicaciones.pais", field: "name", policy };
-  for (const changes of [[valid, { ...valid, model: "core.partner" }], [{ ...valid, field: "password" }], [valid, valid]]) {
+  for (const changes of [[valid, { ...valid, model: "core.user" }], [{ ...valid, field: "password" }], [valid, valid]]) {
     await assert.rejects(setFieldRestrictions(f.prisma, actor, "ubicaciones.gestor", changes), /No tienes permiso/);
   }
   assert.deepEqual(f.updates, []);
@@ -61,7 +61,7 @@ test("only administrators change field policies; actions must be declared by the
 test("foreign model in a mixed permission batch rejects every write", async () => {
   const f = fixture();
   await assert.rejects(setModelAccess(f.prisma, actor, "ubicaciones.gestor", new Map([
-    ["ubicaciones.pais", adjusted], ["core.partner", adjusted],
+    ["ubicaciones.pais", adjusted], ["core.user", adjusted],
   ])), /No tienes permiso/);
   assert.deepEqual(f.updates, []);
 });

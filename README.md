@@ -45,30 +45,25 @@ Su fuente única es [Crear módulos](docs/crear-modulos.md).
 
 La tutoría de **Tickets** está pausada y el módulo se retiró el 2026-11-18.
 Su [guía](docs/tutorial-tickets.md) conserva el recorrido histórico y se retomará
-desde cero cuando el usuario lo indique. La prioridad actual es consolidar
-Partner/User nativos en `core` y la app **Ajustes**; fases 1–4 implementadas.
-Fase 5 en curso: Contactos sobre `core.partner`, con revisiones compartidas
-entre Usuarios y Perfil. `contactosextra` añade dirección básica, RFC y País/Estado;
-Ubicaciones contiene País/Estado/Municipio/Localidad. Los dominios encadenados ya
-están aplicados y Contactos utiliza inserciones de formulario y lista. Motor de
-dominios: [contrato](docs/dominios-modelos.md); composición de vistas:
-[inserciones](docs/inserciones-vistas.md). La lectura automática para usuarios
-internos fue retirada el 2026-11-21: los catálogos se consultan mediante relaciones
-publicadas desde un modelo autorizado. Estados de México importados por el
-usuario; falta comprobar la
-repetición sin cambios, después importar Municipios y Localidades.
-[Estado y siguiente paso](docs/estado-proyecto.md#progreso-guardado-2026-11-21-grupos-por-módulo).
+desde cero cuando el usuario lo indique. Sólo `core.user` permanece nativo:
+Usuarios, Perfil, autenticación y auditoría usan los datos propios de `users`.
+Contactos/core.partner fueron retirados y el usuario desinstaló el piloto
+contactosextra. Directorio será una aplicación declarativa futura, todavía no
+creada. Ubicaciones mantiene País/Estado/Municipio/Localidad.
+
+La transición conserva contactos antiguos como archivo histórico y prepara una
+migración que copia el perfil a users. Antes de ejecutar esta versión contra una
+base existente, revisar su activación en [User autónomo](docs/user-autonomo.md)
+y el estado local en [continuidad](docs/estado-proyecto.md).
 
 Los dominios de relaciones pueden excluir el registro actual con
 `d.neq("id", d.record.id)`, también en extensiones; sin ID al crear no excluyen
 candidatos por esa condición. [Contrato y ejemplo](docs/dominios-modelos.md#identidad-del-registro-actual).
 
 Las colecciones de consulta admiten `<ModelChildCollections openIn="modal" />`:
-creación y edición independientes con el formulario y extensiones del hijo,
-cierre protegido y refresco de la lista. Para un layout independiente:
-`npm run eject:view -- contactosextra core.partner modal` (ya generado en este
-proyecto; editar `views/CorePartnerModal.tsx`). `views.modal` conserva `views.form`
-y sus inserciones de página. [Formularios en modal](docs/formularios-modal.md).
+creación y edición independientes con el formulario del hijo, cierre protegido y
+refresco de la lista. `eject:view -- módulo modelo modal` prepara un layout
+independiente; conserva la presentación de página. [Contrato](docs/formularios-modal.md).
 
 Para abrir creación/edición desde TSX, usar `ModelFormButton` con referencias de
 `src/generated/orm/forms` (orm:sync o `orm:generate -- id --forms-only --write`).

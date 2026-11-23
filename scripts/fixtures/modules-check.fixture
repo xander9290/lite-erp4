@@ -9,7 +9,7 @@ const { fieldFromMetadata } = await import("./src/lib/modules/fields");
 // Runs only inside the disposable project/schema created by modules.integration.ts.
 const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 10, filters: [] };
 const password = await hashPassword("modules-test-only");
-const admin = await prisma.user.create({ data: { login: "modules-admin", password, isAdmin: true, partner: { create: { name: "Administrador de prueba" } } } });
+const admin = await prisma.user.create({ data: { login: "modules-admin", password, isAdmin: true, name: "Administrador de prueba" } });
 const reader = await prisma.user.create({ data: { login: "modules-reader", password, isAdmin: false } });
 const actor = { id: admin.id, sessionVersion: admin.sessionVersion };
 const readerActor = { id: reader.id, sessionVersion: reader.sessionVersion };

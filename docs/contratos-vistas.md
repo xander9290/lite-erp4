@@ -145,7 +145,7 @@ canónica `actions/recurso.actions.ts#lookupRecords`. Comprueba el contrato expl
 use-server/async, createQueryActions con requireAdmin y el repositorio del destino.
 No concede autorización por el nombre de una clase. La ausencia/ambigüedad se
 informa; `--lookup campo=modulo#exportAsync` conserva la alternativa personalizada.
-Partner/User mantienen sus proveedores legacy autorizados. No se añaden dependencias
+User mantiene su proveedor manual autorizado. No se añaden dependencias
 de aplicación ni permisos automáticamente. Los modelos con ciclos pueden necesitar
 crear primero sus acciones y configurar un proveedor explícito.
 

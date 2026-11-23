@@ -32,7 +32,7 @@ class Client {
   async session() { return (await this.request("/api/auth/session")).json(); }
 }
 
-let fixtureId: string | undefined, fixturePartnerId: string | null | undefined;
+let fixtureId: string | undefined;
 try {
   const anonymous = new Client();
   for (const path of ["/erp", "/erp/ajustes/usuarios", "/erp/ajustes/usuarios/nuevo"]) {
@@ -47,11 +47,11 @@ try {
   const admin = await prisma.user.findUniqueOrThrow({ where: { login: "admin" } });
   assert.equal(admin.active && admin.isAdmin, true);
   assert.equal(await verifyPassword("1234", admin.password), true);
-  const counts = await Promise.all([prisma.user.count(), prisma.partner.count()]);
+  const counts = await prisma.user.count();
   execFileSync(process.execPath, ["--import", "tsx", "prisma/seed.ts"], { stdio: "pipe" });
   const seededAgain = await prisma.user.findUniqueOrThrow({ where: { login: "admin" } });
   assert.deepEqual(seededAgain, admin);
-  assert.deepEqual(await Promise.all([prisma.user.count(), prisma.partner.count()]), counts);
+  assert.deepEqual(await prisma.user.count(), counts);
   const bad = await anonymous.login("admin", "wrong-password");
   assert.ok(String(bad.url).includes("CredentialsSignin"));
   assert.equal(await anonymous.session(), null);
@@ -61,17 +61,9 @@ try {
   assert.equal(session.user.id, admin.id); assert.equal(session.user.isAdmin, true);
   assert.equal(JSON.stringify(session).includes("password"), false);
   const authenticated = await adminClient.request("/erp/ajustes/usuarios");
-  for (const path of ["/erp/contactos", "/erp/contactos/nuevo"]) {
-    const contactPage = await adminClient.request(path);
-    const html = await contactPage.text();
-    assert.equal(contactPage.status, 200, path);
-    assert.doesNotMatch(html, /Contrato incompatible|No tienes permiso para abrir/);
-    if (path.endsWith("/nuevo")) {
-      assert.match(html, /name="name"/);
-      assert.match(html, /name="email"/);
-      assert.doesNotMatch(html, /name="password"|name="isAdmin"/);
-    }
-  }
+  const retiredContacts = await adminClient.request("/erp/contactos");
+  assert.ok([200, 404].includes(retiredContacts.status));
+  assert.match(await retiredContacts.text(), /This page could not be found|NEXT_HTTP_ERROR_FALLBACK;404/, "streamed notFound also returns HTTP 200");
   assert.equal(authenticated.status, 200); await authenticated.text();
   const newUserPage = await adminClient.request("/erp/ajustes/usuarios/nuevo");
   const newUserHtml = await newUserPage.text();
@@ -93,18 +85,15 @@ try {
   const saved = await saveUserRecord(prisma, actor, { ...newUserDefaults, login, name: "Prueba temporal de autenticación", password: "test1234", avatarUrl });
   assert.equal(saved.ok, true);
   fixtureId = saved.values.id;
-  const fixture = await prisma.user.findUniqueOrThrow({ where: { id: fixtureId } }); fixturePartnerId = fixture.partnerId;
-  assert.ok(fixturePartnerId); assert.equal(await verifyPassword("test1234", fixture.password), true);
+  const fixture = await prisma.user.findUniqueOrThrow({ where: { id: fixtureId } });
+  assert.equal(await verifyPassword("test1234", fixture.password), true);
   assert.equal(saved.values.password, ""); assert.equal(JSON.stringify(saved.values).includes(fixture.password), false);
   assert.equal(saved.values.avatarUrl, avatarUrl);
-  assert.equal((await prisma.partner.findUniqueOrThrow({ where: { id: fixturePartnerId! } })).avatarUrl, avatarUrl);
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: fixtureId } })).avatarUrl, avatarUrl);
   const listState = { query: login, page: 1, pageSize: 10, sort: "id", direction: "asc" as const, filters: [] };
-  const listedUsers = await listRegistry.user({ model: "user", searchFields: ["login"], columns: [{ field: "partner.name", label: "Contacto", widget: "partner", avatarField: "partner.avatarUrl" }] }, listState);
+  const listedUsers = await listRegistry.user({ model: "user", searchFields: ["login"], columns: [{ field: "name", label: "Contacto", widget: "partner", avatarField: "avatarUrl" }] }, listState);
   const listedUser = listedUsers.rows.find(row => row.id === fixtureId);
-  assert.ok(listedUser?.partner && typeof listedUser.partner === "object" && !Array.isArray(listedUser.partner));
-  assert.equal(listedUser.partner.avatarUrl, avatarUrl); assert.equal(Object.hasOwn(listedUser, "password"), false);
-  const listedPartners = await listRegistry.partner({ model: "partner", searchFields: ["name"], columns: [{ field: "name", label: "Contacto", widget: "partner", avatarField: "avatarUrl" }] }, { ...listState, query: saved.values.name });
-  assert.equal(listedPartners.rows.find(row => row.id === fixturePartnerId)?.avatarUrl, avatarUrl);
+  assert.equal(listedUser?.avatarUrl, avatarUrl); assert.equal(Object.hasOwn(listedUser!, "password"), false);
 
   const regular = new Client(); await regular.login(login, "test1234");
   assert.equal((await regular.session()).user.isAdmin, false);
@@ -118,20 +107,14 @@ try {
   assert.equal((await saveOwnProfile(prisma, ownActor, { ...ownProfile.values, id: admin.id, isAdmin: true })).ok, false);
   const ownSaved = await saveOwnProfile(prisma, ownActor, { ...ownProfile.values, name: "Mi perfil actualizado", phone: "5551234567" });
   assert.equal(ownSaved.ok, true);
-  assert.equal((await prisma.partner.findUniqueOrThrow({ where: { id: fixturePartnerId! } })).phone, "5551234567");
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: fixtureId } })).phone, "5551234567");
   assert.equal((await regular.session()).user.name, "Mi perfil actualizado");
   assert.equal((await saveOwnProfile(prisma, ownActor, ownProfile.values)).ok, false);
   const partnerSnapshot = await loadOwnProfile(prisma, ownActor);
-  await prisma.partner.update({ where: { id: fixturePartnerId! }, data: { phone: "5557654321", updatedAt: new Date(Date.parse(partnerSnapshot.values.partnerRevision!) + 1000) } });
+  await prisma.user.update({ where: { id: fixtureId }, data: { phone: "5557654321", updatedAt: new Date(Date.parse(partnerSnapshot.values.revision) + 1000) } });
   assert.equal((await saveOwnProfile(prisma, ownActor, partnerSnapshot.values)).ok, false);
   assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: fixture.id } })).isAdmin, false);
   const forbiddenPage = await regular.request("/erp/ajustes/usuarios");
-  const readOnlyContacts = await regular.request("/erp/contactos");
-  assert.equal(readOnlyContacts.status, 200);
-  const forbiddenContactCreate = await regular.request("/erp/contactos/nuevo");
-  const forbiddenContactHtml = await forbiddenContactCreate.text();
-  assert.match(forbiddenContactHtml, /No tienes permiso para abrir/);
-  assert.doesNotMatch(forbiddenContactHtml, /name="name"/);
   assert.ok((await forbiddenPage.text()).includes("Necesitas permisos de administrador"));
   const deniedModules = await regular.request("/erp/ajustes/modulos");
   assert.ok((await deniedModules.text()).includes("Necesitas permisos de administrador"));
@@ -152,7 +135,7 @@ try {
 
   const cleared = await saveUserRecord(prisma, actor, { ...edited.values, avatarUrl: null });
   assert.equal(cleared.ok, true);
-  assert.equal((await prisma.partner.findUniqueOrThrow({ where: { id: fixturePartnerId! } })).avatarUrl, null);
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: fixtureId } })).avatarUrl, null);
   assert.equal((await regular.session()).user.image, null);
   current = cleared.values;
   const changedPassword = await saveUserRecord(prisma, actor, { ...current, password: "change12" });
@@ -191,6 +174,5 @@ try {
   console.log("Integración correcta: proxy, login, sesión, permisos, perfiles propios, contraseñas, altas/edición, conflictos, revocación, cuentas inactivas, cookies alteradas y logout.");
 } finally {
   if (fixtureId) await prisma.user.deleteMany({ where: { id: fixtureId } });
-  if (fixturePartnerId) await prisma.partner.deleteMany({ where: { id: fixturePartnerId } });
   await prisma.$disconnect();
 }

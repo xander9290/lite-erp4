@@ -10,15 +10,15 @@ import { nextRevision } from "../orm/revision";
 type Actor = { id: string; sessionVersion: number };
 const passwordAttempts = createLoginLimiter(5);
 const profileSelect = { id: true, active: true, sessionVersion: true, login: true, isAdmin: true, updatedAt: true,
-  partner: { select: { name: true, email: true, phone: true, avatarUrl: true, updatedAt: true } } } satisfies Prisma.UserSelect;
+  name: true, email: true, phone: true, avatarUrl: true } satisfies Prisma.UserSelect;
 type ProfileUser = Prisma.UserGetPayload<{ select: typeof profileSelect }>;
 function checkUser(user: ProfileUser | null, actor: Actor): asserts user is ProfileUser {
   if (!user?.active || user.sessionVersion !== actor.sessionVersion) throw new AccessError("UNAUTHENTICATED");
 }
 function profileRecord(user: ProfileUser): ProfileRecord {
   return { account: { login: user.login, isAdmin: user.isAdmin }, values: {
-    revision: user.updatedAt.toISOString(), partnerRevision: user.partner?.updatedAt.toISOString() ?? null,
-    name: user.partner?.name ?? user.login, email: user.partner?.email ?? "", phone: user.partner?.phone ?? "", avatarUrl: user.partner?.avatarUrl ?? null,
+    revision: user.updatedAt.toISOString(),
+    name: user.name || user.login, email: user.email ?? "", phone: user.phone ?? "", avatarUrl: user.avatarUrl ?? null,
   } };
 }
 
@@ -37,11 +37,11 @@ export async function saveOwnProfile(prisma: PrismaClient, actor: Actor, input: 
       const user = await tx.user.findUnique({ where: { id: actor.id }, select: profileSelect });
       checkUser(user, actor);
       const current = profileRecord(user).values;
-      if (current.revision !== parsed.data.revision || current.partnerRevision !== parsed.data.partnerRevision) return null;
+      if (current.revision !== parsed.data.revision) return null;
       const { name, email, phone, avatarUrl } = parsed.data;
-      const updatedAt = nextRevision(user.updatedAt, ...(user.partner ? [user.partner.updatedAt] : []));
+      const updatedAt = nextRevision(user.updatedAt);
       const contact = { name, email: email || null, phone: phone || null, avatarUrl, updatedAt };
-      return tx.user.update({ where: { id: actor.id, updatedAt: user.updatedAt }, data: { updatedAt, partner: user.partner ? { update: contact } : { create: contact } }, select: profileSelect });
+      return tx.user.update({ where: { id: actor.id, updatedAt: user.updatedAt }, data: contact, select: profileSelect });
     }, { isolationLevel: "Serializable" });
     return result ? { ok: true, values: profileRecord(result).values, message: "Perfil actualizado." }
       : { ok: false, kind: "validation", error: "Tu perfil cambió desde que lo abriste. Recarga los datos antes de guardar." };

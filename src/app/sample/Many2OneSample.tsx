@@ -11,7 +11,7 @@ import { searchMany2One } from "@/lib/many2one/actions";
 import type { Many2OneRecord } from "@/lib/many2one/types";
 import { many2OneSampleSchema, type Many2OneSampleInput, type Many2OneSampleValues } from "./sample.schema";
 
-const defaults: Many2OneSampleInput = { userId: null, partnerId: null };
+const defaults: Many2OneSampleInput = { userId: null, secondaryUserId: null };
 
 export default function Many2OneSample() {
   const methods = useForm<Many2OneSampleInput, unknown, Many2OneSampleValues>({ resolver: zodResolver(many2OneSampleSchema), defaultValues: defaults });
@@ -24,11 +24,11 @@ export default function Many2OneSample() {
   async function loadExample() {
     setLoading(true); setNotice(null);
     try {
-      const result = await searchMany2One({ model: "user", searchFields: ["login", "partner.name"], displayName: "[{login}] {partner.name}", pageSize: 1 });
+      const result = await searchMany2One({ model: "user", searchFields: ["login", "name"], displayName: "[{login}] {name}", pageSize: 1 });
       if (!result.ok) { setNotice(result.error); return; }
       const first = result.items[0];
       if (!first) { setNotice("Aún no hay usuarios en la base de datos. Puedes explorar la búsqueda y su estado vacío."); return; }
-      methods.reset({ userId: first.value, partnerId: first.record.partner?.id ?? null });
+      methods.reset({ userId: first.value, secondaryUserId: null });
       setChange(null); setSubmitted(null);
     } catch { setNotice("No pudimos cargar el ejemplo. Intenta nuevamente."); }
     finally { setLoading(false); }
@@ -47,15 +47,15 @@ export default function Many2OneSample() {
 
         <FormLayout methods={methods} onSubmit={setSubmitted} onInvalid={() => setSubmitted(null)} aria-labelledby="field-many2one-title">
           <FormGroup legend="Usuario · requerido">
-            <FieldMany2One<Many2OneSampleInput> name="userId" label="Usuario" direction="inline" model="user" searchFields={["login", "partner.name"]} displayName="[{login}] {partner.name}"
-              columns={[{ field: "login", label: "Login" }, { field: "partner.name", label: "Contacto" }]} pageSize={5} required
+            <FieldMany2One<Many2OneSampleInput> name="userId" label="Usuario" direction="inline" model="user" searchFields={["login", "name"]} displayName="[{login}] {name}"
+              columns={[{ field: "login", label: "Login" }, { field: "name", label: "Nombre" }]} pageSize={5} required
               onChange={(id, record) => { setChange({ id, record }); setSubmitted(null); }} />
-            <p className="text-xs leading-relaxed text-base-content/55">Busca por login o por el nombre del contacto relacionado. La selección guarda únicamente el ID del usuario.</p>
+            <p className="text-xs leading-relaxed text-base-content/55">Busca por login o por el nombre del usuario. La selección guarda únicamente el ID del usuario.</p>
           </FormGroup>
-          <FormGroup legend="Contacto · opcional, sin label">
-            <FieldMany2One<Many2OneSampleInput> name="partnerId" aria-label="Contacto opcional" model="partner" direction="inline" searchFields={["name", "user.login"]} displayName="{name}" placeholder="Buscar un contacto…"
-              columns={[{ field: "user.login", label: "Usuario vinculado" }]} onChange={(id, record) => { setChange({ id, record }); setSubmitted(null); }} />
-            <p className="text-xs leading-relaxed text-base-content/55">Sin label ocupa todo el ancho. También encuentra contactos por el login de su usuario vinculado.</p>
+          <FormGroup legend="Usuario · opcional, sin label">
+            <FieldMany2One<Many2OneSampleInput> name="secondaryUserId" aria-label="Usuario opcional" model="user" direction="inline" searchFields={["name", "login"]} displayName="{name}" placeholder="Buscar otro usuario…"
+              columns={[{ field: "login", label: "Login" }]} onChange={(id, record) => { setChange({ id, record }); setSubmitted(null); }} />
+            <p className="text-xs leading-relaxed text-base-content/55">Sin label ocupa todo el ancho. También encuentra usuarios por su login.</p>
           </FormGroup>
           <div className="col-span-full flex flex-wrap items-center gap-2 border-t border-base-300 pt-4">
             <button type="submit" className="btn btn-primary">Validar ejemplo</button>

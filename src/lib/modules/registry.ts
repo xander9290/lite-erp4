@@ -65,18 +65,18 @@ export async function creatorLookup(id: string, actor: ModelActor, input: unknow
   return prisma.$transaction(async tx => {
     const scope = await authorizeModel(tx, actor, found.entry.id, "read");
     const policy = projectElementAccess(found.entry, await readActorElementPolicies(tx, actor), modules.flatMap(module => module.models));
-    if (!policy.canRead(["createByUser.partner.name"])) throw new AccessError("DENIED");
+    if (!policy.canRead(["createByUser.name"])) throw new AccessError("DENIED");
     const inverse = `${found.entry.contract.name[0].toLowerCase()}${found.entry.contract.name.slice(1)}CreatedRecords`;
     const ids = request.id ? [request.id] : request.ids;
     const where = {
       [inverse]: { some: scope ?? {} },
-      ...(ids ? { id: { in: ids } } : request.query.trim() ? { partner: { name: { contains: request.query.trim(), mode: "insensitive" as const } } } : {}),
+      ...(ids ? { id: { in: ids } } : request.query.trim() ? { name: { contains: request.query.trim(), mode: "insensitive" as const } } : {}),
     };
     const [total, rows] = await Promise.all([
       tx.user.count({ where }),
-      tx.user.findMany({ where, select: { id: true, partner: { select: { name: true } } }, orderBy: [{ partner: { name: "asc" } }, { id: "asc" }], skip: ids ? 0 : (request.page - 1) * request.pageSize, take: ids ? ids.length : request.pageSize }),
+      tx.user.findMany({ where, select: { id: true, name: true, login: true }, orderBy: [{ name: "asc" }, { id: "asc" }], skip: ids ? 0 : (request.page - 1) * request.pageSize, take: ids ? ids.length : request.pageSize }),
     ]);
-    return { ok: true as const, items: rows.map(row => ({ value: row.id, label: row.partner?.name || "Usuario sin contacto", record: { id: row.id } })), total, page: ids ? 1 : request.page, pageSize: ids ? ids.length : request.pageSize };
+    return { ok: true as const, items: rows.map(row => ({ value: row.id, label: row.name || row.login, record: { id: row.id } })), total, page: ids ? 1 : request.page, pageSize: ids ? ids.length : request.pageSize };
   }, { isolationLevel: "RepeatableRead" });
 }
 const services = new Map<string, Service>();
@@ -233,7 +233,7 @@ export function modelService(id: string): Service {
     // Related records shown through displayName/related paths obey the target's read access and rules.
     relationAccess: (tx, actor) => async (target, ids) => {
       const related = byPrismaName.get(target);
-      // Infrastructure/manual models (User, Partner) carry no module record rules.
+      // Infrastructure/manual models (User) carry no module record rules.
       if (!related) return new Set(ids);
       let scope: Record<string, unknown> | undefined;
       try { scope = await withRelationRead(tx, actor, entry.id, related.id, () => authorizeModel(tx, actor, related.id, "read")); }
@@ -258,7 +258,7 @@ export function modelService(id: string): Service {
   return service;
 }
 
-/** Many2one fields whose target is a registered module model. Manual models (Partner, User) need their own provider. */
+/** Many2one fields whose target is a registered module model. Manual models (User) need their own provider. */
 function lookupTargets(entry: ModuleModel): Record<string, string> {
   const targets: Record<string, string> = {};
   for (const [field, metadata] of Object.entries(entry.metadata)) {

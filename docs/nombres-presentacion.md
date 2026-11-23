@@ -198,7 +198,7 @@ Proveedores propios pueden implementar el método opcional del repositorio.
 
 ## Compatibilidad y ejemplo
 
-Los catálogos manuales `user`/`partner` conservan sus contratos y plantillas
+El catálogo manual `user` conserva su contrato y plantillas
 anteriores, sin ampliar su whitelist. Sus vistas existentes siguen funcionando.
 `mode="display"` conserva su valor ya resuelto. FieldRelationTag no incorpora
 todavía el proveedor declarativo.

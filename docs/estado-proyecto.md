@@ -6,6 +6,137 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Retirada de core.partner y User autónomo (2026-11-23)
+
+Autorizado por el usuario después de desinstalar contactosextra como piloto.
+Sólo core.user permanece nativo: nombre/correo/teléfono/avatar se almacenan en
+users. Retirados el registro/clase de Partner, la app y rutas de Contactos,
+proveedores manuales de Partner y sincronización de revisiones delegadas.
+Autenticación, Perfil, Usuarios, autores/auditoría y generadores consultan User.
+Las restricciones del creador siguen sus campos de User; pruebas específicas
+comprueban que ocultar su nombre no concede lectura por la ruta de auditoría.
+
+La migración 20261123220000_user_standalone_profile copia perfiles a users, avanza
+updatedAt y retira la FK a partners; no elimina datos. Conserva partners como
+LegacyPartner ignorado por Prisma Client y partner_id como legacyPartnerId
+histórico no publicado. Directorio aún no existe; no se añadieron sus modelos,
+relaciones ni automatismos. Contrato/activación en [User autónomo](user-autonomo.md).
+Esta decisión sustituye el diseño anterior de Partner compartido del núcleo y
+deja sin objeto la revisión pendiente del modal real del piloto retirado.
+Los ejemplos vigentes de /documentation usan Biblioteca; los diseños antiguos
+de Contactos se identifican como históricos.
+
+Estado de la base Windows: migración aplicada con aprobación explícita del usuario.
+Preflight sin intentos fallidos; db:deploy aplicó únicamente
+20261123220000_user_standalone_profile. Comprobación posterior mediante conteos y
+huellas internas: 4 cuentas y 6 contactos históricos intactos, credenciales,
+permisos de cuenta, sesiones e IDs de enlace conservados; cero perfiles diferentes
+de su origen y FK retirada. Prisma Client 7.10.1 regenerado; migrate status confirma
+83 migraciones al día. No se borraron registros. Reiniciar dev si estaba abierto;
+no asumir aplicación en otras máquinas ni producción.
+Comprobación posterior de sólo lectura con el código actual: core registra sólo
+User, rechaza core.partner y abre Usuarios y Perfil con contrato válido, sin hash
+ni legacyPartnerId publicados. Sin login real de navegador ni subida Cloudinary;
+la carpeta remota existente se conserva para no exigir cambios del preset.
+
+Verificación actual: Prisma validate/generate y TypeScript/ESLint focalizado
+aprobados. Prueba de migración en esquema sintético aprobada: copia con/sin
+contacto, avance de revisión, credenciales/sesiones/enlaces intactos, contactos
+sin usuario conservados y nueva cuenta independiente. Integración core temporal
+aprobada: altas, extensión CRM de User, relaciones de otro módulo, permisos,
+contraseña, sesión, lastLogin y concurrencia Usuarios/Perfil; proyecto y esquema
+eliminados. Integración domains temporal aprobada y limpiada: búsquedas autorizadas,
+extensiones/colecciones de User, identidad, revisiones, hooks y rollback.
+
+Las pruebas focalizadas de autenticación, servicio, User nativo, consultas/listas,
+presentación relacional generada y restricciones del creador pasaron. La suite
+amplia no se declara íntegramente aprobada: mantiene el fallo conocido de symlink
+de archivo en Windows. Eject y referencias de acciones/formularios pasaron 3/3
+secuencialmente tras dar 90 s al compilador del fixture y mostrar su error de
+proceso en la aserción (antes agotaba 30 s bajo carga). No se omitieron aserciones.
+Applications pasó 16/16 al ejecutarlo con React cliente, como indica su comando
+(react-server no sirve para Lucide). Integración HTTP aprobada con build Next:
+login, altas/edición de Usuarios, Perfil, contraseña, permisos, sesiones, ruta de
+Contactos retirada y tema; proyecto/esquema eliminados. El fixture se corrigió
+para copiar docs y reconocer notFound transmitido con HTTP 200 de Next.
+Formularios y navegación pasaron 41/41 tras adaptar los proveedores de selección.
+Integración completa del framework aprobada: persistencia/evolución, relaciones,
+auditoría, filtros/grupos, concurrencia, hooks e historial; orm:sync con cancelación,
+continuación, evolución, fallo de tipos y repetición; restricciones SQL y guardas
+de longitud/duplicados/nulos/drift/carrera; create:model/create:views con rutas,
+modal, listas/tarjetas/kanban y persistencia autorizada. Proyecto y esquema
+temporales eliminados. TypeScript final y git diff --check aprobados.
+
+Simplificación aplicada: un solo perfil y una revisión por cuenta, sin writes
+delegados ni invalidación cruzada de dos tablas. Fixtures copian docs para el build
+de /documentation; tsconfig excluye .legacy-test-* para no compilar proyectos
+temporales como fuentes de la app principal. No se hicieron commit/push/pull.
+
+## Sugerencias de Django registradas (2026-11-23)
+
+Por petición del usuario se registran cinco sugerencias, sin iniciar implementación:
+chequeos del proyecto, operaciones después del commit, consultas de negocio
+reutilizables, comandos propios de módulos y aplicaciones distribuibles.
+Esta última enlaza el pendiente existente, sin duplicar su estrategia.
+Motivos, condiciones y criterios de aceptación en
+[Conceptos de Django](ideas/conceptos-django.md).
+
+Chequeos del proyecto se recomienda como primera idea por evaluar por los problemas
+recientes de publicación e inserciones; no cambia prioridades acordadas.
+Siguiente: retomar cada sugerencia con un caso real y concretar su alcance antes
+de implementar. Cambio sólo documental, revisado con git diff --check;
+sin nuevas pruebas de código, generación, migraciones ni acceso a BD.
+
+## Confirmación opcional de FormButton (2026-11-23)
+
+Implementado por autorización del usuario: confirm?:string en FormButton, consumido
+por el ciclo de FormView sin enviarlo al DOM. useAlerts pregunta antes de parámetros,
+validación, guardado y acción. Cancelar cualquiera de los pasos no escribe ni limpia
+borradores. Sin texto mantiene el flujo anterior. Un lock síncrono cubre todos los
+pasos; al volver de diálogos se comprueban montaje, identidad/modelo, disponibilidad
+y bloqueos vigentes. El estado dirty proviene de la suscripción vigente de RHF,
+para conservar guardar→acción después de la espera. No cambia metadata @action,
+Server Actions, servicios, permisos, revisiones, transacciones ni reintentos.
+
+Demo ficticia /sample#form-actions permite comparar con/sin confirm y simular fallos
+de guardado/acción. /sample#action-parameters muestra confirmación antes de argumentos.
+Ejemplo añadido a /documentation#confirmar-antes-de-ejecutar-una-accion; contratos
+actualizados en FormView.md, acciones-formulario y acciones-parametros.
+No se habilitaron preguntas en vistas reales de Contactos ni se alteraron los cambios
+del ejercicio del usuario (active, acciones, inserciones y artefactos de Prisma).
+No requiere SQL, generación de acciones ni modificación de datos de negocio.
+
+Comprobación Windows para este cambio: TypeScript y ESLint focalizado aprobados;
+formularios 28/28 y navegación 13/13. Tipos negativos comprueban que confirm sólo
+acepta texto, y render estático verifica que no llega como atributo HTML.
+Build aprobado fuera del sandbox con los tres avisos previos de tracing del gestor.
+Navegador en demos ficticias: cancelar conserva texto dirty y log vacío; aceptar
+produce guardado→acción con la revisión recién guardada; fallo de guardado conserva
+borrador y no ejecuta; sin confirm se ejecuta directamente. Con parámetros,
+cancelar la confirmación no abre argumentos; cancelar argumentos no escribe;
+aceptar ambos produce guardado→acción. Fallo posterior de acción conserva nombre
+y revisión previamente guardados, comprobado con el log de la demo. Se verificó
+la sección nueva de /documentation en el navegador. Pruebas sin datos reales ni nueva integración
+de BD, porque el cambio es cliente y conserva los servicios existentes.
+La revisión visual detectó y corrigió una lectura obsoleta de isDirty tras esperar:
+se usa el snapshot vigente de useFormState antes de decidir si guardar.
+
+Siguiente: usar la prop en las vistas que el usuario elija. Las acciones de lista
+por selección permanecen pendientes, con su contrato separado debajo.
+
+## Pendiente registrado: acciones por selección en listas (2026-11-23)
+
+El usuario acepta registrar la propuesta de publicar referencias tipadas mediante
+selectionActions en la vista, con habilitación explícita de la acción en el modelo
+(list:true provisional). El framework recorre la selección y reutiliza el método
+individual en servidor; parámetros comunes y transacción única con rollback total.
+No hay API implementada ni autorización para iniciarla por esta anotación.
+Plan, límites y aceptación en
+[Acciones por selección](ideas/acciones-formulario.md#pendiente-acciones-de-modelo-por-selección-en-listas-2026-11-23).
+Siguiente al retomarlo: concretar el contrato y consumidores antes de implementar;
+las operaciones colectivas con array quedan condicionadas a un caso real.
+Sólo documentación, comprobada con git diff --check; sin pruebas de código ni BD.
+
 ## Apertura tipada de formularios desde TSX (2026-11-23)
 
 Implementación autorizada en codex/partner. Conservados cambios previos de reglas

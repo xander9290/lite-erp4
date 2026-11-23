@@ -43,7 +43,7 @@ export default function FieldRelationTag<TFieldValues extends FieldValues = Fiel
 }
 
 function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
-  name, label, direction: requestedDirection = "block", model = "partner", load: baseLoad, searchFields = lookupModels[model].searchFields,
+  name, label, direction: requestedDirection = "block", model = "user", load: baseLoad, searchFields = lookupModels[model].searchFields,
   displayName = lookupModels[model].displayName, columns, pageSize = 10, maxSelected = 100, clearable = true,
   onChange, onCreate, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y agregar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps

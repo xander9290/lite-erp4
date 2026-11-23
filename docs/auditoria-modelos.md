@@ -142,12 +142,12 @@ export const recordColumns = [
 Incluye «Creado por» (login/avatar), «Creado el» y «Actualizado el», con tipos
 explícitos para los filtros de la UI. El servicio permite filtros y orden en
 `createdAt`, `updatedAt`, `createBy`, `createByUser.login` y
-`createByUser.partner.name`; búsquedas textuales por las dos últimas si se
+`createByUser.name`; búsquedas textuales por las dos últimas si se
 incluyen en `searchFields`. En ausencia de contacto usar login como columna.
 Las fechas son ISO UTC y los filtros de día conservan el rango convertido por
 la UI. Los filtros «Está vacío» incluyen autores/contactos desconocidos.
 Sólo las columnas de nombre/login admiten widget `partner`, con avatar limitado
-a `createByUser.partner.avatarUrl`. Sin `audit: true` se rechazan estos campos
+a `createByUser.avatarUrl`. Sin `audit: true` se rechazan estos campos
 y no se envían metadatos adicionales.
 
 Ejemplo local, RHF/Zod, guardado simulado y listado: `/sample#record-audit`.
@@ -169,7 +169,7 @@ models: {
     nombre de su contacto; se **filtra** (selector de creadores, igual/distinto, vacío) y se
     **agrupa** por creador; no se ordena ni se busca.
   - `createdAt` «Creado el» y `updatedAt` «Actualizado el»: se ordenan y filtran.
-  - Opcional en `list.fields`: `createByUser.partner.name` «Nombre del creador» (avatar y
+  - Opcional en `list.fields`: `createByUser.name` «Nombre del creador» (avatar y
     orden por nombre).
 - Etiquetas, grupos y el selector del filtro usan un proveedor fijo del servidor
   (`creatorLookup`): sólo creadores de registros que el actor puede **leer** en ese modelo

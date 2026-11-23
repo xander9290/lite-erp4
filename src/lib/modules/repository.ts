@@ -30,7 +30,7 @@ type Delegate = {
 type Guards = Readonly<Record<string, readonly DisplayGuard[]>>;
 
 const datesSelect = { createdAt: true, updatedAt: true } as const;
-const creatorSelect = { ...datesSelect, createBy: true, createByUser: { select: { id: true, login: true, partner: { select: { name: true, avatarUrl: true } } } } } as const;
+const creatorSelect = { ...datesSelect, createBy: true, createByUser: { select: { id: true, login: true, name: true, avatarUrl: true } } } as const;
 const lowerFirst = (value: string) => value[0].toLowerCase() + value.slice(1);
 
 function delegateOf(tx: Prisma.TransactionClient, name: string): Delegate {
@@ -41,8 +41,8 @@ function delegateOf(tx: Prisma.TransactionClient, name: string): Delegate {
 }
 
 function auditDto(record: Record<string, unknown>): RecordAudit {
-  const user = record.createByUser as { id: string; login: string; partner: { name: string; avatarUrl: string | null } | null } | null;
-  return { createdAt: (record.createdAt as Date).toISOString(), updatedAt: (record.updatedAt as Date).toISOString(), createBy: user ? { id: user.id, login: user.login, name: user.partner?.name || user.login, avatarUrl: user.partner?.avatarUrl ?? null } : null };
+  const user = record.createByUser as { id: string; login: string; name: string; avatarUrl: string | null } | null;
+  return { createdAt: (record.createdAt as Date).toISOString(), updatedAt: (record.updatedAt as Date).toISOString(), createBy: user ? { id: user.id, login: user.login, name: user.name || user.login, avatarUrl: user.avatarUrl ?? null } : null };
 }
 
 /**
@@ -63,7 +63,7 @@ export type NativeRepositoryOptions = {
 };
 
 export function createRepository<T extends Record<string, unknown>>(entry: ModuleModel, module: ModuleGeneration, models: readonly ModuleModel[] = [entry], options: { creator?: boolean } & NativeRepositoryOptions = {}): ModelRepository<T> {
-  // Native tables (core: partners/users) are hand-written and have no creator column.
+  // Native tables (core: users) are hand-written and have no creator column.
   const creator = options.creator !== false;
   const secrets = new Map(Object.entries(options.writeOnly ?? {}));
   const systemColumns = new Set(options.readOnly ?? []);
@@ -77,7 +77,7 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
   const many = Object.entries(entry.contract.many2manyFields).filter(([field]) => !extensionMany.has(field)).map(([field, descriptor]) => ({ field, maximum: descriptor.many2many.maxSelected, ...many2manyStorage(entry.contract, field) }));
   const metadata: Readonly<Record<string, FieldMetadata>> = entry.contract.metadata;
   // Fields of extensions live in companion tables owned by the extending modules (1:1 relation).
-  // An inherited relation (Odoo _inherits, e.g. User → Partner) is a 1:1 row read and written the
+  // An explicitly declared inherited relation is a 1:1 row read and written the
   // same way, but its table has no creator column and the foreign key lives on this model.
   type CompanionLink = { field: string; source: string; maximum: number };
   const companions = entry.extensions.filter(extension => extension.relation && (extension.fields.length || extension.many2many?.length)) as readonly { relation: string; fields: readonly string[]; inherits?: boolean; many2many?: readonly CompanionLink[] }[];
@@ -250,13 +250,13 @@ export function createRepository<T extends Record<string, unknown>>(entry: Modul
     async list(tx, query) {
       // Only the server service supplies these whitelisted scalar predicates and order.
       const companion = companions.find(companion => companion.fields.includes(query.sort));
-      const order = companion ? { [companion.relation]: { [query.sort]: query.direction } } : query.sort === "createByUser.login" ? { createByUser: { login: query.direction } } : query.sort === "createByUser.partner.name" ? { createByUser: { partner: { name: query.direction } } } : { [query.sort]: query.direction };
+      const order = companion ? { [companion.relation]: { [query.sort]: query.direction } } : query.sort === "createByUser.login" ? { createByUser: { login: query.direction } } : query.sort === "createByUser.name" ? { createByUser: { name: query.direction } } : { [query.sort]: query.direction };
       const args = { where: whereOf(query.where), orderBy: [order, ...(query.sort === "id" ? [] : [{ id: "asc" as const }])], skip: query.skip, take: query.take };
       if (query.audit) {
         const rows = await delegateOf(tx, entry.delegate).findMany({ ...args, select: { ...select, ...auditSelect } });
         return rows.map(record => {
-          const user = record.createByUser as { id: string; login: string; partner: { name: string; avatarUrl: string | null } | null } | null;
-          return { ...dto(record, false, false), createdAt: (record.createdAt as Date).toISOString(), updatedAt: (record.updatedAt as Date).toISOString(), createBy: (record.createBy as string | null | undefined) ?? null, createByUser: user ? { id: user.id, login: user.login, partner: user.partner ? { name: user.partner.name, avatarUrl: user.partner.avatarUrl } : null } : null };
+          const user = record.createByUser as { id: string; login: string; name: string; avatarUrl: string | null } | null;
+          return { ...dto(record, false, false), createdAt: (record.createdAt as Date).toISOString(), updatedAt: (record.updatedAt as Date).toISOString(), createBy: (record.createBy as string | null | undefined) ?? null, createByUser: user ? { id: user.id, login: user.login, name: user.name, avatarUrl: user.avatarUrl } : null };
         });
       }
       return (await delegateOf(tx, entry.delegate).findMany({ ...args, select })).map(row => dto(row, false, false));

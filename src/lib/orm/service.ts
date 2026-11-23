@@ -159,7 +159,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   const formSchema = model.formSchema ?? model.schema;
   if (Object.keys(many).length && !presentation.relationAccess) throw new Error("Many2many requiere autorización de los destinos en módulos declarativos.");
   if (Object.keys(model.one2manyFields ?? {}).some(name => !Object.hasOwn(lines, name))) throw new Error("One2many requiere el servicio de líneas de módulos declarativos.");
-  const auditFields = new Set(presentation.audit ? ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.partner.name"] : []);
+  const auditFields = new Set(presentation.audit ? ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.name"] : []);
   const policy = presentation.list;
   const relatedFields=model.relatedFields??{};
   const nullableCollection = new Set(presentation.collectionNullable ?? []);
@@ -186,7 +186,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if ((!creator && (model.metadata[name]?.kind !== "many2one" || model.metadata[name].sensitive)) || typeof loader !== "function" || !config.columns.some(column => column.field === name)) throw new Error("Las etiquetas requieren una relación publicada y un lookup autorizado.");
   }
   const allowed = new Set(["id", ...Object.keys(collectionMetadata)]);
-  if (presentation.audit) for (const field of ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.partner.name"]) allowed.add(field);
+  if (presentation.audit) for (const field of ["createdAt", "updatedAt", "createBy", "createByUser.login", "createByUser.name"]) allowed.add(field);
   const columnType = (field: string) => collectionMetadata[field] ? fieldListType(collectionMetadata[field]) : presentation.audit ? auditColumnType(field) ?? "text" : "text";
   const computedNames = config.columns.map(column => column.field).filter(name => Object.hasOwn(computedFields, name));
   validateCollectionComputed(model, computedNames, config.columns.map(column => column.field));
@@ -201,7 +201,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     const badge = column.widget === "badge" && collectionMetadata[column.field]?.kind === "selection" && !collectionMetadata[column.field].sensitive;
     const colored = column.colors === undefined || (collectionMetadata[column.field]?.kind === "selection" && !collectionMetadata[column.field].sensitive);
     return !allowed.has(column.field) || !colored || (Object.hasOwn(virtualFields,column.field) && (column.sortable || column.filterable || column.groupable)) || !validImageColumnOptions(column) || !validBadgeColumnOptions(column) || (column.widget && !(image || relation || badge || (column.widget === "partner" && avatar && (!column.avatarField || column.avatarField === avatar) && (!column.format || column.format === "text")))) || (column.avatarField !== undefined && (column.widget !== "partner" || column.avatarField !== avatar)) || (column.type && column.type !== columnType(column.field));
-  }) || config.searchFields.length > 6 || config.searchFields.some(name => name !== "id" && model.metadata[name]?.kind !== "text" && model.metadata[name]?.kind !== "many2one" && !(presentation.audit && ["createByUser.login", "createByUser.partner.name"].includes(name)))) throw new Error("La lista sólo puede publicar campos declarados o auditoría habilitada y búsquedas de texto permitidas.");
+  }) || config.searchFields.length > 6 || config.searchFields.some(name => name !== "id" && model.metadata[name]?.kind !== "text" && model.metadata[name]?.kind !== "many2one" && !(presentation.audit && ["createByUser.login", "createByUser.name"].includes(name)))) throw new Error("La lista sólo puede publicar campos declarados o auditoría habilitada y búsquedas de texto permitidas.");
   // Normalize date types for server filters even when the view omitted an explicit type.
   config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(Object.hasOwn(virtualFields,column.field)?{filterable:false,sortable:false,groupable:false}:{}), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));
   const authorize: ServiceAuthorizer = presentation.authorize ?? (async (tx, actor) => { await assertActor(tx, actor); return undefined; });
@@ -245,7 +245,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     const audit = await repository.audit(tx, id);
     if (!audit) throw new ModelValidationError("El registro ya no está disponible.");
     const access = await elements(tx, actor);
-    return { audit: access.canRead(["createByUser.login", "createByUser.partner.name", "createByUser.partner.avatarUrl"]) ? audit : { ...audit, createBy: null } };
+    return { audit: access.canRead(["createByUser.login", "createByUser.name", "createByUser.avatarUrl"]) ? audit : { ...audit, createBy: null } };
   }
   /** One cached access decision per target/ID within the operation. */
   const relationAccessFor = (tx: Prisma.TransactionClient, actor: ModelActor) => presentation.relationAccess ? cachedRelationAccess(presentation.relationAccess(tx, actor)) : undefined;
@@ -496,7 +496,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
           } else if (field?.kind === "selection") {
             const nullable = !field.required || nullableCollection.has(filter.field);
             predicates.push(filter.operator === "empty" ? nullable ? { [filter.field]: null } : { id: { in: [] } } : nullable ? { [filter.field]: { not: null } } : {});
-          } else predicates.push(compileColumnFilter(type, filter, nullableCollection.has(filter.field) || (field ? !field.required : ["createBy", "createByUser.partner.name"].includes(filter.field)), presentation.audit ? ["createByUser", "createByUser.partner"] : []));
+          } else predicates.push(compileColumnFilter(type, filter, nullableCollection.has(filter.field) || (field ? !field.required : ["createBy", "createByUser.name"].includes(filter.field)), presentation.audit ? ["createByUser"] : []));
         }
         if (state.query) {
           const search = config.searchFields.filter(field => elementPolicy.canRead([field]));
@@ -604,7 +604,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const page = await readActivity(tx, model.name, model.metadata, parsed.data, presentation.activityLabels
           ? (target, ids) => presentation.activityLabels!(tx, actor, target, ids) : undefined);
         const policy = await elements(tx, actor);
-        const authorReadable = policy.canRead(["createByUser.login", "createByUser.partner.name", "createByUser.partner.avatarUrl"]);
+        const authorReadable = policy.canRead(["createByUser.login", "createByUser.name", "createByUser.avatarUrl"]);
         return { ...page, entries: page.entries.map(entry => ({ ...entry, changes: entry.changes.filter(change => policy.canRead([change.field]) && !policy.fields[change.field]?.noRead), ...(authorReadable ? {} : { author: { id: entry.author.id, login: "", name: "Usuario", avatarUrl: null } }) })) };
       }, { isolationLevel: "RepeatableRead" });
       return { ok: true, data };

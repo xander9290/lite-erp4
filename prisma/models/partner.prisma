@@ -1,20 +1,16 @@
-model Partner {
+// Retained historical data, outside the framework registry and Prisma Client.
+// Directorio will choose its own model and explicit data migration.
+model LegacyPartner {
     id    String  @id @default(cuid())
     name  String
     email String?
     phone String?
     avatarUrl String? @map("avatar_url")
 
-    user User?
-
     createdAt DateTime @default(now()) @map("created_at")
     updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-    @@index([name])
+    @@index([name], map: "partners_name_idx")
     @@map("partners")
-
-  // BEGIN lite-erp:contactosextra:Partner
-  contactosextraCorePartnerRecordIdRecords ContactosextraCorePartner? @relation("ContactosextraCorePartner_recordId")
-  contactosextraCorePartnerParentIdRecords ContactosextraCorePartner[] @relation("ContactosextraCorePartner_parentId")
-  // END lite-erp:contactosextra:Partner
+    @@ignore
 }

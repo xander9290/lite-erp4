@@ -65,6 +65,9 @@ Las referencias se generan con `orm:sync` o
 `npm run orm:generate -- soporte --actions-only --write`, sin BD en este último caso.
 [Tipado y formularios manuales](ideas/acciones-formulario.md#referencias-tipadas-y-generación-2026-11-22).
 
+Si FormButton declara confirm, primero se solicita esa confirmación con useAlerts.
+Cancelar termina sin abrir parámetros ni escribir.
+
 1. Se solicitan y validan los parámetros con su propio RHF/Zod. Cancelar, Escape o
    cerrar no ejecuta guardado ni acción. Los lookups pueden hacer lecturas autorizadas.
 2. Confirmar cierra el diálogo y conserva los argumentos; si el documento es nuevo

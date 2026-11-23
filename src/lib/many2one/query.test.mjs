@@ -11,14 +11,14 @@ const hooks = registerHooks({ resolve(specifier, context, nextResolve) {
   }
 } });
 const require = createRequire(import.meta.url);
-const { lookupRequestSchema, lookupWords, userLookupWhere, partnerLookupWhere, lookupPage, lookupWindow } = require("./query.ts");
+const { lookupRequestSchema, lookupWords, userLookupWhere, lookupPage, lookupWindow } = require("./query.ts");
 const { formatLookupName } = require("./types.ts");
 hooks.deregister();
-const input = { model: "user", searchFields: ["login", "partner.name"], displayName: "[{login}] {partner.name}" };
+const input = { model: "user", searchFields: ["login", "name"], displayName: "[{login}] {name}" };
 
 test("lookup boundary rejects private fields, unknown models, relations and injected query options", () => {
   for (const changes of [
-    { model: "_prisma_migrations" }, { model: "constructor" },
+    { model: "_prisma_migrations" }, { model: "constructor" }, { model: "partner" },
     { searchFields: ["password"] }, { displayName: "{password}" },
     { searchFields: ["partner.user.password"] }, { displayName: "{__proto__.name}" },
     { where: { password: { contains: "secret" } } }, { include: { partner: true } },
@@ -34,14 +34,12 @@ test("lookup boundary bounds page size, input length and ID resolution", () => {
   assert.equal(lookupRequestSchema.parse({ ...input, id: "user-1" }).pageSize, 10);
 });
 
-test("all search words can match different fields, including nullable related records", () => {
+test("all search words can match login and profile name", () => {
   const request = lookupRequestSchema.parse({ ...input, query: "alex aguilar" });
   const where = userLookupWhere(request);
   assert.equal(where.AND.length, 2);
   assert.deepEqual(where.AND[0].OR[0], { login: { contains: "alex", mode: "insensitive" } });
-  assert.deepEqual(where.AND[1].OR[1], { partner: { is: { name: { contains: "aguilar", mode: "insensitive" } } } });
-  const partner = partnerLookupWhere(lookupRequestSchema.parse({ model: "partner", searchFields: ["user.login"], displayName: "{name}", query: "alex" }));
-  assert.deepEqual(partner.AND[0].OR[0], { user: { is: { login: { contains: "alex", mode: "insensitive" } } } });
+  assert.deepEqual(where.AND[1].OR[1], { name: { contains: "aguilar", mode: "insensitive" } });
   assert.deepEqual(userLookupWhere(lookupRequestSchema.parse(input)), { AND: [] });
 });
 
@@ -50,9 +48,9 @@ test("search treats SQL pattern wildcards as literal input", () => {
 });
 
 test("display templates handle missing relations and do not render objects or inherited properties", () => {
-  assert.equal(formatLookupName({ id: "1", login: "alex", partner: { id: "2", name: "Alex Aguilar" } }, input.displayName), "[alex] Alex Aguilar");
-  assert.equal(formatLookupName({ id: "1", login: "alex", partner: null }, input.displayName), "[alex]");
-  assert.equal(formatLookupName({ id: "1", partner: null }, "{partner.name}"), "1");
+  assert.equal(formatLookupName({ id: "1", login: "alex", name: "Alex Aguilar" }, input.displayName), "[alex] Alex Aguilar");
+  assert.equal(formatLookupName({ id: "1", login: "alex", name: null }, input.displayName), "[alex]");
+  assert.equal(formatLookupName({ id: "1", name: null }, "{name}"), "1");
   assert.equal(formatLookupName({ id: "1", partner: { id: "2", name: "Name" } }, "{partner}"), "1");
   assert.equal(formatLookupName({ id: "1" }, "{constructor.name}"), "1");
 });

@@ -88,7 +88,12 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
   const [deleting, setDeleting] = useState(false);
   const [deletedHref, setDeletedHref] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [confirmingAction, setConfirmingAction] = useState(false);
   const actionLock = useRef(false);
+  const actionRuntime = useRef({ disabled, actionBusy, readOnly, actionModel, publishedActions, runAction, isDirty });
+  useEffect(() => {
+    actionRuntime.current = { disabled, actionBusy, readOnly, actionModel, publishedActions, runAction, isDirty };
+  }, [disabled, actionBusy, readOnly, actionModel, publishedActions, runAction, isDirty]);
   const [parameterAction, setParameterAction] = useState<{ action: ClientModelAction; values?: Record<string, unknown>; errors?: Record<string, string> } | null>(null);
   const parameterWaiter = useRef<((values: Record<string, unknown> | null) => void) | null>(null);
   const parameterDrafts = useRef(new Map<string, Record<string, unknown>>());
@@ -161,38 +166,65 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
   }
 
   /**
-   * FormButton sequence: one lock; validate/save through the normal submit when the record
+   * FormButton sequence: one lock from optional confirmation through parameters and action;
+   * validate/save through the normal submit when the record
    * is new or dirty (no second pipeline); only after success run the action with the saved
    * ID/revision. A failed save stops; a failed action keeps the saved record and revision.
    */
-  async function runFormAction(name: string): Promise<boolean> {
+  async function runFormAction(name: string, confirmation?: string): Promise<boolean> {
     if (publishedActions && !publishedActions.some(item => item.name === name)) return false;
     // Synchronous lock: two clicks in the same frame must not both pass before `acting` renders.
     if (!runAction || locked || readOnly || inFlight.current || saveWaiter.current || actionLock.current) return false;
     actionLock.current = true;
     setActing(name);
     let saved: Extract<FormViewResult<TValues>, { ok: true }> | null = null;
+    let mutationStarted = false;
+    const initial = methods.getValues();
+    const initialId = initial.id;
+    const initialRevision = initial.revision;
+    const available = () => {
+      const current = actionRuntime.current;
+      return mounted.current && !current.disabled && !current.actionBusy && !current.readOnly && current.actionModel === actionModel && Boolean(current.runAction)
+        && (current.publishedActions ? current.publishedActions.some(action => action.name === name) : !publishedActions);
+    };
+    const sameRecord = () => {
+      const current = methods.getValues();
+      return current.id === initialId && current.revision === initialRevision;
+    };
     try {
-      const declared = publishedActions?.find(action => action.name === name);
+      if (confirmation?.trim()) {
+        setConfirmingAction(true);
+        const accepted = await alerts.confirm({ title: "Confirmar acción", message: confirmation, confirmLabel: "Continuar", cancelLabel: "Cancelar" });
+        if (mounted.current) setConfirmingAction(false);
+        if (!accepted) return false;
+      }
+      if (!available() || !sameRecord()) return false;
+      const declared = actionRuntime.current.publishedActions?.find(action => action.name === name);
       const params = declared?.params ? await new Promise<Record<string, unknown> | null>(resolve => { parameterWaiter.current = resolve; setParameterAction({ action: declared, values: parameterDrafts.current.get(name), errors: parameterErrors.current.get(name) }); }) : undefined;
-      if (params === null || !mounted.current) return false;
+      if (params === null || !available() || !sameRecord()) return false;
       if (params !== undefined) parameterDrafts.current.set(name, params);
       parameterErrors.current.delete(name);
-      let target = mode === "edit" && !isDirty ? savedTarget : null;
+      let target = mode === "edit" && !actionRuntime.current.isDirty ? formDeleteTarget(methods.getValues()) : null;
       if (!target) {
         const form = document.getElementById(titleId)?.closest("form");
         if (!form) return false;
         saved = await new Promise(resolve => {
           saveWaiter.current = resolve;
           actionSubmit.current = true;
+          mutationStarted = true;
           try { form.requestSubmit(); } finally { actionSubmit.current = false; }
         });
         if (!saved) return false;
         target = formDeleteTarget({ id: saved.values.id, revision: saved.values.revision });
         if (!target) return false;
       }
+      if (!available()) {
+        if (saved && mounted.current) onSaved?.(saved.values, saved.audit, saved.displayName);
+        return false;
+      }
       methods.clearErrors("root.server");
-      const outcome = await runAction(name, target, params);
+      mutationStarted = true;
+      const outcome = await actionRuntime.current.runAction!(name, target, params);
       if (!mounted.current) return false;
       if (!outcome.ok) {
         if (outcome.parameterErrors) parameterErrors.current.set(name, outcome.parameterErrors);
@@ -212,6 +244,10 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
       onSaved?.(outcome.values, outcome.audit, outcome.displayName);
       return true;
     } catch {
+      if (!mutationStarted) {
+        if (mounted.current) await alerts.error({ title: "No se pudo iniciar la acción", message: "Intenta nuevamente. Tus cambios siguen en el formulario." });
+        return false;
+      }
       // Unknown network outcome: never present success nor retry a mutation automatically.
       if (mounted.current) {
         methods.setError("root.server", { type: "server", message: "No se pudo confirmar la acción. Recarga el registro antes de reintentar." });
@@ -222,7 +258,7 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
     } finally {
       saveWaiter.current = null;
       actionLock.current = false;
-      if (mounted.current) setActing(null);
+      if (mounted.current) { setActing(null); setConfirmingAction(false); }
     }
   }
 
@@ -300,7 +336,7 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
     <h2 id={titleId} className="sr-only">{title}</h2>
     <header data-slot="header" className="shrink-0 space-y-3 rounded-t-2xl border-b border-base-300 bg-linear-to-r from-primary/5 to-transparent px-4 py-3 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {busy && !deletedHref && <FormPendingStatus announce={false}>{saving || isSubmitting ? "Guardando cambios…" : deleting ? "Eliminando registro…" : acting ? "Ejecutando acción…" : "Procesando…"}</FormPendingStatus>}
+        {busy && !deletedHref && <FormPendingStatus announce={false}>{saving || isSubmitting ? "Guardando cambios…" : deleting ? "Eliminando registro…" : acting ? confirmingAction ? "Esperando confirmación…" : parameterAction ? "Esperando parámetros…" : "Ejecutando acción…" : "Procesando…"}</FormPendingStatus>}
         {!!breadcrumbs?.length && <div className="min-w-0 flex-1 basis-48"><Breadcrumbs items={breadcrumbs} /></div>}
         {(!readOnly || onNew || hasSecondaryActions) && <fieldset disabled={locked} className="m-0 ml-auto flex min-w-0 flex-wrap items-center gap-1 border-0 p-0 sm:gap-2">
           {onNew && <button type="button" disabled={locked} className="btn btn-soft btn-primary btn-sm gap-1.5" onClick={async () => {

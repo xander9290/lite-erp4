@@ -32,7 +32,7 @@ export async function listRecords(config: ListConfig, state: ListState): Promise
 }
 
 export async function deleteRecords(model: ListConfig["model"], selection: readonly ListDeleteTarget[]): Promise<ListDeleteResult> {
-  const parsed = z.enum(["partner", "user"]).safeParse(model);
+  const parsed = z.enum(["user"]).safeParse(model);
   if (!parsed.success) return { ok: false, kind: "validation", error: "Esta lista no permite eliminar registros." };
   try {
     const result = await deleteRegisteredRecords(prisma, await requireAdmin(), parsed.data, selection);

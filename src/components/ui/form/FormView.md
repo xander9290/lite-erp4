@@ -311,3 +311,14 @@ no escribe; confirmar conserva el flujo guardar → ejecutar con revisión persi
 FormActionRunner recibe `(action, target, params?)`. Los parameterErrors no se
 registran en RHF del documento. El diálogo es hermano de FormLayout, nunca un form
 anidado. Contrato, cancelación y límites: [acciones con parámetros](../../../../docs/acciones-parametros.md).
+
+
+## Confirmación opcional de FormButton
+
+`<FormButton action={acciones.archivar} confirm="¿Archivar este registro?" />`
+usa useAlerts antes de parámetros, validación/guardado y acción. Cancelar conserva
+borradores sin escrituras. Sin texto no pregunta. Un lock cubre el ciclo completo;
+al volver de los diálogos se comprueba que el registro y la acción sigan vigentes.
+Confirm es presentación; el servidor conserva autorización y revisión. No se
+reintentan mutaciones automáticamente. Ejemplos en /sample#form-actions,
+/sample#action-parameters y [el contrato](../../../../docs/ideas/acciones-formulario.md#confirmación-en-formbutton-2026-11-23).

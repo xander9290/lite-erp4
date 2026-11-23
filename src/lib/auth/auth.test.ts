@@ -5,7 +5,7 @@ import { createLoginLimiter } from "./attempts";
 import { hashPassword, verifyPassword } from "./password";
 import { loginSchema } from "../../schemas/login.schema";
 import { userSchema, newUserDefaults } from "../../schemas/user.schema";
-import { avatarUrlSchema } from "../../schemas/partner.schema";
+import { avatarUrlSchema } from "../../schemas/user-profile.schema";
 import { changePasswordSchema, profileSchema } from "../../schemas/profile.schema";
 
 test("login normalizes identifiers and rejects malformed or oversized credentials", () => {
@@ -50,7 +50,7 @@ test("a caller cannot disable themselves or remove the last active administrator
   assert.equal(assertUserChange("other", target, { active: true, isAdmin: false }, 2), null);
 });
 
-test("partner avatars accept public HTTPS URLs or null, never local files or executable schemes", () => {
+test("account avatars accept public HTTPS URLs or null, never local files or executable schemes", () => {
   assert.equal(avatarUrlSchema.safeParse(null).success, true);
   assert.equal(avatarUrlSchema.safeParse("https://images.example.test/avatar.webp").success, true);
   for (const url of ["", "http://images.example.test/avatar.webp", "blob:https://erp.local/image", "data:image/png;base64,abc", "javascript:alert(1)", "https://images.example.test/" + "x".repeat(2048)]) {
@@ -69,7 +69,7 @@ test("login attempts are limited within the window, expire and reset after succe
 });
 
 test("self-service profiles cannot submit a different user, credentials or permissions", () => {
-  const input = { revision: "2026-11-05T00:00:00.000Z", partnerRevision: null, name: "Mi perfil", email: "", phone: "", avatarUrl: null };
+  const input = { revision: "2026-11-05T00:00:00.000Z", name: "Mi perfil", email: "", phone: "", avatarUrl: null };
   assert.equal(profileSchema.safeParse(input).success, true);
   for (const patch of [{ id: "another-user" }, { isAdmin: true }, { active: false }, { login: "someone-else" }, { password: "anything" }]) assert.equal(profileSchema.safeParse({ ...input, ...patch }).success, false);
 });

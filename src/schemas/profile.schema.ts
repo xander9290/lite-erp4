@@ -1,11 +1,10 @@
 import { z } from "zod";
-import { partnerContactShape } from "./partner.schema";
+import { userProfileShape } from "./user-profile.schema";
 import { newPasswordSchema } from "./password.schema";
 
 export const profileSchema = z.strictObject({
   revision: z.iso.datetime(),
-  partnerRevision: z.iso.datetime().nullable(),
-  ...partnerContactShape,
+  ...userProfileShape,
 });
 export type ProfileValues = z.infer<typeof profileSchema>;
 export type ProfileRecord = { values: ProfileValues; account: { login: string; isAdmin: boolean } };

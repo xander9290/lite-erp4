@@ -104,7 +104,7 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
 /**
  * Many2many with `create: true` creates target records from the selector text: the target must
  * be a declarative model with a public Text `name` and no other required value without a
- * default. Native targets (core.partner/user) keep their own creation flows.
+ * default. Native targets (core.user) keep their own creation flows.
  */
 function validateQuickCreate(definitions: readonly ModuleDefinition[]): readonly ModuleDefinition[] {
   const byName = new Map(definitions.flatMap(definition => definition.models.map(model => [model.contract.name, model] as const)));
@@ -112,7 +112,7 @@ function validateQuickCreate(definitions: readonly ModuleDefinition[]): readonly
     if (!descriptor.many2many.create) continue;
     const target = byName.get(descriptor.many2many.target);
     const where = `${model.id}.${field}`;
-    if (!target || target.module === nativeModule) throw new Error(`${where}: create requiere un destino declarativo (no Partner/User).`);
+    if (!target || target.module === nativeModule) throw new Error(`${where}: create requiere un destino declarativo (no User).`);
     const metadata = target.metadata;
     const name = Object.hasOwn(metadata, "name") ? metadata.name : undefined;
     if (!name || name.kind !== "text" || name.sensitive || name.readOnly || name.compute || name.related || name.sequence) throw new Error(`${where}: create requiere que ${target.id} tenga un campo Text «name» editable.`);

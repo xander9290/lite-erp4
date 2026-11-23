@@ -31,7 +31,7 @@ export type ModuleModelSpec = ModelClass | {
   /** Snake-case table override; defaults to `<module>_<key>`. */
   readonly table?: string;
   /**
-   * Native modules only: existing Prisma model name (`Partner`) instead of `<Module><Key>`.
+   * Native modules only: existing Prisma model name (`User`) instead of `<Module><Key>`.
    * Its schema stays hand-written infrastructure; the framework adapts to it.
    */
   readonly name?: string;
@@ -39,7 +39,7 @@ export type ModuleModelSpec = ModelClass | {
   readonly route?: `/erp/${string}`;
   /**
    * Native modules only (Odoo _inherits): fields stored in a 1:1 related record of another
-   * native model, read and written in the same statement (User → its Partner).
+   * native model, read and written in the same statement.
    */
   readonly inherits?: { readonly relation: string; readonly label: string; readonly fields: readonly string[] };
   /** Native modules only: secrets, system columns and update side effects of the adapter. */
@@ -52,7 +52,7 @@ export type ModuleModelSpec = ModelClass | {
   /**
    * Publish audit columns in collections: «Creado por» (createBy: name label, filter and
    * grouping by creator), «Creado el» and «Actualizado el» (sortable, filterable). They take 3 of
-   * the 12 published columns; `createByUser.partner.name` may be added to sort by name.
+   * the 12 published columns; `createByUser.name` may be added to sort by name.
    */
   readonly audit?: boolean;
   /** Custom views (eject). Without them the default list/form are used. */
@@ -194,10 +194,10 @@ export type ModuleDefinition = {
 };
 
 const key = /^[a-z][a-z0-9]*$/;
-/** Native framework module (Partner/User): always present, an implicit dependency of every module. */
+/** Native framework module (User): always present, an implicit dependency of every module. */
 export const nativeModule = "core";
 /** Prisma names of the native models (hand-written schema), for links from other modules. */
-export const nativeModelNames: Readonly<Record<string, string>> = { "core.partner": "Partner", "core.user": "User" };
+export const nativeModelNames: Readonly<Record<string, string>> = { "core.user": "User" };
 const pascal = (value: string) => value.split("-").map(part => part[0].toUpperCase() + part.slice(1)).join("");
 const lowerFirst = (value: string) => value[0].toLowerCase() + value.slice(1);
 const scalar = (field: FieldMetadata) => field.kind !== "image";
@@ -252,7 +252,7 @@ function auditListPolicy(model: string, metadata: Readonly<Record<string, FieldM
     return derivedListPolicy(metadata, override);
   }
   if (override.searchFields?.some(name => auditCollectionFields.includes(name)) || override.groupable?.some(name => auditCollectionFields.includes(name) && name !== "createBy")) throw new Error(`${model}: la auditoría no se busca; sólo «Creado por» (createBy) se agrupa.`);
-  if (override.sortable?.includes("createBy")) throw new Error(`${model}: createBy se ordena con la columna createByUser.partner.name.`);
+  if (override.sortable?.includes("createBy")) throw new Error(`${model}: createBy se ordena con la columna createByUser.name.`);
   const base = derivedListPolicy(metadata, Object.fromEntries(Object.entries(override).map(([key, names]) => [key, (names as readonly string[]).filter(name => !auditCollectionFields.includes(name))])), 12 - defaultAuditFields.length);
   const fields = override.fields ?? [...base.fields, ...defaultAuditFields];
   const audit = auditCollectionFields.filter(name => fields.includes(name));

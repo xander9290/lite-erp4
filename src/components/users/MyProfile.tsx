@@ -11,7 +11,7 @@ import FormGroup from "../ui/form/FormGroup";
 import FieldText from "../ui/form/FieldText";
 import FieldImage from "../ui/form/FieldImage";
 import { readMyProfile, saveMyProfile } from "@/lib/auth/profile-actions";
-import { uploadPartnerAvatar } from "@/lib/uploads/partner-avatar";
+import { uploadUserAvatar } from "@/lib/uploads/user-avatar";
 import { profileSchema, type ProfileRecord, type ProfileValues } from "@/schemas/profile.schema";
 
 function ProfileForm({ record }: { record: ProfileRecord }) {
@@ -20,7 +20,7 @@ function ProfileForm({ record }: { record: ProfileRecord }) {
   return <FormView layout="page" breadcrumbs={[{ label: "Aplicaciones", href: "/erp" }, { label: "Mi perfil" }]} title="Mi perfil" description="Tus datos de contacto y tu cuenta de acceso." icon={<UserRound size={22} />} methods={methods} onSubmit={saveMyProfile} onSaved={() => router.refresh()}>
     <FormGroup legend="Contacto">
       <div className="grid min-w-0 gap-4 sm:grid-cols-[7rem_minmax(0,1fr)]">
-        <FieldImage<ProfileValues> name="avatarUrl" label="Avatar" widget="avatar" upload={uploadPartnerAvatar} />
+        <FieldImage<ProfileValues> name="avatarUrl" label="Avatar" widget="avatar" upload={uploadUserAvatar} />
         <div className="flex min-w-0 flex-col gap-4">
           <FieldText<ProfileValues> name="name" label="Nombre completo" maxLength={120} />
           <FieldText<ProfileValues> name="email" label="Correo electrónico" maxLength={254} />

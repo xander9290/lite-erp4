@@ -12,7 +12,7 @@ export const auditColumnTypes = {
   updatedAt: "datetime",
   createBy: "text",
   "createByUser.login": "text",
-  "createByUser.partner.name": "text",
+  "createByUser.name": "text",
 } as const;
 
 export function auditColumnType(field: string) {
@@ -20,12 +20,12 @@ export function auditColumnType(field: string) {
 }
 
 export function auditAvatarField(field: string) {
-  return field === "createByUser.login" || field === "createByUser.partner.name" ? "createByUser.partner.avatarUrl" : null;
+  return field === "createByUser.login" || field === "createByUser.name" ? "createByUser.avatarUrl" : null;
 }
 
 /** Optional columns, shared by the client view and its authorized server service. */
 export const recordAuditColumns = [
-  { field: "createByUser.login", label: "Creado por", type: "text", widget: "partner", avatarField: "createByUser.partner.avatarUrl", sortable: true },
+  { field: "createByUser.login", label: "Creado por", type: "text", widget: "partner", avatarField: "createByUser.avatarUrl", sortable: true },
   { field: "createdAt", label: "Creado el", type: "datetime", sortable: true },
   { field: "updatedAt", label: "Actualizado el", type: "datetime", sortable: true },
 ] as const satisfies readonly ListColumn[];
@@ -37,7 +37,7 @@ export const recordAuditColumns = [
  */
 export const auditCollectionColumns = [
   { field: "createBy", label: "Creado por", type: "text", widget: "many2one" },
-  { field: "createByUser.partner.name", label: "Nombre del creador", type: "text", widget: "partner", avatarField: "createByUser.partner.avatarUrl" },
+  { field: "createByUser.name", label: "Nombre del creador", type: "text", widget: "partner", avatarField: "createByUser.avatarUrl" },
   { field: "createdAt", label: "Creado el", type: "datetime" },
   { field: "updatedAt", label: "Actualizado el", type: "datetime" },
 ] as const satisfies readonly ListColumn[];

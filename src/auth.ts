@@ -11,7 +11,7 @@ import { isModuleMaintenance } from "./lib/module-manager/maintenance";
 const attempts = createLoginLimiter();
 // A valid fixed-cost hash used for missing/inactive accounts, never an account password.
 const dummyHash = "$2b$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW";
-const sessionSelect = { id: true, login: true, active: true, isAdmin: true, darkMode: true, sessionVersion: true, partner: { select: { name: true, avatarUrl: true } } } as const;
+const sessionSelect = { id: true, login: true, active: true, isAdmin: true, darkMode: true, sessionVersion: true, name: true, avatarUrl: true } as const;
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -28,7 +28,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const updated = await prisma.user.updateMany({ where: { id: user.id, active: true, sessionVersion: user.sessionVersion, password: user.password }, data: { lastLogin: new Date() } });
       if (updated.count !== 1) return null;
       attempts.clear(user.login);
-      return { id: user.id, login: user.login, name: user.partner?.name ?? user.login, image: user.partner?.avatarUrl ?? null, isAdmin: user.isAdmin, darkMode: user.darkMode, sessionVersion: user.sessionVersion };
+      return { id: user.id, login: user.login, name: user.name || user.login, image: user.avatarUrl ?? null, isAdmin: user.isAdmin, darkMode: user.darkMode, sessionVersion: user.sessionVersion };
     },
   })],
   callbacks: {
@@ -39,7 +39,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       try {
         const current = await prisma.user.findUnique({ where: { id: token.sub }, select: sessionSelect });
         if (!current?.active || current.sessionVersion !== token.sessionVersion) return null;
-        token.login = current.login; token.name = current.partner?.name ?? current.login; token.picture = current.partner?.avatarUrl ?? null; token.isAdmin = current.isAdmin;
+        token.login = current.login; token.name = current.name || current.login; token.picture = current.avatarUrl ?? null; token.isAdmin = current.isAdmin;
         token.darkMode = current.darkMode;
         return token;
       } catch { return null; }

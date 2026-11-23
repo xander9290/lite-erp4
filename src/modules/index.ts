@@ -1,5 +1,5 @@
 import ubicacionesModule from "./ubicaciones/manifest";
-import contactosextraModule from "./contactosextra/manifest";
+
 
 
 import "server-only";
@@ -12,7 +12,5 @@ import type { ModuleDefinition } from "@/lib/modules/define";
  * registers hand-created modules after synchronizing their schema and Prisma Client.
  */
 export const modules: readonly ModuleDefinition[] = [
-    contactosextraModule,
   
-    ubicacionesModule,
-  ];
+    ubicacionesModule,];

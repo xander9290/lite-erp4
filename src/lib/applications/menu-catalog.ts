@@ -1,8 +1,7 @@
 import type { ApplicationManifest } from "./manifest";
-import { contactsNavigation } from "@/app/(auth)/erp/contactos/navigation";
 
 export type GroupMenu = { application: string; applicationLabel: string; id: string; label: string; model?: string; href?: string; parent?: string };
-/** Native presentations (Contactos → core.partner) belong to their model's module. */
+/** Native presentations belong to their model's module. */
 export function applicationMenuOwner(application: Pick<ApplicationManifest, "id" | "accessModels">) {
   const owners = [...new Set(application.accessModels?.map(model => model.split(".")[0]) ?? [])];
   return owners.length === 1 ? owners[0] : application.id;
@@ -21,5 +20,5 @@ export function groupMenus(applications: readonly Pick<ApplicationManifest, "id"
 /** Metadata only: do not load icon components in scripts or access transactions. */
 export async function registeredGroupMenus(module: string) {
   const { registeredModules } = await import("../modules/installed");
-  return groupMenus([contactsNavigation, ...registeredModules.filter(item => !item.native && item.models.length).map(item => item.application)], module);
+  return groupMenus([...registeredModules.filter(item => !item.native && item.models.length).map(item => item.application)], module);
 }

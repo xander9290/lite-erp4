@@ -3,7 +3,7 @@ import { lookupModels } from "./types";
 import type { Prisma } from "../../generated/prisma/client";
 
 export const lookupRequestSchema = z.object({
-  model: z.enum(["user", "partner"]),
+  model: z.enum(["user"]),
   searchFields: z.array(z.string().min(1).max(60)).min(1).max(6),
   displayName: z.string().min(1).max(180),
   query: z.string().max(120).default(""),
@@ -38,20 +38,11 @@ export function lookupWords(query: string) {
 export function userLookupWhere(request: Pick<LookupQuery, "query" | "searchFields">): Prisma.UserWhereInput {
   return { AND: lookupWords(request.query).map(word => ({ OR: request.searchFields.map(path => {
     const text = { contains: word, mode: "insensitive" as const };
-    if (path === "partner.name") return { partner: { is: { name: text } } };
-    if (path === "id") return { id: text };
-    return { login: text };
-  }) })) };
-}
-
-export function partnerLookupWhere(request: Pick<LookupQuery, "query" | "searchFields">): Prisma.PartnerWhereInput {
-  return { AND: lookupWords(request.query).map(word => ({ OR: request.searchFields.map(path => {
-    const text = { contains: word, mode: "insensitive" as const };
-    if (path === "user.login") return { user: { is: { login: text } } };
+    if (path === "name") return { name: text };
     if (path === "email") return { email: text };
     if (path === "phone") return { phone: text };
     if (path === "id") return { id: text };
-    return { name: text };
+    return { login: text };
   }) })) };
 }
 

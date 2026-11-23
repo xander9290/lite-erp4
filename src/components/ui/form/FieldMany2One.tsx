@@ -66,7 +66,7 @@ export default function FieldMany2One<TFieldValues extends FieldValues = FieldVa
 
 function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props: EditableProps<TFieldValues>) {
   const {
-  name, label, direction = "block", model = "partner", load: baseLoad, searchFields = lookupModels[model as Many2OneModel].searchFields,
+  name, label, direction = "block", model = "user", load: baseLoad, searchFields = lookupModels[model as Many2OneModel].searchFields,
   displayName = lookupModels[model as Many2OneModel].displayName, columns, pageSize = 10, clearable = true,
   onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y seleccionar…",
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps

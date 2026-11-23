@@ -2,10 +2,10 @@ import "server-only";
 import { Fields, Model } from "@/lib/orm";
 import { defineModule } from "@/lib/modules/define";
 
-/** Relates to the native Partner without declaring core (implicit dependency). */
+/** Relates to the native User without declaring core (implicit dependency). */
 class Cliente extends Model {
   name = Fields.Text({ label: "Nombre", required: true, maxLength: 80 });
-  contactoId = Fields.Many2one("Partner", { label: "Contacto", tracking: true });
+  contactoId = Fields.Many2one("User", { label: "Contacto", tracking: true });
   responsableId = Fields.Many2one("User", { label: "Responsable" });
 }
 

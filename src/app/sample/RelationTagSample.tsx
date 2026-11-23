@@ -11,7 +11,7 @@ import { searchMany2One } from "@/lib/many2one/actions";
 import type { Many2OneRecord } from "@/lib/many2one/types";
 import { relationTagSampleSchema, type RelationTagSampleValues } from "./sample.schema";
 
-const defaults: RelationTagSampleValues = { partnerIds: [], userIds: [] };
+const defaults: RelationTagSampleValues = { reviewerIds: [], userIds: [] };
 
 export default function RelationTagSample() {
   const methods = useForm<RelationTagSampleValues>({ resolver: zodResolver(relationTagSampleSchema), defaultValues: defaults });
@@ -24,14 +24,14 @@ export default function RelationTagSample() {
   async function loadExample() {
     setLoading(true); setNotice(null);
     try {
-      const [partners, users] = await Promise.all([
-        searchMany2One({ model: "partner", searchFields: ["name", "user.login"], displayName: "{name}", pageSize: 3 }),
-        searchMany2One({ model: "user", searchFields: ["login", "partner.name"], displayName: "[{login}] {partner.name}", pageSize: 3 }),
+      const [reviewers, users] = await Promise.all([
+        searchMany2One({ model: "user", searchFields: ["name", "login"], displayName: "{name}", pageSize: 3 }),
+        searchMany2One({ model: "user", searchFields: ["login", "name"], displayName: "[{login}] {name}", pageSize: 3 }),
       ]);
-      if (!partners.ok || !users.ok) { setNotice("No pudimos cargar los registros. Intenta nuevamente."); return; }
-      methods.reset({ partnerIds: partners.items.map(option => option.value), userIds: users.items.map(option => option.value) });
+      if (!reviewers.ok || !users.ok) { setNotice("No pudimos cargar los registros. Intenta nuevamente."); return; }
+      methods.reset({ reviewerIds: reviewers.items.map(option => option.value), userIds: users.items.map(option => option.value) });
       setChange(null); setSubmitted(null);
-      if (!partners.total) setNotice("Aún no hay contactos en la base de datos. Puedes probar la búsqueda y su estado vacío.");
+      if (!reviewers.total) setNotice("Aún no hay usuarios en la base de datos. Puedes probar la búsqueda y su estado vacío.");
     } catch { setNotice("No pudimos conectar para cargar los registros."); }
     finally { setLoading(false); }
   }
@@ -47,15 +47,15 @@ export default function RelationTagSample() {
           <span className="badge badge-soft badge-primary">Many2many · Tags</span>
         </header>
         <FormLayout methods={methods} onSubmit={setSubmitted} onInvalid={() => setSubmitted(null)} aria-labelledby="field-relation-tag-title">
-          <FormGroup legend="Contactos · de 1 a 5">
-            <FieldRelationTag<RelationTagSampleValues> name="partnerIds" label="Contactos" model="partner" searchFields={["name", "user.login"]} displayName="{name}"
-              columns={[{ field: "user.login", label: "Usuario vinculado" }]} pageSize={5} maxSelected={5} required
-              onChange={(ids, records) => { setChange({ field: "partnerIds", ids, records }); setSubmitted(null); }} />
+          <FormGroup legend="Usuarios opcionales · de 1 a 5">
+            <FieldRelationTag<RelationTagSampleValues> name="reviewerIds" label="Usuarios opcionales" model="user" searchFields={["name", "login"]} displayName="{name}"
+              columns={[{ field: "login", label: "Login" }]} pageSize={5} maxSelected={5} required
+              onChange={(ids, records) => { setChange({ field: "reviewerIds", ids, records }); setSubmitted(null); }} />
             <p className="text-xs leading-relaxed text-base-content/55">Zod exige al menos un contacto. Busca por su nombre o por el login de su usuario vinculado.</p>
           </FormGroup>
           <FormGroup legend="Usuarios · opcional, sin label">
-            <FieldRelationTag<RelationTagSampleValues> name="userIds" aria-label="Usuarios opcionales" direction="inline" model="user" searchFields={["login", "partner.name"]} displayName="[{login}] {partner.name}"
-              columns={[{ field: "partner.name", label: "Contacto" }]} maxSelected={8} placeholder="Agregar usuarios…"
+            <FieldRelationTag<RelationTagSampleValues> name="userIds" aria-label="Usuarios opcionales" direction="inline" model="user" searchFields={["login", "name"]} displayName="[{login}] {name}"
+              columns={[{ field: "name", label: "Nombre" }]} maxSelected={8} placeholder="Agregar usuarios…"
               onChange={(ids, records) => { setChange({ field: "userIds", ids, records }); setSubmitted(null); }} />
             <p className="text-xs leading-relaxed text-base-content/55">Sin label ocupa todo el ancho. Quita un tag con su ×, o usa Retroceso cuando la búsqueda esté vacía.</p>
           </FormGroup>

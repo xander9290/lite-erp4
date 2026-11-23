@@ -1,7 +1,6 @@
 /** Public lookup contract. Never expose complete Prisma records here. */
 export const lookupModels = {
-  user: { fields: ["id", "login", "partner.name"], searchFields: ["login", "partner.name"], displayName: "[{login}] {partner.name}" },
-  partner: { fields: ["id", "name", "email", "phone", "user.login"], searchFields: ["name", "user.login"], displayName: "{name}" },
+  user: { fields: ["id", "login", "name"], searchFields: ["login", "name"], displayName: "[{login}] {name}" },
 } as const;
 
 export type Many2OneModel = keyof typeof lookupModels;
@@ -11,8 +10,6 @@ export type Many2OneRecord = {
   name?: string;
   email?: string | null;
   phone?: string | null;
-  partner?: { id: string; name: string } | null;
-  user?: { id: string; login: string } | null;
 };
 export type Many2OneOption = { value: string; label: string; record: Many2OneRecord; domainValid?: boolean };
 export type Many2OneRequest = {

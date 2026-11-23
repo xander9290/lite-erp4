@@ -1,6 +1,5 @@
 export const listModels = {
-  partner: { fields: ["id", "name", "email", "phone", "user.login"], searchFields: ["name", "email", "phone", "user.login"], defaultSort: "name", fieldTypes: { id: "text", name: "text", email: "text", phone: "text", "user.login": "text" }, nullableFields: ["email", "phone"], optionalRelations: ["user"] },
-  user: { fields: ["id", "login", "partner.name", "lastLogin", "active", "isAdmin", "createdAt"], searchFields: ["login", "partner.name"], defaultSort: "login", fieldTypes: { id: "text", login: "text", "partner.name": "text", lastLogin: "datetime", active: "boolean", isAdmin: "boolean", createdAt: "datetime" }, nullableFields: ["lastLogin"], optionalRelations: ["partner"] },
+  user: { fields: ["id", "login", "name", "email", "phone", "lastLogin", "active", "isAdmin", "createdAt"], searchFields: ["login", "name", "email", "phone"], defaultSort: "login", fieldTypes: { id: "text", login: "text", name: "text", email: "text", phone: "text", lastLogin: "datetime", active: "boolean", isAdmin: "boolean", createdAt: "datetime" }, nullableFields: ["lastLogin", "email", "phone"], optionalRelations: [] },
 } as const;
 
 export type ListModel = keyof typeof listModels;
@@ -55,8 +54,7 @@ export type ListPage = { rows: ListRecord[]; total: number; page: number; pageSi
 export type ListResult = { ok: true; data: ListPage } | { ok: false; error: string };
 
 const partnerWidgets: Record<ListModel, Readonly<Record<string, string>>> = {
-  partner: { name: "avatarUrl" },
-  user: { "partner.name": "partner.avatarUrl" },
+  user: { "name": "avatarUrl" },
 };
 
 /** Auxiliary avatar paths are whitelisted separately from searchable/sortable fields. */

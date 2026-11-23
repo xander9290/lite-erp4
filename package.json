@@ -19,8 +19,6 @@
     "test:applications": "node --import tsx --test src/lib/applications/manifest.test.ts",
     "test:access": "node --conditions=react-server --import tsx --test src/lib/access/*.test.ts",
     "test:capabilities:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts --capabilities-only",
-    "test:contacts": "node --conditions=react-server --import tsx --test \"src/app/(auth)/erp/contactos/schemas/contact.schema.test.ts\" \"src/app/(auth)/erp/contactos/models/partner.test.ts\"",
-    "test:contacts:integration": "node --conditions=react-server --import tsx scripts/contacts.integration.ts",
     "test:orm": "node --conditions=react-server --import tsx --test src/lib/orm/*.test.ts",
     "test:images": "node --conditions=react-server --import tsx --test src/lib/orm/image.test.ts src/lib/uploads/model-image.test.ts src/components/ui/form/imageProcessing.test.mjs",
     "orm:generate": "node --conditions=react-server --import tsx scripts/orm-generate.ts",
@@ -60,7 +58,8 @@
     "test:nested:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts --nested-only",
     "test:domains:integration": "node --conditions=react-server --import tsx scripts/modules.integration.ts --domains-only",
     "ubicaciones:import": "node --conditions=react-server --import tsx scripts/importar-estados.ts",
-    "test:ubicaciones:import": "node --conditions=react-server --import tsx scripts/importar-estados.integration.ts"
+    "test:ubicaciones:import": "node --conditions=react-server --import tsx scripts/importar-estados.integration.ts",
+    "test:user-profile-migration:integration": "node --import tsx scripts/user-profile-migration.integration.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

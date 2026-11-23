@@ -5,12 +5,8 @@ import { ModelValidationError } from "../orm/context";
 import { deleteListSelection, type ListDeleteRepository } from "./delete";
 import type { ListModel } from "./types";
 
-// Explicit delegates only. Deleting a User preserves its shared Partner contact.
+// Explicit delegates only. Only registered account operations are exposed.
 const repositories = {
-  partner: {
-    async read(tx, id) { const row = await tx.partner.findUnique({ where: { id }, select: { updatedAt: true } }); return row ? { revision: row.updatedAt.toISOString() } : null; },
-    async remove(tx, id, revision) { await tx.partner.delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },
-  },
   user: {
     async read(tx, id) { const row = await tx.user.findUnique({ where: { id }, select: { updatedAt: true } }); return row ? { revision: row.updatedAt.toISOString() } : null; },
     async remove(tx, id, revision) { await tx.user.delete({ where: { id, updatedAt: new Date(revision) }, select: { id: true } }); },

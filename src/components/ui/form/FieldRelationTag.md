@@ -7,19 +7,19 @@ espacio inferior y limita la altura con scroll interno, también dentro de
 contenedores desplazables y modales. Ejemplo: `/sample#relation-dropdown`.
 
 ```tsx
-const schema = z.object({ partnerIds: z.array(z.string().min(1)).min(1).max(5) });
+const schema = z.object({ userIds: z.array(z.string().min(1)).min(1).max(5) });
 const methods = useForm({
   resolver: zodResolver(schema),
-  defaultValues: { partnerIds: [] }, // También admite un arreglo de IDs existentes.
+  defaultValues: { userIds: [] }, // También admite un arreglo de IDs existentes.
 });
 
 <FormLayout methods={methods} onSubmit={onSubmit}>
   <FormGroup>
     <FieldRelationTag
-      name="partnerIds"
-      label="Contactos"
-      model="partner"
-      searchFields={["name", "user.login"]}
+      name="userIds"
+      label="Usuarios"
+      model="user"
+      searchFields={["name", "login"]}
       displayName="{name}"
       columns={[{ field: "user.login", label: "Usuario" }]}
       maxSelected={5}
@@ -35,7 +35,7 @@ const methods = useForm({
 - El desplegable permite agregar/quitar un registro. El modal usa checkboxes y conserva las marcas entre búsquedas y páginas. **Aplicar selección** confirma el conjunto; Cancelar/Escape lo descartan sin cambiar el formulario ni ejecutar onChange.
 - Las × quitan tags; Retroceso quita el último cuando la búsqueda está vacía. Flechas/Enter/Escape funcionan en el desplegable.
 - `defaultValues` y `reset` reciben IDs. Se resuelven por lote, sin modificar `isDirty` ni ejecutar onChange. Escribir búsquedas o marcar provisionalmente en el modal tampoco cambia RHF.
-- `model`, `searchFields`, `displayName`, `columns` y `pageSize` funcionan como en FieldMany2One. Las relaciones opcionales y rutas como `partner.name` están soportadas.
+- `model`, `searchFields`, `displayName`, `columns` y `pageSize` funcionan como en FieldMany2One. El proveedor manual de usuarios publica `login` y `name`; para modelos declarativos usa su lookup autorizado.
 - `maxSelected`: de 1 a 100 (100 predeterminado); replicar el límite en Zod. Los valores iniciales que superen el límite se reportan como inválidos.
 - `direction="inline" | "block"`, label opcional (sin label ocupa todo el ancho), `disabled`, `readOnly`, `required`, `clearable`, `placeholder` y atributos accesibles.
 - Sin autocomplete, creación ni edición. Los errores del formulario pasan por los toasts de FormLayout. Las consultas fallidas tienen reintento local.

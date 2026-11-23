@@ -15,9 +15,9 @@ Guía para crear aplicaciones con `defineModule` (fases 2–4 del
 de modelo; rutas, acciones, servicios, repositorio y vistas salen por convención.
 Sólo se escribe TSX para lo que se personaliza.
 
-> Estado: utilizado por Ubicaciones y contactosextra. Autorización por grupos,
+> Estado: utilizado por Ubicaciones. El piloto contactosextra fue retirado. Autorización por grupos,
 > permisos por modelo y reglas de registro (sección 5); sin concesiones, sólo
-> administradores. Contactos y Usuarios presentan los modelos nativos de core;
+> administradores. Usuarios presenta el único modelo nativo, core.user;
 > las referencias a Flota y Tickets describen aplicaciones retiradas.
 
 ## Estructura
@@ -34,7 +34,7 @@ El título corresponde al registro persistido, no al borrador RHF. Guardar o
 ejecutar una acción desde ModelForm refresca la ruta y sus metadatos. La carga
 actual hace una lectura autorizada para metadata y otra mediante FormViewLoader;
 no cambia el contrato de las vistas expulsadas ni las rutas manuales de
-Contactos/Usuarios. Una futura unificación de carga debe conservar loader,
+Usuarios. Una futura unificación de carga debe conservar loader,
 reintentos, autorización y actualización del registro sin duplicar consultas.
 
 ```
@@ -135,8 +135,8 @@ export class Tarea extends Model {
 ```
 
 Many2one entre modelos de módulos usa el nombre Prisma (`"DemoCategoria"`) y obtiene
-búsqueda y etiquetas autorizadas sin configurar nada. Partner y User son destinos
-nativos de core y utilizan sus lookups autorizados.
+búsqueda y etiquetas autorizadas sin configurar nada. User es el destino
+nativo de core y utiliza su lookup autorizado.
 
 ### Opciones de colección en cada Field
 
@@ -212,7 +212,7 @@ vistas ya registradas; `--dry-run` sólo muestra el plan.
 Para personalizar únicamente el formulario que abre una colección One2many de
 consulta con `openIn="modal"`, usa `npm run eject:view -- demo tarea modal`.
 Registra `views.modal`, con fallback a `views.form`. Desde un módulo extensor:
-`npm run eject:view -- contactosextra core.partner modal`. Genera el formulario
+`npm run eject:view -- bibliotecaextra biblioteca.libro modal`. Genera el formulario
 completo dentro del extensor y conserva la vista de página y sus inserciones.
 [Sintaxis, precedencia e inserciones independientes](formularios-modal.md#vista-modal-independiente-y-eject).
 
@@ -252,7 +252,7 @@ rules: [
   puede leer ese registro, ese tramo se presenta **vacío** (y todo lo que cuelga de
   él); el ID guardado se conserva y guardar no borra la relación. Lo resuelve el
   servidor por lotes, dentro de la misma transacción. Modelos de infraestructura
-  (User, Partner) no tienen reglas de módulo. Asignar una referencia que el actor no
+  (User) no tienen reglas de módulo. Asignar una referencia que el actor no
   puede leer todavía no se rechaza al guardar.
 - **Superusuario**: `isAdmin` tiene acceso total. Un módulo sin `groups` sigue
   siendo sólo para administradores.
@@ -471,7 +471,7 @@ guardado. Sin vista propia se conservan los controles automáticos dentro de un
 FormGroup con el nombre del extensor. Un formulario expulsado sólo necesita
 conservar `<ModelExtensions />`.
 Si el formulario ya presenta explícitamente campos delegados (por ejemplo los de
-Partner en User), usar `<ModelExtensions excludeFields={["name", "email", "phone", "avatarUrl"]} />`
+campos ya maquetados), usar `<ModelExtensions excludeFields={["name", "email", "phone", "avatarUrl"]} />`
 para evitar controles duplicados. Sólo afecta al render automático; los campos
 permanecen en RHF y en el guardado. Las otras extensiones se siguen presentando.
 
@@ -497,7 +497,7 @@ la acción desde el base. El superusuario conserva el bypass existente.
 
 Límites vigentes: al menos un campo persistente por extensión; campos obligatorios
 con default literal; sin One2many, sensitive, unique obligatorio/con default ni
-extensión de líneas One2many. Partner/User siguen fuera (fase 3). No se edita el
+extensión de líneas One2many. User admite extensiones según el contrato de core. No se edita el
 esquema/propiedad del base para almacenar campos extendidos. Diseño e historial en
 [Herencia de modelos](ideas/herencia-modelos.md).
 

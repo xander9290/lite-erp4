@@ -57,7 +57,7 @@ const tsx = (file: string) => command(["--conditions=react-server", "--import", 
 try {
   await database.connect();
   await database.query(`CREATE SCHEMA "${schema}"`); created = true;
-  for (const directory of ["src", "scripts", "public", "prisma"]) await cp(join(project, directory), join(root, directory), { recursive: true, filter: path => !path.endsWith(".orm-sync.lock") });
+  for (const directory of ["src", "scripts", "public", "docs", "prisma"]) await cp(join(project, directory), join(root, directory), { recursive: true, filter: path => !path.endsWith(".orm-sync.lock") });
   for (const file of [".gitignore", "package.json", "package-lock.json", "tsconfig.json", "next-env.d.ts", "prisma7.config.ts"]) await cp(join(project, file), join(root, file));
   await symlink(join(project, "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
   await writeFile(join(root, ".env.local"), `DATABASE_URL=${JSON.stringify(url.toString())}\nAUTH_SECRET=${randomBytes(32).toString("hex")}\nAUTH_TRUST_HOST=true\nAUTH_URL=${base}\n`, { mode: 0o600 });
@@ -74,7 +74,7 @@ try {
   const trace = JSON.parse(await readFile(join(root, ".next/server/app/(auth)/erp/ajustes/modulos/page.js.nft.json"), "utf8")) as { files: string[] };
   // A declarative manifest is required only when the project has modules (src/modules may be empty).
   const declared = (await readdir(join(root, "src/modules"), { withFileTypes: true })).filter(entry => entry.isDirectory()).map(entry => `src/modules/${entry.name}/manifest.ts`);
-  for (const suffix of [...declared, "src/app/(auth)/erp/contactos/manifest.ts", "prisma/.orm-installations.json"]) assert.ok(trace.files.some(file => file.replaceAll("\\", "/").endsWith(suffix)), `El trace de Módulos debe incluir ${suffix}`);
+  for (const suffix of [...declared, "prisma/.orm-installations.json"]) assert.ok(trace.files.some(file => file.replaceAll("\\", "/").endsWith(suffix)), `El trace de Módulos debe incluir ${suffix}`);
   assert.ok(!trace.files.some(file => /(?:^|\/)\.env[^/]*$|(?:^|\/)\.module-operations\//.test(file.replaceAll("\\", "/"))), "El trace no debe distribuir configuración privada ni respaldos");
   console.log("✓ Trace de Módulos incluye manifests y propiedad para el catálogo en producción.");
   // Default cookie names are required by auth's tampering test. A random dedicated
@@ -89,7 +89,7 @@ try {
     await delay(500);
   }
   assert.ok(ready, sanitize(`El servidor temporal no arrancó: ${serverLog}`));
-  for (const file of ["auth.integration.ts", "contacts.integration.ts", "theme.integration.ts"]) await tsx(`scripts/${file}`);
+  for (const file of ["auth.integration.ts", "theme.integration.ts"]) await tsx(`scripts/${file}`);
 } finally {
   // Terminate only the recorded fixture process tree, including workers on timeout.
   if (server) await stop(server);
@@ -99,4 +99,4 @@ try {
     await rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 500 });
   }
 }
-console.log("✓ Integraciones de autenticación, Contactos y tema aprobadas; proyecto y esquema temporales eliminados.");
+console.log("✓ Integraciones de autenticación y tema aprobadas; proyecto y esquema temporales eliminados.");

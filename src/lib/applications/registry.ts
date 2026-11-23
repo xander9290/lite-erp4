@@ -1,7 +1,6 @@
 import "server-only";
 
 import { icons, type LucideIcon } from "lucide-react";
-import { contactsManifest } from "@/app/(auth)/erp/contactos/manifest";
 import { settingsManifest } from "@/app/(auth)/erp/ajustes/manifest";
 import { createApplicationRegistry, type ApplicationManifest } from "./manifest";
 import { scaffoldApplications } from "./scaffolded/registry";
@@ -17,7 +16,6 @@ const moduleApplications: ApplicationManifest[] = installedModules().filter(defi
 
 /** Explicit imports keep modules reviewable and avoid filesystem discovery at runtime. */
 export const applications = createApplicationRegistry([
-  contactsManifest,
   settingsManifest,
   ...scaffoldApplications,
   ...moduleApplications,

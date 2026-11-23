@@ -7,15 +7,16 @@ No requiere SQL por sí mismo.
 
 ## Colecciones de consulta
 
-En el modelo o su extensión:
+Ejemplo conceptual para un modelo declarativo `DirectorioContacto` (Directorio
+aún no está implementado), en su clase o extensión:
 
 ```ts
-parentId = Fields.Many2one("Partner", {
+parentId = Fields.Many2one("DirectorioContacto", {
   label: "Contacto principal",
   onDelete: "Restrict",
   domain: d => d.neq("id", d.record.id),
 });
-childIds = Fields.One2many("Partner", {
+childIds = Fields.One2many("DirectorioContacto", {
   label: "Subcontactos",
   inverse: "parentId",
   readonly: true,
@@ -116,22 +117,22 @@ Genera `views/PaisModal.tsx` y registra el loader en `models.pais.views.modal`.
 Para un modelo que tu módulo ya extiende, usa el ID completo del destino:
 
 ```bash
-npm run eject:view -- contactosextra core.partner modal --dry-run
-npm run eject:view -- contactosextra core.partner modal
+npm run eject:view -- bibliotecaextra biblioteca.libro modal --dry-run
+npm run eject:view -- bibliotecaextra biblioteca.libro modal
 ```
 
 Este último ya se ejecutó en el proyecto. Archivo editable:
-`src/modules/contactosextra/views/CorePartnerModal.tsx`. El registro queda en el
+`src/modules/bibliotecaextra/views/BibliotecaLibroModal.tsx`. El registro queda en el
 manifest del extensor, junto a las inserciones existentes:
 
 ```ts
 extends: {
-  "core.partner": {
-    model: PartnerExtra,
-    views: { modal: () => import("./views/CorePartnerModal") },
+  "biblioteca.libro": {
+    model: LibroExtra,
+    views: { modal: () => import("./views/BibliotecaLibroModal") },
     insertions: {
-      form: () => import("./views/PartnerInsertions"),
-      list: () => import("./views/PartnerListInsertions"),
+      form: () => import("./views/LibroInsertions"),
+      list: () => import("./views/LibroListInsertions"),
     },
   },
 },
@@ -155,8 +156,8 @@ de cada Field siguen derivándose del contrato autorizado del servidor.
 
 Las líneas editables conservan FieldOne2many inline. Las relaciones de consulta
 se generan con ModelChildCollections; el modal las abre a su vez en modal.
-La página principal de Contactos conserva su TSX e inserciones. No se han cambiado
-defaults, permisos ni reglas del contacto. Eject rechaza archivos/vistas existentes,
+La página principal del modelo conserva su TSX e inserciones. No se han cambiado
+defaults, permisos ni reglas del registro. Eject rechaza archivos/vistas existentes,
 manifests ambiguos y enlaces simbólicos; no admite force ni aplica SQL.
 
 ### Inserciones del modal

@@ -27,7 +27,7 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
   const files: Record<string, string> = {};
   const relations = fields.filter(([, field]) => field.kind === "many2one");
   const lookupImports: string[] = [], lookupEntries: string[] = [];
-  const manualLookups = relations.some(([name, field]) => !options.lookups?.[name] && field.kind === "many2one" && ["Partner", "User"].includes(field.target));
+  const manualLookups = relations.some(([name, field]) => !options.lookups?.[name] && field.kind === "many2one" && field.target === "User");
   if (manualLookups) lookupImports.push('import { searchMany2One } from "@/lib/many2one/actions";', 'import { lookupModels } from "@/lib/many2one/types";');
   for (const [name, field] of relations) {
     const lookup = options.lookups?.[name];
@@ -35,8 +35,8 @@ export function resourceTemplates(identity: Identity, entry: GenerationModel, mo
       const [path, exported] = lookup.split("#"), alias = `lookup${name[0].toUpperCase() + name.slice(1)}`;
       lookupImports.push(`import { ${exported} as ${alias} } from ${quote(path)};`);
       lookupEntries.push(`${name}: ${alias}`);
-    } else if (field.kind === "many2one" && ["Partner", "User"].includes(field.target)) {
-      const target = field.target === "Partner" ? "partner" : "user";
+    } else if (field.kind === "many2one" && field.target === "User") {
+      const target = "user";
       lookupEntries.push(`${name}: (request: ModelLookupRequest) => searchMany2One({ ...request, model: "${target}", searchFields: lookupModels.${target}.searchFields, displayName: lookupModels.${target}.displayName })`);
     } else throw new Error(`${name}: declara --lookup campo=modulo#exportAsync para resolver el Many2one con un proveedor autorizado.`);
   }

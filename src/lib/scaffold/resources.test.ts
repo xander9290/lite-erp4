@@ -32,7 +32,7 @@ test("view templates support typed fields, modal guards and explicit kanban stat
     count = Fields.Integer({ default: 0 });
     at = Fields.DateTime();
     state = Fields.Selection([{ value: "draft", label: "Borrador" }, { value: "done", label: "Hecho" }] as const, { required: true });
-    ownerId = Fields.Many2one("Partner");
+    ownerId = Fields.Many2one("User");
     logo = Fields.Image({ folder: "tests/work", tracking: true });
   }, { name: "TestWork", table: "test_work" });
   const entry = { model, clientFields: Object.keys(model.fields) };
@@ -54,7 +54,7 @@ test("view templates support typed fields, modal guards and explicit kanban stat
   assert.match(template.files["views/work.list.ts"], /modelColumns\(recordFields/);
   assert.match(template.files["models/work.service.ts"], /relations:.*ownerId: async request/);
   assert.doesNotMatch(template.files["actions/work.actions.ts"], /resolveListLabels/);
-  assert.match(template.files["schemas/work.ui.ts"], /model: "partner"/);
+  assert.match(template.files["schemas/work.ui.ts"], /model: "user"/);
   assert.match(template.files["views/WorkForm.tsx"], /model=\{recordUI\}/);
   assert.match(template.files["schemas/work.ui.ts"], /generated\/orm\/uploads\/test\/TestWork.images/);
   assert.doesNotMatch(template.files["actions/work.actions.ts"], /createModelImageSigner/);

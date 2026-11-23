@@ -5,6 +5,110 @@ Pendiente solicitado el 2026-11-13 y ampliado el 2026-11-14. **Implementado el
 acuerdo original y sus criterios de aceptación. Ventas y acciones en Flota siguen
 sin crearse.
 
+## Confirmación en FormButton (2026-11-23)
+
+Implementado por autorización del usuario. Prop opcional confirm de tipo string:
+
+```tsx
+<FormButton
+  action={partnerActions.archivar}
+  confirm="¿Quieres archivar este contacto?"
+/>
+```
+
+El texto pertenece a la presentación TSX; no es metadata de @action ni se genera.
+No requiere orm:generate, sincronización o SQL. Sin confirm, o con texto vacío/
+blanco, conserva el flujo directo anterior. La prop se consume, no se envía al DOM.
+
+Orden: confirmación → parámetros si existen → validación/guardado si corresponde
+→ acción con identidad/revisión persistidas. Usa useAlerts/AlertProvider, título
+«Confirmar acción» y botones Cancelar/Continuar. Escape/fondo/cierre equivalen a
+cancelar; sin aceptación no hay parámetros, validación, guardado ni ejecución.
+Cancelar cualquiera de los diálogos conserva el borrador y los argumentos previos
+reutilizables, sin escrituras. Un error de preparación no se presenta como commit
+incierto: informa que la acción no pudo iniciarse.
+
+FormView mantiene el lock síncrono y el bloqueo visual desde la confirmación hasta
+el fin del ciclo. Tras las esperas comprueba montaje, modelo/registro vigente,
+disponibilidad y consulta/bloqueo actuales antes de escribir. Los permisos y reglas
+se revalidan en el servidor habitual; confirm no concede acceso ni sustituye una
+restricción de negocio. Guardado fallido no ejecuta; fallo posterior de acción
+conserva el guardado previo; no hay reintentos automáticos. Cada nuevo intento
+explícito vuelve a pedir confirmación.
+
+Demo ficticia /sample#form-actions: comparación con/sin confirmación y fallos de
+guardado/acción, con log de llamadas en memoria. /sample#action-parameters muestra
+confirmación antes de los argumentos y conserva su reintento. Ejemplo en
+[/documentation#confirmar-antes-de-ejecutar-una-accion](/documentation#confirmar-antes-de-ejecutar-una-accion).
+No se habilitaron confirmaciones en apps reales. Las acciones por selección siguen
+pendientes, con contrato independiente en la sección siguiente.
+
+## Pendiente: acciones de modelo por selección en listas (2026-11-23)
+
+Propuesta aceptada por el usuario para registrarla como pendiente, sin autorizar
+su implementación. Hoy la selección de ListView permite eliminar/exportar; no
+hay ejecución general de @action sobre seleccionados. Reutilizar las acciones
+individuales y referencias tipadas existentes, con publicación explícita en modelo
+y vista. Las sintaxis siguientes son propuestas; no son APIs disponibles.
+
+En el modelo, habilitar explícitamente la acción para listas:
+
+```ts
+@action({ label: "Archivar", list: true })
+archivar(record: ActionRecord<Nota>): ActionPatch<Nota> {
+  if (!record.active) throw new ModelValidationError("La nota ya está archivada.");
+  return { active: false };
+}
+```
+
+En la vista, elegir las acciones mediante sus referencias generadas:
+
+```tsx
+import { NotasNotaActions as notaActions } from
+  "@/generated/orm/actions/notas/NotasNota.actions";
+
+<ModelCollection
+  config={config}
+  selectionActions={[notaActions.archivar]}
+/>
+```
+
+La lista muestra «Archivar» dentro de Acciones al seleccionar registros. Etiqueta
+y esquema de parámetros proceden del modelo; la vista sólo elige qué presentar.
+La publicación efectiva exige habilitación para listas y permisos del actor;
+una referencia o prop TSX no concede acceso. Concretar los nombres y el tipado
+de las props al implementar, incluyendo ListView estándar y hojas agrupadas.
+
+Plan inicial y criterios de aceptación:
+
+- Selección explícita de la página/hoja actual, inicialmente hasta 50 registros
+  únicos con ID y revisión. No selección implícita de todos los resultados ni
+  grupos enteros. Mantener las reglas actuales de limpieza de selección.
+- Parámetros comunes recogidos una vez para el lote; cancelar no escribe.
+- Un ejecutor servidor compartido recorre los registros mediante for...of y
+  reutiliza la lógica individual de la acción. El autor del modelo no necesita
+  agregar un bucle a cada método ni duplicarlo para formulario/lista.
+- Una sola transacción Serializable: revalidar sesión, entrada, permisos,
+  restricciones de campos/acciones, reglas de registro, parámetros/referencias
+  y revisión por registro; conservar hooks, validación, persistencia e historial.
+  Extraer/reutilizar el ejecutor interno de la acción; no llamar al wrapper público
+  service.action en un bucle con transacciones independientes.
+- Primer alcance atómico: cualquier rechazo revierte todo el lote e identifica
+  el registro fallido sólo con información autorizada. Sin resultados parciales
+  ni reintentos automáticos de escrituras; errores/commit desconocido requieren
+  una respuesta y recarga coherentes, sin afirmar un éxito no confirmado.
+- Bloquear envíos repetidos y cambios incompatibles durante la ejecución.
+  Tras éxito, refrescar conservando la consulta; comprobar cancelación, fallos,
+  concurrencia, revocación, aislamiento y rollback tardío en fixtures temporales.
+  Añadir demo ficticia y ejemplo en /documentation al implementar.
+
+Una acción que necesite operar sobre el conjunto completo podría recibir un array
+tipado en una variante futura, sólo ante un caso real (p. ej. un documento agregado).
+No introducir recordsets tipo self ni esa API colectiva por anticipación.
+Beneficio: publicar una acción existente con poca configuración, compartiendo
+negocio y garantías del servidor. No añadir acciones a aplicaciones reales ni
+cambiar el contrato de @action/FormButton/Kanban sólo por guardar esta propuesta.
+
 ## Contrato implementado (2026-11-14)
 
 Kanban también puede ejecutar estos métodos mediante transiciones declaradas

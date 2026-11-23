@@ -20,8 +20,8 @@ type FormActionsContextValue = {
   readOnly: boolean;
   /** Labels of the actions the server publishes for this form, when known. */
   actions?: readonly import("@/lib/orm/action-parameters").ClientModelAction[];
-  /** Runs save (if new/dirty) and then the action, under one lock. Resolves true on success. */
-  run: ((action: string) => Promise<boolean>) | null;
+  /** Optional confirmation, parameters, save and action share one lock. Resolves true on success. */
+  run: ((action: string, confirmation?: string) => Promise<boolean>) | null;
   /** Which action is running, for its spinner. */
   running: string | null;
 };
@@ -50,15 +50,17 @@ export type FormButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "typ
   variant?: "primary" | "secondary";
   /** Hide without unmounting state; use React conditions for business visibility. */
   invisible?: boolean;
+  /** Optional presentation-only question, asked before parameters, saving or execution. */
+  confirm?: string;
 };
 
 /**
- * Collects declared parameters first (cancel does not save), then validates and saves
+ * Requests optional confirmation and declared parameters (cancel does not save), then validates and saves
  * the form (only if new or modified); on success, runs the
  * named action with the saved ID/revision. One lock covers both phases; a failed save
  * never runs the action, and a failed action keeps what was already saved.
  */
-export function FormButton({ action, children, variant = "primary", invisible = false, disabled, className = "", ...props }: FormButtonProps) {
+export function FormButton({ action, confirm, children, variant = "primary", invisible = false, disabled, className = "", ...props }: FormButtonProps) {
   const { model, locked, readOnly, actions, run, running } = useFormActions("FormButton");
   const name = actionReferenceName(action, model);
   const published = name ? actions?.find(item => item.name === name) : undefined;
@@ -66,7 +68,7 @@ export function FormButton({ action, children, variant = "primary", invisible = 
   const label = children ?? published.label;
   return <button {...props} type="button" disabled={disabled || locked}
     className={`btn btn-sm ${variant === "primary" ? "btn-primary" : "btn-soft"} gap-1.5 ${className}`}
-    onClick={() => { void run(name); }}>
+    onClick={() => { void run(name, confirm); }}>
     {running === name && <span className="loading loading-spinner loading-xs" aria-hidden="true" />}
     {label}
   </button>;

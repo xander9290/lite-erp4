@@ -40,14 +40,14 @@ export type PhoneSampleValues = z.infer<typeof phoneSampleSchema>;
 const uniqueIds = (maximum: number) => z.array(z.string().min(1)).max(maximum, `Selecciona como máximo ${maximum} registros.`)
   .refine(ids => new Set(ids).size === ids.length, "La selección contiene registros duplicados.");
 export const relationTagSampleSchema = z.object({
-  partnerIds: uniqueIds(5).min(1, "Contactos: selecciona al menos un registro."),
+  reviewerIds: uniqueIds(5).min(1, "Revisores: selecciona al menos un registro."),
   userIds: uniqueIds(8),
 });
 export type RelationTagSampleValues = z.infer<typeof relationTagSampleSchema>;
 
 export const many2OneSampleSchema = z.object({
   userId: z.string().min(1).nullable().refine(value => value !== null, "Usuario: selecciona un registro."),
-  partnerId: z.string().min(1).nullable(),
+  secondaryUserId: z.string().min(1).nullable(),
 });
 export type Many2OneSampleInput = z.input<typeof many2OneSampleSchema>;
 export type Many2OneSampleValues = z.output<typeof many2OneSampleSchema>;

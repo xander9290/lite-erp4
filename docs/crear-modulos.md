@@ -387,6 +387,38 @@ Guardado/acciones y protege los cambios pendientes.
 Puedes probar el flujo con datos ficticios en el
 [ejemplo de acciones de formulario](/sample#form-actions).
 
+## Confirmar antes de ejecutar una acción
+
+Añade la prop opcional `confirm` al FormButton de tu vista. Ejemplo, continuando
+con la referencia `notaActions.archivar` del ejercicio anterior:
+
+```tsx
+<FormHeader>
+  <FormButton
+    action={notaActions.archivar}
+    confirm="¿Quieres archivar esta nota?"
+  />
+</FormHeader>
+```
+
+El framework usa el diálogo global con Cancelar/Continuar. La pregunta aparece
+**antes** de solicitar parámetros, validar/guardar el formulario o ejecutar la
+acción. Cancelar (también Escape o cerrar el diálogo) conserva el borrador y no
+escribe. Aceptar continúa con el ciclo habitual; un fallo al guardar impide la
+acción. Si la acción falla después de guardar, ese guardado previo se conserva.
+
+El formulario y sus botones quedan bloqueados durante todo el ciclo para evitar
+envíos repetidos. La confirmación es presentación; el servidor conserva permisos,
+reglas y revisiones. No añadas window.confirm ni otra Server Action. Cambiar sólo
+esta prop no requiere generación ni migración. Si omites confirm, o el texto está
+vacío, no se pregunta. Cada reintento manual vuelve a confirmar.
+
+Puedes comprobar cancelación, aceptación y fallos con la
+[demo ficticia de acciones](/sample#form-actions). El registro de llamadas permite
+verificar que cancelar no guardó ni ejecutó. La
+[demo con parámetros](/sample#action-parameters) pregunta primero y después pide
+los argumentos; cancelar en cualquiera de los pasos no escribe.
+
 ## Personalizar el formulario de un One2many en modal
 
 Una relación One2many de consulta (`readonly: true`) presenta registros independientes.
@@ -405,19 +437,17 @@ FormGroup o Notebook dentro de ModelForm para cambiar su presentación; el frame
 conserva carga, permisos, validación y guardado. Sin views.modal reutiliza views.form.
 Este comando sólo personaliza el formulario: no añade una relación One2many al modelo.
 
-Si tu módulo extiende un modelo ajeno, indica su ID completo. Caso ya generado
-en este proyecto:
+Si tu módulo extiende un modelo ajeno, indica su ID completo. Ejemplo conceptual
+para una extensión `bibliotecaextra` de `biblioteca.libro` (debe declararse primero):
 
 ```bash
-npm run eject:view -- contactosextra core.partner modal
+npm run eject:view -- bibliotecaextra biblioteca.libro modal
 ```
 
-El archivo `src/modules/contactosextra/views/CorePartnerModal.tsx` queda en el
-extensor y su manifest registra `extends["core.partner"].views.modal`. Edita ese
-archivo; repetir eject rechaza la sobrescritura. La página principal de Contactos
-conserva su formulario e inserciones. Para personalizar inserciones del modal se
-usa `insertions.modal`, separada de `insertions.form`. No requiere sincronización
-de la base de datos. Puedes comparar diseños en la [demo ficticia](/sample#form-dialog).
+Genera `views/BibliotecaLibroModal.tsx` en el extensor y registra
+`extends["biblioteca.libro"].views.modal`. Repetir eject rechaza la sobrescritura.
+La página conserva su formulario e inserciones; `insertions.modal` personaliza
+las del modal. No aplica SQL. [Demo ficticia](/sample#form-dialog).
 
 ## Abrir formularios desde un botón TSX
 
@@ -431,21 +461,18 @@ extensiones. El diálogo reutiliza carga, validación, guardado y cierre protegi
 o necesitas las referencias en un proyecto existente, genera sin consultar la BD:
 
 ```bash
-npm run orm:generate -- contactosextra --forms-only --write
+npm run orm:generate -- biblioteca --forms-only --write
 ```
 
-En este proyecto ya existe
-`src/generated/orm/forms/contactosextra/ContactosextraCorePartner.form.ts`, que
-exporta `ContactosextraCorePartnerForm`. Apunta a `core.partner` e incluye los tipos
-de sus campos base y los de esta extensión. No se edita a mano.
-Para Biblioteca: `npm run orm:generate -- biblioteca --forms-only --write`, e
-importar `BibliotecaLibroForm` desde `@/generated/orm/forms/biblioteca/BibliotecaLibro.form`.
+Tras crear Biblioteca con el ejemplo anterior, importa `BibliotecaLibroForm` desde
+`@/generated/orm/forms/biblioteca/BibliotecaLibro.form`. También se genera
+`BibliotecaAutorForm` para los autores. No se editan a mano.
 No hace falta declarar acciones de ventana ni otra ruta.
 
 ### Preparar destinos adicionales en servidor
 
 Dentro de un formulario de `ModelRoute`, su propio modelo y los hijos readonly
-ya están preparados. El ejemplo de Contactos de abajo aprovecha esa composición.
+ya están preparados.
 Para abrir otro modelo o usar una página propia, prepara sólo los destinos que
 necesitas en la página o layout **servidor**:
 
@@ -484,62 +511,44 @@ El contenedor conserva loaders/inserciones en servidor y prepara sólo destinos
 legibles para la sesión. El botón vuelve a comprobar permisos al abrir; si falta
 la composición, informa el error sin sustituir tu vista personalizada.
 
-### Ejemplo completo: agregar una dirección de entrega
+### Ejemplo completo: crear un libro desde un autor
 
-Este ejemplo usa los modelos existentes de Contactos. Crea un archivo de vista,
-por ejemplo `src/modules/contactosextra/views/DeliveryButton.tsx`:
+En Biblioteca, un botón dentro del formulario del autor puede proponer su ID al
+crear un libro. Prepara `BibliotecaLibroForm` con `ModelFormTargets` en el árbol
+servidor que contiene ese formulario, como en el ejemplo anterior. No hace falta
+una relación One2many para abrir el destino adicional.
 
 ```tsx
 "use client";
 
 import { useWatch } from "react-hook-form";
 import ModelFormButton from "@/components/modules/ModelFormButton";
-import { useModelChildCollectionsRefresh } from "@/components/modules/ModelForm";
-import { ContactosextraCorePartnerForm } from "@/generated/orm/forms/contactosextra/ContactosextraCorePartner.form";
+import { BibliotecaAutorForm } from "@/generated/orm/forms/biblioteca/BibliotecaAutor.form";
+import { BibliotecaLibroForm } from "@/generated/orm/forms/biblioteca/BibliotecaLibro.form";
 
-export default function DeliveryButton() {
+export default function LibroButton() {
   const id = useWatch({ name: "id" }) as string | undefined;
-  const refreshChildren = useModelChildCollectionsRefresh();
-
   return (
     <ModelFormButton
-      form={ContactosextraCorePartnerForm}
-      origin={{ form: ContactosextraCorePartnerForm, id }}
-      defaults={{ parentId: id ?? "", partnerType: "delivery" }}
-      onSaved={refreshChildren}
+      form={BibliotecaLibroForm}
+      origin={{ form: BibliotecaAutorForm, id }}
+      defaults={{ autorId: id ?? "" }}
     >
-      Agregar dirección de entrega
+      Agregar libro
     </ModelFormButton>
   );
 }
 ```
 
-Coloca `<DeliveryButton />` dentro de un `FormGroup`, `FormHeader` o inserción del
-`ModelForm` principal. Comparte el contexto del formulario; no montes otro RHF.
-Por ejemplo, junto a la colección existente en la inserción de Contactos:
+Coloca `<LibroButton />` dentro del ModelForm del autor; comparte RHF sin montar
+otro formulario. `origin` desactiva el botón mientras el autor no tenga ID
+persistido. Abrir o cancelar no guarda el principal. El servidor comprueba lectura
+del origen, creación del destino y referencias; guardar conserva permisos,
+validación y concurrencia. `autorId` es una propuesta editable, no una restricción.
 
-```tsx
-import DeliveryButton from "./DeliveryButton";
-import { ModelChildCollections } from "@/components/modules/ModelForm";
-
-// Dentro del contenido de la inserción, bajo ModelForm:
-<>
-  <DeliveryButton />
-  <ModelChildCollections name="childIds" openIn="modal" />
-</>
-```
-
-`origin` desactiva el botón mientras el principal no tenga ID persistido. El usuario
-lo guarda explícitamente primero; abrir o cancelar el modal nunca lo guarda.
-El servidor vuelve a comprobar lectura del origen, permiso de crear el destino,
-campos iniciales y disponibilidad/dominio de las referencias Many2one. Guardar
-aplica otra vez las validaciones, permisos y concurrencia habituales del destino.
-
-`parentId` y `partnerType` son propuestas para crear, no restricciones inmutables.
-Si una relación debe ser obligatoria o no modificable, esa regla pertenece al
-modelo/servicio. El callback refresca las colecciones readonly del formulario
-principal conservando consulta y borradores; no llama a `router.refresh()`.
-Este ejemplo no modifica automáticamente las vistas existentes de Contactos.
+Si añades una colección readonly de libros al autor, prepara su relación en el
+modelo y usa `useModelChildCollectionsRefresh()` como `onSaved` para refrescarla
+sin perder borradores. Este ejemplo no añade esa relación ni modifica apps reales.
 
 ### Editar y elegir presentación
 
@@ -549,15 +558,15 @@ porque los permisos pueden ocultarlos:
 
 ```tsx
 <ModelFormButton
-  form={ContactosextraCorePartnerForm}
-  id={subcontactoId}
+  form={BibliotecaLibroForm}
+  id={libroId}
   view="modal"
   onSaved={values => {
     console.log("Registro guardado:", values.id);
-    refreshChildren();
+    // Refresca aquí tu consumidor si lo necesita.
   }}
 >
-  Editar subcontacto
+  Editar libro
 </ModelFormButton>
 ```
 
