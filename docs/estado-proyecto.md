@@ -1,10 +1,26 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-22.
+Última actualización: 2026-11-23.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
+
+## Migración de Localidad bloqueada en Windows (2026-11-23)
+
+Al ejecutar db:deploy, el usuario encontró P3009 para
+`20261122000000_localidad_municipality_code_unique`. Diagnóstico local mediante
+transacciones RepeatableRead/READ ONLY: el intento falló por PostgreSQL 23505;
+existe un grupo duplicado Municipio+código (dos localidades distintas), sin
+referencias desde la extensión de Contactos. El índice único no existe; la
+migración conserva finished_at y rolled_back_at nulos. No se modificaron datos
+ni el historial de migraciones, ni se ejecutó deploy/resolve.
+
+Siguiente: el usuario debe indicar las claves correctas de los registros antes
+de corregir datos; después comprobar duplicados, resolver el intento fallido
+como rolled-back y reintentar la migración con autorización. No marcarla como
+aplicada mientras falte el índice. La aplicación documentada en Mac sigue siendo
+evidencia exclusiva de aquella máquina. Sin nuevas pruebas de código.
 
 ## Diagnóstico de autocomplete Many2one (2026-11-22)
 
