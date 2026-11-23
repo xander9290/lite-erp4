@@ -6,6 +6,463 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Recuperación de continuidad tras merge (2026-11-23)
+
+Revisión en `codex/partner`, HEAD inicial `12f8d46`, árbol limpio. El merge de
+main había eliminado las secciones recientes de continuidad de partner y la nota
+de migración fallida de main. Recuperadas ambas desde los padres del merge, sin
+modificar código, datos ni historial de Git. Las menciones de cambios sin commit
+más abajo describen sus cierres históricos; ahora esos avances están en `040829b`.
+No se repitieron las pruebas históricas ni se consultó la base en esta revisión.
+El diagnóstico de Localidad corresponde a la consulta anterior de esta sesión;
+su recuperación no acredita una nueva comprobación de la base.
+
+Siguiente: conservar el layout modal personalizado y retomar la revisión visual
+de Contactos y el plan de apertura tipada desde TSX. La corrección de las claves
+duplicadas y recuperación de la migración en Windows sigue pendiente de decisión
+del usuario. No ejecutar deploy/resolve por efecto de esta recuperación documental.
+
+## Migración de Localidad bloqueada en Windows (2026-11-23)
+
+Al ejecutar db:deploy, el usuario encontró P3009 para
+`20261122000000_localidad_municipality_code_unique`. Diagnóstico local mediante
+transacciones RepeatableRead/READ ONLY: el intento falló por PostgreSQL 23505;
+existe un grupo duplicado Municipio+código (dos localidades distintas), sin
+referencias desde la extensión de Contactos. El índice único no existe; la
+migración conserva finished_at y rolled_back_at nulos. No se modificaron datos
+ni el historial de migraciones, ni se ejecutó deploy/resolve.
+
+Siguiente: el usuario debe indicar las claves correctas de los registros antes
+de corregir datos; después comprobar duplicados, resolver el intento fallido
+como rolled-back y reintentar la migración con autorización. No marcarla como
+aplicada mientras falte el índice. La aplicación documentada en Mac sigue siendo
+evidencia exclusiva de aquella máquina. Sin nuevas pruebas de código.
+
+## Punto de continuación guardado (2026-11-22)
+
+Rama comprobada: `codex/partner`. El avance permanece en el árbol local, con
+archivos modificados y nuevos sin commit/push. Este guardado actualiza sólo la
+documentación; no ejecuta sincronización, migraciones ni nuevas pruebas de código.
+Las verificaciones de las secciones siguientes corresponden a sus implementaciones.
+
+**Completado:** dominio para excluir el registro actual, subcontactos en modal
+con guardado independiente, referencias tipadas de FormButton, documentación web
+con ejemplos y eject de layouts modales independientes. La vista editable de
+subcontactos es `src/modules/contactosextra/views/CorePartnerModal.tsx`, registrada
+en `extends["core.partner"].views.modal`; conservar sus futuras personalizaciones.
+Los contratos y las comprobaciones están detallados debajo y en
+[Formularios en modal](formularios-modal.md#vista-modal-independiente-y-eject).
+
+**Pendientes al retomar:**
+
+1. Comprobar visualmente el modal real de Contactos con sesión iniciada: creación/
+   edición, inversa al principal, cierre protegido y refresco de la colección.
+   La demo ficticia ya se comprobó; no equivale a esta revisión de la aplicación.
+2. Siguiente implementación acordada: apertura explícita y tipada desde TSX,
+   `ModelFormButton` como nombre provisional. Modelo/vista, ID opcional y defaults
+   sólo al crear; reutilizar el modal y preservar borradores, autorización y revisión.
+   [Plan y aceptación](formularios-modal.md#pendiente-posterior-apertura-de-formularios-desde-tsx).
+   Continúa como propuesta; no hay API implementada ni registro windowActions.
+3. Mejora posterior sin bloquear aplicaciones: tipar los campos compuestos de
+   extensiones para sustituir Record<string, unknown> en sus vistas completas.
+   Motivo y aceptación al final del cierre del eject.
+
+La guía y los cambios de aplicaciones siguen al ritmo del usuario. Los pendientes
+generales de entornos y distribución de módulos conservan sus documentos y no
+cambian de prioridad con este guardado. Próxima sesión: contrastar Git y estos
+archivos, revisar la comprobación visual pendiente y continuar con la tarea que
+indique el usuario; no repetir eject sobre el archivo ya generado.
+
+## Eject de formularios modales independientes (2026-11-22)
+
+Implementado por autorización del usuario. `views.modal` presenta el formulario
+completo del modelo en modal, independiente de views.form; también se registra
+en extends. ModelRoute prepara el slot del hijo en servidor; sin modal conserva
+el formulario normal. Views.form de extensiones sigue siendo un bloque parcial.
+El override más dependiente gana; overrides sin relación de dependencia rechazan
+la composición. insertions.modal independiente; en fallback a form se conserva
+el contenido de cada extensor salvo sustitución explícita por insertions.modal.
+ModelExtensions consulta los slots activos para evitar perder o duplicar campos.
+
+CLI: `eject:view -- módulo modelo modal [--dry-run]` para modelos propios y
+`eject:view -- extensor dueño.modelo modal [--dry-run]` para destinos ya extendidos.
+Carga sólo el grafo de dependencias y core, sin BD; conserva manifest, vistas de
+página e inserciones. Mantiene rechazo de sobrescrituras, symlinks, configuración
+ambigua y manifest cambiado durante escritura. Genera Fields/ModelForm y las
+relaciones de consulta, sin copiar servicios ni diálogo; líneas editables inline.
+Campos de otras extensiones automáticos; la actual se maqueta sin duplicar sus
+inserciones modales existentes. Modelos propios tipados con FormValues; extensiones
+siguen con Record<string, unknown>, por el límite del descriptor actual.
+
+Ejecutado dry-run y eject real de contactosextra → core.partner: generado
+`src/modules/contactosextra/views/CorePartnerModal.tsx` y registrado views.modal
+en su manifest. El usuario puede editar ese archivo; página de Contactos conserva
+su diseño e inserciones. Documentados comandos/precedencia en formularios-modal,
+módulos declarativos e inserciones; ejemplo añadido a /documentation. Demo
+ficticia /sample#form-dialog compara grupo modal y pestañas de página de consulta
+para el mismo registro/esquema. No añade reglas de negocio ni valores iniciales.
+
+Verificación Mac: módulos (70), formularios/inserciones (28), TypeScript y ESLint
+focalizado aprobados. Fixture CLI con proyecto temporal eliminado comprueba plan
+sin escrituras, generación propia/extendida, compilación del TSX generado, lookup
+externo, conservación de personalizaciones/symlinks e inserciones sin duplicados,
+con URL de BD deliberadamente inválida. Build aprobado fuera del sandbox; conserva
+los tres avisos anteriores de tracing del gestor. Navegador integrado: layouts
+distintos, guardado del hijo preserva borrador/contador cero del principal,
+cancelar cierre conserva el borrador modal; reabrir guardado limpio. Nota de demo
+inicializada a vacío para no introducir dirty al registrar su control. Sin errores
+de consola en esa demo. /documentation muestra el apartado nuevo y comando.
+
+Límite comprobación visual: Contactos requiere sesión en el navegador integrado;
+no se abrió ni guardó un registro real con el layout nuevo. No se cambiaron datos
+de negocio ni se aplicaron migraciones. Sin commit/push. **Siguiente pendiente:**
+apertura explícita y tipada desde TSX (ModelFormButton provisional), según
+[el plan](formularios-modal.md#pendiente-posterior-apertura-de-formularios-desde-tsx).
+La nota histórica de punto de continuación inferior queda sustituida por este cierre.
+
+Oportunidad de simplificación: tipar los campos compuestos de extendModel para
+eliminar Record<string, unknown> en vistas completas de extensiones. Aceptación:
+nombres/tipos base+extensor comprobados por TypeScript, sin importar código servidor
+al cliente ni cambiar composición en ejecución. Fuera del alcance de este eject.
+
+## Ejemplo de acciones en /documentation (2026-11-22)
+
+Añadido por solicitud del usuario el apartado «Acciones de formulario tipadas» a
+docs/crear-modulos.md, fuente única de /documentation. Continúa Notas con una acción
+Archivar sobre active existente: modelo completo con regla de negocio, generación
+--actions-only, eject del formulario y TSX completo con referencia NotasNotaActions.
+Explica autocompletado, permisos y guardado previo, rechazo de una nota ya archivada
+y pasos para comprobarlo; enlace a la demo ficticia existente. Índice automático,
+metadata y texto lateral de la página actualizados.
+
+Comprobación puntual en proyecto temporal eliminado: extraídos los bloques de la
+guía, ejecutada generación de referencias y eject/dry-run sin BD, modelo/formulario
+compilados con las declaraciones globales del proyecto y método archivar probado
+en memoria (éxito y rechazo). ESLint de page.tsx y git diff --check aprobados.
+Navegador integrado verifica el apartado, su enlace en el índice y bloques de
+código en /documentation#acciones-de-formulario-tipadas. No se creó el módulo Notas
+en el ERP ni se probó persistencia con registros reales. Sin SQL, migraciones,
+commit/push ni repetición del build por este cambio de documentación/presentación.
+El modal independiente/eject se completó posteriormente; ver el cierre vigente arriba.
+
+## Referencias tipadas en FormButton (2026-11-22)
+
+Implementado por autorización del usuario antes de añadir acciones a aplicaciones
+reales. Conservados decoradores de negocio e inserciones de vistas, como pidió.
+FormButton recibe `ModelActionReference` generada, con modelo y nombre literales;
+TypeScript detecta miembros mal escritos, strings y objetos manuales. El modelo
+del provider se comprueba en ejecución, junto a la publicación efectiva; referencia
+ajena/ausente, snapshot ausente y consulta ocultan el botón. ModelForm conecta
+actionModel=config.name; formularios manuales lo explicitan. El despacho sigue
+enviando sólo el nombre al endpoint fijo, con autorización/validación servidor
+intactas. No confundir esta mejora con el pendiente de apertura de formularios.
+
+Generador: src/generated/orm/actions/<módulo>/<NombreContrato>.actions.ts y export
+<NombreContrato>Actions, sin métodos, grupos ni parámetros. Incluye acciones
+heredadas; una extensión exporta referencias desde su compañera dirigidas al base.
+orm:sync genera también para runtime; orm:generate completo las incluye y
+--actions-only permite plan/--write/--check sin Prisma/BD. Core admite ese modo
+para sus contratos nativos. Writer existente mantiene hashes/protecciones.
+Contrato y ejemplos vigentes en
+[Acciones de formulario](ideas/acciones-formulario.md#referencias-tipadas-y-generación-2026-11-22).
+
+Adaptadas las demos de acciones, parámetros y capacidades y la prueba de políticas;
+no se añadieron acciones de negocio a Contactos ni a otros módulos actuales.
+Los generadores de vistas no emitían FormButton con strings; no se introdujeron
+botones automáticamente. Documentación de su uso desde TSX actualizada. Dirección
+duradera en AGENTS ya prioriza React/TypeScript y necesidades reales.
+
+Verificación Mac: ORM y módulos (64) aprobados; generador/instalación (23),
+formularios (28), TypeScript y ESLint focalizado aprobados. Build aprobado fuera
+del sandbox con los tres avisos previos de tracing del gestor. Fixture nuevo de
+CLI comprueba plan sin escrituras, generación, contrato TypeScript real, --check,
+renombrado y protección de archivos editados, con URL de BD deliberadamente
+inutilizable; proyecto temporal eliminado. Su primera versión fuera del workspace
+no resolvía tsx/configuración de decoradores; usa un proyecto temporal bajo el
+workspace, como las otras integraciones, sin modificar el motor de decoradores.
+Plan de referencias de core y contactosextra comprobado sin escribir/BD.
+
+Integración de parámetros aprobada en proyecto/esquema PostgreSQL temporales
+eliminados: generación e import del contrato real, rechazo de nombres/props
+incorrectos en tsc, ejecución por nombre derivado de la referencia, grupos/reglas,
+lectura de destinos, revisión, parámetros, errores y rollback. Payloads con objeto
+de referencia en lugar de nombre o con método interno rechazados. Sin SQL nuevo
+ni cambios de datos de negocio del ERP. No se ejecutó orm:sync contra su base real.
+
+Navegador integrado en demos ficticias: dirty → guardar → confirmar con revisión
+guardada; cancelar parámetros no escribe y confirmar respeta guardado → acción;
+consulta/operador/responsable conservan visibilidad/autorización simuladas. Sin
+errores de consola; no se probaron registros reales. Sin commit/push. Siguiente
+pendiente de ese cierre era modal independiente/eject, ahora completado arriba.
+Simplificación: generar una referencia reutilizable por método, sin repetir
+nombres en botones ni duplicar el ciclo de guardado/ejecución.
+
+## Histórico: plan de eject de vista modal independiente (2026-11-22)
+
+Plan histórico implementado después; ver el cierre vigente arriba y
+[el contrato actual](formularios-modal.md#vista-modal-independiente-y-eject).
+Progreso guardado entonces a petición del usuario en la rama `codex/partner`. Los modales
+de subcontactos están conectados; las comprobaciones de implementación del cierre
+inferior son históricas de esa tarea, no pruebas repetidas al guardar este estado.
+`ModelFormModal` ya admite children con una vista propia, pero
+`ModelChildCollections` reutiliza el formulario normal resuelto por ModelRoute.
+Todavía no existen `views.modal`, `insertions.modal` ni eject de ese tipo.
+
+**Siguiente pendiente acordado:** permitir personalizar y hacer eject de la vista
+modal de forma independiente de la vista de página. Registrar `views.modal` con
+fallback a `views.form`, ampliar eject:view, admitir inserciones de modal y permitir
+que un módulo extensor aporte esa vista para el modelo extendido. Caso concreto:
+vista de subcontactos en contactosextra para core.partner, conservando intacta la
+vista principal de Contactos. Plan y criterios en
+[Formularios en modal](formularios-modal.md#vista-modal-independiente-y-eject).
+
+**Pendiente posterior reformulado (2026-11-22): apertura de formularios desde TSX.**
+Después del eject, un componente explícito y tipado (nombre provisional
+`ModelFormButton`) declara modelo/vista, ID de destino opcional y defaults de
+creación. Manifest para registro/dependencias/permisos/vistas; TSX para interacción;
+modelo/servicio para negocio y validación definitiva. Caso conceptual: desde
+sale.order proponer `saleOrderId: record.id` al crear ventas.entrega, otro modelo
+con Fields, restricciones y guardado propios. Validar referencias/permisos en
+servidor; defaults no alteran registros al editar ni fijan relaciones inmutables.
+Si requiere ID del principal, exigir guardarlo explícitamente; conservar su
+borrador y refrescar sólo la colección afectada tras éxito. No crear Ventas.
+
+Sustituye el alcance inicial de registro `windowActions`/`FormOpen` por ID: sólo
+reconsiderar ese registro si aparece una necesidad real que la composición TSX
+no resuelva. Evitar copiar comportamientos/arquitectura de Odoo por inercia;
+conservar mejoras útiles y los contratos actuales de negocio, relaciones y permisos.
+Sin reestructuración general ni implementación en esta tarea. Nombres/props por
+concretar. Plan y aceptación en
+[Apertura de formularios desde TSX](formularios-modal.md#pendiente-posterior-apertura-de-formularios-desde-tsx).
+
+Al retomarlo, revisar generador/registro/resolución de vistas y concretar la sintaxis
+para destinos extendidos y la precedencia entre módulos antes de editar código.
+Reutilizar ModelForm, servicios, permisos, revisiones y protección de borradores;
+el eject sólo genera presentación editable, sin otro diálogo ni ciclo de guardado.
+No implementar este pendiente hasta que el usuario lo indique; mantener la tutoría
+a su ritmo. Sigue pendiente la comprobación visual del ModelForm de Contactos con
+la sesión del usuario; la demo ficticia y el backend temporal sí se comprobaron.
+
+Este cierre sólo actualiza documentación de continuidad/contrato y AGENTS.md.
+Verificación: contraste con Git y fuentes, y git diff --check; sin nuevas pruebas
+de ejecución, SQL, commit ni push. Los cambios actuales siguen en el árbol local;
+compartirlos con otra máquina requiere Git por autorización del usuario.
+
+## Formularios modales y subcontactos (2026-11-22)
+
+Implementado por acuerdo del usuario: `ModelFormModal` reutiliza ModelForm con
+guardado independiente, sin cambiar URL ni guardar/descartar al principal.
+`ModelChildCollections openIn="modal"` conecta Nuevo/filas y refresca la consulta
+vigente tras éxito. ModelRoute resuelve formularios e inserciones como slots de
+servidor para sus colecciones publicadas; no envía loaders del manifest al cliente.
+FormDialog usa diálogo nativo/portal, guard de borrador propio y lock de FormView;
+Escape/fondo/cerrar confirman sólo ese borrador. Navegar fuera conserva protección
+conjunta. Submits de formularios en portal no disparan ni bloquean el del principal.
+Los modales no incluyen Nuevo interno ni eliminación. Se mantienen permisos,
+validaciones y revisión en las acciones fijas de servidor existentes.
+
+Cambio de aplicación autorizado: restaurado `readonly:true` en childIds del
+PartnerExtra del usuario y añadido `openIn="modal"` a su ModelChildCollections.
+No se implementaron líneas One2many editables en extensiones. PartnerType conserva
+contact por defecto; elegir Entrega al crear esa clase de dirección. Contrato,
+API, defaults, límites de vistas personalizadas y alcance de slots en
+[Formularios en modal](formularios-modal.md).
+
+Verificación Mac de este cambio: TypeScript, ESLint focalizado, módulos 64/64,
+formularios 28/28, navegación/borrado 13/13 y build aprobados. Build dentro del
+sandbox quedó sin progreso; detenido únicamente ese proceso y repetido fuera:
+aprobado con los tres avisos previos de tracing del gestor. El primer intento
+fuera se solapó con el bloqueo anterior y se repitió tras liberarlo.
+orm:sync -- contactosextra --plan devuelve diff vacío, sin consultar la base ni
+aplicar SQL. No se aplicaron nuevas migraciones al ERP.
+
+Integración de dominios ampliada, en proyecto/esquema PostgreSQL temporales
+eliminados: colección readonly sobre Partner extendido, inversa en compañera,
+alcance por padre, rechazo de padre ausente/sin permisos y campo ajeno; guardar
+hijos no avanza revisión del principal y guardar principal conserva hijos
+omitidos. Conserva las regresiones de dominios existentes. Primera ejecución
+falló por esperar una excepción en vez del resultado de error del padre ausente;
+corregida sólo la expectativa y repetida con éxito.
+
+Demo ficticia RHF/Zod `/sample#form-dialog` comprobada en navegador integrado:
+Nuevo, edición/reapertura, refresco, cancelación de cierre, Escape, descarte del
+hijo conservando principal, validación rechazada sin cerrar, cierre deshabilitado
+durante guardado, cero formularios anidados en DOM y ningún guardado del principal.
+Probado con principal dirty y limpio; sin errores de consola. El foco vuelve al
+activador al cancelar cuando sigue disponible. Esta demo ejercita FormDialog y
+ListView; no sustituye la prueba visual del ModelForm de Contactos autenticado ni
+se usaron registros reales para verificarlo. Siguiente guía: el usuario prueba
+crear/editar un subcontacto de Entrega desde la pestaña Contactos y reabrirlo.
+Sin commit/push. Simplificación aplicada: una presentación modal del formulario
+configurado, evitando duplicar layouts/servicios y preservando la tutoría.
+
+## Identidad en dominios: d.record.id (2026-11-22)
+
+Ampliación implementada por autorización expresa del usuario durante la guía.
+`domain: d => d.neq("id", d.record.id)` excluye el registro dueño al editar;
+sin identidad al crear, neq es verdadero y eq falso. La referencia sólo admite
+eq/neq sobre id del destino, en Many2one/Many2many; se rechazan otros caminos,
+operadores, arrays y uso en colecciones. AND/OR/NOT y el bloqueo completo por
+dependencias draft vacías mantienen su semántica. No agrega Fields, defaults,
+columnas SQL ni atributos editables. Contrato en
+[Dominios](dominios-modelos.md#identidad-del-registro-actual).
+
+Proveedor cliente transporta `record: {id}` separado de draft y observa el ID
+metadato de la propia fila en líneas anidadas. Invalida cachés al cambiar la
+identidad. Endpoint estricto verifica existencia/lectura/reglas del dueño dentro
+de RepeatableRead antes de habilitar lectura relacional del destino; las
+selecciones históricas legibles conservan etiqueta con domainValid:false.
+Guardar usa exclusivamente identidad del servicio, validada junto a revisión,
+y vuelve a validar después de hooks con el ID real, incluso en altas y líneas.
+Transferencias conservan la identidad del documento en la comprobación del dominio.
+
+Único cambio de aplicación realizado por el agente en esta ampliación: añadir
+ese domain a parentId del PartnerExtra existente. Preservadas las ediciones del
+usuario (partnerType, parentId, constraint de ciclos, alias ModelTypes, selector
+y migraciones previas) y la documentación web todavía sin commit. Sin nuevo SQL,
+sin escrituras de negocio ni pruebas con registros reales del ERP.
+
+Verificaciones Mac: ORM 123/123 (incluye 12 pruebas de dominios), módulos 64/64,
+formularios 28/28, transferencias 17/17, TypeScript y ESLint focalizado aprobados.
+Build aprobado fuera del sandbox con los tres avisos previos de tracing del gestor.
+Integración de dominios en proyecto/esquema temporal propio aprobada y eliminado:
+creación/edición, búsqueda/paginación, ID/lote, fuente ajena/inexistente, payloads
+alterados, Many2many, extensión de Partner y líneas con identidad propia;
+guardado/acciones y hook tardío de alta rechazan autorreferencias sin escribir
+registro ni historial. Los fallos iniciales fueron defaults null/arrays ausentes
+en el fixture ampliado, corregidos sin relajar validación. Integración de
+transferencias País/Estado/Municipio/Localidad repetida y aprobada en esquema
+temporal eliminado. No demuestra el caso específico de transferencia de una
+autorreferencia; éste comparte la validación de persistencia comprobada.
+
+Demo RHF/Zod ficticia `/sample#record-domain`, dentro de Dominios: navegador
+integrado verifica edición A → opciones B/C y creación → A/B/C tanto en búsqueda
+rápida como modal. La primera apertura agotó tiempo mientras compilaba /sample;
+la pestaña terminó cargando y la comprobación posterior pasó. No se inspeccionó
+el Chrome autenticado del usuario. El usuario confirmó el filtro en su prueba.
+El usuario confirmó la prueba guiada: A principal, B de tipo Entrega vinculado a
+A, persistencia al reabrir y rechazo de A→B→A; sin comprobación independiente
+del agente con esos registros. Sigue la lista de subcontactos en la pestaña
+Contactos y el modal quedaron pendientes de esta ampliación de dominios; ahora
+implementados según el cierre anterior. Corrección tras revisar la observación del
+usuario: la afirmación de que extensionFields rechaza también readonly era
+incorrecta. Fields.One2many readonly devuelve ChildCollectionField con otro tag;
+el rechazo isOne2many se refiere a líneas editables. Comprobación en memoria sin
+BD ni archivos: una extensión sintética de Partner con parentId y childIds
+readonly se compone, publica childCollections.childIds y mantiene la colección
+fuera de clientFields. No hace falta recrear el soporte de consulta. Falta
+comprobar la consulta real y su presentación en este caso de Contactos.
+El usuario añadió childIds de consulta hacia Partner con inversa parentId y
+readonly:true. Declaración revisada, ESLint del modelo aprobado y orm:sync
+-- contactosextra --plan sin BD/escrituras devuelve diff vacío: sin SQL nuevo.
+El usuario conectó ModelChildCollections en la pestaña Contactos. Después reportó
+el error «las extensiones todavía no admiten One2many»: revisión del archivo
+entonces confirmó que quitó readonly:true de childIds. Ese plan reprodujo el
+rechazo de la variante editable; esto no invalida el plan vacío ni la composición
+de consulta comprobados antes con readonly:true. Restaurado después por el agente
+al implementar el modal acordado; la edición de subcontactos se hace en su propio
+formulario/modal. No se ha implementado edición de líneas
+One2many en extensiones ni se propone activarla por este error.
+Sin modificaciones de modelo/vista por el agente ni SQL en esta
+revisión. Mantener
+constraint contra ciclos: excluir self no evita A→B→A. Sin commit/push.
+Simplificación aplicada: una referencia declarativa compartida, sin lookups
+personalizados por vista ni un campo ficticio que copie el ID.
+
+## Guía de subcontactos en contactosextra (2026-11-22)
+
+El usuario solicita tutoría paso a paso: él edita/ejecuta y el agente revisa,
+sin adelantar cambios de aplicación. Acordado extender core.partner desde
+contactosextra: partnerType Selection contact/delivery/invoice, obligatorio,
+default contact para principales y subcontactos normales, tracking. Después se
+diseñará parentId, consulta de subcontactos en la pestaña Contactos y creación/
+edición en modal reutilizando ModelForm; implementada después por acuerdo del
+usuario (cierre al inicio). No confundir con --form modal del scaffold anterior.
+
+Revisión de fuentes: el usuario añadió partnerType con los valores/default
+acordados y FieldSelect en el bloque existente group:contacto/inside, antes de
+tagIds, heredando opciones del modelo. ESLint de ambos archivos aprobado.
+orm:sync -- contactosextra --plan aprobado, sin BD/escrituras: propone sólo enum
+contactosextra_core_partner_partner_type (contact/delivery/invoice) y columna
+partner_type NOT NULL DEFAULT 'contact' en la compañera. Esto asignará contact
+a sus filas existentes al aplicar. Artefactos de fuentes propuestos incluyen
+orm-contactosextra.prisma, inversas de user.prisma y registro de instalaciones;
+el historial/SQL global y la BD sólo se comprueban en la sincronización completa.
+El usuario ejecutó la sincronización y confirmó su finalización. SQL generado
+20261122221113_sync_contactosextra revisado: sólo el enum y la columna acordados.
+Migrate status de desarrollo Mac confirma 79 migraciones y esquema al día;
+TypeScript aprobado. user.prisma sólo reordena los bloques de inversas gestionadas.
+No se inspeccionaron ni modificaron registros reales para comprobar sus valores.
+El usuario confirmó la comprobación propuesta de default Contacto y persistencia
+de Entrega al guardar/reabrir; sin comprobación visual o de valores de BD por el
+agente. parentId Many2one("Partner") opcional ya añadido por el usuario en
+PartnerExtra, label Contacto principal, onDelete Restrict y tracking, revisado
+en fuentes. Constraint de autorreferencia ya
+añadida por el usuario y revisada; usa su nuevo alias ModelTypes de
+src/types/model-types.ts (values readonly genérico y ModelContext). ESLint de
+ambos archivos aprobado. Plan sin BD/escrituras aprobado para parentId: columna
+nullable parent_id, índice y FK a partners.id con Restrict; sin borrados.
+El usuario amplió el método async: recorre parentId mediante
+context.tx.contactosextraCorePartner por recordId, proyectando sólo parentId y
+detectando repeticiones con Set sembrado con context.id. Es una comprobación
+interna de integridad con error genérico, sin publicar IDs de antecesores; no
+sustituye autorización del vínculo del servicio. Código presente, sin prueba de
+persistencia/ciclos todavía. El aviso inicial era TypeScript (TS2322/TS2353), con
+ESLint aprobado, debido al Prisma Client aún sin parentId; resuelto después de
+la sincronización ejecutada por el usuario. Migración
+20261122223159_sync_contactosextra revisada: sólo columna nullable, índice y FK
+Restrict previstos. Migrate status confirma 80 migraciones al día en desarrollo
+Mac; TypeScript aprobado. No se ejecutó SQL ni se modificaron registros por el
+agente. Siguiente del usuario: añadir FieldMany2One name="parentId" tras
+partnerType en el bloque existente group:contacto/inside de PartnerInsertions,
+sin otro lookup ni opciones duplicadas; reiniciar dev y luego probar parentesco,
+persistencia, autorreferencia y ciclos. La identidad vigente está en
+ModelContext.id, no en values. Principal sin
+parentId; tipo y parentesco son
+conceptos independientes. No se modificó su modelo/vista ni se aplicó SQL por
+el agente en esta revisión. Cambios previos de documentación web y formato del
+usuario conservados.
+
+La ampliación de dominios solicitada durante este ejercicio está implementada
+por autorización posterior; ver el cierre de d.record.id arriba. El formulario
+ya incorpora parentId. La lista de subcontactos y el modal se implementaron en la
+tarea posterior acordada, con límites/verificaciones en el cierre al inicio.
+
+## Documentación web: Crear módulos (2026-11-22)
+
+Implementada por solicitud del usuario la ruta pública `/documentation`, con
+primer apartado Crear módulos. Dos ejercicios independientes: Notas (un modelo)
+y Biblioteca (Autor/Libro con Many2one); comandos, modelos y manifests completos,
+grupos/menús, sincronización revisada, comprobaciones manuales y eject:view opcional.
+No se crearon esos módulos en el registro ni se modificaron datos o esquema del ERP.
+
+Fuente única `docs/crear-modulos.md`, renderizada en servidor mediante
+react-markdown (dependencia directa añadida con su lockfile). Página cacheable
+con lectura de archivo de ruta fija y tracing acotado al documento; sin lectura
+de BD, secretos ni ejecución de ejemplos. Índice lateral derivado de sus títulos,
+índice desplegable móvil y bloques con botón de copia/estado/error accesibles.
+CSS propio acotado a documentation-article: evita modificar estilos del ERP.
+La regla CSS existente del proyecto procesa todos los .css; se utilizó una hoja
+con prefijo en lugar de depender de exports de CSS Modules, que en la revisión
+inicial no aplicaban la clase. Contenedores relativos evitan que estados sr-only
+generen scroll del documento por fuera del panel. README y referencia enlazados.
+
+Verificaciones: TypeScript y ESLint focalizado aprobados; cinco fragmentos TS
+extraídos del Markdown cargados en una carpeta temporal propia eliminada, ambos
+manifests compuestos con relaciones/menús/permisos sin consultas de BD. Compilación
+final tras ajustes visuales aprobada, ruta prerenderizada y tres avisos previos
+de tracing del gestor conservados. Navegador integrado: lectura de ambos ejemplos, anclas de índice,
+tipografía y bloques visibles, sin errores de consola. A 375×812, índice móvil
+funcional y scroll horizontal limitado al código, sin overflow de página; escritorio
+a 1280×720. Copiar mostró «Código copiado»; la lectura del portapapeles de la
+herramienta devolvió vacío, por lo que no se acredita su contenido en ese navegador.
+No se pudo inspeccionar el Chrome del usuario; esta revisión usa otra sesión.
+Viewport temporal restaurado y `git diff --check` aprobado al cierre.
+
+Siguiente: el usuario revisa `/documentation`; añadir capítulos conforme se
+soliciten. Simplificación aplicada: Markdown único para web y repositorio, sin
+duplicar tutoriales en TSX ni escribir un parser de Markdown. Sin commit/push.
+
 ## Diagnóstico de autocomplete Many2one (2026-11-22)
 
 Revisión de código con árbol limpio al comenzar: FieldMany2One fuerza
@@ -346,6 +803,7 @@ reglas ni aislamiento; contrato en [Grupos por módulo](ideas/access-manager.md)
 
 Histórico: las decisiones y prioridades siguientes fueron sustituidas por el cierre del 2026-11-21.
 
+
 ### Siguiente pendiente: Grupos y acceso directo frente a relaciones (2026-11-20)
 
 El usuario solicita anotarlo como siguiente pendiente, no implementarlo. Mantener
@@ -654,7 +1112,7 @@ false en information_schema. No se importaron países ni se cambiaron permisos
 o datos de negocio. No asumir esta aplicación en otras máquinas.
 
 Verificaciones actuales: test:list-transfer 5 (formatos/límites/contratos), integración PostgreSQL en
-esquema list*transfer_test*<aleatorio> eliminado (crear/cambiar/noop, autor/historial,
+esquema list_transfer_test_<aleatorio> eliminado (crear/cambiar/noop, autor/historial,
 conservación de Estados, rechazo de duplicados/errores, rollback tardío, planes
 alterados/repetidos/obsoletos y revocación de permisos; exportación por filtros y
 selección en ambos formatos, afterSave rechazado y sesión desactivada); access 6, modules 62, list-selection 8,
@@ -925,7 +1383,7 @@ por Estado y con revisión/idempotencia/servicios; Localidades después.
 
 - test:applications 13 y test:modules 58 para navegación de dependencias; tsc y
   ESLint focalizado aprobados.
-- test:ubicaciones:import aprobado en esquema import*states_test*<hex>, eliminado:
+- test:ubicaciones:import aprobado en esquema import_states_test_<hex>, eliminado:
   32 altas, autor/historial, repetición sin escrituras, actualizaciones preservando
   activo, registros manuales conservados, revisiones/actores/País inválidos y
   conflictos; rechazo tardío con rollback de filas/país/historial; concurrencia.
@@ -971,7 +1429,6 @@ domain País→Estado como pendientes. Sólo documentación y `git diff --check`
 sin nuevas suites, navegador, consultas de BD, generación ni migraciones.
 
 **Hecho en la sesión (detalle en las secciones siguientes):**
-
 - One2many anidados (fase B): documento → línea → sublínea, árbol en una transacción,
   límites 100 por relación/500 por documento, sublíneas expandibles en FieldOne2many.
 - Relaciones de consulta (fase A): `Fields.One2many(..., { readonly: true })`, colección
@@ -1003,7 +1460,6 @@ de que el usuario lo borre. Siguiente: se
 retoma la guía de dirección (permisos de catálogos, navegación, importación).
 
 **Avance de dirección y pendientes posteriores:**
-
 1. `PartnerExtra.municipioId` opcional ya añadido por el usuario y revisado en fuentes:
    destino UbicacionesMunicipio, Restrict, tracking y dominio por `estadoId` correctos.
    El usuario indicó terminado el paso de sincronización. Migración
@@ -1046,7 +1502,7 @@ Semántica acordada:
   mediante `insertions: { form: () => import("./views/PartnerInsertions") }`, dentro
   de la entrada `extends` del modelo base.
 - El archivo exporta un componente con `<Inserter target="field:email"
-position="after">...</Inserter>`; sus hijos pueden ser Fields, grupos o notebooks.
+  position="after">...</Inserter>`; sus hijos pueden ser Fields, grupos o notebooks.
 - Sólo posiciones `before`, `after`, `inside` y `replace`.
 - Un Inserter por combinación destino + posición dentro del archivo; puede contener
   varios elementos. Esto no impide que varios módulos extiendan el mismo modelo.
@@ -1056,7 +1512,7 @@ position="after">...</Inserter>`; sus hijos pueden ser Fields, grupos o notebook
 - Destinos explícitos y estables (por ejemplo `field:email`, `group:contacto`),
   resueltos por el framework; no XPath arbitrario sobre el DOM.
 
-**Implementado el 2026-11-19** con autorización del usuario y sus tres decisiones (fallback en producción, gana el dependiente en replace, sólo formularios). Contrato [inserciones-vistas](inserciones-vistas.md), diseño [ideas/inserciones-vistas](ideas/inserciones-vistas.md). Anclas en FieldVisibility (todo Field\* de primer nivel), FormGroup/Stack con `id`, Notebook/NotebookPage con `id` y `group:general` en ModelFields; registro durante el render y re-registro en efecto de layout (StrictMode); manifest `insertions.form` exclusivo con `views.form`; `config.extensions` publica `depends`/`insertions`. Verificado: test:form-model 22 (incluye insertions.test.tsx: orden, replace por dependencia/conflicto, inside sobre reemplazado, publicador, ausentes/duplicados, render SSR con RHF y Notebook), test:modules 53, test:extensions:integration y test:core:integration (proyecto/esquema temporales, con build Next; fixture extension-check actualizado por `depends`), tsc y eslint (sólo los 2 avisos previos); navegador en `/sample#insertions` (orden, error en página insertada revela su pestaña con contador, envío con valores insertados, escenario de conflicto con avisos y fallback). Contactos real comprobado por el usuario tras migrar contactosextra (el agente no lo abrió: requiere sesión).
+**Implementado el 2026-11-19** con autorización del usuario y sus tres decisiones (fallback en producción, gana el dependiente en replace, sólo formularios). Contrato [inserciones-vistas](inserciones-vistas.md), diseño [ideas/inserciones-vistas](ideas/inserciones-vistas.md). Anclas en FieldVisibility (todo Field* de primer nivel), FormGroup/Stack con `id`, Notebook/NotebookPage con `id` y `group:general` en ModelFields; registro durante el render y re-registro en efecto de layout (StrictMode); manifest `insertions.form` exclusivo con `views.form`; `config.extensions` publica `depends`/`insertions`. Verificado: test:form-model 22 (incluye insertions.test.tsx: orden, replace por dependencia/conflicto, inside sobre reemplazado, publicador, ausentes/duplicados, render SSR con RHF y Notebook), test:modules 53, test:extensions:integration y test:core:integration (proyecto/esquema temporales, con build Next; fixture extension-check actualizado por `depends`), tsc y eslint (sólo los 2 avisos previos); navegador en `/sample#insertions` (orden, error en página insertada revela su pestaña con contador, envío con valores insertados, escenario de conflicto con avisos y fallback). Contactos real comprobado por el usuario tras migrar contactosextra (el agente no lo abrió: requiere sesión).
 
 Siguiente paso al retomarlo: revisar ModelExtensions, composición de ModelForm y
 Fields/contenedores; presentar un diseño concreto para destinos, orden/conflictos
@@ -1150,6 +1606,7 @@ siguen pendientes. Esta tarea sólo actualiza documentación; diff --check aprob
 sin suites, BD, SQL ni cambios de código.
 
 ## Filas compactas de One2many (2026-11-19)
+
 
 Diagnóstico posterior de Ubicaciones: el usuario añadió Pais.estadoIds y
 Estado.municipioIds como One2many. defineModule rechaza Pais.estadoIds porque
@@ -1335,9 +1792,9 @@ Usuarios será un menú. Motivo: `createBy` legible/agrupable, Many2one a person
 cualquier módulo y fase 3 de herencia dependen de que User/Partner sean declarativos.
 
 - **Tickets retirado** por el usuario con «Eliminar datos»: commit `71d3358`, migración
-  `20261118165807_uninstall_tickets` (historial y overrides limpios; DROP de tickets*\*
+  `20261118165807_uninstall_tickets` (historial y overrides limpios; DROP de tickets_*
   y enums), `src/modules` vacío, ID `tickets` libre. Avance previo en Git en `68a31d5`.
-  Comprobado por el agente con consultas de sólo lectura: sin tablas `tickets*\*` ni
+  Comprobado por el agente con consultas de sólo lectura: sin tablas `tickets_*` ni
   actividad, última migración aplicada.
 - **Residuo detectado:** `model_sequences` conserva `TicketsTicket.name` (2026, valor 3).
   La retirada no limpia contadores de folios (`cleanupSQL` en operation-engine.ts).
@@ -3026,6 +3483,7 @@ retirada para reiniciar la tutoría; no confundirlas con los archivos nuevos.
   ni regeneración de vistas personalizadas. Aceptación: mismos nombres en sus
   relaciones/encabezados/colecciones, sin mezclar metadata y valores de escritura.
 
+
 - 2026-11-12: nombre de presentación conectado a formularios por petición expresa.
   read/save publica displayName separado de values, sin RHF/defaults/payload ni
   columna nueva. Proyección por ID con rutas/guardas del binding en la misma
@@ -3108,7 +3566,7 @@ retirada para reiniciar la tutoría; no confundirlas con los archivos nuevos.
   iguales e IDs distintos y hojas filtradas por FK. También confirmó evolución y
   orm:sync. No se conservó el resultado final del proceso completo; no atribuir
   una aprobación nueva a sus etapas finales force/resource. Al cierre no quedó
-  directorio .framework-test-\* en el proyecto. La prueba usa un esquema exclusivo
+  directorio .framework-test-* en el proyecto. La prueba usa un esquema exclusivo
   desechable; no escribe en las tablas del ERP.
 - Oportunidad acotada: evaluar publicaciones explícitas de related adicionales
   cuando exista un caso real; conservar consultas por página/lote y políticas
@@ -3622,6 +4080,7 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
 - ~~Auditoría en ModelCollection declarativo~~: implementada el 2026-11-18 con
   `audit: true` por modelo; ver la sección de esa fecha.
 
+
 - **Lista cuando falla el lookup de una relación**: con lectura de Vehicle pero
   sin lectura de Modelo, resolveListLabels rechaza toda la lista. Aceptación:
   diseñar un fallback seguro para relación no disponible sin publicar etiquetas
@@ -3644,6 +4103,7 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
   ordinarios, sin reescribir el manifest entero. Pendiente independiente,
   sin implementación en esta tarea.
 
+
 - **Revisión de Fabricantes/CardView**, registrada por petición expresa el
   2026-11-12. Pendientes sin implementación; priorizar logos y decisión de auditoría:
   1. **Logos sin recortes:** evaluar contain/padding en miniaturas y proporción
@@ -3665,8 +4125,8 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
      Aceptación: ESLint sin esos avisos y mismo comportamiento de CardView,
      navegación, búsqueda y permisos; no retirar acciones de servidor por estar
      ausentes de esta vista.
-     Esta anotación sólo modifica documentación; no autoriza ejecutar estos cambios
-     por adelantado durante la tutoría. Verificación de la nota: git diff --check.
+  Esta anotación sólo modifica documentación; no autoriza ejecutar estos cambios
+  por adelantado durante la tutoría. Verificación de la nota: git diff --check.
 
 - **Simplificar relaciones y vistas**, registrado el 2026-11-11, sin implementación:
   incluye también Fields de formulario enlazados al contrato cliente del modelo
