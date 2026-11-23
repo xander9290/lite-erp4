@@ -7,6 +7,7 @@ const { modelClientConfig, modelService, getModuleModel, withActor, relationLook
 const { setGroupMembers, setFieldRestrictions, setActionRestrictions, setMenuVisibility, groupDetail } = await import("./src/lib/access/admin");
 const { applicationNavigation, firstApplicationMenu } = await import("./src/lib/applications/navigation");
 const { canOpenApplication } = await import("./src/lib/applications/manifest");
+const { prepareRegisteredFormOpen } = await import("./src/lib/modules/form-open.server");
 const { hashPassword } = await import("./src/lib/auth/password");
 
 // Only copied/executed in the disposable project/schema by modules.integration.ts.
@@ -36,6 +37,14 @@ assert.ok(category.ok);
 const entry = getModuleModel("ensayo.tarea")!;
 const record = await tasks.save(prisma, reader, { ...entry.entry.contract.createDefaults(), name: "Tarea propia", categoria: category.values.id });
 assert.ok(record.ok);
+// Opening a form is read-only, validates origins/default relations and preserves saved revisions.
+const openRequest = { model: "ensayo.tarea", view: "modal" };
+const opened = await prepareRegisteredFormOpen({ ...openRequest, defaults: { name: "Propuesta", categoria: category.values.id }, origin: { model: "ensayo.tarea", id: record.values.id } }, reader);
+assert.equal(opened.defaults.categoria, category.values.id);
+assert.equal(opened.config.id, "ensayo.tarea");
+await assert.rejects(prepareRegisteredFormOpen({ ...openRequest, defaults: { categoria: "missing-reference" } }, reader));
+await assert.rejects(prepareRegisteredFormOpen({ ...openRequest, origin: { model: "ensayo.tarea", id: "missing-origin" } }, reader));
+await assert.rejects(prepareRegisteredFormOpen({ model: "unregistered.item", view: "modal" }, admin));
 const application = { ...entry.module.application, icon: (() => null) as never };
 const state = { query: "", sort: "name", direction: "asc" as const, page: 1, pageSize: 10, filters: [] };
 
@@ -65,6 +74,11 @@ const readonlyAccess = await snapshot(reader);
 const readonlyConfig = modelClientConfig("ensayo.tarea", readonlyAccess);
 assert.deepEqual(readonlyConfig.capabilities, { read: true, create: false, write: false, unlink: false, move: false });
 assert.deepEqual(readonlyConfig.actions, []);
+const readonlyOpened = await prepareRegisteredFormOpen({ ...openRequest, id: record.values.id, defaults: { name: "Ignore" } }, reader);
+assert.equal(readonlyOpened.config.capabilities?.write, false);
+assert.deepEqual(readonlyOpened.defaults, {});
+await assert.rejects(prepareRegisteredFormOpen(openRequest, reader));
+
 assert.deepEqual(readonlyConfig.kanbanTransitions, []);
 assert.ok((await tasks.read(prisma, reader, record.values.id)).ok);
 assert.ok((await withActor(reader, () => tasks.list(prisma, reader, state))).ok);
@@ -132,6 +146,8 @@ await prisma.accessUserGroup.deleteMany({ where: { userId: reader.id } });
 assert.equal(canOpenApplication(application, await snapshot(reader)), false);
 await prisma.user.update({ where: { id: manager.id }, data: { sessionVersion: { increment: 1 } } });
 await assert.rejects(snapshot(manager), /sesión/);
+await assert.rejects(prepareRegisteredFormOpen({ ...openRequest, id: record.values.id }, manager));
 await prisma.user.update({ where: { id: reader.id }, data: { active: false } });
 await assert.rejects(snapshot(reader), /sesión/);
+await assert.rejects(prepareRegisteredFormOpen(openRequest, reader));
 await prisma.$disconnect();

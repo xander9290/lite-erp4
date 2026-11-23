@@ -17,6 +17,7 @@ import { bindRepositories } from "./bind";
 import { moduleRegistration } from "../../modules/scaffold";
 import { writeResource } from "../../scaffold/resource-write";
 import { assertNoOtherModuleOperation } from "../../module-manager/operation-lock";
+import { formReferenceFiles } from "./form-references";
 import { actionReferenceFiles } from "./action-references";
 
 export type MigrationFile = { name: string; sql: string };
@@ -88,12 +89,16 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   // Preflight before touching the schema or the database. Reject ambiguous source indexes early.
   const registration = profile.runtime ? await moduleRegistration(root, id) : [];
   const actionDirectory = join(root, "src/generated/orm/actions", id);
+  const formDirectory = join(root, "src/generated/orm/forms", id);
+  const forms = formReferenceFiles(profile.module);
+  const formPlan = await artifactPlan(formDirectory, `forms-${id}`, forms);
   const actions = actionReferenceFiles(profile.module);
   const actionPlan = await artifactPlan(actionDirectory, `actions-${id}`, actions);
   if (options.plan) {
     const plan = await installModels(root, profile, false, true, options.force);
     const uploadDirectory = join(root, "src/generated/orm/uploads", id);
     const uploads = await artifactPlan(uploadDirectory, `uploads-${id}`, profile.runtime ? {} : imageUploadFiles(profile.module));
+    for (const change of formPlan.changes.filter(change => change.action !== "unchanged")) options.log(`${change.action}: ${relative(root, join(formDirectory, change.name))}`);
     options.log(`Plan de fuentes de ${id} (sin consultar la base):`);
     for (const change of plan.changes) options.log(relative(root, change.path));
     for (const change of registration) options.log(`update: ${relative(root, change.path)}`);
@@ -144,6 +149,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
   const generate = async () => {
     // Actions need a static contract for TypeScript, even on runtime declarative models.
     await writeArtifacts(actionDirectory, `actions-${id}`, actions);
+    await writeArtifacts(formDirectory, `forms-${id}`, forms);
     // Declarative modules build other client contracts, uploads and repositories at runtime.
     if (profile.runtime) return;
     const files = await prepareModuleArtifacts(root, profile.module, profile.externalOwners);

@@ -174,70 +174,72 @@ La demo `/sample#form-dialog` compara el mismo subcontacto con un grupo compacto
 en modal y pestañas en una vista de página de consulta; comparten esquema. Es una
 demo ficticia de presentación, no una instalación de modelos ni persistencia real.
 
-## Pendiente posterior: apertura de formularios desde TSX
+## Apertura de formularios desde TSX
 
-Reformulado el 2026-11-22 por decisión del usuario. Las vistas modales independientes
-y su eject ya están implementados; la apertura desde TSX es el siguiente pendiente.
-Esta sección describe el plan, sin API implementada. Criterio: negocio en modelos/servicios, presentación e interacción en React
-y contratos comprobables con TypeScript. Incorporar patrones de otros ERP cuando
-resuelvan una necesidad concreta, sin reproducir su arquitectura por inercia.
+Implementado el 2026-11-23 con `ModelFormButton`. Recibe `form` (referencia
+estática generada), `view="modal"|"form"`, ID opcional, defaults escalares de
+creación, origen persistido opcional y callback onSaved. Ambos layouts se presentan
+en diálogo; view elige su contenido. No hay registro windowActions ni rutas nuevas.
 
-Propuesta inicial: un componente cliente explícito, con nombre provisional
-`ModelFormButton`, que indique modelo destino, presentación/vista, ID opcional
-para edición y defaults para creación. Ejemplo conceptual, no API disponible:
+`orm:sync` y la generación completa producen `src/generated/orm/forms/<módulo>`.
+Para actualizar sólo referencias: `npm run orm:generate -- id --forms-only --write`;
+sin --write revisa, --check detecta diferencias. No consulta la BD ni aplica SQL.
+Los tipos incluyen escalares editables publicados y valores Selection; excluyen
+identidad/revisión, campos sensibles, secuencias, virtuales y arrays. Las referencias
+de una extensión apuntan al modelo base e incluyen sus campos más los del extensor;
+no son referencias de la tabla compañera ni incluyen campos de otros extensores.
 
-```tsx
-<ModelFormButton
-  model="ventas.entrega"
-  view="modal"
-  defaults={{ saleOrderId: record.id }}
->
-  Agregar entrega
-</ModelFormButton>
-```
+### Composición en servidor
 
-`ventas.entrega` sería otro modelo registrado con sus Fields, formulario, lógica
-de negocio, restricciones, permisos y servicio de guardado. Desde un pedido
-`sale.order`, `saleOrderId` propone su ID; la referencia se persiste al guardar
-el destino con éxito. Es un ejemplo conceptual: no crear Ventas ni estos modelos.
-Para subcontactos, la vista puede proponer `parentId` y `partnerType: "delivery"`.
-ID de destino presente edita; ausente crea. Los defaults aplican sólo a creación
-y no deben sobrescribir los valores persistidos de un registro abierto para editar.
+`ModelRoute` prepara automáticamente las vistas form/modal del formulario actual y
+los modales de sus colecciones readonly. Para destinos adicionales o páginas propias,
+usar el componente servidor `ModelFormTargets forms={[Referencia]}` alrededor del
+contenido que contiene los botones. Sólo prepara destinos legibles con entrada
+directa, carga los loaders del manifest en servidor y conserva sus extensiones e
+inserciones. Los proveedores anidados combinan sus destinos. No precarga todos los
+modelos del ERP ni importa el registro servidor al cliente.
 
-Responsabilidades y plan:
+Esta composición es necesaria por el límite servidor/cliente de Next: las vistas
+cliente deben formar parte del árbol RSC de la página, no devolverse como imports
+nuevos desde una Server Action. El botón recibe sus slots por contexto; la acción
+openModelForm devuelve sólo datos autorizados. Si falta un destino preparado, informa
+el error en vez de abrir un formulario automático que perdería su personalización.
+La configuración autorizada de cada apertura prevalece en ModelForm sobre el snapshot
+del template; las operaciones de lectura/guardado vuelven a autorizarse.
 
-- El modelo/servicio define negocio, relaciones, restricciones y autorización.
-  El manifest registra modelos, dependencias, accesos y vistas; la vista TSX
-  declara el botón, su presentación y las propuestas de valores iniciales.
-- Reutilizar ModelFormModal y la resolución de vistas ya implementada,
-  manteniendo loaders en servidor. Tipar referencias de modelo/vista y defaults
-  con los contratos públicos del framework, sin importar clases server-only al
-  cliente. Concretar nombres y props al implementarlo.
-- El servidor resuelve sólo modelos/vistas registrados y revalida actor, permisos,
-  reglas, campos, referencias y revisión. Defaults e IDs del navegador son propuestas,
-  no autorización; si el flujo requiere datos del origen, validar su identidad y
-  lectura en servidor. Una relación obligatoria o inmutable se exige en el modelo/
-  servicio, no sólo mediante el botón o un campo prellenado.
-- Si necesita el ID del principal, exigir primero su guardado explícito. Abrir y
-  cancelar conservan su borrador y no lo guardan automáticamente. Mantener guardado
-  independiente, bloqueo, errores, cierre protegido y foco del modal existente.
-- Conectar un callback tipado tras éxito para refrescar las colecciones afectadas,
-  reutilizando el mecanismo actual; no refrescar la página ni descartar borradores.
-  Compartir botones repetidos mediante componentes o funciones TSX cuando se necesite.
+### Apertura y guardado
 
-La propuesta anterior de un registro `windowActions` y botones `FormOpen` por ID
-queda fuera del alcance inicial. Sólo reconsiderarlo si un caso real demuestra
-que la composición TSX no cubre una reutilización o resolución dinámica necesaria.
-Las acciones de negocio publicadas existentes conservan su contrato; no reescribir
-decoradores, relaciones, permisos ni el framework completo por este cambio de plan.
+La acción valida estrictamente destino, vista e identidad. Revalida sesión, grupo
+de entrada, lectura y capacidad de crear al abrir una alta; al editar comprueba la
+lectura del registro y respeta la consulta sin escritura. Si hay origin, exige ID
+y lectura del registro de origen. No recibe actor, métodos, loaders ni SQL.
 
-Criterios de aceptación: abrir creación/edición del mismo u otro modelo con la
-vista elegida; Many2one prellenado y persistido tras validación; defaults sin efecto
-en edición; errores de tipado para referencias/campos inválidos y rechazo servidor
-ante IDs/valores alterados o permisos insuficientes; origen sin guardar, cancelación,
-fallo de guardado y refresco tras éxito preservan las garantías del principal/modal.
-Incluir demo ficticia y pruebas apropiadas al implementar.
+Defaults sólo en creación: hasta 50 escalares/16.000 caracteres JSON, públicos,
+editables y permitidos por las políticas del actor. Rechaza nombres desconocidos,
+identidad, secretos y campos protegidos; valida tipos y Many2one mediante el lookup
+relacional autorizado y sus dominios. En edición los defaults no se utilizan.
+El servicio de guardado sigue siendo la autoridad definitiva para relaciones,
+reglas de registro, hooks, revisiones, permisos, transacción e historial.
 
-Beneficio buscado: reducir cada apertura a una declaración TSX tipada, reutilizando
-resolución, diálogo, carga y guardado existentes sin agregar un registro de acciones
-ni otro lenguaje de configuración. Esta tarea sólo documenta el pendiente.
+`origin={{form:Referencia,id}}` desactiva el botón si falta ID persistido. No guarda
+el origen automáticamente ni descarta sus borradores. Sus valores son propuestas:
+las relaciones obligatorias/inmutables se exigen en el modelo o servicio.
+
+El activador usa type=button, bloqueo del formulario padre, exclusión de dobles
+clics e indicador de apertura. Tiene timeout de 15 segundos y reintento manual;
+ignora la respuesta posterior al timeout o desmontaje, sin prometer cancelar SQL.
+No reintenta escrituras. Reutiliza ModelFormModal/FormDialog para foco, cierre
+protegido y bloqueo durante guardado. Un rechazo conserva el borrador del modal.
+
+onSaved recibe ID/revisión confirmados y un Partial de los campos públicos tipados.
+Cierra tras éxito; un fallo del callback de refresco informa que el registro ya se
+guardó, sin mantenerlo abierto para duplicar el guardado. Para colecciones readonly
+del formulario origen: `useModelChildCollectionsRefresh()` dentro de ModelForm,
+como callback. Cambia el proveedor de consulta y conserva página/filtros/borradores;
+no hace router.refresh ni guarda el principal. Las listas propias pueden usar su
+propio callback de invalidación.
+
+Ejemplo completo, creación relacionada y edición en
+[/documentation#abrir-formularios-desde-un-boton-tsx](/documentation#abrir-formularios-desde-un-boton-tsx),
+fuente [Crear módulos](crear-modulos.md). Demo ficticia en /sample#form-dialog:
+mismo activador, respuestas JSON y modal, editor explícito sin modelos/BD reales.

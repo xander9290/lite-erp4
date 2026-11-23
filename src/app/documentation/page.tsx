@@ -9,7 +9,7 @@ import "./documentation.css";
 
 export const metadata: Metadata = {
   title: "Crear módulos · Documentación · Lite ERP",
-  description: "Aprende a crear módulos de Lite ERP con Notas y Biblioteca: modelos, relaciones, permisos, acciones tipadas y formularios en modal paso a paso.",
+  description: "Aprende a crear módulos de Lite ERP con Notas y Biblioteca: modelos, relaciones, permisos, acciones tipadas y apertura de formularios desde botones TSX paso a paso.",
 };
 
 function headingId(text: string) {
@@ -19,7 +19,7 @@ function headingId(text: string) {
 // Only top-level sections belong in the navigation; ignore headings inside code.
 function sections(source: string) {
   let fenced = false;
-  return source.split("\n").flatMap(line => {
+  return source.split(/\r?\n/).flatMap(line => {
     if (line.startsWith("```")) fenced = !fenced;
     const title = !fenced && /^## (.+)$/.exec(line)?.[1];
     return title ? [{ title, id: headingId(title) }] : [];
@@ -58,7 +58,7 @@ export default async function DocumentationPage() {
             <p className="px-3 text-xs font-semibold tracking-wider text-base-content/50 uppercase">Desarrollo de aplicaciones</p>
             <a href="#crear-modulos" aria-current="page" className="mt-4 flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2.5 text-sm font-semibold text-primary"><Layers size={16} aria-hidden="true" />Crear módulos</a>
             <nav aria-label="En esta guía" className="mt-3 space-y-1 border-l border-base-300 pl-3">{sectionLinks}</nav>
-            <p className="mt-8 px-3 text-xs leading-5 text-base-content/50">Dos ejemplos completos para empezar con modelos, acciones tipadas y formularios independientes en modal.</p>
+            <p className="mt-8 px-3 text-xs leading-5 text-base-content/50">Ejemplos completos de modelos, acciones tipadas y apertura de formularios desde TSX.</p>
           </aside>
 
           <main className="min-w-0 max-w-3xl pb-12">

@@ -1,0 +1,8 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "forms-contactosextra",
+  "files": {
+    "ContactosextraPartnertags.form.ts": "aa348bedaa22177795ebf37f8a0d5d1e62cd0e12a9d77d88edc9c3041b852d8a",
+    "ContactosextraCorePartner.form.ts": "dc6d2f8199276ec885d5bb26d7541c76614613debc59720e0f320482bd620e43"
+  }
+}

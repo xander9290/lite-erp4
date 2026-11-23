@@ -38,19 +38,33 @@ test("actions-only CLI plans without writes, generates, detects staleness and pr
   const project = process.cwd();
   const dir = join(root, "src/modules/example");
   const generated = join(root, "src/generated/orm/actions/example/ExampleItem.actions.ts");
-  const run = (...args: string[]) => spawnSync(process.execPath, ["--conditions=react-server", "--import", "tsx", join(project, "scripts/orm-generate.ts"), "example", "--actions-only", ...args], { cwd: root, env: { ...process.env, TSX_TSCONFIG_PATH: join(root, "tsconfig.json"), DATABASE_URL: "postgresql://unused:unused@127.0.0.1:1/unused" }, encoding: "utf8", timeout: 20000 });
+  const run = (...args: string[]) => spawnSync(process.execPath, ["--conditions=react-server", "--import", "tsx", join(project, "scripts/orm-generate.ts"), "example", ...(args.includes("--forms-only") ? [] : ["--actions-only"]), ...args], { cwd: root, env: { ...process.env, TSX_TSCONFIG_PATH: join(root, "tsconfig.json"), DATABASE_URL: "postgresql://unused:unused@127.0.0.1:1/unused" }, encoding: "utf8", timeout: 20000 });
   try {
     await mkdir(dir, { recursive: true });
     await symlink(join(project, "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
     await writeFile(join(root, "package.json"), JSON.stringify({ type: "module" }));
-    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ extends: join(project, "tsconfig.json"), compilerOptions: { incremental: false, experimentalDecorators: true }, include: ["**/*.ts"], exclude: [] }));
-    const source = (method = "confirmar") => `import { Fields, Model, action } from ${JSON.stringify(join(project, "src/lib/orm/index"))};\nimport { defineModule } from ${JSON.stringify(join(project, "src/lib/modules/define"))};\nclass Item extends Model { name = Fields.Text(); @action({label:"Confirmar"}) ${method}() { return {}; } }\nexport default defineModule({id:"example",name:"Example",icon:"list",models:{item:Item}});\n`;
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ extends: join(project, "tsconfig.json"), compilerOptions: { incremental: false, experimentalDecorators: true }, include: ["**/*.ts", join(project, "src/types/next-auth.d.ts")], exclude: [] }));
+    const source = (method = "confirmar") => `import { Fields, Model, action } from ${JSON.stringify("../../../../src/lib/orm/index")};\nimport { defineModule } from ${JSON.stringify("../../../../src/lib/modules/define")};\nclass Item extends Model { name = Fields.Text(); @action({label:"Confirmar"}) ${method}() { return {}; } }\nexport default defineModule({id:"example",name:"Example",icon:"list",models:{item:Item}});\n`;
     await writeFile(join(dir, "manifest.ts"), source());
     const plan = run(); assert.equal(plan.status, 0, plan.stderr); assert.match(plan.stdout, /create actions\/ExampleItem.actions.ts/);
     await assert.rejects(readFile(generated), { code: "ENOENT" });
     const write = run("--write"); assert.equal(write.status, 0, write.stderr);
     assert.match(await readFile(generated, "utf8"), /\["confirmar"\]/);
+    const formFile = join(root, "src/generated/orm/forms/example/ExampleItem.form.ts");
+    assert.equal(run("--forms-only").status, 0);
+    await assert.rejects(readFile(formFile), { code: "ENOENT" });
+    assert.equal(run("--forms-only", "--write").status, 0);
+    assert.match(await readFile(formFile, "utf8"), /defineModelFormReference/);
+    assert.equal(run("--forms-only", "--check").status, 0);
+
     await writeFile(join(root, "contract-check.ts"), `import { ExampleItemActions } from "./src/generated/orm/actions/example/ExampleItem.actions";\nimport type { FormButtonProps } from ${JSON.stringify(join(project, "src/components/ui/form/formActions"))};\nconst valid: FormButtonProps = {action:ExampleItemActions.confirmar};\n// @ts-expect-error Missing action must fail in the generated contract.\nconst typo: FormButtonProps = {action:ExampleItemActions.confimar};\n// @ts-expect-error Arbitrary text must fail.\nconst raw: FormButtonProps = {action:"confirmar"};\nvoid [valid,typo,raw];\n`);
+    await writeFile(join(root, "form-contract-check.ts"), `import { ExampleItemForm } from "./src/generated/orm/forms/example/ExampleItem.form";
+import type { ModelFormButtonProps } from "../src/components/modules/ModelFormButton";
+const valid: ModelFormButtonProps<typeof ExampleItemForm> = {form:ExampleItemForm,defaults:{name:"Example"}};
+// @ts-expect-error A typo must fail.
+const typo: ModelFormButtonProps<typeof ExampleItemForm> = {form:ExampleItemForm,defaults:{naem:"Example"}};
+void [valid,typo];
+`);
     const types = spawnSync(process.execPath, [join(project, "node_modules/typescript/bin/tsc"), "--project", join(root, "tsconfig.json"), "--noEmit"], { cwd: root, encoding: "utf8", timeout: 30000 });
     assert.equal(types.status, 0, types.stdout + types.stderr);
     assert.equal(run("--check").status, 0);

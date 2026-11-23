@@ -6,6 +6,120 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Apertura tipada de formularios desde TSX (2026-11-23)
+
+Implementación autorizada en codex/partner. Conservados cambios previos de reglas
+y continuidad; no se modificaron vistas personalizadas de Contactos ni sus modelos.
+ModelFormButton usa referencias generadas de modelo/campos, view form/modal, ID
+opcional, defaults escalares sólo en creación, origin persistido opcional y onSaved.
+ModelFormTargets prepara destinos adicionales en servidor; ModelRoute prepara su
+modelo y sus colecciones readonly. Slots anidados se combinan, y la configuración
+de cada apertura autorizada prevalece en ModelForm sobre el template de la página.
+No se introduce windowActions ni un registro cliente global de módulos.
+
+La acción de apertura devuelve datos; revalida sesión, entrada al módulo, lectura,
+crear para altas, registro al editar, origen y valores iniciales/campos/Many2one.
+Abrir no escribe ni guarda el principal. Se conserva el servicio de guardado y sus
+reglas, revisión, hooks, historial y rollback. El botón bloquea dobles clics y el
+lock del padre, informa carga/timeout/reintento manual y reutiliza el modal con
+cierre protegido. Callback de refresco tras éxito; useModelChildCollectionsRefresh
+invalida colecciones readonly sin recargar página ni perder el borrador principal.
+
+Generación: orm:sync y orm:generate completos incorporan referencias en
+src/generated/orm/forms; --forms-only revisa/genera sin BD ni SQL. Se generaron las
+referencias de core, contactosextra y ubicaciones mediante el CLI, sin tocar hashes
+a mano. Extensiones tipan campos base+extensor, sin ID de compañera ni secretos.
+Contrato en [Formularios en modal](formularios-modal.md#apertura-de-formularios-desde-tsx).
+Ejemplo completo añadido a docs/crear-modulos.md (fuente de /documentation):
+composición servidor para Biblioteca y dirección de entrega de Contactos con
+origin, defaults y refresco; no se crearon esos botones en apps por anticipación.
+
+Comprobaciones Windows: módulos 74/74 fuera del sandbox; TypeScript y ESLint
+focalizado aprobados; formularios 28/28 y navegación 13/13. Generadores de acciones/formularios: pruebas focalizadas y
+CLI temporal aprobados, con tipos negativos, plan sin escrituras y preservación
+de archivos personalizados. Se corrigieron imports temporales absolutos para
+Windows y la inclusión explícita de las declaraciones globales de NextAuth.
+Integración capabilities aprobada en proyecto/esquema temporales eliminados:
+apertura sin escritura, origen/referencia inexistentes, modelo no registrado,
+consulta sin crear/escribir, defaults ignorados al editar y sesión revocada.
+Build aprobado fuera del sandbox con los tres avisos previos de tracing del gestor.
+Los fallos iniciales de filesystem del sandbox no se ocultaron: se repitieron los
+fixtures fuera de él. No se aplicaron migraciones ni se cambiaron datos del ERP.
+
+Navegador integrado en demo ficticia /sample#form-dialog: creación con valor
+propuesto, guardado del hijo y refresco de su lista con principal dirty y contador
+cero; edición conserva valor persistido; ERROR rechaza guardado y conserva el
+borrador; cancelar cierre lo conserva y confirmar sólo descarta el modal. Esta
+prueba no acredita una revisión autenticada de Contactos ni todas sus políticas.
+Los ejemplos completos de /documentation (DeliveryButton, Toolbar y composición
+servidor) compilaron en un proyecto temporal eliminado, generando Biblioteca desde
+los propios bloques de la guía y sin conexión a BD.
+En /documentation se comprobó la sección, sus ejemplos y el índice navegable.
+Corregido el lector del índice para CRLF de Windows (antes no detectaba encabezados).
+La prueba inicial detectó el límite de manifest cliente de Next al intentar
+retornar JSX desde una acción; corregido con slots preparados en el árbol RSC y
+respuesta de apertura sólo con datos, sin importar loaders al cliente.
+
+El usuario acepta el enfoque basado en composición React/TSX, referencias tipadas
+y servicios existentes. La validación funcional en una aplicación real queda para
+cuando surja esa necesidad durante su desarrollo; no implica que ya se haya probado
+ese caso ni autoriza crear una aplicación de demostración por anticipación.
+Esta anotación sólo actualiza documentación, sin nuevas pruebas de código ni BD.
+
+Siguiente: aplicar y evaluar el flujo cuando aparezca ese caso real al
+ritmo del usuario. El tipado completo de vistas de extensiones y los pendientes
+generales conservan su alcance separado. Oportunidad aplicada: compartir slots,
+validación y diálogo existentes en vez de replicar el ciclo de edición por botón.
+
+## Criterio de diseño reafirmado (2026-11-23)
+
+Ante necesidades reales, usar Odoo como referencia funcional y adaptar sus ideas
+al ecosistema actual, con prioridad a sencillez y menor verbosidad. Regla duradera
+en [AGENTS.md](../AGENTS.md), sección Maduración continua del framework. No cambia
+los pendientes ni inicia una refactorización o implementación. Actualización sólo
+documental; verificada con git diff --check, sin pruebas de código ni acceso a BD.
+
+## Revisión de pendientes vigentes (2026-11-23)
+
+Revisión documental contrastada con Git y código, sin nuevas pruebas ni acceso
+a BD. Las migraciones y la recuperación del merge ya están resueltas.
+
+1. Verificación visual pendiente del modal real de Contactos: crear/editar
+   subcontacto, relación al principal, cierre protegido y refresco sin perder
+   borradores. La demo ficticia tiene evidencia previa; no acredita esta prueba.
+2. Apertura explícita y tipada desde TSX: implementada el 2026-11-23, ver cierre
+   superior. Contrato y ejemplos en [Formularios en modal](formularios-modal.md#apertura-de-formularios-desde-tsx).
+3. Mejora posterior: tipar los campos base+extensión de vistas completas para
+   sustituir Record<string, unknown>, sin cambiar la composición en ejecución.
+
+Pendientes generales separados de esa continuación: distribución de módulos
+entre proyectos, estrategia de entornos, visibilidad de NotebookPage/presentaciones,
+compute persistido ante un caso real, limpieza segura de imágenes, agrupación por
+rutas/periodos y portabilidad de fixtures Windows. Conservan sus contratos y no
+se implementan por esta revisión. Required por grupo sólo se reconsidera ante
+un caso real. El diagnóstico visual de autocomplete Many2one sigue abierto.
+Los hallazgos de Flota/Fabricantes son históricos: esos módulos están retirados,
+y cualquier mejora compartida requiere reproducir el caso en consumidores vigentes.
+
+Corregidas dos notas obsoletas abajo: migración de permisos y simplificación de
+relaciones/vistas ya implementada en su primer alcance. No se repiten eject,
+importaciones ni pruebas históricas como parte de esta revisión.
+
+## Migraciones recuperadas en Windows (2026-11-23)
+
+Tras confirmar el usuario que corrigió las claves, preflight RepeatableRead/READ
+ONLY comprobó cero grupos duplicados Municipio+código y ausencia del índice.
+Se resolvió el intento fallido de `20261122000000_localidad_municipality_code_unique`
+con migrate resolve --rolled-back, y db:deploy aplicó esa migración y las dos
+aditivas de Contactosextra: `20261122221113_sync_contactosextra` (tipo de contacto)
+y `20261122223159_sync_contactosextra` (contacto principal, índice y FK Restrict).
+Migrate status confirma las 80 migraciones al día en desarrollo Windows.
+Consulta READ ONLY confirma el índice de Localidad único y válido; db:generate
+completó Prisma Client 7.10.1. No se editaron ni borraron registros de negocio
+por el agente. No se ejecutaron suites ni revisión visual de Contactos; reiniciar
+dev si estaba abierto para cargar el cliente generado. El bloqueo descrito abajo
+queda resuelto; las comprobaciones de Mac permanecen históricas y separadas.
+
 ## Recuperación de continuidad tras merge (2026-11-23)
 
 Revisión en `codex/partner`, HEAD inicial `12f8d46`, árbol limpio. El merge de
@@ -18,11 +132,10 @@ El diagnóstico de Localidad corresponde a la consulta anterior de esta sesión;
 su recuperación no acredita una nueva comprobación de la base.
 
 Siguiente: conservar el layout modal personalizado y retomar la revisión visual
-de Contactos y el plan de apertura tipada desde TSX. La corrección de las claves
-duplicadas y recuperación de la migración en Windows sigue pendiente de decisión
-del usuario. No ejecutar deploy/resolve por efecto de esta recuperación documental.
+de Contactos y el plan de apertura tipada desde TSX. La recuperación de la
+migración en Windows se completó posteriormente; ver el cierre superior.
 
-## Migración de Localidad bloqueada en Windows (2026-11-23)
+## Histórico: migración de Localidad bloqueada en Windows (2026-11-23, resuelta)
 
 Al ejecutar db:deploy, el usuario encontró P3009 para
 `20261122000000_localidad_municipality_code_unique`. Diagnóstico local mediante
@@ -61,7 +174,7 @@ Los contratos y las comprobaciones están detallados debajo y en
 2. Siguiente implementación acordada: apertura explícita y tipada desde TSX,
    `ModelFormButton` como nombre provisional. Modelo/vista, ID opcional y defaults
    sólo al crear; reutilizar el modal y preservar borradores, autorización y revisión.
-   [Plan y aceptación](formularios-modal.md#pendiente-posterior-apertura-de-formularios-desde-tsx).
+   [Plan y aceptación](formularios-modal.md#apertura-de-formularios-desde-tsx).
    Continúa como propuesta; no hay API implementada ni registro windowActions.
 3. Mejora posterior sin bloquear aplicaciones: tipar los campos compuestos de
    extensiones para sustituir Record<string, unknown> en sus vistas completas.
@@ -117,7 +230,7 @@ Límite comprobación visual: Contactos requiere sesión en el navegador integra
 no se abrió ni guardó un registro real con el layout nuevo. No se cambiaron datos
 de negocio ni se aplicaron migraciones. Sin commit/push. **Siguiente pendiente:**
 apertura explícita y tipada desde TSX (ModelFormButton provisional), según
-[el plan](formularios-modal.md#pendiente-posterior-apertura-de-formularios-desde-tsx).
+[el plan](formularios-modal.md#apertura-de-formularios-desde-tsx).
 La nota histórica de punto de continuación inferior queda sustituida por este cierre.
 
 Oportunidad de simplificación: tipar los campos compuestos de extendModel para
@@ -233,7 +346,7 @@ no resuelva. Evitar copiar comportamientos/arquitectura de Odoo por inercia;
 conservar mejoras útiles y los contratos actuales de negocio, relaciones y permisos.
 Sin reestructuración general ni implementación en esta tarea. Nombres/props por
 concretar. Plan y aceptación en
-[Apertura de formularios desde TSX](formularios-modal.md#pendiente-posterior-apertura-de-formularios-desde-tsx).
+[Apertura de formularios desde TSX](formularios-modal.md#apertura-de-formularios-desde-tsx).
 
 Al retomarlo, revisar generador/registro/resolución de vistas y concretar la sintaxis
 para destinos extendidos y la precedencia entre módulos antes de editar código.
@@ -4090,9 +4203,9 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
 
 - **Permisos por campo y presentación por grupo**, solicitado el 2026-11-14:
   lectura/escritura e invisible/readOnly implementados por autorización posterior
-  el 2026-11-21, con migración pendiente de aplicar (ver estado vigente arriba).
-  Required por grupo, visibilidad de NotebookPage y permisos por presentación
-  completa siguen pendientes. Alcance y aceptación en
+  el 2026-11-21, con migración verificada en desarrollo Windows ese día.
+  Visibilidad de NotebookPage y permisos por presentación completa siguen
+  pendientes; Required por grupo sólo se reconsidera ante un caso real. Alcance y aceptación en
   [el contrato](ideas/permisos-campos.md); no añadirlos por anticipación.
 
 - **Unificar escrituras de eject:view:** el comando aún tiene su propia secuencia
@@ -4128,7 +4241,9 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
   Esta anotación sólo modifica documentación; no autoriza ejecutar estos cambios
   por adelantado durante la tutoría. Verificación de la nota: git diff --check.
 
-- **Simplificar relaciones y vistas**, registrado el 2026-11-11, sin implementación:
+- **Histórico: simplificar relaciones y vistas**, primer alcance implementado
+  el 2026-11-11 según su guía y docs/contratos-vistas.md. El planteamiento original
+  incluía:
   incluye también Fields de formulario enlazados al contrato cliente del modelo
   para heredar etiqueta, required, maxLength, opciones y lookup configurado,
   manteniendo componentes y props explícitos. Control automático FormView.Field
@@ -4141,9 +4256,9 @@ Comprobaciones anteriores a la actividad (históricas para esos alcances):
   displayName y propuestas de actualización de vistas que preserven
   personalizaciones. Motivo, orden y criterios de aceptación en
   [el pendiente específico](ideas/simplificar-relaciones-y-vistas.md).
-  Esta anotación sólo modifica documentación; verificada con `git diff --check`.
-  Próximo paso al retomarlo: diseñar los dos primeros puntos con ejemplos de
-  código antes/después; no se inicia su implementación con esta anotación.
+  No tratar los puntos 1–7 de esa propuesta como pendientes sin implementación.
+  Las ampliaciones deben partir de los límites del contrato vigente y un caso
+  real. El tipado compuesto de extensiones conserva su pendiente específico arriba.
 
 - **Retirada segura de archivos remotos:** falta inventario de assets y referencias
   de todos los consumidores. Motivo: no se puede deducir propiedad/ausencia de uso

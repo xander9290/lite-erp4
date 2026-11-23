@@ -365,7 +365,7 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
       const contract = defineModel(Companion, { name, table });
       const Extended = extension.apply(extension.base);
       const actions = decoratedMethods(new Extended()).actions.map(action => action.method);
-      companions.push({ model: contract, clientFields: Object.keys(contract.metadata), ...(actions.length ? { actionReferences: { model: actionModel, names: actions } } : {}) });
+      companions.push({ model: contract, clientFields: Object.keys(contract.metadata), formReference: { model: target, fields: defineModel(Extended, { name: actionModel, table }).metadata }, ...(actions.length ? { actionReferences: { model: actionModel, names: actions } } : {}) });
       companion = Object.freeze({ name, table, relation: `${lowerFirst(name)}${pascal(companionLink)}Records` });
     }
     extensions.push(Object.freeze({ target, module: id, label: spec.name, extension, fields: Object.freeze(persistent), computed: Object.freeze(computed), many2many: Object.freeze(Object.keys(many)), ...(views ? { views } : {}), ...(insertions ? { insertions } : {}), ...(companion ? { companion } : {}) }));
@@ -449,7 +449,7 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
   // Validate ids, menus and dependencies now; the icon component is attached by the registry.
   defineApplication({ ...application, icon: (() => null) as unknown as ApplicationManifest["icon"] });
   const profile: GenerationProfile = {
-    module: { id, depends: spec.depends ?? [], models: [...models.map(model => ({ model: model.contract, clientFields: model.clientFields })), ...companions] },
+    module: { id, depends: spec.depends ?? [], models: [...models.map(model => ({ model: model.contract, clientFields: model.clientFields, formReference: { model: model.id, fields: model.metadata } })), ...companions] },
     externalOwners: {}, runtime: true,
   };
   return Object.freeze({ id, application, icon: spec.icon, models: Object.freeze(models), profile, access, extensions: Object.freeze(extensions), native: spec.native === true });

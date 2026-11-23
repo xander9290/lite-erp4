@@ -176,7 +176,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 - Fields.Integer/Text/Image admiten compute con nombre de método y dependencias @depends("campo", ...) o declaración de lectura explícita. Se excluyen de persistencia/defaults/ModelInput/Zod de guardado/clientFields y publican en PreviewFields/readFields. Un método de un Field devuelve el escalar; varios Fields comparten método y devuelven objeto completo. FieldText/Number/Image mode=display presentan sin RHF; scaffold genera estos controles. Sólo dependencias locales persistentes no sensibles, sin cadenas/ciclos, store ni inverse; las colecciones los proyectan por página autorizada, sin incorporarlos automáticamente a read/lookup. Contrato y demo en docs/campos-calculados.md y /sample#model-reactions. Conservar constraints definitivas y transacciones readonly; no añadir cálculos a Flota por adelantado.
 
-- Dirección acordada: reglas de negocio, métodos, cálculos y resolución de relaciones en modelos/servicios del backend; React para presentación, interacción y validación rápida sin sustituir la del servidor. Priorizar ergonomía propia de TypeScript/Prisma y composición React/TSX explícita; incorporar patrones de otros ERP sólo ante una necesidad real, sin copiar su arquitectura por inercia (decisión del 2026-11-22). Se conservan decoradores e inserciones por elección del usuario. Cada mejora debe reducir lógica repetida con un caso real; no reescribir todo ni esconder permisos/transacciones.
+- Dirección acordada: reglas de negocio, métodos, cálculos y resolución de relaciones en modelos/servicios del backend; React para presentación, interacción y validación rápida sin sustituir la del servidor. Ante una necesidad real, tomar Odoo como referencia funcional y adaptar sus ideas al ecosistema Next.js/React/TypeScript/Prisma del proyecto (criterio reafirmado el 2026-11-23). Priorizar ergonomía propia y composición React/TSX explícita; adoptar directamente un patrón cuando encaje y sea sencillo, y simplificarlo o elegir una solución propia cuando añada verbosidad o dificultad innecesarias. No copiar su arquitectura por inercia ni refactorizar globalmente para imitarlo. Se conservan decoradores e inserciones por elección del usuario. Cada mejora debe reducir lógica repetida con un caso real; no reescribir todo ni esconder permisos/transacciones.
 - Fields.Image/Text con related son virtuales de lectura y se excluyen de fields persistentes, defaults, valores/tipos RHF, SQL y clientFields. Se publican como PreviewFields/readFields y reutilizan reacciones readonly. Rutas Many2one de hasta tres saltos del mismo perfil, publicadas y no sensibles; generación/binding con delegates explícitos y proyecciones mínimas agrupadas por raíz. FieldImage mode=display los presenta sin registrar RHF ni subir archivos. No son computed almacenados; la proyección related en colecciones usa CollectionFields y relatedMany, según las reglas de colecciones. Contrato y pendientes en docs/campos-relacionados.md; demo /sample#related-image. El caso anterior de Vehicle era un ejemplo de related; no recrearlo por anticipación ni restaurar los componentes retirados.
 
 - Metodología vigente para modelos nuevos dentro de apps: create:model -- app Modelo, personalizar clase/reglas y clientFields explícitos, create:views -- app Modelo, orm:sync -- app. create:model registra declaración/import/perfil/manifest; create:views genera TSX editable (list/form por defecto, card/kanban y form modal opcionales), servicio, acciones, reexports, rutas y menús. No SQL ni hashes gestionados desde esos create; ambos admiten --dry-run, preflight y rechazo de colisiones/symlinks/configuración ambigua. No --force ni regeneración de vistas personalizadas. Guía [docs/modelos-y-vistas.md](docs/modelos-y-vistas.md).
@@ -197,19 +197,26 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   CorePartnerModal.tsx generado en contactosextra por autorización del usuario;
   conservar sus personalizaciones. No regenerar ni aplicar SQL para cambiar el layout.
 
-- **Siguiente pendiente reformulado (2026-11-22): apertura de formularios desde TSX.**
-  Componente explícito y tipado (nombre
-  provisional `ModelFormButton`) con modelo/vista, ID opcional y defaults de creación.
-  Manifest para registro/dependencias/permisos/vistas; React para interacción;
-  modelos/servicios para negocio y validaciones. Reutilizar ModelFormModal, validar
-  referencias y permisos en servidor, conservar borradores y refrescar colecciones
-  tras éxito; defaults no sobrescriben edición ni imponen relaciones inmutables.
-  Ejemplo conceptual: saleOrderId desde sale.order; no crear Ventas por anticipación.
-  Sustituye el registro inicial `windowActions`/`FormOpen`: reconsiderarlo sólo con
-  una necesidad real que la composición TSX no cubra. No copiar arquitectura de Odoo
-  por inercia ni reescribir contratos existentes por este cambio de plan. Sólo
-  documentado, props por concretar y sin implementación. Plan y aceptación en
-  [Apertura de formularios desde TSX](docs/formularios-modal.md#pendiente-posterior-apertura-de-formularios-desde-tsx).
+- **Apertura tipada desde TSX implementada (2026-11-23):** ModelFormButton usa
+  referencias generadas en src/generated/orm/forms (orm:sync o
+  orm:generate -- id --forms-only --write). Form/modal elige el layout dentro del
+  diálogo; ID edita, defaults escalares sólo crean. origin exige ID persistido y
+  lectura del origen, sin guardar el principal automáticamente. Servidor revalida
+  entrada, sesión, capacidades, registro, campos y referencias; guardado conserva
+  sus servicios, permisos, hooks y revisión. ModelRoute prepara su modelo e hijos;
+  para otros destinos/páginas, ModelFormTargets compone los slots en servidor.
+  No devolver vistas cliente nuevas desde Server Actions: Next requiere que estén
+  en el árbol RSC de la página. Apertura devuelve sólo datos autorizados; ModelForm
+  usa esa configuración vigente sobre la del template. onSaved y
+  useModelChildCollectionsRefresh refrescan sin router.refresh ni perder borradores.
+  Sin windowActions, SQL ni cambios de negocio por esta capacidad. Contrato y demo:
+  [Formularios desde TSX](docs/formularios-modal.md#apertura-de-formularios-desde-tsx),
+  /sample#form-dialog y ejemplo completo /documentation#abrir-formularios-desde-un-boton-tsx.
+
+- Validación de ergonomía (2026-11-23): el usuario acepta la apertura desde TSX
+  como adaptación al ecosistema del framework, con Odoo como referencia funcional.
+  Evaluar ajustes cuando aparezca un caso real al desarrollar una aplicación;
+  no crear una app ni adelantar otra implementación sólo para demostrar el flujo.
 
 - Required por grupo queda fuera del alcance actual por decisión del usuario
   (2026-11-21). Sólo reconsiderarlo ante una necesidad real; required y validación

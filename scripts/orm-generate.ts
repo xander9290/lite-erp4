@@ -5,6 +5,7 @@ import { artifactPlan, writeArtifacts } from "../src/lib/orm/generator/write";
 import { prepareModuleArtifacts } from "../src/lib/orm/generator/prepare";
 import { loadAppGenerationProfile } from "../src/lib/orm/generator/profile";
 import { imageUploadFiles } from "../src/lib/orm/generator/image-uploads";
+import { formReferenceFiles } from "../src/lib/orm/generator/form-references";
 import { actionReferenceFiles } from "../src/lib/orm/generator/action-references";
 
 const profiles: Record<string, ModuleGeneration> = {
@@ -16,11 +17,21 @@ const externalOwners: Record<string, Readonly<Record<string, string>>> = { flota
 
 async function main() {
   const [id, ...flags] = process.argv.slice(2);
-  if (!id || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id) || new Set(flags).size !== flags.length || flags.some(flag => !["--write", "--check", "--example", "--actions-only"].includes(flag)) || (flags.includes("--write") && flags.includes("--check"))) throw new Error("Uso: npm run orm:generate -- id [--write | --check] [--example] [--actions-only]. Sin --write sólo revisa el plan.");
+  if (!id || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(id) || new Set(flags).size !== flags.length || flags.some(flag => !["--write", "--check", "--example", "--actions-only", "--forms-only"].includes(flag)) || (flags.includes("--write") && flags.includes("--check")) || (flags.includes("--forms-only") && flags.includes("--actions-only"))) throw new Error("Uso: npm run orm:generate -- id [--write | --check] [--example] [--actions-only | --forms-only]. Sin --write sólo revisa el plan.");
   const mode = flags.includes("--write") ? "--write" : flags.includes("--check") ? "--check" : undefined;
   const root = process.cwd();
-  const application = flags.includes("--example") ? null : id === "core" && flags.includes("--actions-only") ? (await import("../src/lib/core/manifest")).default.profile : await loadAppGenerationProfile(root, id);
+  const application = flags.includes("--example") ? null : id === "core" && (flags.includes("--actions-only") || flags.includes("--forms-only")) ? (await import("../src/lib/core/manifest")).default.profile : await loadAppGenerationProfile(root, id);
   if (!application && !Object.hasOwn(profiles, id)) throw new Error("No existe un orm.config.ts para esta aplicación ni un ejemplo con ese nombre.");
+  const formDirectory = resolve(root, "src/generated/orm/forms", id);
+  const forms = formReferenceFiles(application?.module ?? profiles[id]);
+  const formPlan = flags.includes("--actions-only") ? null : await artifactPlan(formDirectory, `forms-${id}`, forms);
+  if (flags.includes("--forms-only") && formPlan) {
+    if (mode === "--write") await writeArtifacts(formDirectory, `forms-${id}`, forms);
+    for (const change of formPlan.changes) console.log(`${change.action} forms/${change.name}`);
+    console.log("Sólo referencias tipadas de formularios. Sin consultar la base ni aplicar SQL.");
+    if (mode === "--check" && (formPlan.manifestChanged || formPlan.changes.some(change => change.action !== "unchanged"))) process.exitCode = 2;
+    return;
+  }
   const actionDirectory = resolve(root, "src/generated/orm/actions", id);
   const actions = actionReferenceFiles(application?.module ?? profiles[id]);
   const actionPlan = await artifactPlan(actionDirectory, `actions-${id}`, actions);
@@ -41,13 +52,15 @@ async function main() {
     await writeArtifacts(directory, id, files);
     if (uploads) await writeArtifacts(uploadDirectory, `uploads-${id}`, uploads);
     await writeArtifacts(actionDirectory, `actions-${id}`, actions);
+    await writeArtifacts(formDirectory, `forms-${id}`, forms);
   }
   console.log(`Prisma validó la propuesta de ${id}. ${mode === "--write" ? "Artefactos escritos" : "Plan de generación"}:`);
   for (const change of plan.changes) console.log(`  ${change.action.padEnd(9)} ${change.name}`);
   for (const change of uploadPlan?.changes ?? []) console.log(`  ${change.action.padEnd(9)} uploads/${change.name}`);
   for (const change of actionPlan.changes) console.log(`  ${change.action.padEnd(9)} actions/${change.name}`);
+  for (const change of formPlan?.changes ?? []) console.log(`  ${change.action.padEnd(9)} forms/${change.name}`);
   console.log("No se modificó prisma/models, no se aplicaron migraciones y no se instaló ninguna aplicación.");
-  if (mode === "--check" && [plan, uploadPlan, actionPlan].some(item => item && (item.manifestChanged || item.changes.some(change => change.action !== "unchanged")))) process.exitCode = 2;
+  if (mode === "--check" && [plan, uploadPlan, actionPlan, formPlan].some(item => item && (item.manifestChanged || item.changes.some(change => change.action !== "unchanged")))) process.exitCode = 2;
 }
 
 main().catch(error => { console.error(error instanceof Error ? error.message : "No se pudo generar el módulo."); process.exitCode = 1; });

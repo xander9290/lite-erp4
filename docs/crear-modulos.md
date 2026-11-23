@@ -419,6 +419,173 @@ conserva su formulario e inserciones. Para personalizar inserciones del modal se
 usa `insertions.modal`, separada de `insertions.form`. No requiere sincronización
 de la base de datos. Puedes comparar diseños en la [demo ficticia](/sample#form-dialog).
 
+## Abrir formularios desde un botón TSX
+
+`ModelFormButton` abre creación o edición sin salir de la página. Usa una referencia
+estática generada; el servidor comprueba el acceso y resuelve el formulario y sus
+extensiones. El diálogo reutiliza carga, validación, guardado y cierre protegido.
+
+### Generar la referencia
+
+`orm:sync` genera estas referencias junto con los contratos. Si sólo cambian vistas
+o necesitas las referencias en un proyecto existente, genera sin consultar la BD:
+
+```bash
+npm run orm:generate -- contactosextra --forms-only --write
+```
+
+En este proyecto ya existe
+`src/generated/orm/forms/contactosextra/ContactosextraCorePartner.form.ts`, que
+exporta `ContactosextraCorePartnerForm`. Apunta a `core.partner` e incluye los tipos
+de sus campos base y los de esta extensión. No se edita a mano.
+Para Biblioteca: `npm run orm:generate -- biblioteca --forms-only --write`, e
+importar `BibliotecaLibroForm` desde `@/generated/orm/forms/biblioteca/BibliotecaLibro.form`.
+No hace falta declarar acciones de ventana ni otra ruta.
+
+### Preparar destinos adicionales en servidor
+
+Dentro de un formulario de `ModelRoute`, su propio modelo y los hijos readonly
+ya están preparados. El ejemplo de Contactos de abajo aprovecha esa composición.
+Para abrir otro modelo o usar una página propia, prepara sólo los destinos que
+necesitas en la página o layout **servidor**:
+
+```tsx
+import ModelFormTargets from "@/components/modules/ModelFormTargets";
+import { BibliotecaLibroForm } from "@/generated/orm/forms/biblioteca/BibliotecaLibro.form";
+import Toolbar from "./Toolbar";
+
+export default function Page() {
+  return (
+    <ModelFormTargets forms={[BibliotecaLibroForm]}>
+      <Toolbar />
+    </ModelFormTargets>
+  );
+}
+```
+
+El componente cliente `Toolbar.tsx` contiene el botón:
+
+```tsx
+"use client";
+
+import ModelFormButton from "@/components/modules/ModelFormButton";
+import { BibliotecaLibroForm } from "@/generated/orm/forms/biblioteca/BibliotecaLibro.form";
+
+export default function Toolbar() {
+  return (
+    <ModelFormButton form={BibliotecaLibroForm} defaults={{ name: "Nuevo libro" }}>
+      Crear libro
+    </ModelFormButton>
+  );
+}
+```
+
+El contenedor conserva loaders/inserciones en servidor y prepara sólo destinos
+legibles para la sesión. El botón vuelve a comprobar permisos al abrir; si falta
+la composición, informa el error sin sustituir tu vista personalizada.
+
+### Ejemplo completo: agregar una dirección de entrega
+
+Este ejemplo usa los modelos existentes de Contactos. Crea un archivo de vista,
+por ejemplo `src/modules/contactosextra/views/DeliveryButton.tsx`:
+
+```tsx
+"use client";
+
+import { useWatch } from "react-hook-form";
+import ModelFormButton from "@/components/modules/ModelFormButton";
+import { useModelChildCollectionsRefresh } from "@/components/modules/ModelForm";
+import { ContactosextraCorePartnerForm } from "@/generated/orm/forms/contactosextra/ContactosextraCorePartner.form";
+
+export default function DeliveryButton() {
+  const id = useWatch({ name: "id" }) as string | undefined;
+  const refreshChildren = useModelChildCollectionsRefresh();
+
+  return (
+    <ModelFormButton
+      form={ContactosextraCorePartnerForm}
+      origin={{ form: ContactosextraCorePartnerForm, id }}
+      defaults={{ parentId: id ?? "", partnerType: "delivery" }}
+      onSaved={refreshChildren}
+    >
+      Agregar dirección de entrega
+    </ModelFormButton>
+  );
+}
+```
+
+Coloca `<DeliveryButton />` dentro de un `FormGroup`, `FormHeader` o inserción del
+`ModelForm` principal. Comparte el contexto del formulario; no montes otro RHF.
+Por ejemplo, junto a la colección existente en la inserción de Contactos:
+
+```tsx
+import DeliveryButton from "./DeliveryButton";
+import { ModelChildCollections } from "@/components/modules/ModelForm";
+
+// Dentro del contenido de la inserción, bajo ModelForm:
+<>
+  <DeliveryButton />
+  <ModelChildCollections name="childIds" openIn="modal" />
+</>
+```
+
+`origin` desactiva el botón mientras el principal no tenga ID persistido. El usuario
+lo guarda explícitamente primero; abrir o cancelar el modal nunca lo guarda.
+El servidor vuelve a comprobar lectura del origen, permiso de crear el destino,
+campos iniciales y disponibilidad/dominio de las referencias Many2one. Guardar
+aplica otra vez las validaciones, permisos y concurrencia habituales del destino.
+
+`parentId` y `partnerType` son propuestas para crear, no restricciones inmutables.
+Si una relación debe ser obligatoria o no modificable, esa regla pertenece al
+modelo/servicio. El callback refresca las colecciones readonly del formulario
+principal conservando consulta y borradores; no llama a `router.refresh()`.
+Este ejemplo no modifica automáticamente las vistas existentes de Contactos.
+
+### Editar y elegir presentación
+
+Para editar un registro conocido, pasar `id`. El callback recibe la identidad y
+los campos publicados que devolvió el guardado; los demás campos son opcionales
+porque los permisos pueden ocultarlos:
+
+```tsx
+<ModelFormButton
+  form={ContactosextraCorePartnerForm}
+  id={subcontactoId}
+  view="modal"
+  onSaved={values => {
+    console.log("Registro guardado:", values.id);
+    refreshChildren();
+  }}
+>
+  Editar subcontacto
+</ModelFormButton>
+```
+
+`view="modal"` es el valor predeterminado y usa el layout modal con fallback al
+formulario normal. `view="form"` permite mostrar el layout de página dentro del
+diálogo. Los loaders y las inserciones se resuelven en servidor. No son URLs ni
+nombres de componentes enviados por el navegador.
+
+Con `id`, los valores `defaults` se ignoran: no sobrescriben la edición. Sin ID,
+sólo se permiten propuestas escalares públicas y editables; no identidad/revisión,
+campos sensibles, secuencias, virtuales ni arrays de relaciones. El tipado detecta
+nombres y valores inválidos; el servidor vuelve a comprobar el contrato vigente.
+Errores de acceso/carga permiten reintentar manualmente; no hay escrituras al abrir.
+
+### Comprobar el comportamiento
+
+1. Principal nuevo: el botón indica que debes guardarlo primero.
+2. Principal guardado con cambios pendientes: abrir conserva esos cambios.
+3. Crear propone Entrega y el contacto principal; cancelar sólo descarta el modal.
+4. Guardar el subcontacto refresca su lista sin guardar ni limpiar el principal.
+5. Editar conserva los valores persistidos aunque se envíen defaults diferentes.
+6. Sin permisos o con referencias alteradas, el servidor rechaza la operación.
+
+La [demo ficticia de botones](/sample#form-dialog) usa el mismo activador y
+transporte de datos, con un editor de ejemplo sin base de datos. Permite crear,
+editar, probar un rechazo con ERROR y comprobar el contador de guardados del
+principal. La prueba con modelos reales requiere una sesión autorizada.
+
 ## Comprobar lo aprendido
 
 En Notas has definido campos y acceso para un solo modelo. En Biblioteca has

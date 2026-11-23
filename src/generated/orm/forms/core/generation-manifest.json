@@ -1,0 +1,8 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "forms-core",
+  "files": {
+    "Partner.form.ts": "ef27cf7f5e75451823a83ce8ffaa66cf0832a8ab023d4449b0ee22815a8f682e",
+    "User.form.ts": "22f8bdd93207c9c054e3cc5eda124d8a0185e32b4073b96c389c12361271b102"
+  }
+}

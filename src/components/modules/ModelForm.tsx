@@ -55,6 +55,14 @@ function display(name: string, field: FieldMetadata) {
 }
 
 const ModelUIContext = createContext<ModelUI | null>(null);
+const ChildCollectionRefreshContext = createContext<{ version: number; refresh: () => void } | null>(null);
+
+/** Refresh the current form's readonly collections after a separate, confirmed child save. */
+export function useModelChildCollectionsRefresh() {
+  const context = useContext(ChildCollectionRefreshContext);
+  if (!context) throw new Error("useModelChildCollectionsRefresh se usa dentro de ModelForm.");
+  return context.refresh;
+}
 
 /**
  * Read-only relations of the record (children created in their own form): one paginated,
@@ -78,12 +86,13 @@ function ChildCollection({ parent, field, recordId, collection, openIn }: {
 }) {
   const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const [version, setVersion] = useState(0);
+  const externalVersion = useContext(ChildCollectionRefreshContext)?.version ?? 0;
   const source = useMemo(() => ({
     load: (state: ListState) => modelChildren(parent, field, recordId, state),
     filterLookups: Object.fromEntries(Object.keys(collection.config.lookups).map(lookup => [lookup, (request: import("@/lib/many2one/model-lookup").ModelLookupRequest) => modelRelationLookup(collection.config.id, lookup, { request, draft: {}, filter: true })])),
     // Replacing this provider after a confirmed save reloads the current query/page.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [parent, field, recordId, collection, version]);
+  }), [parent, field, recordId, collection, version, externalVersion]);
   const defaults = { [collection.inverse]: recordId };
   const inverse = collection.config.fields[collection.inverse];
   return <><ModelCollection embedded config={collection.config} view="list" title={collection.label} paramPrefix={field}
@@ -144,11 +153,14 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
   const returnQuery = `?returnTo=${encodeURIComponent(returnHref)}`;
   const [savedId, setSavedId] = useState(record.id as string | undefined);
   const [savedName, setSavedName] = useState(displayName);
+  const [collectionVersion, setCollectionVersion] = useState(0);
+  const refreshCollections = useCallback(() => setCollectionVersion(value => value + 1), []);
+  const collectionRefresh = useMemo(() => ({ version: collectionVersion, refresh: refreshCollections }), [collectionVersion, refreshCollections]);
   const methods = useForm<Values>({ resolver: zodResolver(ui.schema as never), defaultValues: record });
   const kind = useModelFormViewKind(config.id);
   const insertions = useModelExtensionInsertions(kind, config.id);
   const insertionModules = useMemo(() => (config.extensions ?? []).map(extension => ({ module: extension.module, depends: extension.depends ?? [] })), [config.extensions]);
-  return <ModelUIContext.Provider value={ui}><FormView
+  return <ModelUIContext.Provider value={ui}><ChildCollectionRefreshContext.Provider value={collectionRefresh}><FormView
     layout={modal ? "content" : "page"}
     breadcrumbs={modal ? [] : [{ label: "Aplicaciones", href: "/erp" }, { label: config.label, href: returnHref }, { label: savedId ? savedName || "Registro" : "Nuevo registro" }]}
     title={savedId ? "Editar registro" : "Nuevo registro"}
@@ -176,15 +188,16 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
   >
     <FormDialogLock />
     <InsertionProvider modules={insertionModules} collectors={insertions}>{children ?? <ModelFields ui={ui} />}</InsertionProvider>
-  </FormView></ModelUIContext.Provider>;
+  </FormView></ChildCollectionRefreshContext.Provider></ModelUIContext.Provider>;
 }
 
 /**
  * Form wiring shared by every module model: loader, reload guard, routing, breadcrumbs,
  * activity and deletion. Custom views pass only their field layout as children.
  */
-export default function ModelForm({ config, id: routeId, children }: { config: ModelClientConfig; id?: string; children?: ReactNode }) {
-  const modal = useModelFormPresentation(config.id);
+export default function ModelForm({ config: providedConfig, id: routeId, children }: { config: ModelClientConfig; id?: string; children?: ReactNode }) {
+  const modal = useModelFormPresentation(providedConfig.id);
+  const config = modal?.config ?? providedConfig;
   const id = modal ? modal.id : routeId;
   const ui = useMemo(() => buildModelUI(config), [config]);
   const router = useRouter();

@@ -574,3 +574,12 @@ reset: "year" } })` asigna el folio al crear desde el servidor. No requiere
 beforeSave; el campo se conserva único y de sólo lectura. ModelForm muestra Nuevo
 en el borrador y el valor asignado después de guardar. [Migración, concurrencia
 y límites](folios-secuencias.md).
+
+
+## Botones para abrir formularios
+
+ModelFormButton usa referencias generadas por orm:sync o
+`orm:generate -- id --forms-only --write`. ModelRoute prepara su formulario e
+hijos; para destinos adicionales, componer ModelFormTargets en servidor.
+[Contrato](formularios-modal.md#apertura-de-formularios-desde-tsx) y
+[ejemplo completo](crear-modulos.md#abrir-formularios-desde-un-boton-tsx).

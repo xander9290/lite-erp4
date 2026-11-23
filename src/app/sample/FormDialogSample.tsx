@@ -13,6 +13,9 @@ import ListView from "@/components/ui/list/ListView";
 import type { ListResult, ListState } from "@/lib/list/types";
 import { dialogSampleSchema, type DialogSampleValues } from "./form-dialog.schema";
 import { saveDialogSample } from "./form-dialog.actions";
+import { FormOpenButton } from "@/components/modules/ModelFormButton";
+import { openFormSample } from "./form-open.actions";
+import FormOpenSampleEditor from "./FormOpenSampleEditor";
 
 function Child({ record, onClose, onSaved }: { record: DialogSampleValues; onClose: () => void; onSaved: (record: DialogSampleValues) => void }) {
   const methods = useForm<DialogSampleValues>({ resolver: zodResolver(dialogSampleSchema), defaultValues: { note: "", ...record } });
@@ -55,6 +58,21 @@ export default function FormDialogSample() {
     <FormView methods={methods} title="Principal de ejemplo" onSubmit={async values => ({ ok: true, values })} onSaved={() => setParentSaves(value => value + 1)}
       footer={<p data-testid="dialog-parent-saves">Guardados del principal: {parentSaves}</p>}>
       <FormGroup legend="Principal"><FieldText name="name" label="Nombre del principal" /></FormGroup>
+      <FormGroup fullWidth legend="Abrir desde un botón">
+        <p className="text-sm">Mismo activador y transporte de datos del framework, con servidor ficticio sin base de datos. Crear propone un nombre; editar conserva el nombre guardado aunque se proponga otro. Guarda el hijo y comprueba que el contador del principal sigue en cero.</p>
+        <div className="flex flex-wrap gap-2">
+          <FormOpenButton prepare={async () => {
+            const result = await openFormSample({ defaults: { name: "Dirección propuesta" } });
+            return result.ok ? { ...result, content: <FormOpenSampleEditor record={result.record} /> } : result;
+          }}
+            onSaved={values => setRecords(current => [...current, values as DialogSampleValues])}>Crear desde botón</FormOpenButton>
+          <FormOpenButton prepare={async () => {
+            const result = await openFormSample({ record: records[0], defaults: { name: "NO sobrescribir" } });
+            return result.ok ? { ...result, content: <FormOpenSampleEditor record={result.record} /> } : result;
+          }}
+            onSaved={values => setRecords(current => current.map(record => record.id === values.id ? values as DialogSampleValues : record))}>Editar desde botón</FormOpenButton>
+        </div>
+      </FormGroup>
       <FormGroup fullWidth legend="Subcontactos de ejemplo">
         <ListView model="sample.dialog" title="Subcontactos de ejemplo" paramPrefix="dialogSample" columns={[{ field: "name", label: "Nombre", type: "text" }]} searchFields={["name"]}
           load={load} delete={false} onCreate={() => setEditing({ name: "" })} onOpen={row => setEditing(records.find(record => record.id === row.id)!)} />

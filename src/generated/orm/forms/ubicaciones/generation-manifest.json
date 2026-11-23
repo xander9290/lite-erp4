@@ -1,0 +1,10 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "forms-ubicaciones",
+  "files": {
+    "UbicacionesPais.form.ts": "005e988447a6cd13a076f1ed6de0b75ae684288ce9281d2725c5f5a0bac5edd1",
+    "UbicacionesEstado.form.ts": "058141f8b3cc6bc3144925a63b34bd3f0d04cc860de9d2b85b2f8bea3595042a",
+    "UbicacionesMunicipio.form.ts": "76db739ca6a5dd00c0e5eb5ef95020fd6ec5b6efb5effa9569870cd924e1c42b",
+    "UbicacionesLocalidad.form.ts": "948a6a479d70cd0ab46b81b16f87db392bd119ac2d8f79aa64f25d14439f307b"
+  }
+}

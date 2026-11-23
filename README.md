@@ -70,6 +70,13 @@ cierre protegido y refresco de la lista. Para un layout independiente:
 proyecto; editar `views/CorePartnerModal.tsx`). `views.modal` conserva `views.form`
 y sus inserciones de página. [Formularios en modal](docs/formularios-modal.md).
 
+Para abrir creación/edición desde TSX, usar `ModelFormButton` con referencias de
+`src/generated/orm/forms` (orm:sync o `orm:generate -- id --forms-only --write`).
+`ModelFormTargets` compone destinos adicionales en servidor; el formulario actual
+y sus hijos ya se preparan en ModelRoute. Ejemplo completo en
+[/documentation#abrir-formularios-desde-un-boton-tsx](http://localhost:3000/documentation#abrir-formularios-desde-un-boton-tsx)
+y [contrato](docs/formularios-modal.md#apertura-de-formularios-desde-tsx).
+
 Los botones de negocio usan referencias tipadas: `action={ventaActions.confirmar}`.
 `orm:sync` las genera; para actualizar sólo acciones sin consultar la BD, usar
 `npm run orm:generate -- id --actions-only --write`.
