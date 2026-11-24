@@ -4,6 +4,11 @@ El control y la opción «Buscar más…» no muestran iconos de lupa; el input 
 el padding izquierdo estándar. Se conservan sugerencias, búsqueda por teclado,
 limpieza y apertura del modal mediante la flecha.
 
+El input y el buscador del modal no tienen placeholder predeterminado. La prop
+`placeholder` permite un texto explícito cuando una vista lo necesita. Las celdas
+Many2one de FieldOne2many heredan este comportamiento; One2many no añade placeholders
+propios. Su mensaje de colección vacía se conserva.
+
 Para modelos declarativos, usar `load={lookupRecords}` del servicio del modelo
 relacionado, sin plantilla de presentación ni campos de búsqueda en la vista.
 Contrato, permisos, compatibilidad y ejemplo RHF/Zod en

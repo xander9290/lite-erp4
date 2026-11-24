@@ -14,6 +14,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import SampleForms from "./SampleForms";
 import ImageSample from "./ImageSample";
+import FormMediaSample from "./FormMediaSample";
+import FormDensitySample from "./FormDensitySample";
 import Many2OneSample from "./Many2OneSample";
 import RelationDropdownSample from "./RelationDropdownSample";
 import ActionParametersSample from "./ActionParametersSample";
@@ -79,6 +81,8 @@ export default function PageSample() {
             <a className="btn btn-sm btn-outline" href="#field-select-statebar">Statebar</a>
             <a className="btn btn-sm btn-outline" href="#field-text">FieldText</a>
             <a className="btn btn-sm btn-outline" href="#stack">Stack</a>
+            <a className="btn btn-sm btn-outline" href="#form-media-layout">Imagen y campos</a>
+            <a className="btn btn-sm btn-outline" href="#form-density">Densidad</a>
             <a className="btn btn-sm btn-outline" href="#field-invisible">Invisible</a>
             <a className="btn btn-sm btn-outline" href="#field-text-header">Encabezado</a>
             <a className="btn btn-sm btn-outline" href="#field-text-phone">Teléfono</a>
@@ -136,6 +140,8 @@ export default function PageSample() {
         <One2manySample />
         <One2manyDeclarativeSample />
         <ImageSample />
+        <FormMediaSample />
+        <FormDensitySample />
         <ImageSample widget="avatar" />
       </div>
     </main>

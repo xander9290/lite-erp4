@@ -34,7 +34,7 @@ function BooleanControl<TFieldValues extends FieldValues = FieldValues>(props: F
   return (
     <div data-form-field={name} className={fieldDirectionClassName(direction, fieldLabel)}>
       {fieldLabel && <label htmlFor={inputId} className={fieldLabelClassName(direction)}>{fieldLabel}</label>}
-      <div className="flex min-h-10 w-full min-w-0 items-center">
+      <div className="flex min-h-[var(--form-control-height,2.5rem)] w-full min-w-0 items-center">
         <input
           {...inputProps}
           name={fieldName}

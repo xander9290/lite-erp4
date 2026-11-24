@@ -68,7 +68,7 @@ function EditableRelation<TFieldValues extends FieldValues = FieldValues>(props:
   const {
   name, label, direction = "block", model = "user", load: baseLoad, searchFields = lookupModels[model as Many2OneModel].searchFields,
   displayName = lookupModels[model as Many2OneModel].displayName, columns, pageSize = 10, clearable = true,
-  onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder = "Buscar y seleccionar…",
+  onChange, onBlur, onFocus, disabled, readOnly, required, id, className = "", placeholder,
   "aria-label": ariaLabel, "aria-describedby": describedBy, ...inputProps
 } = useModelField(props, "many2one");
   const load = useRelationDomainLoad(name, baseLoad);

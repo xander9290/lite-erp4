@@ -86,6 +86,23 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Preferencias de diseño de formularios
 
+- Densidad de formularios (2026-11-24): ModelForm/FormView/FormLayout admiten
+  density="normal" (default) o "compact". Compact: inputs/selects 32px, fuente
+  habitual 14px, gap de composición 8px, label block 4px y FormGroup padding 12px.
+  Variables locales por formulario; no remonta Fields ni cambia RHF/guardado.
+  Conservar tamaños explícitos, líneas One2many y medidas de imágenes, textareas,
+  header/statebar/auditoría. Directorio activa compact. Contrato FormLayout.md en
+  ui/form y demo /sample#form-density.
+
+- FormMediaLayout (2026-11-24) compone media y Fields dentro del formulario
+  existente: posición left/right y ancho de columna configurable; dos columnas
+  desde 32rem del propio contenedor, imagen arriba en anchos menores. No impone
+  dirección de Fields ni crea otro formulario/contexto RHF. Directorio lo usa;
+  con id publica media:<id>: inside añade a la columna de campos y
+  before/after/replace actúan sobre el layout completo.
+  contrato en src/components/ui/form/FormMediaLayout.md y demo RHF/Zod en
+  /sample#form-media-layout.
+
 - Formularios modales declarativos (2026-11-22): `ModelChildCollections openIn="modal"`
   opt-in para colecciones readonly; usa `ModelFormModal`, ModelForm y vistas e
   inserciones resueltas en servidor. `views.modal` es un layout completo independiente

@@ -1,10 +1,190 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-23.
+Última actualización: 2026-11-24.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
+
+## Punto de continuación vigente: Directorio y UI (2026-11-24)
+
+Revisión de cierre por solicitud del usuario, mediante documentación, fuentes y
+Git. Rama codex/partner, HEAD 4bc81a9. Hay cambios sin commit, incluidos archivos
+nuevos de UI, modelos, artefactos y ocho carpetas de migración de Directorio.
+Conservar todos los cambios del usuario; no asumir árbol limpio. No se hizo
+commit/push/pull. Este punto sustituye como estado actual las descripciones de
+Directorio del 2026-11-23; esas secciones conservan su evidencia histórica.
+
+### Implementado durante esta sesión
+
+- Many2one y su buscador modal sin placeholder predeterminado; One2many no tenía
+  placeholders propios. Búsqueda/selección y mensajes de colección vacía intactos.
+- FormMediaLayout reutilizable y adaptable, con media, posición, ancho y ancla
+  media:<id>. inside añade a la columna de campos; before/after/replace actúan
+  sobre el layout completo. Directorio usa actualmente id="formMedia", por lo
+  que el destino es media:formMedia (el id inicial form-media ya fue renombrado
+  por el usuario). La demo mantiene su propio id form-media.
+- density normal/compact en ModelForm/FormView/FormLayout; PartnerForm y la vista
+  BusinessactivityForm actual activan compact. Medidas, límites y comprobaciones
+  en la sección de densidad inferior. Demos /sample#form-media-layout y #form-density.
+- /documentation incluye Notebook/NotebookPage y densidad; docs/crear-modulos.md
+  sigue siendo su fuente única. Contratos específicos enlazados más abajo.
+
+### Directorio actual, comprobado sólo en fuentes
+
+El usuario amplió el módulo con PartnerTags y BusinessActivity, registrados como
+partnertags y businessactivity. Nombres de destino: DirectoryPartnertags y
+DirectoryBusinessactivity; derivan de las claves del manifest, no del casing de
+las clases. Menú Contactos y Configuración → Etiquetas / Actividad empresarial.
+depends conserva sólo ubicaciones; core/User es dependencia implícita.
+
+Partner tiene tagIds Many2many (máximo 10, create:true), activityIds Many2many
+(máximo 3), parentId autorrelacional y saleUserId/purchaseUserId hacia User activo.
+parentId excluye el propio registro y type="contact" mediante d.all. El modelo
+conserva dirección encadenada y beforeSave que arma completeAddress. No se añadió
+creación/sincronización automática de usuarios o contactos. PartnerTags normaliza
+name con trim/minúsculas. BusinessActivity declara name, description, code único
+opcional, parentId y active; @displayName("parent.name", "name") concatena
+«Padre / Nombre», sin resolver recursivamente todos los ancestros.
+
+PartnerForm conserva FormMediaLayout, datos fiscales, etiquetas/actividades y
+pestañas Otras direcciones (sólo «En construcción»), Ventas, Compras y Otra
+información. PartnerCard ya usa ListCellValue con widget many2one para Estado y
+Municipio, reutilizando $labels del servidor; renderCard recibe IDs, no objetos
+relacionales completos. Manifest publica ocho campos: image/name/phones/street/
+streetNumber/vat/provinceId/countyId. completeAddress sigue en el modelo pero ya
+no está publicado ni presentado en esa tarjeta. Card inicial y Lista estándar
+siguen habilitadas. Función exportada de PartnerCard aún se llama PartnerList.
+
+El usuario cambió el tema de corporate a cmyk en globals.css y layout.tsx;
+dark sigue declarado. No revertir ni atribuir ese cambio a la densidad.
+Existen esquemas/artefactos y migraciones locales de las ampliaciones; esta lectura
+no acredita cuáles están aplicadas ni su persistencia en Windows u otras máquinas.
+
+### Pendientes al retomar
+
+1. Verificar el formulario real de Directorio y sus dos presentaciones con las
+   últimas ediciones: relaciones, etiquetas/creación rápida, actividades, responsables,
+   guardado/recarga, errores y retorno. Confirmar historial de migraciones del entorno
+   antes de atribuir comportamiento a la base. No ejecutar SQL ni cargas como efecto
+   de ponerse al día. Las pruebas previas de UI no cubren todo el ejercicio actual.
+2. Definir el siguiente paso de Otras direcciones: hoy no hay colección/formulario
+   de direcciones implementado en esa pestaña. Revisar también si excluir
+   type="contact" en parentId corresponde a la intención de contacto principal.
+3. Si se mantiene la jerarquía de contactos/actividades, añadir validación de
+   servidor contra ciclos de varios registros. Excluirse a sí mismo con domain
+   no impide A → B → A; ninguna de las dos clases declara esa constraint ahora.
+4. Sigue pendiente el ajuste de formato RFC descrito en su sección: ambas ramas
+   conservan [A-Z0-9]{3}, en lugar de [A-Z0-9]{2}[0-9A]. No se modificó por adelanto.
+   Validación de varios correos/teléfonos y grupos/permisos de Directorio quedan
+   para definir con el caso real; no fueron implementados por estas explicaciones.
+5. Limpieza opcional: renombrar la función PartnerList de PartnerCard y retirar
+   imports de tipos sin uso en los nuevos catálogos cuando se revise su código.
+   Aceptación: mismos contratos/presentación, sin regenerar vistas personalizadas.
+
+Los pendientes generales ya registrados conservan su alcance: acciones por
+selección en listas, tipado base+extensión, distribución de módulos, estrategia
+de entornos, visibilidad de páginas/presentaciones, agrupación relacional/fechas,
+limpieza segura de imágenes y portabilidad Windows. No se iniciaron por esta sesión.
+
+Evidencia previa de esta sesión: TypeScript y ESLint focalizado, test:form-model
+29/29, render de inserciones y comprobaciones de navegador en demos ficticias,
+detalladas en las secciones inferiores. Esa evidencia es anterior a las últimas
+ediciones del usuario (incluido tema y tarjeta); no se repitió una suite completa,
+build, SQL ni pruebas autenticadas al guardar este punto. Verificación de este
+cierre documental: git diff --check aprobado; sin tocar código ni datos.
+
+## Densidad compacta de formularios (2026-11-24)
+
+ModelForm, FormView (por herencia de props) y FormLayout admiten density normal o
+compact. Opt-in activado en PartnerForm de Directorio, preservando los cambios
+actuales del usuario. Variables CSS locales por formulario, sin provider nuevo;
+normal restablece tokens. Inputs/selects 32px, gap de composición 8px, gap block
+4px, padding FormGroup 12px, radios compactos y Many2many flexible. Texto habitual
+14px y labels inline de 112px conservados. Los tamaños explícitos prevalecen sobre
+el token de daisyUI; no se reduce imagen, textarea, header/statebar/auditoría.
+Stack conserva su distribución de hasta tres columnas con el gap correspondiente.
+
+Demo /sample#form-density con RHF/Zod y selector normal/compact sin remontar,
+datos ficticios y validación local sin persistencia ni subidas. Guía publicada en
+docs/crear-modulos.md; contrato en ui/form/FormLayout.md y enlaces en FormView,
+Notebook y FormMediaLayout.
+
+Verificaciones Windows: TypeScript y ESLint focalizado aprobados; test:form-model
+29/29, git diff --check aprobado. Navegador: normal 40px/16px de gap/16px padding;
+compact 32px/8px/12px con fuente 14px, radios de 32px y Stack en dos columnas.
+Alternar densidad conserva el nombre dirty; nombre vacío se rechaza, corregirlo
+valida y deja el formulario limpio. A 375px y 320px sin overflow de la demo;
+formulario normal vecino mantiene controles de 40px. One2many conserva clases
+explícitas móviles de 32px y tabla desktop 32px/14px. La última corrección del token
+de altura se comprobó en navegador para respetar h-* personalizados. Sin nuevo
+build, prueba autenticada de Directorio, SQL, generación ni escrituras reales.
+Las modificaciones de modelos/migraciones del usuario son independientes de este
+cambio y no se ejecutaron ni revirtieron como parte de su implementación.
+
+## Notebook y NotebookPage en /documentation (2026-11-24)
+
+Guía añadida a docs/crear-modulos.md, fuente única de /documentation e índice
+automático: formulario de Notas con campos existentes, props, selección controlada,
+descriptores pages desde servidor, anclas notebook/page e inserciones, composición,
+conservación de borradores, errores RHF y teclado. Enlace a /sample#notebook.
+No modifica componentes, modelos ni vistas de negocio. Metadatos de la página
+actualizados. Verificación: sintaxis de los cuatro bloques TSX mediante TypeScript,
+ESLint de la página y git diff --check aprobados; navegador comprueba el apartado,
+su entrada en el índice y los ejemplos publicados. Sin build, SQL, generación ni
+pruebas nuevas del comportamiento de Notebook; se contrastó la guía con sus fuentes.
+
+## FormMediaLayout reutilizable (2026-11-24)
+
+Ampliación posterior: con id publica el destino media:<id> mediante el hook
+compartido useInsertionAnchor. Admite before/after/replace sobre el layout completo
+e inside al final de la columna de campos. El id="form-media" añadido por el
+usuario en Directorio se conserva y ahora es direccionable. Demo ampliada con
+campo opcional insertado y validación en el mismo RHF. Contratos actualizados.
+Verificación: 11/11 pruebas de inserciones (incluye render, orden, sustitución y
+contexto RHF de media), TypeScript, ESLint focalizado y git diff --check aprobados.
+Sin nueva prueba de navegador para esta ampliación ni escrituras de BD/generación.
+
+Nuevo componente de composición en ui/form: slot media y children, posición
+left/right y mediaWidth opcional (auto, longitud CSS o píxeles). Dos columnas desde
+32rem del ancho del componente, apiladas con imagen arriba por debajo del umbral;
+separación de 16px y alineación superior. Sin formulario/contexto RHF nuevos ni
+cambios de FieldImage. Directorio lo usa para imagen y tipo/nombre/correos/teléfonos;
+RFC/CURP siguen debajo a todo el ancho del grupo. Contrato en
+[FormMediaLayout](../src/components/ui/form/FormMediaLayout.md).
+
+Demo /sample#form-media-layout con RHF/Zod, posición/ancho, envío local y reset.
+TypeScript, ESLint focalizado y git diff --check aprobados. Navegador: a 1280px
+columna visual auto de 104px junto a campos; derecha con 10rem produce columna de
+160px. A 375px se apila sin overflow del layout. Envío local valida nombre ficticio
+e imagen null; reset ejecutado. Sin subir imágenes ni guardar datos reales,
+sin comprobar el formulario autenticado de Directorio ni ejecutar SQL/generación.
+
+## Relaciones sin placeholder predeterminado (2026-11-24)
+
+FieldMany2One deja vacío el input sin selección, sin «Buscar y seleccionar…»;
+el buscador del modal tampoco añade placeholder. Se retira el texto explícito
+de la demo Many2OneSample. Se conserva la prop opcional para vistas personalizadas,
+así como búsqueda, selección, etiquetas accesibles y autocomplete off.
+FieldOne2many no tiene placeholders propios: sus celdas Many2one heredan el cambio;
+el mensaje de colección vacía permanece. ESLint de los tres TSX modificados y
+git diff --check aprobados. Sin nueva prueba de navegador, BD ni generación.
+
+## Puesta al día en Windows (2026-11-24)
+
+Revisados AGENTS.md, README, continuidad, historial Git y fuentes de los módulos,
+núcleo y Directorio. Rama codex/partner, HEAD 4bc81a9; árbol limpio al comenzar.
+Ese commit incorpora el avance de Directorio descrito abajo, incluidas sus vistas,
+artefactos y migraciones. El registro de módulos contiene ubicaciones y directory;
+core declara sólo User. La lectura del código confirma Card inicial, Lista estándar,
+formulario personalizado y completeAddress calculado en beforeSave.
+
+Siguen sin nueva comprobación el navegador, la persistencia y las migraciones de
+Directorio en esta máquina. El patrón RFC conserva [A-Z0-9]{3} y su ajuste sigue
+pendiente. Próximo paso del ejercicio: verificar las presentaciones y el guardado
+real cuando se retome, sin adelantar modelos, permisos ni automatismos. Esta revisión
+sólo corrige documentación; git diff --check aprobado, sin pruebas de código,
+generación, SQL, acceso a BD ni commit/push/pull.
 
 ## Directory: Card, dirección completa, menú y multivista (2026-11-23)
 
@@ -116,13 +296,12 @@ El modelo del usuario no se modificó por esta documentación.
 
 ## Punto de continuación: Directory (2026-11-23)
 
-Rama comprobada: codex/partner, HEAD 9244e34. La retirada del Partner nativo y
-User autónomo están en 337af62; la declaración inicial de directory está en
-9244e34. El árbol actual tiene cambios sin commit del usuario en modelos,
-manifest/vistas, documentación y artefactos/migraciones de Directorio. No asumir
-árbol limpio ni revertirlos. Este guardado sólo actualiza continuidad; sin commit,
-push, pull, generación ni SQL. Los detalles del avance actual y las comprobaciones
-están en la sección Directory: Card, dirección completa, menú y multivista.
+Al guardar este punto el 2026-11-23, la rama era codex/partner, HEAD 9244e34,
+con cambios del usuario sin commit. La retirada del Partner nativo y User autónomo
+están en 337af62; la declaración inicial de directory está en 9244e34. El avance
+posterior quedó incorporado en 4bc81a9, comprobado el 2026-11-24 con árbol limpio.
+Los detalles del avance y las comprobaciones están en la sección Directory: Card,
+dirección completa, menú y multivista.
 
 Partner → directory.partner / DirectoryPartner mantiene partnerType obligatorio
 sin default, type inicial contact, active true y displayName basado en name.

@@ -15,6 +15,7 @@ import { useModelReactions } from "./useModelReactions";
 import useFormErrorToasts from "./useFormErrorToasts";
 import { FormValidationContext, type FormFieldValidator, type FormFieldValidation } from "./formValidation";
 import { focusInvalidField, invalidFormFields, revealNotebookFieldEvent } from "./notebookErrors";
+import { formDensityStyle, type FormDensity } from "./formDensity";
 
 export type FormLayoutProps<
   TFieldValues extends FieldValues,
@@ -22,6 +23,7 @@ export type FormLayoutProps<
   TTransformedValues = TFieldValues,
 > = Omit<ComponentPropsWithoutRef<"form">, "onSubmit" | "onInvalid" | "children" | "autoComplete"> & {
   model?: FormModel;
+  density?: FormDensity;
   methods: UseFormReturn<TFieldValues, TContext, TTransformedValues>;
   onSubmit: SubmitHandler<TTransformedValues>;
   onInvalid?: SubmitErrorHandler<TFieldValues>;
@@ -40,12 +42,14 @@ export default function FormLayout<
 >({
   methods,
   model,
+  density = "normal",
+  style,
   onSubmit,
   onInvalid,
   children,
   className = "",
   noValidate = true,
-  contentClassName = "grid grid-cols-1 items-start gap-4 @2xl/form:grid-cols-2",
+  contentClassName = "grid grid-cols-1 items-start gap-[var(--form-layout-gap,1rem)] @2xl/form:grid-cols-2",
   onSubmitError,
   onSubmitSettled,
   silentErrorTypes,
@@ -85,6 +89,8 @@ export default function FormLayout<
       <form
         {...formProps}
         ref={formRef}
+        data-form-density={density}
+        style={{ ...formDensityStyle(density), ...style }}
         autoComplete="off"
         className={`@container/form min-w-0 ${className}`}
         noValidate={noValidate}

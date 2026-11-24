@@ -3,6 +3,7 @@ import { defineModelFormReference } from "@/lib/modules/form-reference";
 
 export const DirectoryPartnerForm = defineModelFormReference<{
   "name": string;
+  "active": boolean;
   "emails": string;
   "phones": string;
   "street": string;
@@ -20,5 +21,7 @@ export const DirectoryPartnerForm = defineModelFormReference<{
   "countyId": string | null;
   "townId": string | null;
   "completeAddress": string;
-  "active": boolean;
+  "parentId": string | null;
+  "saleUserId": string | null;
+  "purchaseUserId": string | null;
 }>("directory.partner");

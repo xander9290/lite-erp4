@@ -9,7 +9,7 @@ import "./documentation.css";
 
 export const metadata: Metadata = {
   title: "Crear módulos · Documentación · Lite ERP",
-  description: "Aprende a crear módulos de Lite ERP: Fields.Selection, Fields.Image, relaciones, permisos, acciones tipadas y formularios desde TSX paso a paso.",
+  description: "Aprende a crear módulos de Lite ERP: Fields.Selection, Fields.Image, Notebook y NotebookPage, relaciones, permisos, acciones tipadas y formularios desde TSX paso a paso.",
 };
 
 function headingId(text: string) {
@@ -58,7 +58,7 @@ export default async function DocumentationPage() {
             <p className="px-3 text-xs font-semibold tracking-wider text-base-content/50 uppercase">Desarrollo de aplicaciones</p>
             <a href="#crear-modulos" aria-current="page" className="mt-4 flex items-center gap-2 rounded-lg bg-primary/10 px-3 py-2.5 text-sm font-semibold text-primary"><Layers size={16} aria-hidden="true" />Crear módulos</a>
             <nav aria-label="En esta guía" className="mt-3 space-y-1 border-l border-base-300 pl-3">{sectionLinks}</nav>
-            <p className="mt-8 px-3 text-xs leading-5 text-base-content/50">Ejemplos de modelos, Fields.Selection, Fields.Image, acciones tipadas y formularios desde TSX.</p>
+            <p className="mt-8 px-3 text-xs leading-5 text-base-content/50">Ejemplos de modelos, Fields.Selection, Fields.Image, Notebook y NotebookPage, acciones tipadas y formularios desde TSX.</p>
           </aside>
 
           <main className="min-w-0 max-w-3xl pb-12">

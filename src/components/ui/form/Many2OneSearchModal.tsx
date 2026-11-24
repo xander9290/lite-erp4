@@ -75,7 +75,7 @@ function VisibleSearchModal(props: SearchModalProps) {
 
         <label className="input w-full shrink-0 gap-2 rounded-xl border-base-content/15 bg-base-200/50 focus-within:border-base-content/50 focus-within:outline-none">
           <Search size={17} className="shrink-0 text-base-content/45" aria-hidden="true" />
-          <input ref={searchRef} value={query} maxLength={120} autoComplete="off" aria-label={`Buscar ${title}`} placeholder="Escribe para buscar…"
+          <input ref={searchRef} value={query} maxLength={120} autoComplete="off" aria-label={`Buscar ${title}`}
             onChange={event => { setQuery(event.currentTarget.value); setPage(1); }} />
           {query && <button type="button" className="btn btn-circle btn-ghost btn-xs" aria-label="Limpiar búsqueda" onClick={() => { setQuery(""); setPage(1); searchRef.current?.focus(); }}><X size={14} aria-hidden="true" /></button>}
         </label>

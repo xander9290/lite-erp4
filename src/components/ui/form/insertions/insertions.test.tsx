@@ -7,6 +7,7 @@ import { InsertionProvider, Inserter } from "./Insertions";
 import FieldText from "../FieldText";
 import FormGroup from "../FormGroup";
 import Stack from "../Stack";
+import FormMediaLayout from "../FormMediaLayout";
 import Notebook from "../Notebook";
 import NotebookPage from "../NotebookPage";
 
@@ -39,6 +40,8 @@ test("Notebook rejects mixed page declarations and unrelated child elements", ()
 test("declaration syntax and allowed positions per kind of target", () => {
   assert.equal(insertionDeclarationIssue("field:email", "after"), undefined);
   assert.equal(insertionDeclarationIssue("page:extra/notas", "inside"), undefined);
+  for (const position of ["before", "after", "inside", "replace"])
+    assert.equal(insertionDeclarationIssue("media:form-media", position), undefined);
   assert.match(insertionDeclarationIssue("field:email", "inside")!, /no admite position="inside"/);
   assert.match(insertionDeclarationIssue("notebook:extra", "replace")!, /no admite/);
   assert.match(insertionDeclarationIssue("page:notas", "after")!, /<notebook>\/<página>/);
@@ -139,6 +142,34 @@ test("without insertion files the base form is unchanged", () => {
   const plain = renderToStaticMarkup(<BaseForm collectors={{}} />);
   assert.match(plain, /Teléfono/);
   assert.doesNotMatch(plain, /RFC|Dirección/);
+});
+
+test("media anchor inserts around the layout and inside its fields with the same RHF context", () => {
+  function MediaForm({ replace = false }: { replace?: boolean }) {
+    const methods = useForm({ defaultValues: { name: "Ana" } });
+    return <FormProvider {...methods}>
+      <InsertionProvider modules={modules.slice(0, 1)} collectors={{ contactosextra: <>
+        <Inserter target="media:form-media" position="before"><Probe label="antes" /></Inserter>
+        <Inserter target="media:form-media" position="after"><Probe label="después" /></Inserter>
+        {replace
+          ? <Inserter target="media:form-media" position="replace"><Probe label="reemplazo" /></Inserter>
+          : <Inserter target="media:form-media" position="inside"><Probe label="dentro" /></Inserter>}
+      </> }}>
+        <FormMediaLayout id="form-media" media={<span>Imagen base</span>}>
+          <span>Campo base</span>
+        </FormMediaLayout>
+      </InsertionProvider>
+    </FormProvider>;
+  }
+  const html = renderToStaticMarkup(<MediaForm />);
+  const order = ["antes=Ana", "Imagen base", "Campo base", "dentro=Ana", "después=Ana"].map(text => html.indexOf(text));
+  assert.ok(order.every(index => index >= 0));
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  assert.match(html, /Campo base<\/span><span data-probe="true">dentro=Ana<\/span><\/div>/, "inside queda en la columna de campos");
+  const replaced = renderToStaticMarkup(<MediaForm replace />);
+  assert.match(replaced, /antes=Ana.*reemplazo=Ana.*después=Ana/);
+  assert.doesNotMatch(replaced, /Imagen base|Campo base/);
+  assert.equal((html.match(/<form/g) ?? []).length, 0);
 });
 
 test("Inserter outside an insertions file fails clearly", () => {

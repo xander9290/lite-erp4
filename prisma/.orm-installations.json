@@ -14,7 +14,7 @@
     },
     "directory": {
       "file": "orm-directory.prisma",
-      "hash": "e6a6e30f3b624b1ac493ebcdc33e29573ad0b9a2909cc0b0740e952b70eb7787",
+      "hash": "cfcdcb77f44b7834d5e4170ae86b6823428ca7f99efef86eaf89f5f3843c57e7",
       "inverses": [
         {
           "file": "orm-ubicaciones.prisma",
@@ -39,7 +39,7 @@
         {
           "file": "user.prisma",
           "target": "User",
-          "text": "\n  // BEGIN lite-erp:directory:User\n  directoryPartnerCreatedRecords DirectoryPartner[] @relation(\"DirectoryPartner_createBy\")\n  // END lite-erp:directory:User\n"
+          "text": "\n  // BEGIN lite-erp:directory:User\n  directoryPartnerSaleUserIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_saleUserId\")\n  directoryPartnerPurchaseUserIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_purchaseUserId\")\n  directoryPartnerCreatedRecords DirectoryPartner[] @relation(\"DirectoryPartner_createBy\")\n  directoryPartnertagsCreatedRecords DirectoryPartnertags[] @relation(\"DirectoryPartnertags_createBy\")\n  directoryBusinessactivityCreatedRecords DirectoryBusinessactivity[] @relation(\"DirectoryBusinessactivity_createBy\")\n  // END lite-erp:directory:User\n"
         }
       ]
     }

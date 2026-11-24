@@ -28,6 +28,9 @@ import NotebookPage from "@/components/ui/form/NotebookPage";
 
 Notebook ocupa todas las columnas del formulario. Cada página organiza sus FormGroup en una columna en móvil y dos cuando el contenedor tiene espacio. La barra de pestañas permite desplazamiento horizontal sin ensanchar el formulario.
 
+La grilla de cada página hereda la [densidad del formulario](FormLayout.md#densidad-opcional):
+separación de 16px en normal y 8px en compact, sin cambiar las dimensiones de las pestañas.
+
 ## Props
 
 - `Notebook`: `children` o `pages`, `label` (nombre accesible del tablist), `id`, `className`, `defaultPage`, `activePage`, `onPageChange(name)`.

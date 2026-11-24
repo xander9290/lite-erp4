@@ -53,7 +53,7 @@ export default function Many2OneSample() {
             <p className="text-xs leading-relaxed text-base-content/55">Busca por login o por el nombre del usuario. La selección guarda únicamente el ID del usuario.</p>
           </FormGroup>
           <FormGroup legend="Usuario · opcional, sin label">
-            <FieldMany2One<Many2OneSampleInput> name="secondaryUserId" aria-label="Usuario opcional" model="user" direction="inline" searchFields={["name", "login"]} displayName="{name}" placeholder="Buscar otro usuario…"
+            <FieldMany2One<Many2OneSampleInput> name="secondaryUserId" aria-label="Usuario opcional" model="user" direction="inline" searchFields={["name", "login"]} displayName="{name}"
               columns={[{ field: "login", label: "Login" }]} onChange={(id, record) => { setChange({ id, record }); setSubmitted(null); }} />
             <p className="text-xs leading-relaxed text-base-content/55">Sin label ocupa todo el ancho. También encuentra usuarios por su login.</p>
           </FormGroup>

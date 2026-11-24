@@ -2,6 +2,10 @@
 
 Card de formulario con un único `FormLayout`/`FormProvider`. El header contiene Guardar, Revertir, `headerActions`, `menuActions` y `statebar`; el body organiza los `FormGroup` en una o dos columnas según el ancho disponible; `footer` permite contenido adicional.
 
+`density="compact"` compacta controles y composición del body; por defecto
+`density="normal"` conserva las medidas actuales. También disponible en ModelForm
+y FormLayout. [Medidas, alcance y demo](FormLayout.md#densidad-opcional).
+
 ## Eliminación opcional
 
 `deletion` añade «Eliminar» al menú de acciones del formulario:

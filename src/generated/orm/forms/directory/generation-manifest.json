@@ -2,6 +2,8 @@
   "generator": "lite-erp-orm-v1",
   "module": "forms-directory",
   "files": {
-    "DirectoryPartner.form.ts": "499ead890a22c1aae7a54c675902b4a437f004e69113892627cc3328f897213e"
+    "DirectoryPartner.form.ts": "3571f4364505db144c52148f019c8558993ecb38337918895f22574adbe4064b",
+    "DirectoryPartnertags.form.ts": "e421af8cead84295d1ccc677809c308d688664b8f65d2df69f243164f4f71629",
+    "DirectoryBusinessactivity.form.ts": "2f6b4ba8d69acb210fd8ec596e50e1f5d150be9814d726ab899b5c4fb0bedcf0"
   }
 }

@@ -48,8 +48,10 @@ Su [guía](docs/tutorial-tickets.md) conserva el recorrido histórico y se retom
 desde cero cuando el usuario lo indique. Sólo `core.user` permanece nativo:
 Usuarios, Perfil, autenticación y auditoría usan los datos propios de `users`.
 Contactos/core.partner fueron retirados y el usuario desinstaló el piloto
-contactosextra. Directorio (`directory`) está en construcción como aplicación
-declarativa, con la declaración inicial de Partner; avance y verificaciones en
+contactosextra. Directorio (`directory`) es una aplicación declarativa con Partner,
+catálogos de etiquetas y actividades empresariales, formulario personalizado,
+Tarjetas y Lista, y dirección completa al guardar;
+avance, verificaciones y pendientes de comprobación en
 [continuidad](docs/estado-proyecto.md). Ubicaciones mantiene País/Estado/Municipio/Localidad.
 
 La transición conserva contactos antiguos como archivo histórico y prepara una

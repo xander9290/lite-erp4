@@ -173,7 +173,7 @@ function SelectControl<TFieldValues extends FieldValues = FieldValues, TValue ex
             {...controlProps}
             id={inputId}
             role="radiogroup"
-            className={`flex min-h-10 w-full min-w-0 flex-wrap items-center gap-2 ${className}`}
+            className={`flex min-h-[var(--form-control-height,2.5rem)] w-full min-w-0 flex-wrap items-center gap-2 ${className}`}
             style={style}
             aria-label={accessibleLabel}
             aria-labelledby={labelledBy || (!ariaLabel && fieldLabel ? labelId : undefined)}
@@ -198,7 +198,7 @@ function SelectControl<TFieldValues extends FieldValues = FieldValues, TValue ex
               return (
                 <label
                   key={option.key}
-                  className={`flex min-h-10 max-w-full min-w-0 items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-colors motion-reduce:transition-none ${checked ? "border-primary/40 bg-primary/10" : "border-base-300 bg-base-100"} ${optionDisabled ? "cursor-not-allowed opacity-45" : "cursor-pointer hover:border-base-content/30"}`}
+                  className={`flex min-h-[var(--form-control-height,2.5rem)] max-w-full min-w-0 items-center gap-2 rounded-xl border px-[var(--form-option-px,0.75rem)] py-[var(--form-option-py,0.5rem)] text-sm transition-colors motion-reduce:transition-none ${checked ? "border-primary/40 bg-primary/10" : "border-base-300 bg-base-100"} ${optionDisabled ? "cursor-not-allowed opacity-45" : "cursor-pointer hover:border-base-content/30"}`}
                 >
                   <input
                     id={`${inputId}-${index}`}

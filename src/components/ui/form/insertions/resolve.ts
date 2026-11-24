@@ -42,6 +42,7 @@ const allowed: Readonly<Record<string, readonly InsertionPosition[]>> = {
   field: ["before", "after", "replace"],
   group: insertionPositions,
   stack: insertionPositions,
+  media: insertionPositions,
   notebook: ["before", "after", "inside"],
   page: insertionPositions,
   // Collections (ModelCollection): list columns and zones of the default card.
@@ -50,12 +51,12 @@ const allowed: Readonly<Record<string, readonly InsertionPosition[]>> = {
   card: ["before", "after", "inside"],
 };
 const fixedNames: Readonly<Record<string, readonly string[]>> = { columns: ["end"], card: ["title", "body", "footer"] };
-const targetPattern = /^(field|group|stack|notebook|page|column|columns|card):([A-Za-z][\w-]*(?:\/[A-Za-z0-9][\w-]*)?)$/;
+const targetPattern = /^(field|group|stack|media|notebook|page|column|columns|card):([A-Za-z][\w-]*(?:\/[A-Za-z0-9][\w-]*)?)$/;
 
 /** Syntax and position check of one declaration; undefined when valid. */
 export function insertionDeclarationIssue(target: string, position: string): string | undefined {
   const match = targetPattern.exec(target);
-  if (!match) return `destino inválido «${target}» (usa field:, group:, stack:, notebook:, page:<notebook>/<página>, column:, columns:end o card:)`;
+  if (!match) return `destino inválido «${target}» (usa field:, group:, stack:, media:, notebook:, page:<notebook>/<página>, column:, columns:end o card:)`;
   const [, kind, name] = match;
   if ((kind === "page") !== name.includes("/")) return `destino inválido «${target}» (sólo page: usa <notebook>/<página>)`;
   if (fixedNames[kind] && !fixedNames[kind].includes(name)) return `destino inválido «${target}» (usa ${fixedNames[kind].map(item => `${kind}:${item}`).join(", ")})`;

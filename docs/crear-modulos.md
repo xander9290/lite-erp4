@@ -444,6 +444,194 @@ Personaliza ese TSX; el generador rechaza sobrescribir una vista existente.
 Para nuevas aplicaciones de `src/modules`, no necesitas `create:views` ni
 declarar `clientFields`: pertenecen al flujo anterior de aplicaciones.
 
+## Densidad de formularios
+
+`ModelForm`, `FormView` y `FormLayout` admiten `density="compact"` para compactar
+los controles y los contenedores compartidos. Sin la prop, o con `density="normal"`,
+se conserva la presentación habitual. En una vista personalizada:
+
+```tsx
+<ModelForm config={config} id={id} density="compact">
+  <FormGroup legend="Datos generales">
+    <FieldText name="name" direction="inline" />
+    <FieldBoolean name="active" direction="inline" />
+  </FormGroup>
+</ModelForm>
+```
+
+Usa los imports habituales del formulario; density no se declara en los Fields.
+Compact ofrece controles de 32px, separación de 8px entre campos/contenedores,
+4px entre label y control en bloque y padding de 12px en FormGroup. Conserva
+la fuente habitual de 14px y la columna de 112px de los labels inline. Los radios
+de selección reducen su padding; las etiquetas Many2many siguen envolviendo y
+su control crece cuando necesita varias filas.
+
+La densidad no reduce imágenes, áreas de texto multilínea, botones del header,
+statebar ni auditoría. Cada formulario independiente elige su densidad, también
+en modales; cambiarla no reinicia el borrador ni modifica validación o guardado.
+Las clases de tamaño explícitas de una vista y el diseño propio de One2many se
+conservan. Esta opción de presentación no requiere SQL ni generación.
+
+Compara ambas variantes con RHF/Zod en [Densidad en /sample](/sample#form-density).
+Contrato: `src/components/ui/form/FormLayout.md`.
+
+## Formularios con Notebook y NotebookPage
+
+`Notebook` organiza el contenido en pestañas; cada `NotebookPage` define una
+sección. Ambos comparten el formulario, sus valores y su guardado. Puedes usarlos
+dentro de `ModelForm`, `FormView` o `FormLayout`, sin crear otro formulario.
+
+### Añadir pestañas a un formulario
+
+Después de expulsar el formulario de **Notas**, conserva sus props `config` e
+`id` y organiza los campos que ya existen en el modelo. Este ejemplo no añade
+campos ni requiere una migración:
+
+```tsx
+"use client";
+
+import ModelForm, { ModelExtensions } from "@/components/modules/ModelForm";
+import FormGroup from "@/components/ui/form/FormGroup";
+import FieldText from "@/components/ui/form/FieldText";
+import FieldBoolean from "@/components/ui/form/FieldBoolean";
+import Notebook from "@/components/ui/form/Notebook";
+import NotebookPage from "@/components/ui/form/NotebookPage";
+import type { ModelClientConfig } from "@/lib/modules/config";
+
+export default function NotaForm({ config, id }: {
+  config: ModelClientConfig;
+  id?: string;
+}) {
+  return (
+    <ModelForm config={config} id={id}>
+      <FormGroup legend="Datos generales">
+        <FieldText name="name" />
+      </FormGroup>
+      <Notebook id="nota-info" label="Información de la nota" defaultPage="contenido">
+        <NotebookPage name="contenido" label="Contenido">
+          <FormGroup legend="Texto de la nota" fullWidth>
+            <FieldText name="contenido" widget="long" />
+          </FormGroup>
+        </NotebookPage>
+        <NotebookPage name="opciones" label="Opciones">
+          <FormGroup legend="Estado">
+            <FieldBoolean name="active" />
+          </FormGroup>
+        </NotebookPage>
+      </Notebook>
+      <ModelExtensions />
+    </ModelForm>
+  );
+}
+```
+
+`ModelForm` sigue aportando carga, validación, guardado, historial y protección de
+borradores. Los Fields heredan sus metadatos del modelo. Si tu formulario ya tiene
+acciones, colecciones o extensiones personalizadas, conserva también ese contenido.
+
+### Opciones de los componentes
+
+- `Notebook.label`: nombre accesible del conjunto de pestañas.
+- `Notebook.id`: identificador estable y opcional; habilita las anclas de inserción.
+- `Notebook.defaultPage`: `name` de la pestaña inicial. Sin él se abre la primera
+  habilitada. Si la seleccionada deja de estar disponible, se usa la primera habilitada.
+- `Notebook.activePage` y `onPageChange(name)`: selección controlada desde React.
+- `Notebook.className`: clases del contenedor completo.
+- `NotebookPage.name`: identidad única y no vacía dentro del Notebook; se utiliza
+  para selección, errores e inserciones. `label` es el texto visible de la pestaña.
+- `NotebookPage.icon` y `badge`: contenido React opcional junto al título. Por
+  ejemplo, `badge="2"` muestra una insignia; su valor lo aporta la vista.
+- `NotebookPage.disabled`: impide abrir esa pestaña. No deshabilita sus Fields,
+  no elimina sus valores ni modifica las validaciones o permisos del servidor.
+- `NotebookPage.className`: clases del panel. No tiene padding por defecto;
+  usa `FormGroup` para agrupar campos o añade padding explícito, por ejemplo `p-2`.
+
+Notebook ocupa todo el ancho de la fila. Las páginas admiten `FormGroup`, `Stack`,
+Fields, colecciones y otra composición React. Los grupos se distribuyen en una
+columna o dos según el espacio; `fullWidth` ocupa la fila completa. La barra de
+pestañas tiene scroll horizontal cuando no caben sus títulos.
+
+Los hijos directos de Notebook deben ser NotebookPage, también dentro de fragments
+o condiciones React. No envuelvas cada página en un componente propio como hijo
+directo: Notebook necesita reconocer sus declaraciones.
+
+### Controlar la pestaña desde React
+
+En una vista cliente, importa `useState` y declara el estado dentro del componente:
+
+```tsx
+const [page, setPage] = useState("contenido");
+
+<Notebook id="nota-info" activePage={page} onPageChange={setPage}>
+  <NotebookPage name="contenido" label="Contenido">…</NotebookPage>
+  <NotebookPage name="opciones" label="Opciones">…</NotebookPage>
+</Notebook>
+```
+
+Al usar `activePage`, actualiza ese estado con `onPageChange`, incluso cuando el
+cambio lo solicite el revelado de un error. Para la selección inicial habitual
+basta `defaultPage`; no necesitas estado propio.
+
+### Usarlo desde un Server Component
+
+Usa `pages` con descriptores en lugar de hijos NotebookPage. Notebook crea las
+páginas dentro de su límite cliente y acepta contenido renderizado en servidor:
+
+```tsx
+import Notebook from "@/components/ui/form/Notebook";
+
+<Notebook label="Información" pages={[
+  { name: "resumen", label: "Resumen", children: <p>Resumen del registro.</p> },
+  { name: "detalle", label: "Detalle", children: <p>Detalle del registro.</p> },
+]} />
+```
+
+No combines `pages` y `children`. También funciona fuera de un formulario para
+organizar contenido; sin RHF no muestra contadores de errores de Fields.
+
+### Insertar contenido desde una extensión
+
+Con `id="nota-info"`, el formulario publica `notebook:nota-info` y
+`page:nota-info/contenido`, `page:nota-info/opciones`. En el archivo de inserciones
+de una extensión puedes añadir una pestaña sin editar el formulario base:
+
+```tsx
+import { Inserter } from "@/components/ui/form/insertions/Insertions";
+import NotebookPage from "@/components/ui/form/NotebookPage";
+
+<Inserter target="notebook:nota-info" position="inside">
+  <NotebookPage name="ayuda" label="Ayuda">
+    <p className="p-4">Instrucciones adicionales para esta nota.</p>
+  </NotebookPage>
+</Inserter>
+```
+
+`notebook:<id>` admite `before`, `after` e `inside`; dentro sólo admite NotebookPage.
+`page:<id>/<name>` admite `inside` para añadir contenido al panel y
+`before`/`after`/`replace` para declarar páginas. Conserva nombres únicos y las
+reglas de dependencias/conflictos del sistema de inserciones. Registra el archivo
+en `insertions.form` o `insertions.modal` de la extensión según la presentación.
+
+### Valores, errores y comprobación
+
+- Cambiar de pestaña mantiene montados los Fields y conserva sus valores y
+  borradores. Los paneles inactivos quedan ocultos y fuera del teclado.
+- Guardar valida también los campos de las otras páginas. FormLayout/FormView
+  abre la página del primer Field con error y le dirige el foco; cada pestaña
+  indica cuántos Fields contienen errores. Los Fields personalizados necesitan
+  `data-form-field={name}` y su ref registrado en RHF para participar.
+- Las flechas izquierda/derecha recorren pestañas habilitadas; Home/End van a la
+  primera/última. Enter o Espacio activan la seleccionada.
+- Ocultar o deshabilitar una pestaña en React no concede ni revoca permisos.
+  La visibilidad de páginas por grupo todavía no tiene una API declarativa.
+- Prueba cambiar de pestaña tras editar, validar un campo requerido en otra
+  página, revertir los cambios y navegar con teclado.
+
+Ejemplo funcional con RHF/Zod: [Notebook en /sample](/sample#notebook).
+Contrato del componente: `src/components/ui/form/Notebook.md`; inserciones:
+`docs/inserciones-vistas.md`. Esta organización visual no requiere SQL ni
+regenerar contratos cuando los campos ya existen.
+
 ## Acciones de formulario tipadas
 
 Continuando el ejemplo de **Notas**, añade un botón **Archivar**. El método del

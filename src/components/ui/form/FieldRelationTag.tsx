@@ -170,13 +170,13 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
     <div data-form-field={name} className={fieldDirectionClassName(direction, fieldLabel)}>
       {fieldLabel && <label htmlFor={inputId} className={fieldLabelClassName(direction)}>{fieldLabel}</label>}
       <div ref={root} className="relative min-w-0" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
-        <div ref={anchor} className={`${fieldInputClassName} h-auto! min-h-11 flex-wrap items-end gap-1 px-1 py-1 ${locked ? "opacity-55" : ""} ${className}`}>
+        <div ref={anchor} className={`${fieldInputClassName} h-auto! min-h-[var(--form-tags-min-height,2.75rem)] flex-wrap items-end gap-1 px-1 py-1 ${locked ? "opacity-55" : ""} ${className}`}>
           <div className="flex min-w-0 basis-48 flex-1 flex-wrap items-center gap-1.5">
             {ids.length > 0 && <ul role="list" aria-label={`${accessibleLabel}: seleccionados`} className="contents">
               {ids.map(value => {
                 const option = byId.get(value);
                 const canRemove = !locked && !resolution.loading && Boolean(resolveRelationTags(ids.filter(id => id !== value), available));
-                return <li key={value} className={`badge badge-soft h-auto min-h-7 max-w-full gap-1 rounded-lg px-2 py-1 ${option ? "badge-primary" : "badge-ghost"}`}>
+                return <li key={value} className={`badge badge-soft h-auto min-h-[var(--form-tag-min-height,1.75rem)] max-w-full gap-1 rounded-lg px-2 py-[var(--form-tag-py,0.25rem)] ${option ? "badge-primary" : "badge-ghost"}`}>
                   <span className="min-w-0 text-xs leading-relaxed whitespace-normal wrap-anywhere">{option?.label ?? (resolution.loading ? "Cargando…" : "Registro no disponible")}</span>
                   {!locked && <button type="button" disabled={!canRemove} className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-primary/15 focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-default disabled:opacity-40" aria-label={`Quitar ${option?.label ?? value}`} onClick={() => remove(value)}><X size={12} aria-hidden="true" /></button>}
                 </li>;
@@ -186,7 +186,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
               <Search size={15} className="shrink-0 text-base-content/40" aria-hidden="true" />
               <input {...inputProps} id={inputId} name={field.name} ref={element => { input.current = element; field.ref(element); }} type="text" role="combobox" autoComplete="off"
                 disabled={field.disabled} readOnly={editingBlocked} value={query} maxLength={120} placeholder={locked ? ids.length ? "" : "Sin selección" : placeholder}
-                className="h-8 w-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none placeholder:text-base-content/40 focus:outline-none"
+                className="h-[var(--form-tags-input-height,2rem)] w-full min-w-0 flex-1 border-0 bg-transparent text-sm shadow-none outline-none placeholder:text-base-content/40 focus:outline-none"
                 aria-label={inputProps["aria-labelledby"] ? ariaLabel : accessibleLabel} aria-expanded={expanded} aria-controls={expanded ? listId : undefined} aria-autocomplete="list" aria-haspopup="listbox"
                 aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined} aria-required={required} aria-invalid={fieldState.invalid || inputProps["aria-invalid"]}
                 aria-describedby={[describedBy, statusId, fieldState.invalid ? errorId : undefined].filter(Boolean).join(" ")}
@@ -209,7 +209,7 @@ function RelationTagControl<TFieldValues extends FieldValues = FieldValues>({
                 }} />
             </div>
           </div>
-          <div className="flex h-8 shrink-0 items-center gap-1">
+          <div className="flex h-[var(--form-tags-input-height,2rem)] shrink-0 items-center gap-1">
             {ids.length > 0 && clearable && !locked && <button type="button" className="btn btn-circle btn-ghost btn-xs shrink-0" aria-label={`Limpiar ${accessibleLabel}`} onClick={() => { commit([]); restoreFocus(); }}><X size={14} aria-hidden="true" /></button>}
             <button type="button" className="btn btn-circle btn-ghost btn-xs shrink-0" disabled={editingBlocked} aria-label={`Buscar más: ${accessibleLabel}`} aria-haspopup="dialog" onClick={openModal}><ChevronDown size={16} aria-hidden="true" /></button>
           </div>

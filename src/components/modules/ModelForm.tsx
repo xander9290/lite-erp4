@@ -18,6 +18,7 @@ import FieldSelect from "@/components/ui/form/FieldSelect";
 import FieldImage from "@/components/ui/form/FieldImage";
 import FieldRelationTag from "@/components/ui/form/FieldRelationTag";
 import FieldMany2One from "@/components/ui/form/FieldMany2One";
+import type { FormDensity } from "@/components/ui/form/formDensity";
 import { useFormNavigation } from "@/components/ui/form/FormNavigationProvider";
 import { useAlerts } from "@/components/ui/alerts/AlertProvider";
 import { buildModelUI, type ModelUI } from "@/lib/modules/client";
@@ -143,7 +144,7 @@ export function ModelFields({ ui }: { ui: ModelUI }) {
   return <><FormGroup id="general" legend="Datos generales">{controls}{previews}{Object.keys(ui.recordUI.many2many).filter(name => !extended.has(name)).map(name => <FieldRelationTag key={name} name={name} direction="inline" />)}</FormGroup><ModelExtensions />{Object.keys(ui.recordUI.lines).map(name => <FormGroup fullWidth key={name}><FieldOne2many name={name} /></FormGroup>)}<ModelChildCollections /></>;
 }
 
-function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; record: Values; displayName?: string; onReload?: () => void; children?: ReactNode }) {
+function Editor({ ui, record, displayName, onReload, children, density }: { ui: ModelUI; record: Values; displayName?: string; onReload?: () => void; children?: ReactNode; density?: FormDensity }) {
   const router = useRouter();
   const params = useSearchParams();
   const { config } = ui;
@@ -161,6 +162,7 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
   const insertions = useModelExtensionInsertions(kind, config.id);
   const insertionModules = useMemo(() => (config.extensions ?? []).map(extension => ({ module: extension.module, depends: extension.depends ?? [] })), [config.extensions]);
   return <ModelUIContext.Provider value={ui}><ChildCollectionRefreshContext.Provider value={collectionRefresh}><FormView
+    density={density}
     layout={modal ? "content" : "page"}
     breadcrumbs={modal ? [] : [{ label: "Aplicaciones", href: "/erp" }, { label: config.label, href: returnHref }, { label: savedId ? savedName || "Registro" : "Nuevo registro" }]}
     title={savedId ? "Editar registro" : "Nuevo registro"}
@@ -195,7 +197,7 @@ function Editor({ ui, record, displayName, onReload, children }: { ui: ModelUI; 
  * Form wiring shared by every module model: loader, reload guard, routing, breadcrumbs,
  * activity and deletion. Custom views pass only their field layout as children.
  */
-export default function ModelForm({ config: providedConfig, id: routeId, children }: { config: ModelClientConfig; id?: string; children?: ReactNode }) {
+export default function ModelForm({ config: providedConfig, id: routeId, children, density }: { config: ModelClientConfig; id?: string; children?: ReactNode; density?: FormDensity }) {
   const modal = useModelFormPresentation(providedConfig.id);
   const config = modal?.config ?? providedConfig;
   const id = modal ? modal.id : routeId;
@@ -218,8 +220,8 @@ export default function ModelForm({ config: providedConfig, id: routeId, childre
   };
   const capabilities = modelUiCapabilities(config.capabilities);
   if (!capabilities.read || (!id && !capabilities.create)) return <p role="alert" className="p-6">No tienes permiso para abrir este formulario.</p>;
-  if (!id) return <Editor key={router.bfcacheId} ui={ui} record={{ ...ui.createDefaults(), ...proposed }}>{children}</Editor>;
+  if (!id) return <Editor key={router.bfcacheId} ui={ui} density={density} record={{ ...ui.createDefaults(), ...proposed }}>{children}</Editor>;
   return <FormViewLoader key={`${router.bfcacheId}:${id}:${attempt}`} recordKey={id} load={load}>
-    {(record, _audit, displayName) => <Editor ui={ui} record={record} displayName={displayName} onReload={reload}>{children}</Editor>}
+    {(record, _audit, displayName) => <Editor ui={ui} density={density} record={record} displayName={displayName} onReload={reload}>{children}</Editor>}
   </FormViewLoader>;
 }

@@ -56,6 +56,7 @@ ModelExtensions. [Contrato completo y eject](formularios-modal.md#vista-modal-in
 | `field:<nombre>` | Todo Field* de primer nivel (no las celdas de líneas) | before, after, replace |
 | `group:<id>` | `FormGroup` con `id` | before, after, inside, replace |
 | `stack:<id>` | `Stack` con `id` | before, after, inside, replace |
+| `media:<id>` | `FormMediaLayout` con `id` | before, after, inside, replace |
 | `notebook:<id>` | `Notebook` con `id` (inside: sólo `NotebookPage`) | before, after, inside |
 | `page:<notebook>/<name>` | `NotebookPage` de un Notebook con `id` | before/after (sólo `NotebookPage`), inside, replace |
 
@@ -63,6 +64,10 @@ ModelExtensions. [Contrato completo y eject](formularios-modal.md#vista-modal-in
 - Los contenedores sin `id` no son direccionables: el autor del formulario base decide qué
   es estable. Las páginas insertadas por otro módulo no publican `page:` propios.
 - `inside` agrega al final del contenedor.
+- En `media:<id>`, `inside` agrega al final de la columna de campos;
+  `before`/`after` rodean el layout completo y `replace` incluye la imagen.
+  Ejemplo: `<Inserter target="media:form-media" position="inside">…</Inserter>`.
+  Demo RHF/Zod en `/sample#form-media-layout`.
 - Para ser extensible, oculta con `invisible` (el ancla sigue montada) en lugar de
   `{condición && …}`: un destino no montado cuenta como ausente.
 

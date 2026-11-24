@@ -15,7 +15,7 @@ export default function Stack({ children, direction = "block", className = "", .
   return anchor.wrap(
     <FieldDirectionContext.Provider value={direction}>
       <div {...props} className={`@container/stack col-span-full w-full min-w-0 ${className}`}>
-        <div className="grid min-w-0 grid-cols-1 items-start gap-4 @sm/stack:grid-cols-[repeat(auto-fit,minmax(calc((100%-1rem)/2),1fr))] @2xl/stack:grid-cols-[repeat(auto-fit,minmax(calc((100%-2rem)/3),1fr))]">
+        <div className="grid min-w-0 grid-cols-1 items-start gap-[var(--form-layout-gap,1rem)] @sm/stack:grid-cols-[repeat(auto-fit,minmax(calc((100%-var(--form-layout-gap,1rem))/2),1fr))] @2xl/stack:grid-cols-[repeat(auto-fit,minmax(calc((100%-2*var(--form-layout-gap,1rem))/3),1fr))]">
           {children}
           {anchor.inside}
         </div>

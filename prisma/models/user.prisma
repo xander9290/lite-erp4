@@ -30,6 +30,10 @@ model User {
   // END lite-erp:ubicaciones:User
 
   // BEGIN lite-erp:directory:User
+  directoryPartnerSaleUserIdRecords DirectoryPartner[] @relation("DirectoryPartner_saleUserId")
+  directoryPartnerPurchaseUserIdRecords DirectoryPartner[] @relation("DirectoryPartner_purchaseUserId")
   directoryPartnerCreatedRecords DirectoryPartner[] @relation("DirectoryPartner_createBy")
+  directoryPartnertagsCreatedRecords DirectoryPartnertags[] @relation("DirectoryPartnertags_createBy")
+  directoryBusinessactivityCreatedRecords DirectoryBusinessactivity[] @relation("DirectoryBusinessactivity_createBy")
   // END lite-erp:directory:User
 }
