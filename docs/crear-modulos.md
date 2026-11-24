@@ -239,6 +239,195 @@ Después realiza estas comprobaciones:
 5. Si necesitas acceso con otra cuenta, asígnala a **Biblioteca → Gestor** desde
    Ajustes → Grupos y repite la consulta con ella.
 
+## Campos de selección con Fields.Selection
+
+`Fields.Selection` permite elegir **un valor de una lista fija**, por ejemplo
+Persona o Empresa. Las opciones se declaran en el modelo; el formulario reutiliza
+esas opciones y el servidor rechaza valores ajenos a la lista.
+
+### Declararlo en el modelo
+
+Este ejemplo usa el caso de Directorio. Dentro de tu clase Partner añade el campo
+`partnerType`, conservando los demás campos y métodos. La clase mínima sería:
+
+```ts
+import "server-only";
+import { Fields, Model } from "@/lib/orm";
+
+export class Partner extends Model {
+  name = Fields.Text({ label: "Nombre", required: true, maxLength: 120 });
+
+  partnerType = Fields.Selection(
+    [
+      { value: "person", label: "Persona" },
+      { value: "company", label: "Empresa" },
+    ],
+    {
+      label: "Tipo de contacto",
+      default: "company",
+      tracking: true,
+    },
+  );
+}
+```
+
+La función recibe dos argumentos: primero las opciones y después la configuración
+del campo. Leer este ejemplo no cambia Directorio ni instala su modelo.
+
+- **`value` de la opción:** clave que se guarda, `"person"` o `"company"`.
+  También se usa en reglas y filtros.
+- **`label` de la opción:** texto mostrado al usuario, «Persona» o «Empresa».
+- **`label` del campo:** etiqueta del control, «Tipo de contacto».
+- **`default`:** valor inicial al crear; aquí se propone Empresa. Cambiar el
+  default no reescribe valores ya guardados.
+- **`tracking`:** incluye los cambios guardados del campo en el historial.
+- **`required`:** si es `true`, exige una selección al guardar. Se omite cuando
+  no es necesaria esa regla.
+
+Las opciones necesitan valores únicos y etiquetas no vacías. Cada valor empieza
+por una letra y admite letras de A a Z, números y guion bajo; evita espacios y
+guiones. Usa claves estables: puedes cambiar «Empresa» por otra etiqueta sin
+cambiar `"company"`. Renombrar o quitar una clave ya utilizada requiere revisar
+los datos y consumidores que la usan.
+
+Sin `required: true`, el campo permite `null` aunque tenga un default. Sin default,
+empieza en `null`. Añade `required: true` al segundo argumento sólo si el negocio
+exige elegir una opción. El default, cuando se declara como texto, debe coincidir
+con un `value`; `default: "Empresa"` es incorrecto porque es la etiqueta.
+
+### Mostrarlo en el formulario
+
+El formulario automático genera el selector. Si personalizas el TSX con eject,
+importa el control existente:
+
+```tsx
+import FieldSelect from "@/components/ui/form/FieldSelect";
+```
+
+Dentro de un FormGroup de tu ModelForm:
+
+```tsx
+<FieldSelect name="partnerType" direction="inline" />
+```
+
+El control hereda etiqueta, opciones y obligatoriedad del modelo; no necesitas
+repetir `options` ni crear otro esquema Zod. El valor inicial procede de los
+defaults del formulario. Para mostrar las mismas opciones como radios, sustituye
+ese control por:
+
+```tsx
+<FieldSelect name="partnerType" type="optional" direction="inline" />
+```
+
+`type="optional"` es el nombre actual de la presentación de radios; no cambia
+si el campo es obligatorio. La variante `widget="statebar"` presenta estados y
+es de sólo lectura por defecto; no es necesaria para Persona/Empresa.
+
+### Sincronizar y comprobar
+
+Después de cambiar la declaración de datos, revisa el plan y sincroniza el módulo:
+
+```bash
+npm run orm:sync -- directory --plan
+npm run orm:sync -- directory
+```
+
+Revisa el SQL antes de aprobar y reinicia desarrollo al terminar. En una base
+existente no asumas que declarar el campo ya creó su columna ni rellenó sus filas.
+
+1. Crea un registro: debe comenzar en Empresa.
+2. Elige Persona, guarda y vuelve a abrirlo: debe conservar la selección.
+3. Comprueba que se muestra «Persona», mientras el dato guardado es `"person"`.
+4. Si pruebas el campo con `required: true` y sin default, intenta guardar un alta
+   sin seleccionar: debe rechazarlo.
+
+En colecciones se muestran las etiquetas del modelo; para cambiar su apariencia
+puedes configurar `widget: "badge"` y `colors` en la **columna de la vista**.
+Estas opciones no van en Fields.Selection. Para catálogos que el usuario necesite
+ampliar con nuevos registros, utiliza Many2one en lugar de una selección fija.
+
+## Campos de imagen con Fields.Image
+
+`Fields.Image` guarda la **URL HTTPS de una imagen**, no el archivo binario.
+En el modelo, declara el campo con una carpeta de destino. Ejemplo mínimo para
+Directorio; conserva los demás campos y métodos de tu clase:
+
+```ts
+import "server-only";
+import { Fields, Model } from "@/lib/orm";
+
+export class Partner extends Model {
+  name = Fields.Text({ label: "Nombre", required: true, maxLength: 120 });
+
+  image = Fields.Image({
+    label: "Imagen",
+    folder: "lite-erp/directory",
+  });
+}
+```
+
+- **`label`:** etiqueta mostrada en el formulario.
+- **`folder`:** carpeta del proveedor de imágenes; es obligatoria para un campo
+  persistente. No es una ruta del disco ni una relación con otro modelo.
+- **`required: true`:** opcional, sólo si el negocio exige una imagen al guardar.
+  Sin esa opción, el campo comienza vacío y permite `null`.
+- **`tracking: true`:** opcional, registra cambios de la URL en el historial.
+- **`maxLength`:** limita la longitud de la URL, hasta 2.048 caracteres; no es
+  el tamaño máximo del archivo.
+
+La carpeta admite letras, números, guiones y guiones bajos separados por `/`,
+hasta 200 caracteres; por ejemplo `lite-erp/directory`. Evita espacios, puntos,
+barras dobles o una barra al principio/final. La URL guardada debe ser HTTPS y
+no incluir credenciales.
+
+### Imagen y avatar en el formulario
+
+El formulario automático incorpora el control de imagen. En una vista TSX
+personalizada, importa FieldImage:
+
+```tsx
+import FieldImage from "@/components/ui/form/FieldImage";
+```
+
+Dentro de un FormGroup de ModelForm, usa la presentación normal:
+
+```tsx
+<FieldImage name="image" />
+```
+
+O sustituye ese control por un avatar:
+
+```tsx
+<FieldImage name="image" widget="avatar" />
+```
+
+Ambos editan el mismo campo. `widget` cambia la presentación; no va en
+Fields.Image. `shape="squared"` permite esquinas rectas; por defecto, la imagen
+tiene esquinas redondeadas y el avatar es circular. En ModelForm, el control
+hereda los metadatos y el uploader autorizado; no necesitas repetir `folder`
+ni conectar otro servicio de guardado desde la vista.
+
+### Preparar la subida y guardar
+
+Tras añadir el campo, revisa `npm run orm:sync -- directory --plan` y después
+sincroniza el módulo con `npm run orm:sync -- directory`, aprobando el SQL
+revisado. Declarar el campo en TypeScript no crea su columna por sí solo.
+
+Cloudinary es el proveedor predeterminado. Para subir archivos, configura en el
+servidor `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET`
+en `.env.local` y reinicia desarrollo. Las credenciales permanecen en servidor;
+no se declaran en Fields.Image ni se pasan al componente cliente.
+
+Selecciona una imagen y confirma su edición para subirla. Después guarda el
+registro para persistir su URL. Quitar o reemplazar la imagen del formulario no
+borra el archivo remoto; cancelar el guardado tampoco revierte una subida ya
+completada.
+
+Puedes probar el control en [Imagen](/sample#field-image) y
+[Avatar](/sample#field-image-avatar). Estas demos no guardan registros, aunque
+confirmar una subida con configuración válida sí puede enviar el archivo al
+proveedor. Esta guía no modifica el modelo de Directorio ni configura el servicio.
+
 ## Cuándo personalizar una vista
 
 Empieza con las vistas por defecto. Si necesitas reorganizar campos, añade una

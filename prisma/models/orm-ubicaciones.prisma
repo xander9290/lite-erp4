@@ -11,6 +11,10 @@ model UbicacionesPais {
   @@index([createBy])
   @@map("ubicaciones_pais")
   ubicacionesEstadoPaisIdRecords UbicacionesEstado[] @relation("UbicacionesEstado_paisId")
+
+  // BEGIN lite-erp:directory:UbicacionesPais
+  directoryPartnerCountryIdRecords DirectoryPartner[] @relation("DirectoryPartner_countryId")
+  // END lite-erp:directory:UbicacionesPais
 }
 
 model UbicacionesEstado {
@@ -29,6 +33,10 @@ model UbicacionesEstado {
   @@index([createBy])
   @@map("ubicaciones_estado")
   ubicacionesMunicipioEstadoIdRecords UbicacionesMunicipio[] @relation("UbicacionesMunicipio_estadoId")
+
+  // BEGIN lite-erp:directory:UbicacionesEstado
+  directoryPartnerProvinceIdRecords DirectoryPartner[] @relation("DirectoryPartner_provinceId")
+  // END lite-erp:directory:UbicacionesEstado
 }
 
 model UbicacionesMunicipio {
@@ -47,6 +55,10 @@ model UbicacionesMunicipio {
   @@index([createBy])
   @@map("ubicaciones_municipio")
   ubicacionesLocalidadMunicipioIdRecords UbicacionesLocalidad[] @relation("UbicacionesLocalidad_municipioId")
+
+  // BEGIN lite-erp:directory:UbicacionesMunicipio
+  directoryPartnerCountyIdRecords DirectoryPartner[] @relation("DirectoryPartner_countyId")
+  // END lite-erp:directory:UbicacionesMunicipio
 }
 
 model UbicacionesLocalidad {
@@ -64,4 +76,8 @@ model UbicacionesLocalidad {
   @@unique([municipioId, codigo])
   @@index([createBy])
   @@map("ubicaciones_localidad")
+
+  // BEGIN lite-erp:directory:UbicacionesLocalidad
+  directoryPartnerTownIdRecords DirectoryPartner[] @relation("DirectoryPartner_townId")
+  // END lite-erp:directory:UbicacionesLocalidad
 }

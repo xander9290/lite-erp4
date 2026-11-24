@@ -1,0 +1,7 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "actions-directory",
+  "files": {
+    "DirectoryPartner.actions.ts": "d26a79854ae072ea20894762c5faba451119d59bcf88a89eccf4d7bf663bd7e2"
+  }
+}

@@ -28,4 +28,8 @@ model User {
   ubicacionesMunicipioCreatedRecords UbicacionesMunicipio[] @relation("UbicacionesMunicipio_createBy")
   ubicacionesLocalidadCreatedRecords UbicacionesLocalidad[] @relation("UbicacionesLocalidad_createBy")
   // END lite-erp:ubicaciones:User
+
+  // BEGIN lite-erp:directory:User
+  directoryPartnerCreatedRecords DirectoryPartner[] @relation("DirectoryPartner_createBy")
+  // END lite-erp:directory:User
 }

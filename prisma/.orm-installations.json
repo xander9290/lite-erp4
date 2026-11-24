@@ -11,6 +11,37 @@
           "text": "\n  // BEGIN lite-erp:ubicaciones:User\n  ubicacionesPaisCreatedRecords UbicacionesPais[] @relation(\"UbicacionesPais_createBy\")\n  ubicacionesEstadoCreatedRecords UbicacionesEstado[] @relation(\"UbicacionesEstado_createBy\")\n  ubicacionesMunicipioCreatedRecords UbicacionesMunicipio[] @relation(\"UbicacionesMunicipio_createBy\")\n  ubicacionesLocalidadCreatedRecords UbicacionesLocalidad[] @relation(\"UbicacionesLocalidad_createBy\")\n  // END lite-erp:ubicaciones:User\n"
         }
       ]
+    },
+    "directory": {
+      "file": "orm-directory.prisma",
+      "hash": "e6a6e30f3b624b1ac493ebcdc33e29573ad0b9a2909cc0b0740e952b70eb7787",
+      "inverses": [
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesPais",
+          "text": "\n  // BEGIN lite-erp:directory:UbicacionesPais\n  directoryPartnerCountryIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_countryId\")\n  // END lite-erp:directory:UbicacionesPais\n"
+        },
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesEstado",
+          "text": "\n  // BEGIN lite-erp:directory:UbicacionesEstado\n  directoryPartnerProvinceIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_provinceId\")\n  // END lite-erp:directory:UbicacionesEstado\n"
+        },
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesMunicipio",
+          "text": "\n  // BEGIN lite-erp:directory:UbicacionesMunicipio\n  directoryPartnerCountyIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_countyId\")\n  // END lite-erp:directory:UbicacionesMunicipio\n"
+        },
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesLocalidad",
+          "text": "\n  // BEGIN lite-erp:directory:UbicacionesLocalidad\n  directoryPartnerTownIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_townId\")\n  // END lite-erp:directory:UbicacionesLocalidad\n"
+        },
+        {
+          "file": "user.prisma",
+          "target": "User",
+          "text": "\n  // BEGIN lite-erp:directory:User\n  directoryPartnerCreatedRecords DirectoryPartner[] @relation(\"DirectoryPartner_createBy\")\n  // END lite-erp:directory:User\n"
+        }
+      ]
     }
   }
 }

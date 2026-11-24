@@ -6,40 +6,145 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Directory: Card, dirección completa, menú y multivista (2026-11-23)
+
+Estado comprobado en fuentes: directory.partner declara 19 campos. El manifest
+publica explícitamente image, name, phones, street, streetNumber, vat y
+completeAddress en list.fields. Esto resuelve el error de image, que quedaba fuera
+de los primeros 12 campos de la política automática; el límite sigue intacto.
+Los campos publicados se comparten entre Lista y Card; columns sólo presenta.
+
+PartnerCard.tsx contiene el renderCard personalizado: imagen lg (96 × 96) a la
+izquierda y nombre de presentación, teléfonos, dirección completa y RFC a la
+derecha. Conserva widget image. El archivo fue renombrado desde PartnerList;
+su función exportada aún se llama PartnerList, sin afectar al import por defecto.
+Renombrar esa función a PartnerCard es una limpieza opcional, no un bloqueo.
+
+El manifest declara view: "card", views.card con loader de PartnerCard,
+views.list: true y el formulario personalizado. Lista estándar ya está habilitada;
+no existe actualmente PartnerList.tsx ni hace falta para esa presentación.
+Personalizar la tabla con un archivo propio queda para cuando el usuario lo
+requiera. Menú explícito menu: { Contactos: "partner" }.
+
+La multivista comparte datos/política y muestra el selector al disponer de varias
+presentaciones. Orden fijo del selector: Lista → Tarjetas → Kanban (sólo las
+habilitadas), independiente del orden del objeto views. Selección: ?view válido
+en URL → view del modelo → list si se omite view. Cambiar presentación conserva
+búsqueda/filtros/orden y reinicia paginación, agrupación y selección. Contrato en
+[colecciones de modelos](colecciones-modelos.md).
+
+completeAddress es Text persistente opcional, maxLength 500. beforeSave async
+concatena calle+número exterior, CP, municipio, estado y país; consulta sólo name
+de los tres destinos con context.tx, omite partes vacías y devuelve null si todo
+está vacío. normalize corre antes. Se recalcula al guardar cada contacto; renombrar
+un catálogo por separado no recompone direcciones guardadas ni rellena registros
+antiguos automáticamente. El esquema generado declara VARCHAR(500), y existen
+migraciones locales para alta/ampliación del campo; esto no acredita su aplicación
+a la BD ni a otras máquinas. No es compute persistido del framework.
+PartnerForm ya incluye los cuatro controles Many2one de ubicación.
+
+Verificaciones de esta sesión: la corrección inicial de publicación pasó
+TypeScript, ESLint focalizado y 8 pruebas de colección. Tras las ediciones del
+usuario, comprobación actual en memoria del manifest: 19 campos, 7 publicados,
+Card inicial y alternativas list/card con selección por URL. beforeSave real
+comprobado con tx simulado en dos casos ficticios (dirección completa y vacíos);
+no acredita persistencia ni permisos de consultas reales. No se repitieron tsc ni
+ESLint sobre estas últimas ediciones. Sin BD, SQL, generación, subidas ni navegador.
+
+Pendientes inmediatos: comprobar Card/Lista, selector, retorno y guardado real de
+completeAddress al crear/editar, incluida dirección incompleta y vacía; confirmar
+migraciones aplicadas en el entorno de trabajo antes de atribuir persistencia.
+Validación RFC pendiente descrita abajo. La mejora general de selección automática
+de columnas continúa separada; el caso concreto de Directory ya está resuelto.
+
+## Validación guiada de RFC y CURP en Partner (2026-11-23)
+
+El usuario añadió normalize para trim/mayúsculas de vat/curp y constraints
+validateRfc(vat,partnerType) y validateCurp(curp), usando ModelValidationError
+como Err. Ambos campos permanecen opcionales. RFC comprueba formato por tipo y
+calendario con base 2000 para el año abreviado; CURP comprueba estructura, entidad,
+fecha y siglo según posición 17. El usuario eligió seguir con formato/fecha del
+RFC sin bloquear por cálculo de dígito verificador. CURP tampoco calcula checksum
+ni consulta RENAPO. Sin tratamiento especial de RFC genéricos en esta versión.
+
+Verificación de las declaraciones reales: 13 casos ficticios en memoria mediante
+contract.normalize/constrain, con errores asociados al campo, vacíos, normalización,
+RFC por tipo, fechas imposibles, bisiestos CURP 1900/2000 y estructura/entidad.
+Fixture eliminado, sin BD ni guardados. ESLint focalizado aprobado. TypeScript
+falló inicialmente por tipos .next obsoletos de la ruta retirada de Contactos;
+next typegen regeneró sólo tipos locales y tsc pasó después. Sin build ni SQL.
+
+Pendiente inmediato comunicado en la guía: el patrón de RFC entregado inicialmente
+admite cualquier letra final. Ajustar en ambas ramas [A-Z0-9]{3} a
+[A-Z0-9]{2}[0-9A], conforme al tipo RFC del XSD del SAT; sigue siendo validación
+de formato sin calcular el verificador. El caso ficticio con Z final demuestra
+la aceptación actual; no se editó el modelo del usuario para corregirlo. Después,
+comprobar errores y conservación del borrador desde el formulario real.
+
+## Fields.Image en /documentation (2026-11-23)
+
+Añadido el apartado «Campos de imagen con Fields.Image» a docs/crear-modulos.md,
+publicado en /documentation con entrada automática en el índice. Incluye modelo
+mínimo, folder, persistencia de URL HTTPS, required/tracking opcionales y maxLength
+de URL; FieldImage normal/avatar, shape y uploader heredado de ModelForm. Explica
+sincronización y configuración privada de Cloudinary en .env.local, subida antes
+de guardar la URL y conservación del archivo remoto al quitar/cancelar.
+
+Verificación puntual Mac: extraído y ejecutado en memoria el modelo de la guía,
+comprobando carpeta, default vacío, URLs válidas, rechazo de HTTP/credenciales y
+required; sintaxis de los bloques TSX comprobada. Fixture temporal eliminado,
+sin BD ni subidas. ESLint focalizado y git diff --check aprobados. Navegador
+integrado verifica sección, índice y ejemplos normal/avatar. Sin build, SQL,
+configuración de credenciales ni cambios al modelo del usuario.
+
+## Fields.Selection en /documentation (2026-11-23)
+
+Añadido por solicitud del usuario el apartado «Campos de selección con
+Fields.Selection» a docs/crear-modulos.md, fuente de /documentation e índice
+automático. Ejemplo Persona/Empresa de Directorio: value/label, default, tracking,
+nulabilidad y required sólo cuando el negocio lo exige. Incluye FieldSelect
+heredando opciones, presentación dropdown/radios, nota de statebar, comandos de
+sincronización y separación de colores/badge de las opciones del Field.
+
+Verificación puntual Mac: modelo del ejemplo extraído y ejecutado en memoria
+en fixture temporal eliminado; defaults, valores válidos/inválidos, null y required
+comprobados, y sintaxis de los bloques TSX revisada. ESLint de la página y
+git diff --check aprobados. Navegador integrado muestra el apartado, enlace de
+índice, bloques y explicaciones como listas (Markdown de la página no interpreta
+tablas GFM). Sin build, SQL, instalación de Directorio ni pruebas persistentes.
+El modelo del usuario no se modificó por esta documentación.
+
 ## Punto de continuación: Directory (2026-11-23)
 
-Rama comprobada: codex/partner, HEAD 337af62. La retirada del Partner nativo y
-User autónomo ya están en ese commit. Permanecen sin commit las declaraciones
-nuevas de directory, su registro en src/modules/index.ts y la actualización de
-continuidad. Este guardado no ejecuta commit, push, pull, generación ni SQL.
+Rama comprobada: codex/partner, HEAD 9244e34. La retirada del Partner nativo y
+User autónomo están en 337af62; la declaración inicial de directory está en
+9244e34. El árbol actual tiene cambios sin commit del usuario en modelos,
+manifest/vistas, documentación y artefactos/migraciones de Directorio. No asumir
+árbol limpio ni revertirlos. Este guardado sólo actualiza continuidad; sin commit,
+push, pull, generación ni SQL. Los detalles del avance actual y las comprobaciones
+están en la sección Directory: Card, dirección completa, menú y multivista.
 
-El usuario construye el módulo declarativo directory, mostrado como Directorio,
-con Partner → directory.partner / DirectoryPartner. La clase contiene name,
-emails, phones, street, crossStreets, streetNumber, unitNumber, zipNumber y active.
-Name es obligatorio, active inicia true y displayName devuelve name. Las nueve
-columnas se publicaban en la revisión inicial; no se ha alterado esa política.
+Partner → directory.partner / DirectoryPartner mantiene partnerType obligatorio
+sin default, type inicial contact, active true y displayName basado en name.
+Depende de ubicaciones; countryId → País, provinceId → Estado con dominio por
+país, countyId → Municipio por estado y townId → Localidad por municipio; los
+cuatro campos son opcionales. El modelo conserva crossStreets y zipNumber Text,
+tracking de dirección, normalización y constraints de RFC/CURP/CP del usuario.
+completeAddress añade el campo 19 y su armado antes de guardar.
 
-Ajustes posteriores hechos por el usuario y comprobados por lectura de fuentes:
-secondStreet pasó a crossStreets; zipNumber ahora es Text; números exterior e
-interior y código postal ya tienen tracking. Conservar el nombre zipNumber salvo
-que el usuario decida renombrarlo; postalCode fue una sugerencia, no un requisito.
-El ledger local aún no registra directory. No se acredita instalación, migración
-ni prueba persistente de este módulo por esta nota.
+El ledger local registra directory y sus artefactos; esquema/migraciones locales
+incluyen ubicaciones y completeAddress VARCHAR(500). Se comprobaron sólo archivos,
+no estado de aplicación de migraciones ni datos persistidos. La evidencia histórica
+de pruebas anteriores conserva su alcance; no atribuirla a todas las ediciones
+posteriores del usuario.
 
-Verificación histórica del primer alcance: TypeScript y ESLint focalizado pasaron;
-la declaración se cargó en memoria y se comprobaron required/defaults/publicación.
-Entonces zipNumber todavía era Integer. Las correcciones posteriores sólo se
-contrastaron con las fuentes; no atribuirles nuevas pruebas. Este guardado sólo
-comprueba git diff --check y no consulta BD ni modifica modelos o aplicaciones.
-
-Siguiente paso del ejercicio: continuar la declaración y reglas de negocio al
-ritmo del usuario. Acordar cómo almacenar/separar varios correos y teléfonos y
-validar cada valor cuando lo requiera el caso. Formato del código postal y reglas
-por persona/empresa corresponden al modelo, mediante normalize/constraints/hooks
-según la necesidad; el tipo Text y tracking son configuración de datos/auditoría.
-Tipo de contacto, RFC, ubicaciones y relación con User no se añaden por anticipación.
-Cuando el usuario dé por lista la declaración, revisar el plan de orm:sync y su
-SQL antes de instalar; el registro de grupos/permisos sigue siendo explícito.
+Siguiente paso del ejercicio: validar el formulario y las dos presentaciones en
+el entorno real, conservando el ritmo del usuario. Lista estándar ya funciona por
+configuración; una lista TSX personalizada es opcional y queda para después.
+Revisar el ajuste pendiente del patrón RFC indicado arriba. Acordar separación y
+validación de varios correos/teléfonos cuando lo requiera el caso. No añadir campos,
+relación con User ni automatismos por anticipación. Grupos/permisos de negocio
+siguen pendientes de definición explícita; el menú no concede acceso.
 
 Pendientes vigentes separados del ejercicio:
 
@@ -51,7 +156,9 @@ Pendientes vigentes separados del ejercicio:
 3. Revisar publicación de columnas cuando el límite de 12 y el orden excluyan
    campos solicitados. Motivo: caso anterior de active/estadoId en el piloto;
    aceptación: selección de campos predecible y explícita conservando límites y
-   política del servidor. Directory tiene nueve campos; no exige cambiarlo ahora.
+   política del servidor. Directory ya publica siete campos explícitos y resuelve
+   su caso de image; queda sólo evaluar una mejora general con un caso nuevo,
+   sin ampliar el límite por anticipación.
 4. Vincular User y contactos de Directorio sólo cuando se concrete el caso.
    La creación automática de contacto desde extensión/hook aún no está diseñada
    ni implementada; definir atomicidad, permisos, duplicados y composición de hooks.

@@ -6,7 +6,18 @@ export default defineModule({
   id: "directory",
   name: "Directorio",
   icon: "notebook",
+  depends: ["ubicaciones"],
   models: {
-    partner: Partner,
+    partner: {
+      model: Partner,
+      view: "card",
+      list: {
+        fields: ["image", "name", "phones", "street", "streetNumber", "vat", "completeAddress"],
+      },
+      views: { form: () => import("./views/PartnerForm"), card: () => import("./views/PartnerCard"), list: true },
+    },
+  },
+  menu: {
+    Contactos: "partner",
   },
 });
