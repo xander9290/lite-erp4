@@ -128,7 +128,9 @@ export async function relationLookup(model: string, field: string, actor: ModelA
   if (!found || !Object.hasOwn(lookupTargets(found.entry), field)) throw new Error("Relación no publicada.");
   const relation = relationDomains(found.entry).find(relation => relation.field === field);
   const envelope = z.strictObject({ request: modelLookupSchema, draft: z.record(z.string(), z.unknown()), record: z.strictObject({ id: z.string().trim().min(1).max(100).optional() }).optional(), filter: z.boolean().default(false) }).parse(input);
-  if (envelope.filter && !found.entry.list.fields.includes(field)) throw new Error("Filtro no publicado.");
+  // Collection filters: published list columns, plus Many2many fields, which collections publish
+  // apart from list.fields (tag columns and «Tiene alguna/todas»).
+  if (envelope.filter && !found.entry.list.fields.includes(field) && !Object.hasOwn(found.entry.contract.many2manyFields, field)) throw new Error("Filtro no publicado.");
   const usesRecord = Boolean(relation && !envelope.filter && domainUsesRecordId(relation.domain));
   if (envelope.record && !usesRecord) throw new Error("La relación no utiliza identidad de registro.");
   const target = getModuleModel(lookupTargets(found.entry)[field])!.entry;

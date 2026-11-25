@@ -60,8 +60,8 @@ export default defineModule({
     },
   },
   menu: {
-    Contactos: {
-      Directorio: {
+    Catálogos: {
+      Contactos: {
         model: "partner",
         screen: "contacts",
       },

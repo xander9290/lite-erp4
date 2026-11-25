@@ -21,6 +21,8 @@ export default function PartnerList({ config }: { config: ModelClientConfig }) {
         { field: "streetNumber" },
         { field: "vat" },
         { field: "provinceId" },
+        { field: "tagIds" },
+        { field: "activityIds" },
       ]}
       renderCard={(record) => (
         <div className="flex items-start gap-4 p-3">
@@ -54,6 +56,12 @@ export default function PartnerList({ config }: { config: ModelClientConfig }) {
                   label: "Municipio",
                   widget: "many2one",
                 }}
+              />
+            </p>
+            <p>
+              <ListCellValue
+                record={record}
+                column={{ field: "tagIds", label: "Etiquetas", widget: "tags" }}
               />
             </p>
           </div>

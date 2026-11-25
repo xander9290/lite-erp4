@@ -87,6 +87,14 @@ Texto, JSON) en lugar de mostrar TypeScript para todo. Verificado: TypeScript,
 ESLint y navegador (las tres guías responden 200, índice y etiquetas correctos);
 dos 500 transitorios durante la edición, ya resueltos.
 
+Corrección (2026-11-25): los filtros de colección de un Many2many (p. ej. Etiquetas
+en Directorio) fallaban con «No se pudo consultar la relación»: relationLookup con
+filter:true exigía el campo en list.fields (control añadido en 5422540), pero los
+Many2many se publican aparte. Ahora acepta también los Many2many del modelo
+(registry.ts). Comprobado en navegador: el lookup lista «cliente» y el filtro
+«Tiene alguna de» se aplica (2 registros). TypeScript, ESLint, test:modules 82/82,
+test:access 21/21 y test:list-grouping 17/17 aprobados.
+
 Pendientes de esta función:
 1. Opcional: expulsar `PartnerAddressesForm` con `--screen=addresses` para un
    formulario de direcciones dedicado (hoy reutiliza PartnerForm).
