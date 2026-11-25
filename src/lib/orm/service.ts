@@ -454,14 +454,14 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     return rows.map(row => ({ ...row, ...Object.fromEntries(linked.map(([field, byRow, readable]) => [field, (byRow.get(row.id) ?? []).filter(id => readable.has(id))])) }));
   }
 
-  async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>, transaction?: Prisma.TransactionClient): Promise<ListResult> {
+  async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>, transaction?: Prisma.TransactionClient, collection: "main" | "relation" = "main"): Promise<ListResult> {
     try {
       const query = async (tx: Prisma.TransactionClient) => {
         if (computedNames.length && !transaction) await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         const scope = await authorize(tx, actor, "read");
         const fixedDomain = domain ? await domain({ actor: Object.freeze({ id: actor.id, sessionVersion: actor.sessionVersion }), tx }) : undefined;
         const elementPolicy = await elements(tx, actor);
-        const baseDomain = presentation.domain ? await compileCollectionDomain(domainMetadata, presentation.domain, { actor: Object.freeze({ ...actor }), tx }) : undefined;
+        const baseDomain = collection === "main" && presentation.domain ? await compileCollectionDomain(domainMetadata, presentation.domain, { actor: Object.freeze({ ...actor }), tx }) : undefined;
         const parsed = listStateSchema.safeParse(input);
         if (!parsed.success || parsed.data.invalidFilters) throw new ModelValidationError("Revisa los filtros y parámetros de esta lista.");
         if (policy && parsed.data.sort && parsed.data.sort !== "id" && !policy.sortable?.includes(parsed.data.sort)) throw new ModelValidationError("El orden solicitado no está habilitado.");
@@ -576,6 +576,14 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       return compileListDomain(domainMetadata, Array.isArray(result) ? result : [result]);
     };
     return (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, resolve);
+  }
+
+  /** Server-only relation source: bind its inverse instead of inheriting the main collection domain. */
+  function defineChildListAction(inverse: string, parentId: string) {
+    const field = model.metadata[inverse];
+    if (field?.kind !== "many2one" || field.sensitive) throw new Error("La colección de consulta requiere una inversa Many2one pública.");
+    const fixed = compileListDomain(domainMetadata, [{ field: inverse, operator: "eq", value: parentId }]);
+    return (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, async () => fixed, undefined, "relation");
   }
 
   function remove(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<ListDeleteResult> {
@@ -750,5 +758,5 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (rows.length > 1) throw new ModelValidationError("La clave de importación no es única.");
     return rows[0] ? scalar ? repository.read(tx, String(rows[0].id)) : transaction.snapshot(tx, actor, String(rows[0].id)) : null;
   }
-  return { transaction, findUniqueInTransaction, listInTransaction: (prisma: PrismaClient, tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, undefined, tx), react, read, save, action, actions: model.actions ?? [], remove, activity, addNote, lookup, lookupInTransaction, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, kanban, move };
+  return { transaction, findUniqueInTransaction, listInTransaction: (prisma: PrismaClient, tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, undefined, tx), react, read, save, action, actions: model.actions ?? [], remove, activity, addNote, lookup, lookupInTransaction, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, defineChildListAction, kanban, move };
 }

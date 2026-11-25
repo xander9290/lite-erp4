@@ -330,8 +330,9 @@ function lineConfigs(module: ModuleDefinition, owner: ModuleModel, access?: Capa
 
 /**
  * Children of a parent record for a read-only relation: the parent must be readable by the
- * actor, and the child list keeps its own permissions, rules and policy, AND the fixed
- * `<inverse> = parentId` domain set here (never by the browser). Paginated, no row limit.
+ * actor, and the child list keeps its own permissions, rules and field policy, AND the fixed
+ * `<inverse> = parentId` domain set here (never by the browser). The main collection
+ * domain does not narrow this independent relation source. Paginated, no row limit.
  */
 export async function childCollectionList(parentModel: string, field: string, parentId: unknown, actor: ModelActor, state: unknown) {
   const found = getModuleModel(parentModel);
@@ -345,7 +346,7 @@ export async function childCollectionList(parentModel: string, field: string, pa
   if (!parent.ok) return { ok: false as const, error: parent.error };
   const child = byPrismaName.get(collection.target)!;
   const service = modelService(child.id);
-  return withActor(actor, () => service.defineListAction({ domain: [{ field: collection.inverse, operator: "eq", value: parentId }] as never })(prisma, actor, state));
+  return withActor(actor, () => service.defineChildListAction(collection.inverse, parentId)(prisma, actor, state));
 }
 
 export function modelClientConfig(id: string, access?: CapabilityActor, nested = true): ModelClientConfig {

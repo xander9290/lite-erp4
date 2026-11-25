@@ -140,6 +140,9 @@ class Estado extends Model {
   orden** (`<ModelChildCollections />`; el formulario por defecto la incluye). El servidor fija
   `<inverse> = registro` (AND con cualquier filtro del navegador), exige leer al padre y
   aplica permisos y reglas del hijo (`modelChildren` → `childCollectionList`).
+  El dominio del manifest del hijo corresponde a su colección principal y no se
+  hereda aquí: la inversa fija la fuente de esta consulta independiente. Los filtros
+  válidos del usuario y la política de campos siguen aplicándose.
 - Cada fila abre el formulario del hijo; «Nuevo» llega con el padre preasignado
   (`?default_<inverse>=<id>`, validado al guardar como cualquier Many2one) y vuelve al padre.
 - Mismo módulo; el hijo debe tener un Many2one `inverse` hacia el padre (obligatorio o no).

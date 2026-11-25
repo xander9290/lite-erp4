@@ -147,8 +147,18 @@ models: {
 },
 ```
 
-El mismo dominio se aplica antes de contar, paginar, agrupar y consultar cada
-columna Kanban. No se coloca en las columnas TSX ni se envía desde React.
+El mismo dominio se aplica a las presentaciones de la colección principal antes
+de contar, paginar, agrupar y consultar cada columna Kanban. No se coloca en las
+columnas TSX ni se envía desde React.
+
+Las colecciones de consulta One2many readonly tienen una fuente independiente:
+no heredan el dominio de la colección principal del modelo destino. El servidor
+fija inverse = ID del padre y conserva permisos, reglas de registro, política de
+campos y filtros válidos del usuario. Por ejemplo, directory.partner puede declarar
+`domain: d => d.eq("type", "contact")` para Lista/Card, mientras childIds sigue
+mostrando Entrega y Facturación del contacto abierto. Un defineListAction propio
+sigue combinando su dominio con el de la colección principal; la separación sólo
+la usa el proveedor interno de relaciones de consulta.
 No modifica permisos de lectura de registros individuales, guardado o borrado.
 Un `source` personalizado sigue siendo responsable de su propia consulta autorizada;
 no recibe el dominio del manifest como un filtro ejecutable en el navegador.

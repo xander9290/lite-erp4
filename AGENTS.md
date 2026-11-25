@@ -227,6 +227,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Ideas pendientes
 
+- **Siguiente implementación solicitada (2026-11-24): pantallas nombradas por
+  modelo.** Propuesta screens indexado por ID, con views list/card/kanban/form/modal,
+  dominio/defaults/presentación inicial por pantalla y menús modelo+screen. Conservar
+  selección durante apertura/guardado/retorno, permisos y manifests actuales como
+  pantalla default. Primera versión sin capa adicional de acciones de navegación.
+  Aún no implementado; registrar como siguiente pendiente no autoriza iniciarlo
+  durante este guardado. Alcance y aceptación en
+  [Pantallas por modelo](docs/ideas/pantallas-modelos.md).
+
 - Sugerencias de Django registradas (2026-11-23), sin implementación activa:
   chequeos del proyecto, operaciones después del commit, consultas reutilizables,
   comandos por módulo y aplicaciones distribuibles (enlazadas a su pendiente

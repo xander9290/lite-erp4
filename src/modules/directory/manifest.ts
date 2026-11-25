@@ -12,23 +12,16 @@ export default defineModule({
   models: {
     partner: {
       model: Partner,
+      domain: (d) => d.eq("type", "contact"),
       view: "card",
       list: {
-        fields: [
-          "image",
-          "name",
-          "phones",
-          "street",
-          "streetNumber",
-          "vat",
-          "provinceId",
-          "countyId",
-        ],
+        fields: ["image", "name", "phones", "street", "streetNumber", "vat", "provinceId", "countyId"],
       },
       views: {
         form: () => import("./views/PartnerForm"),
         card: () => import("./views/PartnerCard"),
         list: true,
+        modal: () => import("./views/PartnerModal"),
       },
     },
 

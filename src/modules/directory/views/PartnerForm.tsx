@@ -1,6 +1,6 @@
 "use client";
 
-import ModelForm, { ModelExtensions } from "@/components/modules/ModelForm";
+import ModelForm, { ModelExtensions, ModelChildCollections } from "@/components/modules/ModelForm";
 import FormGroup from "@/components/ui/form/FormGroup";
 import FormMediaLayout from "@/components/ui/form/FormMediaLayout";
 import FieldBoolean from "@/components/ui/form/FieldBoolean";
@@ -22,36 +22,15 @@ type Values = FormValues<typeof Partner>;
  * Vista expulsada con eject:view: edita libremente la maquetación.
  * ModelForm aporta carga, guardado, recarga, breadcrumbs, historial y eliminación.
  */
-export default function PartnerForm({
-  config,
-  id,
-}: {
-  config: ModelClientConfig;
-  id?: string;
-}) {
+export default function PartnerForm({ config, id }: { config: ModelClientConfig; id?: string }) {
   return (
     <ModelForm config={config} id={id} density="compact">
       {/* <div className="col-span-full">
         <FieldText name="name" widget="header" />
       </div> */}
       <FormGroup legend="Datos personales" id="contact">
-        <FormMediaLayout
-          media={
-            <FieldImage<Values>
-              name="image"
-              widget="avatar"
-              shape="squared"
-              label=""
-            />
-          }
-          id="formMedia"
-        >
-          <FieldSelect<Values>
-            name="partnerType"
-            direction="inline"
-            type="optional"
-            label=""
-          />
+        <FormMediaLayout media={<FieldImage<Values> name="image" widget="avatar" shape="squared" label="" />} id="formMedia">
+          <FieldSelect<Values> name="partnerType" direction="inline" type="optional" label="" />
           <FieldText<Values> name="name" direction="inline" />
           <FieldText<Values> name="emails" direction="inline" />
           <FieldText<Values> name="phones" direction="inline" widget="phone" />
@@ -66,22 +45,9 @@ export default function PartnerForm({
       <FormGroup legend="Dirección" id="address">
         <FieldText<Values> name="street" direction="inline" />
         <Stack>
-          <FieldText<Values>
-            name="streetNumber"
-            direction="inline"
-            className="text-end"
-          />
-          <FieldText<Values>
-            name="unitNumber"
-            direction="inline"
-            className="text-end"
-          />
-          <FieldText<Values>
-            name="zipNumber"
-            direction="inline"
-            label="C.P."
-            className="text-center"
-          />
+          <FieldText<Values> name="streetNumber" direction="inline" className="text-end" />
+          <FieldText<Values> name="unitNumber" direction="inline" className="text-end" />
+          <FieldText<Values> name="zipNumber" direction="inline" label="C.P." className="text-center" />
         </Stack>
         <FieldText<Values> name="crossStreets" direction="inline" />
         <Stack>
@@ -92,14 +58,8 @@ export default function PartnerForm({
         </Stack>
       </FormGroup>
       <Notebook defaultPage="otherAddresses" id="additionalInfo">
-        <NotebookPage
-          label="Otras direcciones"
-          name="otherAddresses"
-          className="p-2"
-        >
-          <FormGroup>
-            <h2>En construcción</h2>
-          </FormGroup>
+        <NotebookPage label="Otras direcciones" name="otherAddresses" className="p-2">
+          <ModelChildCollections name="childIds" openIn="modal" />
         </NotebookPage>
         <NotebookPage label="Ventas" name="sales" className="p-2">
           <FormGroup id="saleInfo">
@@ -116,11 +76,7 @@ export default function PartnerForm({
             <Stack>
               <FieldSelect<Values> name="type" direction="inline" />
               <FieldMany2One<Values> name="parentId" />
-              <FieldBoolean<Values>
-                name="active"
-                direction="inline"
-                invisible
-              />
+              <FieldBoolean<Values> name="active" direction="inline" invisible />
             </Stack>
           </FormGroup>
         </NotebookPage>

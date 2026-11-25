@@ -8,12 +8,17 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Punto de continuación vigente: Directorio y UI (2026-11-24)
 
-Revisión de cierre por solicitud del usuario, mediante documentación, fuentes y
-Git. Rama codex/partner, HEAD 4bc81a9. Hay cambios sin commit, incluidos archivos
-nuevos de UI, modelos, artefactos y ocho carpetas de migración de Directorio.
-Conservar todos los cambios del usuario; no asumir árbol limpio. No se hizo
-commit/push/pull. Este punto sustituye como estado actual las descripciones de
-Directorio del 2026-11-23; esas secciones conservan su evidencia histórica.
+Puesta al día contrastada con documentación, fuentes y Git. Rama codex/partner,
+HEAD 4821b76 (punto de progreso); los cambios de UI, modelos, artefactos y
+migraciones descritos en el cierre anterior ya están incluidos en ese commit.
+El árbol local conserva la guía cerrada de Otras direcciones y la corrección de
+alcance del dominio: define.ts, registry/service, manifest, modelo/vistas de Partner,
+pruebas y documentación. PartnerModal y la regresión de dominios son archivos nuevos
+sin commit. Conservar todas las ediciones. El siguiente pendiente solicitado es
+implementar screens; su diseño se documenta, todavía sin iniciar esa función.
+Esta actualización sólo registra continuidad;
+sin commit/push/pull. Este punto sustituye como estado actual las descripciones
+de Directorio del 2026-11-23; esas secciones conservan su evidencia histórica.
 
 ### Implementado durante esta sesión
 
@@ -30,7 +35,7 @@ Directorio del 2026-11-23; esas secciones conservan su evidencia histórica.
 - /documentation incluye Notebook/NotebookPage y densidad; docs/crear-modulos.md
   sigue siendo su fuente única. Contratos específicos enlazados más abajo.
 
-### Directorio actual, comprobado sólo en fuentes
+### Directorio actual, fuentes y confirmación del usuario
 
 El usuario amplió el módulo con PartnerTags y BusinessActivity, registrados como
 partnertags y businessactivity. Nombres de destino: DirectoryPartnertags y
@@ -40,7 +45,7 @@ depends conserva sólo ubicaciones; core/User es dependencia implícita.
 
 Partner tiene tagIds Many2many (máximo 10, create:true), activityIds Many2many
 (máximo 3), parentId autorrelacional y saleUserId/purchaseUserId hacia User activo.
-parentId excluye el propio registro y type="contact" mediante d.all. El modelo
+parentId excluye sólo el propio registro; el filtro que excluía type="contact" fue retirado. El modelo
 conserva dirección encadenada y beforeSave que arma completeAddress. No se añadió
 creación/sincronización automática de usuarios o contactos. PartnerTags normaliza
 name con trim/minúsculas. BusinessActivity declara name, description, code único
@@ -48,7 +53,7 @@ opcional, parentId y active; @displayName("parent.name", "name") concatena
 «Padre / Nombre», sin resolver recursivamente todos los ancestros.
 
 PartnerForm conserva FormMediaLayout, datos fiscales, etiquetas/actividades y
-pestañas Otras direcciones (sólo «En construcción»), Ventas, Compras y Otra
+pestañas Otras direcciones (colección childIds en modal), Ventas, Compras y Otra
 información. PartnerCard ya usa ListCellValue con widget many2one para Estado y
 Municipio, reutilizando $labels del servidor; renderCard recibe IDs, no objetos
 relacionales completos. Manifest publica ocho campos: image/name/phones/street/
@@ -61,24 +66,125 @@ dark sigue declarado. No revertir ni atribuir ese cambio a la densidad.
 Existen esquemas/artefactos y migraciones locales de las ampliaciones; esta lectura
 no acredita cuáles están aplicadas ni su persistencia en Windows u otras máquinas.
 
+### Comprobación funcional confirmada (2026-11-24)
+
+El usuario confirma comprobados en la aplicación real el guardado, las relaciones
+y las presentaciones de Directorio. Se retira ese punto de los pendientes vigentes.
+Es evidencia reportada por el usuario; el agente no repitió esas pruebas ni consultó
+la BD. La confirmación no acredita el historial exacto de migraciones ni su
+aplicación en otras máquinas. No repetir la verificación como requisito para
+continuar, salvo que nuevos cambios o fallos lo justifiquen.
+
+### Otras direcciones: guía cerrada (2026-11-24)
+
+Guía ejecutada por el usuario sobre el mismo modelo Partner. childIds declara
+Fields.One2many("DirectoryPartner", { inverse: "parentId", readonly: true,
+label: "Otras direcciones" }); la pestaña presenta ModelChildCollections con
+name="childIds" y openIn="modal". Es consulta paginada, fuera del borrador/guardado
+del principal; parentId se propone al crear y cada dirección guarda por separado.
+La FK ya existía; esta relación por sí sola no añade otra columna SQL.
+
+Se detectó y reprodujo que defineModule rechazaba la autorrelación de consulta,
+aunque la guía de modales la ejemplificaba. El usuario retiró child === parent
+únicamente del validador de childCollections; las líneas editables conservan su
+restricción y los demás controles de la inversa siguen vigentes. La declaración
+autorrelacional y childIds real se comprobaron en memoria sin BD.
+
+El usuario completó la prueba guiada de alta/edición con el formulario reutilizado.
+Después ejecutó eject:view para modal: PartnerModal.tsx registrado en views.modal.
+La vista dedicada usa ModelForm compacto con nombre, partnerType, type, correo,
+teléfono, principal en lectura, dirección/ubicaciones y ModelExtensions. Sin
+childIds, pestañas, imagen ni responsables. El bloqueo de parentId es presentación;
+completeAddress permanece derivado en beforeSave y los valores omitidos se conservan.
+views.modal aplica a los modales de Partner, no sólo al abierto desde esta pestaña.
+
+Alcance acordado: un nivel, principal → direcciones adicionales. validateParent,
+constraint async sobre parentId, permite principal sin padre y direcciones bajo
+un principal; rechaza autorreferencia, destino inexistente, padre que ya tiene
+padre y convertir un contacto con hijos en hijo de otro. Se ejecuta en el pipeline
+de guardado con context.tx; esta lógica no requiere migración. No se añadió la
+constraint a BusinessActivity ni se limpiaron datos existentes automáticamente.
+
+Verificación actual del agente: 7 casos del método real con tx simulado aprobados
+(sin padre, alta/edición válidas y cuatro rechazos); TypeScript sin emisión/archivo
+incremental y ESLint focalizado de modelo, vistas y manifest aprobados. Pruebas de
+nested/form-view 7/7 y git diff --check aprobados. Sin nuevas consultas a BD, SQL,
+subidas, navegador ni pruebas de concurrencia/persistencia de esta ampliación.
+
+Cierre solicitado por el usuario el 2026-11-24 tras completar la guía. Quedan
+implementadas la colección autorrelacional, alta/edición en modal dedicado y
+validación de un solo nivel. El ejercicio queda cerrado; no repetirlo ni iniciar
+otra ampliación por este cierre. La evidencia del agente mantiene el alcance
+anterior: no se ejecutaron nuevas pruebas de navegador, persistencia o SQL.
+
+Se explicó el recorrido de parentId: inverse → defaults de la colección →
+ModelFormModal → contexto React de presentación → valores iniciales de ModelForm.
+Al guardar viaja en values.parentId; el context del servidor aporta tx/actor/
+operación/identidad. Los defaults se aplican al crear; editar carga el valor guardado.
+El campo readOnly del modal limita la presentación, no cambia la política servidor.
+
+### Dominio principal separado de childIds (2026-11-24)
+
+Corrección solicitada tras cerrar la guía: un domain type=contact en el modelo
+Partner también recortaba childIds y ocultaba Entrega/Facturación. La consulta
+readonly reutilizaba defineListAction, que combinaba el dominio principal del
+servicio con la inversa. Ahora childCollectionList usa defineChildListAction:
+una fuente interna vinculada a una inversa Many2one pública y un ID válido del
+padre, que conserva la consulta compartida y omite sólo el dominio principal.
+La comprobación de lectura del padre/campo, permisos y reglas del hijo, política
+de campos, filtros, conteos y paginación permanecen en sus rutas autorizadas.
+No hay opción enviada por el navegador para elegir u omitir este alcance.
+
+Partner declara domain: d => d.eq("type", "contact"). Lista/Card principales
+muestran contactos; childIds consulta todos los tipos permitidos por sus reglas
+bajo parentId del contacto abierto. Kanban y defineListAction propios conservan
+el dominio principal. No cambia la lectura individual ni el guardado.
+
+Verificación: copia aislada aprobada antes de aplicar. Sobre las fuentes finales,
+TypeScript sin emisión/incremental, ESLint focalizado y 20 pruebas de servicio/
+dominios aprobados (4 regresiones nuevas y 16 existentes), con repositorio y
+tx simulados. Cubren aislamiento por padre/reglas, Entrega/Facturación, filtros,
+conteo/paginación, rechazo de parámetros manipulados y autorización. Las 74 pruebas
+de módulos quedaron aprobadas: 73 en la suite inicial y la prueba de CLI modal al
+repetirla con permiso para crear/limpiar su carpeta temporal, antes bloqueada por
+el sandbox. Guías, comentario del contrato y git diff --check actualizados.
+Sin SQL, migración, generación de modelos ni consultas a BD; pendiente comprobar
+este ajuste concreto en la interfaz real. El cierre de la guía se conserva.
+
+### Siguiente implementación: pantallas nombradas (2026-11-24)
+
+El usuario pide guardar el avance y poner como siguiente pendiente la propuesta
+screens por modelo, motivada por dos listas/formularios distintos para la misma
+entidad. La sintaxis mostrada en la conversación es ilustrativa; screens,
+defaultScreen y menu.screen aún no existen en el framework.
+
+Diseño propuesto: objeto screens indexado por ID; cada pantalla reúne etiqueta,
+view inicial, domain y defaults, más views list/card/kanban/form/modal con loaders
+diferidos. Menú sólo referencia modelo+screen. Conservar la pantalla al abrir,
+guardar y volver, con dominio/defaults resueltos en servidor y publicación/permisos
+del modelo intactos. Los manifests actuales deben continuar como pantalla default.
+Primera versión sin acciones de navegación separadas. Documentar/validar fallbacks,
+selección de destino modal/relacional y precedencia de defaults antes de cerrar API.
+
+Plan y criterios en [Pantallas nombradas por modelo](ideas/pantallas-modelos.md).
+Este guardado actualiza sólo documentación y AGENTS; no implementa pantallas ni
+modifica código de aplicación/framework. Se mantienen las comprobaciones históricas
+registradas: TypeScript, ESLint y 94 pruebas de la corrección anterior aprobadas;
+sin repetirlas por este cambio documental. git diff --check comprobado al cierre.
+Sin commit/push/pull ni SQL.
+
 ### Pendientes al retomar
 
-1. Verificar el formulario real de Directorio y sus dos presentaciones con las
-   últimas ediciones: relaciones, etiquetas/creación rápida, actividades, responsables,
-   guardado/recarga, errores y retorno. Confirmar historial de migraciones del entorno
-   antes de atribuir comportamiento a la base. No ejecutar SQL ni cargas como efecto
-   de ponerse al día. Las pruebas previas de UI no cubren todo el ejercicio actual.
-2. Definir el siguiente paso de Otras direcciones: hoy no hay colección/formulario
-   de direcciones implementado en esa pestaña. Revisar también si excluir
-   type="contact" en parentId corresponde a la intención de contacto principal.
-3. Si se mantiene la jerarquía de contactos/actividades, añadir validación de
-   servidor contra ciclos de varios registros. Excluirse a sí mismo con domain
-   no impide A → B → A; ninguna de las dos clases declara esa constraint ahora.
-4. Sigue pendiente el ajuste de formato RFC descrito en su sección: ambas ramas
+1. **Siguiente: implementar pantallas nombradas screens**, con el alcance y la
+   compatibilidad del plan enlazado arriba. No confundir la propuesta con API vigente.
+2. Si se mantiene la jerarquía de BusinessActivity, añadir su validación contra
+   ciclos de varios registros. La protección de un nivel en Partner ya está
+   implementada; la clase BusinessActivity aún no declara esa constraint.
+3. Sigue pendiente el ajuste de formato RFC descrito en su sección: ambas ramas
    conservan [A-Z0-9]{3}, en lugar de [A-Z0-9]{2}[0-9A]. No se modificó por adelanto.
    Validación de varios correos/teléfonos y grupos/permisos de Directorio quedan
    para definir con el caso real; no fueron implementados por estas explicaciones.
-5. Limpieza opcional: renombrar la función PartnerList de PartnerCard y retirar
+4. Limpieza opcional: renombrar la función PartnerList de PartnerCard y retirar
    imports de tipos sin uso en los nuevos catálogos cuando se revise su código.
    Aceptación: mismos contratos/presentación, sin regenerar vistas personalizadas.
 
