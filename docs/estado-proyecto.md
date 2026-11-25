@@ -6,6 +6,29 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Cierre de continuidad (2026-11-25, Windows)
+
+Rama `codex/partner`, HEAD `7abffb1` (`se remueve experimento de crear contacto en
+user`). Árbol limpio antes de esta actualización documental: el avance de código y
+la retirada del experimento ya están guardados en Git. Contrastados el último
+commit, el modelo UserDirectory y su vista: permanece el vínculo opcional y único
+con un contacto existente; no hay acción de creación ni sincronización de imágenes.
+
+Siguiente paso: confirmar la aplicación local de `20261125184206_sync_directory`
+y comprobar en Usuarios → Otra información selección, cambio, limpieza y guardado
+del contacto, rechazo de un contacto ya vinculado y que guardar User no modifique
+la imagen de Partner. La evidencia y el alcance están en «User ↔ Partner: vínculo
+opcional manual», más abajo. No asumir migración aplicada por existir sus archivos.
+
+Otros pendientes de pantallas: formulario dedicado de direcciones opcional,
+transfer por pantalla y tipado/autocompletado de `{ model, screen }`; se conservan
+en su lista específica. Las oportunidades generales siguen en su sección final.
+
+Este cierre sólo actualiza documentación y comprueba `git diff --check`; no repite
+pruebas de código ni verifica navegador, servidor, base de datos o remoto. Las
+verificaciones anteriores conservan su fecha y alcance. Sin commit/push/pull en
+este cierre; esta nota queda como cambio local para el siguiente commit autorizado.
+
 ## Punto de continuación vigente: pantallas nombradas (2026-11-25)
 
 Windows, rama codex/partner, HEAD bc7224b al iniciar esta retirada. Los avances de pantallas/UI están en
