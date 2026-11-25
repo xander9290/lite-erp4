@@ -13,7 +13,16 @@ export default defineModule({
     partner: {
       model: Partner,
       list: {
-        fields: ["image", "name", "phones", "street", "streetNumber", "vat", "provinceId", "countyId"],
+        fields: [
+          "image",
+          "name",
+          "phones",
+          "street",
+          "streetNumber",
+          "vat",
+          "provinceId",
+          "countyId",
+        ],
       },
       defaultScreen: "contacts",
       screens: {
@@ -51,8 +60,13 @@ export default defineModule({
     },
   },
   menu: {
-    Contactos: "partner",
-    Direcciones: { model: "partner", screen: "addresses" },
+    Contactos: {
+      Directorio: {
+        model: "partner",
+        screen: "contacts",
+      },
+      Direcciones: { model: "partner", screen: "addresses" },
+    },
     Configuración: {
       Etiquetas: "partnertags",
       "Actividad empresarial": "businessactivity",

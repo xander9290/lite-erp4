@@ -238,6 +238,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   modales de otros modelos usan la pantalla default. Transfer sólo en la default.
   `eject:view -- … --screen=<id>`. Directorio las usa (2026-11-25): Contactos
   default y Direcciones (delivery/invoice). Contrato en [Pantallas nombradas](docs/pantallas-modelos.md).
+  Guía web en /documentation/backend (fuente única docs/backend.md; /documentation
+  sigue leyendo docs/crear-modulos.md). Sin tablas Markdown: no hay remark-gfm.
 
 - Sugerencias de Django registradas (2026-11-23), sin implementación activa:
   chequeos del proyecto, operaciones después del commit, consultas reutilizables,

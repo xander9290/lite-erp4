@@ -60,6 +60,19 @@ registros sin incluirla y «Otras direcciones» del principal la muestra (1 regi
 Sin errores de consola. El registro de prueba se conserva; borrarlo es decisión del
 usuario.
 
+Documentación web (2026-11-25): /documentation pasa a tener dos guías con
+navegación compartida (`src/app/documentation/DocumentationGuide.tsx`):
+«Crear módulos» (/documentation, fuente docs/crear-modulos.md, sin cambios de
+contenido) y «Backend» (/documentation/backend, fuente nueva docs/backend.md) con
+manifest, screens, menús, dominios (operadores, `actor` de la sesión, createBy),
+dominio de pantalla frente a rules, defaults y eject por pantalla. Sin tablas
+Markdown: react-markdown no tiene remark-gfm instalado. Se comprobó que los
+dominios con `actor.id`, `createBy` y `createdAt` compilan con compileCollectionDomain
+(la respuesta previa al usuario dudaba de createBy; sí es válido). Verificado:
+TypeScript, ESLint de la ruta y navegador (ambas guías, índice lateral, enlaces
+entre guías, móvil y 1280px, sin errores de consola). El menú agrupado
+Contactos → Directorio/Direcciones del manifest es edición del usuario sin commit.
+
 Pendientes de esta función:
 1. Opcional: expulsar `PartnerAddressesForm` con `--screen=addresses` para un
    formulario de direcciones dedicado (hoy reutiliza PartnerForm).
