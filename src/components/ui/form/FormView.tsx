@@ -5,7 +5,7 @@ import type { ClientModelAction } from "@/lib/orm/action-parameters";
 import FormPendingStatus from "./FormPendingStatus";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useFormState, type FieldPath, type FieldValues } from "react-hook-form";
-import { Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import FormLayout, { type FormLayoutProps } from "./FormLayout";
@@ -51,6 +51,11 @@ export type FormViewProps<TValues extends FieldValues, TContext = unknown, TOutp
     revertLabel?: string;
     newLabel?: string;
     onNew?: () => void | Promise<void>;
+    /**
+     * «3 / 12» with previous/next buttons (e.g. the records of the list page the form came from).
+     * Each move runs through the unsaved-changes guard. A missing callback disables that arrow.
+     */
+    pager?: FormViewPager;
     onSubmit: FormViewSubmit<TValues, TOutput>;
     onSaved?: (values: TValues, audit?: import("@/lib/orm/audit").RecordAudit, displayName?: string) => void;
     onRevert?: () => void;
@@ -64,6 +69,13 @@ export type FormViewProps<TValues extends FieldValues, TContext = unknown, TOutp
     actions?: readonly ClientModelAction[];
   };
 
+export type FormViewPager = {
+  readonly position: number;
+  readonly total: number;
+  readonly onPrevious?: () => void | Promise<void>;
+  readonly onNext?: () => void | Promise<void>;
+};
+
 class SaveRejected extends Error {
   constructor(message: string, readonly kind: "validation" | "server" = "server", readonly details: string[] = [], readonly field?: string) { super(message); }
 }
@@ -71,7 +83,7 @@ const serverErrorTypes = ["server"];
 
 export default function FormView<TValues extends FieldValues, TContext = unknown, TOutput = TValues>({
   title, width = "normal", layout = "content", breadcrumbs, audit, activity, methods, mode = "edit", disabled = false, readOnly = false, busy: actionBusy = false,
-  headerActions, menuActions, statebar, footer, saveLabel = "Guardar", revertLabel = "Revertir", newLabel = "Nuevo", onNew, onSubmit, onSaved, onRevert, deletion, runAction, actions: publishedActions,
+  headerActions, menuActions, statebar, footer, saveLabel = "Guardar", revertLabel = "Revertir", newLabel = "Nuevo", onNew, pager, onSubmit, onSaved, onRevert, deletion, runAction, actions: publishedActions,
   children, id, className = "", onSubmitCapture, actionModel, ...formProps
 }: FormViewProps<TValues, TContext, TOutput>) {
   const generatedId = useId();
@@ -338,6 +350,11 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
       <div className="flex flex-wrap items-center justify-between gap-3">
         {busy && !deletedHref && <FormPendingStatus announce={false}>{saving || isSubmitting ? "Guardando cambios…" : deleting ? "Eliminando registro…" : acting ? confirmingAction ? "Esperando confirmación…" : parameterAction ? "Esperando parámetros…" : "Ejecutando acción…" : "Procesando…"}</FormPendingStatus>}
         {!!breadcrumbs?.length && <div className="min-w-0 flex-1 basis-48"><Breadcrumbs items={breadcrumbs} /></div>}
+        {pager && <nav aria-label="Navegar entre registros" className="ml-auto flex shrink-0 items-center gap-1">
+          <span className="px-1 text-sm tabular-nums text-base-content/60" aria-live="polite">{pager.position} / {pager.total}</span>
+          <button type="button" className="btn btn-ghost btn-sm btn-square" aria-label="Registro anterior" title="Registro anterior" disabled={locked || !pager.onPrevious} onClick={() => { if (pager.onPrevious) void navigation.run(pager.onPrevious).catch(() => undefined); }}><ChevronLeft size={17} aria-hidden="true" /></button>
+          <button type="button" className="btn btn-ghost btn-sm btn-square" aria-label="Registro siguiente" title="Registro siguiente" disabled={locked || !pager.onNext} onClick={() => { if (pager.onNext) void navigation.run(pager.onNext).catch(() => undefined); }}><ChevronRight size={17} aria-hidden="true" /></button>
+        </nav>}
         {(!readOnly || onNew || hasSecondaryActions) && <fieldset disabled={locked} className="m-0 ml-auto flex min-w-0 flex-wrap items-center gap-1 border-0 p-0 sm:gap-2">
           {onNew && <button type="button" disabled={locked} className="btn btn-soft btn-primary btn-sm gap-1.5" onClick={async () => {
             if (locked) return;

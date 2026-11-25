@@ -34,6 +34,7 @@ import { InsertionProvider, useInsertionFallback } from "@/components/ui/form/in
 import { FormDialogLock } from "@/components/ui/form/FormDialog";
 import ModelFormModal from "./ModelFormModal";
 import { useModelFormPresentation } from "./ModelFormPresentation";
+import { useRecordPager } from "@/components/ui/collection/recordPager";
 
 type Values = Record<string, unknown>;
 
@@ -156,6 +157,9 @@ function Editor({ ui, record, displayName, onReload, children, density }: { ui: 
   const formHref = (path: string) => screenHref(config, path, { returnTo: returnHref });
   const [savedId, setSavedId] = useState(record.id as string | undefined);
   const [savedName, setSavedName] = useState(displayName);
+  // Previous/next within the list page the form came from (page forms only; never modals).
+  const pager = useRecordPager(modal ? null : returnHref, savedId);
+  const openSibling = (id: string) => () => router.push(formHref(`${config.route}/${encodeURIComponent(id)}`));
   const [collectionVersion, setCollectionVersion] = useState(0);
   const refreshCollections = useCallback(() => setCollectionVersion(value => value + 1), []);
   const collectionRefresh = useMemo(() => ({ version: collectionVersion, refresh: refreshCollections }), [collectionVersion, refreshCollections]);
@@ -179,6 +183,7 @@ function Editor({ ui, record, displayName, onReload, children, density }: { ui: 
     runAction={(action, target, params) => modelAction(config.id, { action, ...target, ...(params !== undefined ? { params } : {}) })}
     actions={config.actions}
     actionModel={config.name}
+    pager={pager ? { position: pager.position, total: pager.total, ...(pager.previous ? { onPrevious: openSibling(pager.previous) } : {}), ...(pager.next ? { onNext: openSibling(pager.next) } : {}) } : undefined}
     onNew={!modal && savedId && capabilities.create ? () => router.push(formHref(`${config.route}/nuevo`)) : undefined}
     onSaved={(values, _audit, name) => {
       setSavedId(values.id as string);

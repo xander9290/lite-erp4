@@ -33,7 +33,7 @@
     "test:scaffold": "node --conditions=react-server --import tsx --test src/lib/scaffold/*.test.ts",
     "test:framework:integration": "node --conditions=react-server --import tsx scripts/framework.integration.ts",
     "test:relation-filter": "node --import tsx --test src/components/ui/list/relationFilter.test.ts",
-    "test:collection-load": "node --import tsx --test src/components/ui/collection/collectionLoad.test.ts",
+    "test:collection-load": "node --import tsx --test src/components/ui/collection/collectionLoad.test.ts src/components/ui/collection/recordPager.test.ts",
     "test:views": "node --conditions=react-server --import tsx --test src/lib/kanban/*.test.ts",
     "test:list-selection": "node --conditions=react-server --import tsx --test src/components/ui/list/listSelection.test.ts src/lib/list/delete.test.ts",
     "test:list-grouping": "node --conditions=react-server --import tsx --test src/lib/list/grouping.test.ts src/lib/orm/service.test.ts",

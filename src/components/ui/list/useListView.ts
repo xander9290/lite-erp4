@@ -5,6 +5,7 @@ import { listRecords } from "@/lib/list/actions";
 import type { ListConfig, ListViewConfig, ListResult, ListState } from "@/lib/list/types";
 import { useCollectionLoad } from "../collection/useCollectionLoad";
 import { useCollectionState } from "../collection/useCollectionState";
+import { rememberCollectionPage } from "../collection/recordPager";
 
 export function useListView(config: ListViewConfig, pageSize: number, prefix: string, load?: (state: ListState) => Promise<ListResult>, grouping = true) {
   const query = useCollectionState(config, pageSize, prefix, grouping);
@@ -19,6 +20,11 @@ export function useListView(config: ListViewConfig, pageSize: number, prefix: st
   useEffect(() => {
     if (data && data.page !== state.page) update({ page: data.page }, true);
   }, [data, state.page, update]);
+  // Forms opened from this page can step through its records (grouped pages are not a flat order).
+  const { currentUrl } = query;
+  useEffect(() => {
+    if (data && !data.groups && data.page === state.page) rememberCollectionPage(currentUrl, data.rows.map(row => row.id));
+  }, [data, state.page, currentUrl]);
 
   return {
     ...query, ...response,

@@ -107,6 +107,17 @@ esqueleto de 18rem a 21rem (petición del usuario; 24rem se probó y quedaba
 demasiado alargada). Navegador a 1920 px: 5 columnas de 371×149 px; con 24rem
 móvil (1 columna) y 1366 px no desbordaban.
 
+Anterior/siguiente en formularios (2026-11-25, petición del usuario: sólo dentro
+de la página, sin cruzar paginación). FormView admite `pager`; ModelForm lo conecta
+con recordPager.ts: useListView guarda los IDs de cada página (no agrupada) en
+sessionStorage por URL y el formulario los busca por su returnTo. Guard de cambios
+sin guardar en cada movimiento; conserva returnTo y `screen`. No aplica a kanban,
+listas agrupadas, modales ni registros nuevos. Verificado: TypeScript, ESLint,
+test:collection-load 8/8 (4 nuevas del pager), test:form-navigation 13/13,
+test:form-model 29/29, test:views 4/4; navegador en Directorio: 1/3 con anterior
+desactivado → 2/3 → 3/3 con siguiente desactivado, y con un cambio pendiente aparece
+«Cambios sin guardar» (se eligió seguir editando y se revirtió; sin escrituras).
+
 Pendientes de esta función:
 1. Opcional: expulsar `PartnerAddressesForm` con `--screen=addresses` para un
    formulario de direcciones dedicado (hoy reutiliza PartnerForm).

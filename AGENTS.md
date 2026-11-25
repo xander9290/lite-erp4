@@ -149,6 +149,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - FormViewLoader carga sin modal: marco estático de formulario e indicador discreto en cabecera; no montar campos editables antes de tener el registro. FormView mantiene campos/statebar/acciones bloqueados mientras guarda, con indicador integrado; conservar locks, errores/reintentos/timeout, respuestas vigentes y dirty guard. No volver a usar alerts.loading para abrir registros. Los errores/confirmaciones y otros flujos explícitos conservan sus diálogos. Ejemplos /sample#alerts y /sample#form-view; contrato ui/form/FormView.md.
 - Las alertas globales usan `AlertProvider` / `useAlerts` en `ui/alerts`. En nuevas vistas de registros, usar `FormViewLoader` para «Cargando…», errores y reintentos. FormView muestra «Error de validación» para rechazos del servidor (`kind: "validation"` / `fieldErrors`); conservar los toasts para validaciones locales. Contratos y ejemplos en `src/components/ui/alerts/README.md` y `/sample#alerts`.
 - FormView protege cambios pendientes con RHF `isDirty` y FormNavigationProvider en el layout raíz. Para acciones como cerrar sesión o cerrar un modal de edición, ejecutar el efecto dentro de `useFormNavigation().run(...)` para confirmar antes. No limpiar el bloqueo si el guardado falla. Los Links con opciones `replace`/`scroll` o callbacks propios deben usar `NavigationGuardLink` de `nextjs-nav-guard`. Contrato en `src/components/ui/form/FormView.md`.
+- FormView `pager` (2026-11-25): «n / total» con anterior/siguiente por el guard de
+  cambios sin guardar. ModelForm recorre sólo la página de lista/tarjetas de origen
+  (IDs en sessionStorage por URL desde useListView, buscada por returnTo); no cruza
+  páginas por decisión del usuario. Presentación sin consultas nuevas; no en kanban,
+  agrupadas, modales ni altas. Contrato en src/components/ui/form/FormView.md.
 - `FieldOne2many` edita líneas directamente en la tabla; el usuario no quiere un modal para editarlas. Reutilizar los Fields existentes en sus columnas. Ejemplo y documentación en `/sample#field-one2many` y `src/components/ui/form/FieldOne2many.md`. La demo no persiste pedidos/líneas; los modelos actuales no contienen esas entidades.
 
 ## Núcleo de usuarios y aplicaciones de contactos

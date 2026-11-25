@@ -268,6 +268,26 @@ En éxito, después de finalizar `handleSubmit`, `reset(values)` establece los n
 
 `menuActions` agrupa acciones secundarias, como imprimir o exportar, en un dropdown con engrane junto a Guardar/Revertir. Acepta un arreglo o una función del mismo contexto; cada acción tiene `id`, `label`, `onSelect` y opcionalmente `icon` y `disabled`. El menú se cierra al elegir una acción, pulsar Escape o salir de él. Las acciones principales permanecen en `headerActions`. Si no hay elementos, no se muestra el engrane.
 
+## Navegar entre registros (2026-11-25)
+
+`pager={{ position, total, onPrevious, onNext }}` muestra «3 / 12» con flechas
+anterior/siguiente junto a los breadcrumbs. Cada movimiento pasa por el guard de
+cambios sin guardar (`useFormNavigation().run`), como «Nuevo». Sin `onPrevious` u
+`onNext`, esa flecha queda desactivada; mientras guarda o ejecuta se bloquean.
+
+ModelForm lo conecta solo: cuando la página de lista o tarjetas que lo abrió está
+recordada (`src/components/ui/collection/recordPager.ts`), recorre **los registros
+de esa página** en el orden mostrado (búsqueda, filtros, orden, pantalla). Al llegar
+al primero/último de la página se desactiva; cambiar de página se hace en la lista.
+
+- `useListView` guarda en `sessionStorage` los IDs de cada página cargada bajo su
+  URL (hasta 20 páginas por pestaña); el formulario busca su `returnTo` validado.
+- Es presentación: cada registro se abre con la lectura autorizada habitual. Sin
+  página recordada (enlace directo, otra pestaña, almacenamiento bloqueado), con
+  listas agrupadas, kanban, modales o un registro nuevo no aparece.
+- La página recordada es la que se vio: si después cambian los datos, el orden no
+  se recalcula hasta volver a la lista.
+
 ## FieldSelect statebar
 
 `widget="statebar"` tiene prioridad sobre `type` y conserva el valor original `string | number`, el `onChange(value)` y la integración RHF. Por defecto es de solo lectura: `aria-current="step"` identifica el estado actual. No asume que todos los estados anteriores están completados ni ejecuta transiciones de negocio.
