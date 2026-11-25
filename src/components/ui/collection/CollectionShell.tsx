@@ -23,7 +23,7 @@ export function CollectionMessage({ error, retry, empty = "No hay registros", de
 export function CollectionSkeleton({ title, breadcrumbs, className = "" }: Pick<CollectionProps, "title" | "breadcrumbs" | "className">) {
   return <section role="status" aria-label={`Cargando ${title}`} className={`card flex min-h-64 min-w-0 flex-1 flex-col rounded-2xl border border-base-300 bg-base-100 ${className}`}>
     <header className="flex min-w-0 flex-wrap items-center gap-2 border-b border-base-300 px-2 py-2 sm:px-3">{breadcrumbs?.length ? <div className="min-w-0 basis-48"><ListBreadcrumbs items={breadcrumbs} /></div> : null}<span aria-hidden="true" className="skeleton h-8 min-w-24 flex-1 motion-reduce:animate-none" /><span aria-hidden="true" className="skeleton size-8 motion-reduce:animate-none" /></header>
-    <div aria-hidden="true" className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-2 p-2 sm:p-3">{[1, 2, 3].map(id => <span key={id} className="skeleton h-24 rounded-xl motion-reduce:animate-none" />)}</div>
+    <div aria-hidden="true" className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,21rem),1fr))] gap-2 p-2 sm:p-3">{[1, 2, 3].map(id => <span key={id} className="skeleton h-24 rounded-xl motion-reduce:animate-none" />)}</div>
     <span className="sr-only">Cargando…</span>
   </section>;
 }

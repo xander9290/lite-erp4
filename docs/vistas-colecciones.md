@@ -120,10 +120,19 @@ ese parámetro al construir su enlace de vuelta.
 
 CardView usa padding exterior de 8px en móvil y 12px desde sm, con separación de
 8px entre tarjetas. Las tarjetas predeterminadas tienen padding interior de 12px
-y no reservan un bloque de detalles si no hay campos adicionales. Cuando hay
-recordHref, su título es el acceso al registro; no se repite una fila «Abrir
-registro» abajo. renderCard personalizado conserva el acceso adicional porque
-el framework no controla su contenido.
+y no reservan un bloque de detalles si no hay campos adicionales. Las columnas
+tienen un mínimo de 21rem (336 px) y se reparten el ancho (desde 2026-11-25; antes
+18rem; 24rem dejaba las tarjetas demasiado alargadas): una columna en móvil y
+5 de unos 370 px en 1920 px.
+
+Con recordHref, en CardView **toda la tarjeta abre el registro** (2026-11-25): un
+único enlace real se extiende sobre ella, así que Ctrl/clic central, abrir en otra
+pestaña y el teclado siguen funcionando, y no hay fila «Abrir registro». En la
+tarjeta por defecto ese enlace es el título; con renderCard es un enlace invisible
+con `aria-label="Abrir <título>"` y el contenido deja pasar los clics, salvo sus
+propios enlaces, botones y campos, que siguen respondiendo. KanbanView conserva la
+fila «Abrir registro» en tarjetas personalizadas porque sus tarjetas se arrastran y
+tienen selector de estado.
 
 En columnas se admite `options: [{value,label}]` para una selección; así el filtro
 presenta sus etiquetas y no operadores de texto incompatibles con un enum.

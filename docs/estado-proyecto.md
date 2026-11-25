@@ -95,6 +95,18 @@ Many2many se publican aparte. Ahora acepta también los Many2many del modelo
 «Tiene alguna de» se aplica (2 registros). TypeScript, ESLint, test:modules 82/82,
 test:access 21/21 y test:list-grouping 17/17 aprobados.
 
+Tarjetas clicables (2026-11-25, petición del usuario): en CardView toda la tarjeta
+abre el registro con un enlace real estirado (RecordCard `clickable`, que sólo pasa
+CardViewClient); sin fila «Abrir registro», también con renderCard (enlace invisible
+debajo y contenido con pointer-events-none salvo a/button/input/label/select/textarea).
+Kanban sin cambios. Comprobado en navegador con PartnerCard (sin pie; imagen, centro
+y borde inferior caen en el enlace; clic abre el registro) y por render en servidor
+de las cinco variantes. TypeScript, ESLint, test:views, test:collection-load y
+test:form-model aprobados. Mismo día: ancho mínimo de columna de CardView y su
+esqueleto de 18rem a 21rem (petición del usuario; 24rem se probó y quedaba
+demasiado alargada). Navegador a 1920 px: 5 columnas de 371×149 px; con 24rem
+móvil (1 columna) y 1366 px no desbordaban.
+
 Pendientes de esta función:
 1. Opcional: expulsar `PartnerAddressesForm` con `--screen=addresses` para un
    formulario de direcciones dedicado (hoy reutiliza PartnerForm).
