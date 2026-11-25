@@ -8,7 +8,10 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Punto de continuación vigente: pantallas nombradas (2026-11-25)
 
-Windows, rama codex/partner sobre HEAD ced123c, cambios sin commit. Primera versión
+Windows, rama codex/partner. Todo lo descrito en esta sección está en commits
+9d42f65, 9126518, 8b2661e, 19b10ea, 4dfd801 y cb9b146 (sobre ced123c), **sin push**:
+el usuario lo pospuso («Ahora no»). Sin commit sólo queda el experimento User ↔
+Partner del usuario (subsección final). Primera versión
 de `screens` implementada en el framework según el plan; contrato en
 [Pantallas nombradas](pantallas-modelos.md). Sustituye al pendiente 1 de la sección
 siguiente. Directorio **no** se modificó: su manifest compila igual (pantalla
@@ -123,6 +126,39 @@ Pendientes de esta función:
    formulario de direcciones dedicado (hoy reutiliza PartnerForm).
 2. Transfer por pantalla (pasar el ID a export/import) y tipado/autocompletado de
    `{ model, screen }`; sección en docs/crear-modulos.md (/documentation).
+
+### Experimento en curso del usuario: User ↔ Partner uno a uno (2026-11-25)
+
+Edición del usuario, sin commit y **sin orm:sync/migración**: `src/modules/directory/
+models/usert.ts` declara `UserDirectory = extendModel(User, …)` (clase aún vacía) y
+el manifest de Directorio añade `extends: { "core.user": UserDirectory }`. No avanzar
+estos archivos sin pedirlo. Decisiones conversadas:
+
+- Uno a uno = `Fields.Many2one(..., { unique: true })`; el generador crea la inversa
+  como `X?` (probado en generator.test.ts). La extensión admite Many2one y unique
+  opcional sin default. Sólo un lado guarda el vínculo. A: `partnerId` →
+  `DirectoryPartner` en la extensión (tabla `directory_core_user`, sólo admins,
+  Partner no ve su usuario: las extensiones no admiten One2many). B: `userId` →
+  `User` en Partner (sin extensión). Se recomendó B; el usuario eligió A para
+  experimentar con una `@action` «Crear contacto» que copia nombre/correo/teléfono
+  y devuelve `{ partnerId }`; el resto de datos se llena en Directorio.
+- Límite conocido: `ActionContext` da `{ tx, actor, action }`; crear Partner con
+  `tx.directoryPartner.create` es Prisma directo y se salta Zod, normalize,
+  constraints, hooks (completeAddress), historial, defaults del modelo y reglas de
+  Directorio. Mitigar: `active`, `type: "contact"` y `createById: actor.id`
+  explícitos; buscar duplicado por correo antes de crear; comentario de advertencia.
+  Atómico con el guardado del usuario; unique + revisión evitan doble vínculo.
+  Many2many sobre `core.user` no se admite (repositorio propio).
+- Al instalar: `npm run orm:sync -- directory` genera y aplica migración en la base
+  de desarrollo; mostrar el SQL al usuario y pedir aprobación antes.
+
+Pendientes del experimento:
+1. Que el usuario complete `partnerId` + la acción y decida instalar (orm:sync).
+2. Vista propia de la extensión con `<FormButton>` de la acción (UserForm ya tiene
+   `<ModelExtensions />`); regenerar referencias de acciones tras cambiarla.
+3. Si se adopta: diseñar en el núcleo un guardado de otro modelo por su servicio
+   dentro de la transacción de una acción (p. ej. `context.save(...)`), con
+   permisos, duplicados y errores definidos. No iniciado; requiere autorización.
 
 ## Punto de continuación anterior: Directorio y UI (2026-11-24)
 

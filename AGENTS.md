@@ -167,7 +167,10 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   avance está en docs/estado-proyecto.md. Sus contactos y relación opcional con
   User pertenecen a la app. La creación automática desde
   una extensión/hook requiere definir permisos, atomicidad y duplicados con el caso
-  real; no está implementada por esta retirada.
+  real; no está implementada por esta retirada. Desde 2026-11-25 el usuario
+  experimenta (sin commit ni orm:sync) con `extends core.user` en Directorio y una
+  @action que crea el Partner con `context.tx`: es Prisma directo y omite el ciclo
+  del servicio de Partner. Estado y límites en docs/estado-proyecto.md.
 - La migración `20261123220000_user_standalone_profile` copia los perfiles vinculados
   a users y retira su FK a partners, sin borrar contactos ni credenciales. La tabla
   partners se conserva como `LegacyPartner` ignorado por Prisma Client;
