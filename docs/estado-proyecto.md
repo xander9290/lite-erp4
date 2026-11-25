@@ -8,10 +8,10 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Punto de continuación vigente: pantallas nombradas (2026-11-25)
 
-Windows, rama codex/partner. Todo lo descrito en esta sección está en commits
-9d42f65, 9126518, 8b2661e, 19b10ea, 4dfd801 y cb9b146 (sobre ced123c), **sin push**:
-el usuario lo pospuso («Ahora no»). Sin commit sólo queda el experimento User ↔
-Partner del usuario (subsección final). Primera versión
+Windows, rama codex/partner, HEAD a626650. Los avances de pantallas/UI están en
+9d42f65, 9126518, 8b2661e, 19b10ea, 4dfd801 y cb9b146 (sobre ced123c); el experimento
+User ↔ Partner está guardado en a626650 (subsección final). HEAD coincide con la
+referencia local origin/codex/partner; no se verificó el remoto por red. Primera versión
 de `screens` implementada en el framework según el plan; contrato en
 [Pantallas nombradas](pantallas-modelos.md). Sustituye al pendiente 1 de la sección
 siguiente. Directorio **no** se modificó: su manifest compila igual (pantalla
@@ -129,11 +129,15 @@ Pendientes de esta función:
 
 ### Experimento en curso del usuario: User ↔ Partner uno a uno (2026-11-25)
 
-Edición guiada del usuario, sin commit y **sin sincronización aplicada/migración**:
-`src/modules/directory/models/usert.ts` declara `UserDirectory = extendModel(User, …)`
+Avance guardado por el usuario en `a626650` (2026-11-25, Windows, codex/partner).
+Al revisar, HEAD coincide con la referencia local origin/codex/partner y el árbol
+está limpio; no se consultó el remoto. Este cierre documental queda posterior al commit.
+`src/modules/directory/models/user.ts` (antes usert.ts) declara `UserDirectory = extendModel(User, …)`
 con `partnerId` opcional/único/Restrict y la acción `crearContacto`. El manifest
 registra la extensión y su vista `UserDirectoryForm`: FieldMany2One y FormButton
-en FormHeader, dentro del formulario existente de Usuarios. Referencia generada
+en FormHeader, dentro del formulario existente de Usuarios. La vista usa useWatch
+para ocultar el botón si partnerId tiene valor y presenta el vínculo en readOnly:
+la selección manual no está disponible en esta versión de la UI. Referencia generada
 `DirectoryCoreUserActions.crearContacto` apunta al contrato User. Decisiones conversadas:
 
 - Uno a uno = `Fields.Many2one(..., { unique: true })`; el generador crea la inversa
@@ -147,7 +151,7 @@ en FormHeader, dentro del formulario existente de Usuarios. Referencia generada
 - Límite conocido: `ActionContext` da `{ tx, actor, action }`; crear Partner con
   `tx.directoryPartner.create` es Prisma directo y se salta Zod, normalize,
   constraints, hooks (completeAddress), historial, defaults del modelo y reglas de
-  Directorio. Mitigar: `active`, `type: "contact"` y `createById: actor.id`
+  Directorio. Mitigar: `active`, `type: "contact"` y `createBy: actor.id`
   explícitos; buscar duplicado por correo antes de crear; comentario de advertencia.
   Atómico con el guardado del usuario; unique + revisión evitan doble vínculo.
   Many2many sobre `core.user` no se admite (repositorio propio).
@@ -163,15 +167,40 @@ persistencia. Acción rechaza vínculo existente, correo >200 caracteres y coinc
 exacta de correo completo sin distinguir mayúsculas; no garantiza unicidad global
 de correos. Crea persona/contacto activo con createBy explícito mediante Prisma directo.
 
+Estado posterior comprobado por lectura: migración versionada
+`20261125184206_sync_directory`, esquemas/registro de instalación, referencias de
+acciones/formularios y Prisma Client local incluyen DirectoryCoreUser. SQL revisado:
+sólo crea la tabla compañera, índices y FK esperadas; no contiene borrado de datos.
+No se recibió salida final de orm:sync ni confirmación del destino/aplicación:
+la existencia de estos archivos no demuestra que la migración esté aplicada.
+
+Sincronización de imágenes implementada por el usuario: crearContacto copia avatarUrl
+a image; afterSave conserva super, compara avatarUrl y partnerId con context.previous
+y actualiza la imagen del contacto vinculado con context.tx si cambia cualquiera.
+Incluye limpiar con null; al cambiar de contacto sobrescribe el nuevo y conserva
+la imagen del anterior. Dirección User → Partner, sin sincronización inversa.
+El hook pertenece a la misma transacción, pero la actualización directa omite
+permisos, hooks, historial y comprobación de revisión del servicio de Partner.
+No es un evento global de BD: escrituras que omitan el servicio de User no ejecutan
+este hook. No se verificó el flujo desde Perfil ni la persistencia de imágenes.
+
 Pendientes del experimento:
-1. Preparar la sincronización completa, revisar destino y SQL real y obtener
-   aprobación antes de aplicarlo; después reiniciar dev si corresponde.
-2. Probar selección manual, creación y rechazos desde Usuarios; comprobar vínculo
-   y contacto persistidos. Falta añadir en la acción el comentario sobre la omisión
-   del servicio de Partner para mantener visible el límite del experimento.
+1. Confirmar resultado final de orm:sync, destino y aplicación de la migración en
+   desarrollo Windows antes de dar por instalado el experimento; reiniciar dev si procede.
+2. Probar creación y rechazos desde Usuarios, visibilidad del botón, vínculo persistido
+   y sincronización al cambiar/quitar avatar, cancelar borrador y fallar el guardado.
+   Si se desea vincular un contacto existente tras detectar correo duplicado, decidir
+   cómo habilitarlo: hoy el mensaje pide seleccionarlo pero partnerId es readOnly.
+   Falta añadir en crearContacto el comentario sobre la omisión del servicio de Partner.
 3. Si se adopta: diseñar en el núcleo un guardado de otro modelo por su servicio
    dentro de la transacción de una acción (p. ej. `context.save(...)`), con
    permisos, duplicados y errores definidos. No iniciado; requiere autorización.
+
+Cierre documental (2026-11-25): revisión del código actual y SQL versionado;
+TypeScript sin emisión/incremental aprobado sobre el código con afterSave;
+git diff --check sin errores. Sin ejecución de acciones, navegador, consultas a BD,
+migraciones ni commit/push/pull por el agente. Siguiente paso: confirmar instalación
+y comprobar el experimento antes de ampliar su alcance.
 
 ## Punto de continuación anterior: Directorio y UI (2026-11-24)
 
