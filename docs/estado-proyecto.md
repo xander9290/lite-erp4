@@ -8,10 +8,10 @@ Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
 ## Punto de continuación vigente: pantallas nombradas (2026-11-25)
 
-Windows, rama codex/partner, HEAD a626650. Los avances de pantallas/UI están en
+Windows, rama codex/partner, HEAD bc7224b al iniciar esta retirada. Los avances de pantallas/UI están en
 9d42f65, 9126518, 8b2661e, 19b10ea, 4dfd801 y cb9b146 (sobre ced123c); el experimento
-User ↔ Partner está guardado en a626650 (subsección final). HEAD coincide con la
-referencia local origin/codex/partner; no se verificó el remoto por red. Primera versión
+User ↔ Partner se inició en a626650; su creación/sincronización se retira ahora
+por decisión del usuario (subsección final). Sin consultas al remoto. Primera versión
 de `screens` implementada en el framework según el plan; contrato en
 [Pantallas nombradas](pantallas-modelos.md). Sustituye al pendiente 1 de la sección
 siguiente. Directorio **no** se modificó: su manifest compila igual (pantalla
@@ -127,80 +127,48 @@ Pendientes de esta función:
 2. Transfer por pantalla (pasar el ID a export/import) y tipado/autocompletado de
    `{ model, screen }`; sección en docs/crear-modulos.md (/documentation).
 
-### Experimento en curso del usuario: User ↔ Partner uno a uno (2026-11-25)
+### User ↔ Partner: vínculo opcional manual (2026-11-25)
 
-Avance guardado por el usuario en `a626650` (2026-11-25, Windows, codex/partner).
-Al revisar, HEAD coincide con la referencia local origin/codex/partner y el árbol
-está limpio; no se consultó el remoto. Este cierre documental queda posterior al commit.
-`src/modules/directory/models/user.ts` (antes usert.ts) declara `UserDirectory = extendModel(User, …)`
-con `partnerId` opcional/único/Restrict y la acción `crearContacto`. El manifest
-registra la extensión y su vista `UserDirectoryForm`: FieldMany2One y FormButton
-en FormHeader, dentro del formulario existente de Usuarios. La vista usa useWatch
-para ocultar el botón si partnerId tiene valor y presenta el vínculo en readOnly:
-la selección manual no está disponible en esta versión de la UI. Referencia generada
-`DirectoryCoreUserActions.crearContacto` apunta al contrato User. Decisiones conversadas:
+Decisión vigente del usuario: crear los contactos por separado en Directorio y
+relacionarlos desde Usuarios sólo cuando sea necesario. Se retiraron la acción
+crearContacto y el hook afterSave que sincronizaba avatarUrl → image. User y Partner
+mantienen sus imágenes y datos independientes.
 
-- Uno a uno = `Fields.Many2one(..., { unique: true })`; el generador crea la inversa
-  como `X?` (probado en generator.test.ts). La extensión admite Many2one y unique
-  opcional sin default. Sólo un lado guarda el vínculo. A: `partnerId` →
-  `DirectoryPartner` en la extensión (tabla `directory_core_user`, sólo admins,
-  Partner no ve su usuario: las extensiones no admiten One2many). B: `userId` →
-  `User` en Partner (sin extensión). Se recomendó B; el usuario eligió A para
-  experimentar con una `@action` «Crear contacto» que copia nombre/correo/teléfono
-  y devuelve `{ partnerId }`; el resto de datos se llena en Directorio.
-- Límite conocido: `ActionContext` da `{ tx, actor, action }`; crear Partner con
-  `tx.directoryPartner.create` es Prisma directo y se salta Zod, normalize,
-  constraints, hooks (completeAddress), historial, defaults del modelo y reglas de
-  Directorio. Mitigar: `active`, `type: "contact"` y `createBy: actor.id`
-  explícitos; buscar duplicado por correo antes de crear; comentario de advertencia.
-  Atómico con el guardado del usuario; unique + revisión evitan doble vínculo.
-  Many2many sobre `core.user` no se admite (repositorio propio).
-- Al instalar: `npm run orm:sync -- directory` genera y aplica migración en la base
-  de desarrollo; mostrar el SQL al usuario y pedir aprobación antes.
+Código actual: src/modules/directory/models/user.ts conserva únicamente la extensión
+UserDirectory con partnerId opcional, unique y onDelete Restrict. La vista
+UserDirectoryForm conserva la inserción del usuario en group:otherInfoGroup y el
+FieldMany2One editable. El manifest usa insertions.form; se respetaron los cambios
+locales del usuario en UserForm (Notebook/Otra información), manifest, tema y layout.
+Botón, useWatch e imports de acciones retirados; referencias regeneradas mediante
+orm:generate -- directory --actions-only --write, sin consultar BD ni modificar SQL.
 
-Verificación (2026-11-25, Windows): TypeScript sin emisión/incremental aprobado;
-`git diff --check` sin errores. `orm:sync -- directory --plan` aprobado, sin consultas
-a BD ni escrituras: propone crear directory_core_user con índices únicos de
-record_id/partner_id y FK a users (Cascade para record_id) y directory_partner
-(Restrict para partner_id). Es plan de fuentes, no migración aplicada ni prueba de
-persistencia. Acción rechaza vínculo existente, correo >200 caracteres y coincidencia
-exacta de correo completo sin distinguir mayúsculas; no garantiza unicidad global
-de correos. Crea persona/contacto activo con createBy explícito mediante Prisma directo.
+Antecedente histórico: a626650 implementó creación directa de Partner por una acción
+sobre User y sincronización de imágenes por Prisma directo, omitiendo el servicio de
+Partner. El usuario guardó después bc7224b. Este cierre retira esos comportamientos,
+conservando el vínculo uno a uno y los registros existentes. La migración
+20261125184206_sync_directory crea la tabla compañera directory_core_user, índices
+y FK; se conserva íntegra. No se revierte el esquema ni se eliminan contactos,
+vínculos o imágenes previamente copiados. No se confirmó en esta sesión la aplicación
+de esa migración a desarrollo Windows: los archivos generados no acreditan su aplicación.
 
-Estado posterior comprobado por lectura: migración versionada
-`20261125184206_sync_directory`, esquemas/registro de instalación, referencias de
-acciones/formularios y Prisma Client local incluyen DirectoryCoreUser. SQL revisado:
-sólo crea la tabla compañera, índices y FK esperadas; no contiene borrado de datos.
-No se recibió salida final de orm:sync ni confirmación del destino/aplicación:
-la existencia de estos archivos no demuestra que la migración esté aplicada.
+Pendientes vigentes:
+1. Confirmar el resultado final de orm:sync/aplicación local de la migración si no
+   está ya confirmado por el usuario. Esta retirada de métodos/botón no necesita DDL.
+2. Comprobar en Usuarios → Otra información selección, cambio, limpieza y guardado
+   de Contacto, rechazo de contacto ya vinculado a otro usuario y ausencia del botón
+   Crear contacto. Guardar el usuario no debe cambiar la imagen del contacto.
+3. Decidir sólo si surge una necesidad real si se desea un flujo entre servicios;
+   context.save y sincronización automática dejan de ser requisitos de este caso.
 
-Sincronización de imágenes implementada por el usuario: crearContacto copia avatarUrl
-a image; afterSave conserva super, compara avatarUrl y partnerId con context.previous
-y actualiza la imagen del contacto vinculado con context.tx si cambia cualquiera.
-Incluye limpiar con null; al cambiar de contacto sobrescribe el nuevo y conserva
-la imagen del anterior. Dirección User → Partner, sin sincronización inversa.
-El hook pertenece a la misma transacción, pero la actualización directa omite
-permisos, hooks, historial y comprobación de revisión del servicio de Partner.
-No es un evento global de BD: escrituras que omitan el servicio de User no ejecutan
-este hook. No se verificó el flujo desde Perfil ni la persistencia de imágenes.
+Simplificación: se elimina la escritura cruzada con Prisma directo y la lógica
+especial de duplicados por correo; el servicio de Directorio administra las altas y
+el guardado habitual de User administra el vínculo con autorización y unicidad.
+Criterio de aceptación: vincular contactos existentes sin crearlos ni modificar sus
+datos desde Usuarios. Sin navegador ni comprobación de persistencia en este cierre.
 
-Pendientes del experimento:
-1. Confirmar resultado final de orm:sync, destino y aplicación de la migración en
-   desarrollo Windows antes de dar por instalado el experimento; reiniciar dev si procede.
-2. Probar creación y rechazos desde Usuarios, visibilidad del botón, vínculo persistido
-   y sincronización al cambiar/quitar avatar, cancelar borrador y fallar el guardado.
-   Si se desea vincular un contacto existente tras detectar correo duplicado, decidir
-   cómo habilitarlo: hoy el mensaje pide seleccionarlo pero partnerId es readOnly.
-   Falta añadir en crearContacto el comentario sobre la omisión del servicio de Partner.
-3. Si se adopta: diseñar en el núcleo un guardado de otro modelo por su servicio
-   dentro de la transacción de una acción (p. ej. `context.save(...)`), con
-   permisos, duplicados y errores definidos. No iniciado; requiere autorización.
-
-Cierre documental (2026-11-25): revisión del código actual y SQL versionado;
-TypeScript sin emisión/incremental aprobado sobre el código con afterSave;
-git diff --check sin errores. Sin ejecución de acciones, navegador, consultas a BD,
-migraciones ni commit/push/pull por el agente. Siguiente paso: confirmar instalación
-y comprobar el experimento antes de ampliar su alcance.
+Verificación de esta retirada (2026-11-25, Windows): TypeScript sin emisión ni
+incremental aprobado; ESLint focalizado de modelo/vista aprobado y git diff --check
+sin errores. Sin SQL, consultas a BD, borrado de datos ni commit/push/pull.
 
 ## Punto de continuación anterior: Directorio y UI (2026-11-24)
 

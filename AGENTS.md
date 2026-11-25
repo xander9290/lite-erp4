@@ -167,12 +167,12 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   avance está en docs/estado-proyecto.md. Sus contactos y relación opcional con
   User pertenecen a la app. La creación automática desde
   una extensión/hook requiere definir permisos, atomicidad y duplicados con el caso
-  real; no está implementada por esta retirada. Desde 2026-11-25 el usuario
-  experimenta con `extends core.user` en Directorio, una @action que crea Partner
-  y afterSave que copia avatarUrl → image al cambiar avatar/vínculo, con context.tx.
-  Guardado en a626650; migración preparada, aplicación no confirmada en esta sesión.
-  Es Prisma directo y omite el ciclo del servicio de Partner. Estado, límites y
-  comprobaciones pendientes en docs/estado-proyecto.md.
+  real; no está implementada por esta retirada. Decisión del 2026-11-25: los contactos
+  se crean por separado en Directorio y se vinculan opcionalmente desde Usuarios.
+  La extensión core.user conserva partnerId opcional/único/Restrict; se retiraron
+  la acción crearContacto y la sincronización avatarUrl → image del experimento
+  a626650. No recrearlas automáticamente. Se conserva la migración de la tabla
+  compañera y sus datos. Estado y comprobaciones pendientes en docs/estado-proyecto.md.
 - La migración `20261123220000_user_standalone_profile` copia los perfiles vinculados
   a users y retira su FK a partners, sin borrar contactos ni credenciales. La tabla
   partners se conserva como `LegacyPartner` ignorado por Prisma Client;

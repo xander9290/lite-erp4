@@ -13,7 +13,7 @@ export default defineModule({
   extends: {
     "core.user": {
       model: UserDirectory,
-      views: {
+      insertions: {
         form: () => import("./views/UserDirectoryForm"),
       },
     },
