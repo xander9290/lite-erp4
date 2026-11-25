@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 
+const languageLabels: Readonly<Record<string, string>> = {
+  bash: "Terminal", powershell: "Terminal", sh: "Terminal",
+  ts: "TypeScript", typescript: "TypeScript", tsx: "TSX",
+  csv: "CSV", text: "Texto", json: "JSON",
+};
+
 export default function CodeBlock({ code, language }: { code: string; language: string }) {
   const [status, setStatus] = useState<"idle" | "copied" | "error">("idle");
 
@@ -24,7 +30,7 @@ export default function CodeBlock({ code, language }: { code: string; language: 
   return (
     <div className="relative my-5 min-w-0 overflow-hidden rounded-xl border border-base-content/15 bg-base-200/60">
       <div className="flex items-center justify-between gap-3 border-b border-base-content/10 px-4 py-2">
-        <span className="font-mono text-xs text-base-content/60">{language === "bash" ? "Terminal" : "TypeScript"}</span>
+        <span className="font-mono text-xs text-base-content/60">{languageLabels[language] ?? language.toUpperCase()}</span>
         <button type="button" className="btn btn-ghost btn-xs gap-1.5" aria-label={`Copiar código ${language}`} onClick={copy}>
           {status === "copied" ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
           {status === "copied" ? "Copiado" : "Copiar"}

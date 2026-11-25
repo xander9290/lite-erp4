@@ -1,5 +1,8 @@
 # Importar y exportar desde ListView
 
+Guía paso a paso para principiantes: `docs/importar-exportar.md`, publicada en
+/documentation/importar-exportar. Este documento es la referencia técnica.
+
 Función compartida de módulos declarativos (2026-11-20), opt-in por modelo en el
 manifest. Admite escalares, fechas, Many2one, Many2many y una cadena One2many editable.
 Habilitados: País, Estado, Municipio y Localidad de Ubicaciones. Sólo la ListView

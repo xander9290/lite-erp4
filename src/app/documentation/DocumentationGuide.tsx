@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import Link from "next/link";
-import { BookOpen, ArrowUpRight, Layers, ArrowRight, Server } from "lucide-react";
+import { BookOpen, ArrowUpRight, Layers, ArrowRight, Server, FileSpreadsheet } from "lucide-react";
 import Markdown from "react-markdown";
 import CodeBlock from "./CodeBlock";
 import "./documentation.css";
@@ -12,6 +12,8 @@ export const guides = {
     summary: "Ejemplos de modelos, Fields.Selection, Fields.Image, Notebook y NotebookPage, acciones tipadas y formularios desde TSX." },
   backend: { title: "Backend", href: "/documentation/backend", source: "backend.md", group: "Backend", icon: Server, crumb: "Servidor",
     summary: "Manifest, pantallas por modelo, dominios con el usuario de la sesión, reglas de registro y valores propuestos." },
+  transfer: { title: "Importar y exportar", href: "/documentation/importar-exportar", source: "importar-exportar.md", group: "Backend", icon: FileSpreadsheet, crumb: "Excel y CSV",
+    summary: "Claves de negocio, Many2one de uno a tres saltos, Many2many en una celda y documentos con líneas y sublíneas, paso a paso." },
 } as const;
 export type GuideId = keyof typeof guides;
 
@@ -40,14 +42,17 @@ export default async function DocumentationGuide({ guide: current }: { guide: Gu
       {section.title}
     </a>
   ));
-  const guideLinks = (Object.keys(guides) as GuideId[]).map(id => {
+  const ids = Object.keys(guides) as GuideId[];
+  const guideLinks = ids.map((id, index) => {
     const item = guides[id];
     const Icon = item.icon;
     const active = id === current;
+    // Consecutive guides of the same group share one heading.
+    const opensGroup = index === 0 || guides[ids[index - 1]].group !== item.group;
     return (
-      <div key={id} className="mt-6 first:mt-0">
-        <p className="px-3 text-xs font-semibold tracking-wider text-base-content/50 uppercase">{item.group}</p>
-        <Link href={active ? `#${top}` : item.href} aria-current={active ? "page" : undefined} className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${active ? "bg-primary/10 font-semibold text-primary" : "text-base-content/70 hover:bg-base-200 hover:text-base-content"}`}>
+      <div key={id} className={opensGroup ? "mt-6 first:mt-0" : "mt-1"}>
+        {opensGroup && <p className="mb-2 px-3 text-xs font-semibold tracking-wider text-base-content/50 uppercase">{item.group}</p>}
+        <Link href={active ? `#${top}` : item.href} aria-current={active ? "page" : undefined} className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${active ? "bg-primary/10 font-semibold text-primary" : "text-base-content/70 hover:bg-base-200 hover:text-base-content"}`}>
           <Icon size={16} aria-hidden="true" />{item.title}
         </Link>
         {active && <nav aria-label="En esta guía" className="mt-3 space-y-1 border-l border-base-300 pl-3">{sectionLinks}</nav>}

@@ -73,6 +73,20 @@ TypeScript, ESLint de la ruta y navegador (ambas guías, índice lateral, enlace
 entre guías, móvil y 1280px, sin errores de consola). El menú agrupado
 Contactos → Directorio/Direcciones del manifest es edición del usuario sin commit.
 
+Guía «Importar y exportar» (2026-11-25): /documentation/importar-exportar, fuente
+docs/importar-exportar.md, en el grupo Backend de la barra lateral (las guías del
+mismo grupo comparten encabezado). Explica claves simples/compuestas, transfer,
+permisos, Many2one de 1/2/3 saltos (Ubicaciones real), Many2one fuera de la clave,
+Many2many add/replace con clave simple y compuesta, One2many con líneas y
+sublíneas, valores por tipo, errores comunes y límites. El módulo de práctica
+«Tienda» (Cliente, Pedido, Línea, Entrega, Etiqueta, Producto) no existe en el ERP:
+se compiló en memoria con composeModules junto a core/ubicaciones y el validador
+aceptó sus contratos; los encabezados y los mensajes de error citados son los
+reales. CodeBlock ahora etiqueta por lenguaje (Terminal, TypeScript, TSX, CSV,
+Texto, JSON) en lugar de mostrar TypeScript para todo. Verificado: TypeScript,
+ESLint y navegador (las tres guías responden 200, índice y etiquetas correctos);
+dos 500 transitorios durante la edición, ya resueltos.
+
 Pendientes de esta función:
 1. Opcional: expulsar `PartnerAddressesForm` con `--screen=addresses` para un
    formulario de direcciones dedicado (hoy reutiliza PartnerForm).

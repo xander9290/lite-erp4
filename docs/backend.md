@@ -251,7 +251,8 @@ rechaza.
 
 ## Límites actuales
 
-- Importar y exportar sólo aparecen en la pantalla por defecto.
+- Importar y exportar sólo aparecen en la pantalla por defecto. Cómo activarlos
+  está en la guía [Importar y exportar](/documentation/importar-exportar).
 - La referencia `{ model, screen }` se valida al cargar el manifest; todavía no
   hay autocompletado de los IDs de pantalla.
 - Las columnas publicadas (`list.fields`) son del modelo, no de cada pantalla.
