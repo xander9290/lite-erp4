@@ -82,6 +82,11 @@ export type ModelClientConfig = {
   };
   readonly view: CollectionView;
   readonly collectionViews?: readonly CollectionView[];
+  /**
+   * Screen selected by the route (set only by ModelRoute, never by relation configs). Collections
+   * send its id to the server, which resolves the domain; defaults only propose values on create.
+   */
+  readonly screen?: ModelScreenConfig;
   readonly kanban?: string;
   /** UI routes only; action dispatch remains fixed in the server registry. */
   readonly kanbanTransitions?: readonly KanbanRoute[];
@@ -99,6 +104,24 @@ export type ModelClientConfig = {
     readonly insertions?: readonly ("form" | "modal" | "list" | "card" | "kanban")[];
   }[];
 };
+
+export type ModelScreenConfig = {
+  readonly id: string;
+  readonly label: string;
+  /** True for the default screen: its links carry no `screen` query value. */
+  readonly isDefault: boolean;
+  readonly defaults: Readonly<Record<string, string | number | boolean | null>>;
+};
+
+/** `screen=<id>` query entries that keep a non-default screen across collection/form navigation. */
+export function screenQuery(config: Pick<ModelClientConfig, "screen">): Record<string, string> {
+  return config.screen && !config.screen.isDefault ? { screen: config.screen.id } : {};
+}
+/** Route of the model with its screen selector, e.g. `/erp/directory/partner/nuevo?screen=addresses`. */
+export function screenHref(config: Pick<ModelClientConfig, "screen">, path: string, extra: Record<string, string> = {}) {
+  const params = new URLSearchParams({ ...screenQuery(config), ...extra }).toString();
+  return params ? `${path}${path.includes("?") ? "&" : "?"}${params}` : path;
+}
 
 export const modelIdPattern = /^[a-z][a-z0-9]*\.[a-z][a-z0-9]*$/;
 

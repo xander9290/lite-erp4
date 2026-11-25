@@ -18,10 +18,13 @@ export type EjectModel = {
   readonly lines?: readonly string[];
   readonly collections?: readonly string[];
   readonly excludeExtensionFields?: readonly string[];
+  /** Screen that registers the view (names it `<Model><Screen><Kind>`). */
+  readonly screen?: string;
 };
 
 const pascal = (value: string) => value[0].toUpperCase() + value.slice(1);
-export const viewName = (key: string, kind: EjectKind) => `${key.split(".").map(pascal).join("")}${pascal(kind)}`;
+/** `PartnerForm`, or `PartnerAddressesForm` for the `addresses` screen of `partner`. */
+export const viewName = (key: string, kind: EjectKind, screen?: string) => `${key.split(".").map(pascal).join("")}${screen ? pascal(screen) : ""}${pascal(kind)}`;
 
 function control(name: string, field: FieldMetadata, lookups: readonly string[]): [string, string] | null {
   const attr = `<Values> name=${JSON.stringify(name)}`;
@@ -56,7 +59,7 @@ export function formViewSource(model: EjectModel, kind: "form" | "modal" = "form
     lines.push(`<${component} mode="display" name=${JSON.stringify(name)}${field.kind === "integer" ? ' type="integer"' : ""} direction="inline" />`);
   }
   if (model.lines?.length) imports.add("FieldOne2many");
-  const name = viewName(model.key, kind);
+  const name = viewName(model.key, kind, model.screen);
   const hasClass = Boolean(model.className && model.classImport);
   const helpers = ["ModelExtensions", ...(model.collections?.length ? ["ModelChildCollections"] : [])];
   const exclude = model.excludeExtensionFields?.length ? ` excludeFields={${JSON.stringify(model.excludeExtensionFields)}}` : "";
@@ -91,7 +94,7 @@ ${(model.lines ?? []).map(field => `      <FormGroup fullWidth><FieldOne2many na
 
 /** Editable column list. Columns only present; the server list policy still decides what is allowed. */
 export function listViewSource(model: EjectModel, kind: Exclude<EjectKind, "form" | "modal"> = "list"): string {
-  const name = viewName(model.key, kind);
+  const name = viewName(model.key, kind, model.screen);
   return `import ModelCollection from "@/components/modules/ModelCollection";
 import type { ModelClientConfig } from "@/lib/modules/config";
 
@@ -148,12 +151,28 @@ export function manifestModel(text: string, key: string) {
   return { file, entry, value, className, classImport: imports[0].moduleSpecifier.text };
 }
 
-/** Register a lazy view in the manifest: `views: { form: () => import("./views/TareaForm") }`. */
-export function registerView(text: string, key: string, kind: EjectKind): string {
+/**
+ * Register a lazy view in the manifest: `views: { form: () => import("./views/TareaForm") }`.
+ * Models with `screens` register it inside the chosen screen (`screens.<id>.views`).
+ */
+export function registerView(text: string, key: string, kind: EjectKind, screen?: string): string {
   if (key.includes(".") && kind !== "modal") throw new Error("El eject de un modelo extendido admite sólo modal.");
-  const { file, value, className } = key.includes(".") ? manifestExtension(text, key) : manifestModel(text, key);
-  const loader = `${kind}: () => import("./views/${viewName(key, kind)}")`;
+  if (key.includes(".") && screen) throw new Error("Las extensiones no declaran pantallas; omite --screen.");
+  const found = key.includes(".") ? manifestExtension(text, key) : manifestModel(text, key);
+  const { file, className } = found;
   const indentOf = (node: ts.Node) => /[ \t]*$/.exec(text.slice(0, node.getStart(file)))![0];
+  const screens = ts.isObjectLiteralExpression(found.value) && !key.includes(".") ? propertyNamed(found.value, "screens") : undefined;
+  if (screens && !screen) throw new Error(`${key} declara screens: indica la pantalla con --screen=<id>.`);
+  if (!screens && screen) throw new Error(`${key} no declara screens; omite --screen.`);
+  let value = found.value;
+  if (screens) {
+    if (!ts.isPropertyAssignment(screens)) throw new Error(`${key}: screens debe ser un objeto literal.`);
+    const entry = propertyNamed(object(screens.initializer), screen!);
+    const initializer = entry && ts.isPropertyAssignment(entry) ? unwrap(entry.initializer) : undefined;
+    if (!initializer || !ts.isObjectLiteralExpression(initializer)) throw new Error(`${key}: la pantalla ${screen} no está declarada como objeto literal en screens.`);
+    value = initializer;
+  }
+  const loader = `${kind}: () => import("./views/${viewName(key, kind, screen)}")`;
   if (!ts.isObjectLiteralExpression(value)) {
     // `tarea: Tarea` → `tarea: { model: Tarea, views: { form: ... } }`
     return text.slice(0, value.getStart(file)) + `{ model: ${className}, views: { ${loader} } }` + text.slice(value.end);

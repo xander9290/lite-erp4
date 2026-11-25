@@ -1,8 +1,11 @@
 # Pantallas nombradas por modelo
 
-Estado: siguiente implementación pendiente solicitada el 2026-11-24. Diseño
-propuesto, todavía sin código ni API disponible. Este guardado no inicia su
-implementación. Avance comprobado en [continuidad](../estado-proyecto.md).
+Estado: primera versión implementada el 2026-11-25. Contrato vigente, decisiones
+tomadas (404 para IDs desconocidos, precedencia de defaults, pantalla default para
+relaciones) y límites en [Pantallas nombradas](../pantallas-modelos.md). Este
+documento conserva el diseño y los criterios originales; la sintaxis de abajo ya
+coincide con la API, salvo que `list.fields` sigue siendo del modelo. Avance en
+[continuidad](../estado-proyecto.md).
 
 ## Motivo y separación
 

@@ -9,7 +9,7 @@ import { composeModules } from "../src/lib/modules/compose";
 import core from "../src/lib/core/manifest";
 import { sourceFile } from "../src/lib/scaffold/source-edit";
 
-const usage = "Uso: npm run eject:view -- modulo modelo form|modal|list|card|kanban [--dry-run]. Para una extensión: modulo propietario.modelo modal.";
+const usage = "Uso: npm run eject:view -- modulo modelo form|modal|list|card|kanban [--screen=<id>] [--dry-run]. --screen es obligatorio en modelos con screens. Para una extensión: modulo propietario.modelo modal.";
 
 /** Load only the selected module's dependency graph, including the implicit native core. */
 async function dependencies(root: string, definition: ModuleDefinition) {
@@ -32,12 +32,17 @@ async function dependencies(root: string, definition: ModuleDefinition) {
 
 /** Copy a default view into src/modules/<id>/views and register it lazily in the manifest. Never overwrites. */
 async function main() {
-  const [id, key, kind, flag, ...extra] = process.argv.slice(2);
-  if (!id || id === "core" || !key || !["form", "modal", "list", "card", "kanban"].includes(kind) || extra.length || (flag && flag !== "--dry-run") || !/^[a-z][a-z0-9]*$/.test(id) || !/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)?$/.test(key) || (key.includes(".") && kind !== "modal")) throw new Error(usage);
+  const [id, key, kind, ...options] = process.argv.slice(2);
+  const flag = options.includes("--dry-run") ? "--dry-run" : undefined;
+  const screenOptions = options.filter(option => option.startsWith("--screen="));
+  const screen = screenOptions[0]?.slice("--screen=".length);
+  const unknown = options.filter(option => option !== "--dry-run" && !option.startsWith("--screen="));
+  if (unknown.length || new Set(options).size !== options.length || screenOptions.length > 1 || (screen !== undefined && !/^[a-z][a-z0-9]*$/.test(screen))) throw new Error(usage);
+  if (!id || id === "core" || !key || !["form", "modal", "list", "card", "kanban"].includes(kind) || !/^[a-z][a-z0-9]*$/.test(id) || !/^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)?$/.test(key) || (key.includes(".") && kind !== "modal")) throw new Error(usage);
   const root = process.cwd();
   await assertNoOtherModuleOperation(root);
   const manifestPath = join(root, "src/modules", id, "manifest.ts");
-  const viewPath = join(root, "src/modules", id, "views", `${viewName(key, kind as EjectKind)}.tsx`);
+  const viewPath = join(root, "src/modules", id, "views", `${viewName(key, kind as EjectKind, screen)}.tsx`);
   await assertNoSymlinks(manifestPath);
   await assertNoSymlinks(viewPath);
   await lstat(viewPath).then(() => { throw new Error(`${relative(root, viewPath)} ya existe; no se sobrescribe.`); }, error => {
@@ -66,14 +71,15 @@ async function main() {
   const targets = new Set(modules.flatMap(module => module.models.map(model => model.contract.name)));
   const lookups = Object.entries(fields).filter(([, field]) => field.kind === "many2one" && !field.sensitive && targets.has(field.target)).map(([name]) => name);
   const model = {
+    ...(screen ? { screen } : {}),
     many2many, key, ...classInfo, lookups, listFields: entry.list.fields, fields, preview,
     lines: Object.keys(entry.contract.one2manyFields), collections: Object.keys(entry.contract.childCollections),
     ...(kind === "modal" ? { excludeExtensionFields: [...Object.keys(fields), ...Object.keys(preview), ...many2many] } : {}),
   };
   const source = kind === "form" || kind === "modal" ? formViewSource(model, kind) : listViewSource(model, kind as Exclude<EjectKind, "form" | "modal">);
   sourceFile(source, "view.tsx");
-  const updated = registerView(text, key, kind as EjectKind);
-  console.log(`${flag ? "Plan" : "Vista expulsada"}: ${modelId} ${kind}${extension ? ` en ${id}` : ""}`);
+  const updated = registerView(text, key, kind as EjectKind, screen);
+  console.log(`${flag ? "Plan" : "Vista expulsada"}: ${modelId} ${kind}${screen ? ` (pantalla ${screen})` : ""}${extension ? ` en ${id}` : ""}`);
   console.log(`  create ${relative(root, viewPath)}`);
   console.log(`  update ${relative(root, manifestPath)}`);
   if (flag) return;

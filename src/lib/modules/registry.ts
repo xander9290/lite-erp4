@@ -201,7 +201,7 @@ export function modelService(id: string): Service {
       return [name, { metadata: field.one2many, child: () => modelService(child.id).transaction }];
     })),
     owners: module.models.flatMap(parent => Object.values(parent.contract.one2manyFields).filter(field => field.one2many.target === entry.contract.name).map(field => ({ inverse: field.one2many.inverse, parent: () => modelService(parent.id).transaction }))),
-    list: entry.list, audit: true, defaultSort: entry.defaultSort, domain: entry.declaration.domain,
+    list: entry.list, audit: true, defaultSort: entry.defaultSort, domain: entry.screens[entry.defaultScreen].domain,
     elementAccess: async (tx, actor) => projectElementAccess(entry, await readActorElementPolicies(tx, actor), runtimeModels),
     validateRelations: async (tx, actor, values, record) => {
       for (const [field, targetId] of Object.entries(lookupTargets(entry))) {

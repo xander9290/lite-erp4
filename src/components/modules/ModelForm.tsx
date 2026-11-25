@@ -22,7 +22,7 @@ import type { FormDensity } from "@/components/ui/form/formDensity";
 import { useFormNavigation } from "@/components/ui/form/FormNavigationProvider";
 import { useAlerts } from "@/components/ui/alerts/AlertProvider";
 import { buildModelUI, type ModelUI } from "@/lib/modules/client";
-import type { ModelClientConfig } from "@/lib/modules/config";
+import { screenHref, type ModelClientConfig } from "@/lib/modules/config";
 import type { FieldMetadata } from "@/lib/orm/fields";
 import ModelCollection from "./ModelCollection";
 import FieldVisibility from "@/components/ui/form/FieldVisibility";
@@ -150,8 +150,10 @@ function Editor({ ui, record, displayName, onReload, children, density }: { ui: 
   const { config } = ui;
   const modal = useModelFormPresentation(config.id);
   const capabilities = modelUiCapabilities(config.capabilities);
-  const returnHref = formDeleteReturnHref(params.get("returnTo"), config.route);
-  const returnQuery = `?returnTo=${encodeURIComponent(returnHref)}`;
+  // The selected screen survives create → save → back: list fallback and form links keep `screen`.
+  const listHref = screenHref(config, config.route);
+  const returnHref = formDeleteReturnHref(params.get("returnTo"), listHref);
+  const formHref = (path: string) => screenHref(config, path, { returnTo: returnHref });
   const [savedId, setSavedId] = useState(record.id as string | undefined);
   const [savedName, setSavedName] = useState(displayName);
   const [collectionVersion, setCollectionVersion] = useState(0);
@@ -172,17 +174,17 @@ function Editor({ ui, record, displayName, onReload, children, density }: { ui: 
     mode={savedId ? "edit" : "create"}
     readOnly={savedId ? !capabilities.write : !capabilities.create}
     onSubmit={values => modelSave(config.id, values)}
-    deletion={!modal && capabilities.unlink ? { action: selection => modelDelete(config.id, selection), returnHref: config.route, allowReadOnly: true } : undefined}
+    deletion={!modal && capabilities.unlink ? { action: selection => modelDelete(config.id, selection), returnHref: listHref, allowReadOnly: true } : undefined}
     // FormButton: published @action names only; the server validates them and re-authorizes.
     runAction={(action, target, params) => modelAction(config.id, { action, ...target, ...(params !== undefined ? { params } : {}) })}
     actions={config.actions}
     actionModel={config.name}
-    onNew={!modal && savedId && capabilities.create ? () => router.push(`${config.route}/nuevo${returnQuery}`) : undefined}
+    onNew={!modal && savedId && capabilities.create ? () => router.push(formHref(`${config.route}/nuevo`)) : undefined}
     onSaved={(values, _audit, name) => {
       setSavedId(values.id as string);
       setSavedName(name);
       if (modal) { modal.onSaved(values); return; }
-      if (!record.id && values.id) router.replace(`${config.route}/${encodeURIComponent(values.id as string)}${returnQuery}`);
+      if (!record.id && values.id) router.replace(formHref(`${config.route}/${encodeURIComponent(values.id as string)}`));
       router.refresh();
     }}
     menuActions={onReload ? [{ id: "reload", label: "Recargar registro", icon: <RefreshCw size={16} />, onSelect: onReload }] : undefined}
@@ -220,7 +222,10 @@ export default function ModelForm({ config: providedConfig, id: routeId, childre
   };
   const capabilities = modelUiCapabilities(config.capabilities);
   if (!capabilities.read || (!id && !capabilities.create)) return <p role="alert" className="p-6">No tienes permiso para abrir este formulario.</p>;
-  if (!id) return <Editor key={router.bfcacheId} ui={ui} density={density} record={{ ...ui.createDefaults(), ...proposed }}>{children}</Editor>;
+  // Precedence on create: field defaults < screen defaults (page only) < explicit proposals
+  // (`default_<field>` or a relation's inverse in a modal). The server validates every value on save.
+  const screenDefaults = modal ? {} : Object.fromEntries(Object.entries(config.screen?.defaults ?? {}).filter(([name]) => Object.hasOwn(config.fields, name) && !config.fieldAccess?.[name]?.noWrite && !config.fieldAccess?.[name]?.noRead));
+  if (!id) return <Editor key={router.bfcacheId} ui={ui} density={density} record={{ ...ui.createDefaults(), ...screenDefaults, ...proposed }}>{children}</Editor>;
   return <FormViewLoader key={`${router.bfcacheId}:${id}:${attempt}`} recordKey={id} load={load}>
     {(record, _audit, displayName) => <Editor ui={ui} density={density} record={record} displayName={displayName} onReload={reload}>{children}</Editor>}
   </FormViewLoader>;

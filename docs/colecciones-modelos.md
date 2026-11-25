@@ -194,3 +194,9 @@ sin renderers ni fórmulas adicionales. Son columnas de lectura y no habilitan
 búsqueda/filtros/orden/grupos. La política incluye dependencias y salidas publicadas;
 no se calculan cabeceras de grupo. [Alcance y límites](campos-calculados.md#lista-card-y-kanban-2026-11-15).
 Demo independiente `/sample#computed-collections`.
+
+## Varias pantallas sobre el mismo modelo
+
+Para presentar el mismo modelo con listas, dominios y formularios distintos (por
+ejemplo Contactos y Direcciones), usar `screens` en el manifest en lugar de
+duplicar el modelo. Contrato en [Pantallas nombradas](pantallas-modelos.md).

@@ -227,14 +227,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Ideas pendientes
 
-- **Siguiente implementación solicitada (2026-11-24): pantallas nombradas por
-  modelo.** Propuesta screens indexado por ID, con views list/card/kanban/form/modal,
-  dominio/defaults/presentación inicial por pantalla y menús modelo+screen. Conservar
-  selección durante apertura/guardado/retorno, permisos y manifests actuales como
-  pantalla default. Primera versión sin capa adicional de acciones de navegación.
-  Aún no implementado; registrar como siguiente pendiente no autoriza iniciarlo
-  durante este guardado. Alcance y aceptación en
-  [Pantallas por modelo](docs/ideas/pantallas-modelos.md).
+- **Pantallas nombradas por modelo (implementadas 2026-11-25, primera versión).**
+  `screens` indexado por ID (label, view, domain, defaults, views) y `defaultScreen`;
+  exclusivo con view/views/domain del modelo. Sin screens hay una pantalla implícita
+  `default` y los menús conservan sus IDs. Menús `{ model, screen }` → `?screen=<id>`;
+  ID desconocido = 404. El navegador envía sólo el ID; el servidor aplica el dominio
+  (sustituye al default, AND con filtros/permisos/reglas; nunca amplía, no restringe
+  lectura individual ni guardado). Defaults literales validados al compilar;
+  precedencia Field < pantalla < propuesta explícita; no en modales. Relaciones y
+  modales de otros modelos usan la pantalla default. Transfer sólo en la default.
+  `eject:view -- … --screen=<id>`. Directorio las usa (2026-11-25): Contactos
+  default y Direcciones (delivery/invoice). Contrato en [Pantallas nombradas](docs/pantallas-modelos.md).
 
 - Sugerencias de Django registradas (2026-11-23), sin implementación activa:
   chequeos del proyecto, operaciones después del commit, consultas reutilizables,

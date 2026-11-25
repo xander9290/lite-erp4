@@ -1,6 +1,6 @@
 import "server-only";
 import type { ComponentType } from "react";
-import { availableCollectionViews, collectionFieldMetadata, collectionViews, modelIdPattern, type CollectionView, type ModelClientConfig } from "./config";
+import { collectionFieldMetadata, modelIdPattern, type CollectionView, type ModelClientConfig } from "./config";
 import { defineApplication, type ApplicationManifest, type ApplicationMenu, type ApplicationMenuLink } from "../applications/manifest";
 import { defineModel, Model } from "../orm/model";
 import { Fields, type Field, type FieldMetadata } from "../orm/fields";
@@ -20,6 +20,7 @@ import { relationFieldName } from "../orm/display";
 import type { CollectionDomain } from "../orm/domain";
 import { validateTransferSpec, type TransferSpec } from "../list/transfer-contract";
 import { decoratedMethods } from "../orm/decorators";
+import { compileScreens, defaultScreenId, type CompiledScreen, type ModelScreen } from "./screens";
 
 type ModelClass = new () => Model;
 export type ModuleModelSpec =
@@ -59,6 +60,14 @@ export type ModuleModelSpec =
       readonly audit?: boolean;
       /** Custom views (eject). Without them the default list/form are used. */
       readonly views?: ModelViews;
+      /**
+       * Named screens over this model (e.g. Contactos and Direcciones on Partner), each with its
+       * own label, initial view, server domain, creation defaults and views. Exclusive with the
+       * top-level view/views/domain. Menus reference `{ model, screen }`. See docs/pantallas-modelos.md.
+       */
+      readonly screens?: Readonly<Record<string, ModelScreen<ModelViews>>>;
+      /** Screen opened by plain menu links and relations (default: the first declared screen). */
+      readonly defaultScreen?: string;
     };
 export type ModuleModelOptions = Exclude<ModuleModelSpec, ModelClass>;
 export type ModelFormView = ComponentType<{ config: ModelClientConfig; id?: string }>;
@@ -95,8 +104,10 @@ export type ModelViews = {
   readonly card?: true | (() => Promise<{ default: ModelListView }>);
   readonly kanban?: true | (() => Promise<{ default: ModelListView }>);
 };
+/** A menu link: a model key (its default screen) or a model key plus one of its screens. */
+export type ModuleMenuTarget = string | { readonly model: string; readonly screen: string };
 /** Menu entries reference model keys; nested objects create one group level. */
-export type ModuleMenu = Readonly<Record<string, string | Readonly<Record<string, string>>>>;
+export type ModuleMenu = Readonly<Record<string, ModuleMenuTarget | Readonly<Record<string, ModuleMenuTarget>>>>;
 
 export type ModuleSpec = {
   readonly id: string;
@@ -177,7 +188,11 @@ export type ModuleModel = {
   readonly view: CollectionView;
   readonly collectionViews: readonly CollectionView[];
   readonly defaultSort?: ListViewConfig["defaultSort"];
+  /** Views of the default screen (relations, modals from other models and plain links use them). */
   readonly views: ModelViews;
+  /** Compiled screens; models without `screens` have one implicit "default" screen. */
+  readonly screens: Readonly<Record<string, CompiledScreen<ModelViews>>>;
+  readonly defaultScreen: string;
   /** Original manifest declaration, recompiled by the registry when other modules extend it. */
   readonly declaration: ModuleModelOptions;
   /** Extensions composed onto this model by the registry (empty in the declaring module). */
@@ -246,12 +261,24 @@ export function derivedListPolicy(metadata: Readonly<Record<string, FieldMetadat
   };
 }
 
+/**
+ * A menu value is a link when it is a model key or exactly `{ model, screen }` with string values;
+ * any other object is a group of links.
+ */
+export function isMenuTarget(value: unknown): value is ModuleMenuTarget {
+  if (typeof value === "string") return true;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length === 2 && keys.includes("model") && keys.includes("screen") && typeof (value as Record<string, unknown>).model === "string" && typeof (value as Record<string, unknown>).screen === "string";
+}
+const targetModel = (target: ModuleMenuTarget) => typeof target === "string" ? target : target.model;
+
+/** Model label: the first plain menu link to the model, else the first screen link, else its key. */
 function menuLabel(menu: ModuleMenu | undefined, modelKey: string) {
-  for (const [label, value] of Object.entries(menu ?? {})) {
-    if (value === modelKey) return label;
-    if (typeof value === "object") for (const [child, target] of Object.entries(value)) if (target === modelKey) return child;
-  }
-  return modelKey[0].toUpperCase() + modelKey.slice(1);
+  const links = Object.entries(menu ?? {}).flatMap(([label, value]) => isMenuTarget(value) ? [[label, value] as const] : Object.entries(value));
+  const plain = links.find(([, target]) => target === modelKey);
+  const screen = links.find(([, target]) => typeof target !== "string" && target.model === modelKey);
+  return (plain ?? screen)?.[0] ?? modelKey[0].toUpperCase() + modelKey.slice(1);
 }
 
 /**
@@ -318,14 +345,8 @@ export function compileModuleModel(id: string, modelKey: string, options: Module
     list.fields,
   );
   const kanban = compileKanbanConfig(options.kanban, contract.metadata, contract.actions, list.fields);
-  const view = options.view ?? "list";
-  if (!collectionViews.includes(view)) throw new Error(`${id}.${modelKey}: vista de lista inválida.`);
-  for (const [kind, loader] of Object.entries(options.views ?? {})) {
-    if (loader === undefined) continue;
-    if (![...collectionViews, "form", "modal"].includes(kind) || (typeof loader !== "function" && !(collectionViews.includes(kind as CollectionView) && loader === true)))
-      throw new Error(`${id}.${modelKey}: registro de vista inválido: ${kind}.`);
-  }
-  const presentations = availableCollectionViews(view, options.views ?? {}, Boolean(kanban));
+  const { screens, defaultScreen } = compileScreens(`${id}.${modelKey}`, options, { label, hasKanban: Boolean(kanban), metadata: contract.metadata as Readonly<Record<string, FieldMetadata>>, clientFields });
+  const main = screens[defaultScreen];
   return Object.freeze({
     id: `${id}.${modelKey}`,
     key: modelKey,
@@ -339,10 +360,12 @@ export function compileModuleModel(id: string, modelKey: string, options: Module
     list,
     kanban: kanban?.field,
     ...(kanban?.transitions !== undefined ? { kanbanTransitions: kanban.transitions } : {}),
-    view,
-    collectionViews: presentations,
+    view: main.view,
+    collectionViews: main.collectionViews,
     defaultSort: options.defaultSort,
-    views: options.views ?? {},
+    views: main.views,
+    screens,
+    defaultScreen,
     declaration: options,
     extensions: Object.freeze([...extensions]),
   });
@@ -513,14 +536,21 @@ export function defineModule(spec: ModuleSpec): ModuleDefinition {
   // Without groups the module stays admin-only (superuser), as before access control existed.
   const grouped = access.groups.length > 0;
   const visibility = (groups: readonly string[]) => (grouped ? { access: "authenticated" as const, groups } : { access: "admin" as const });
-  const link = (label: string, target: string): ApplicationMenuLink => {
-    const model = byKey.get(target);
-    if (!model) throw new Error(`${id}: el menú «${label}» apunta a un modelo inexistente: ${target}.`);
-    return { id: `${target}-list`, label, href: model.route, model: model.id, ...visibility(readGroups(access, model.id)) };
+  const link = (label: string, target: ModuleMenuTarget): ApplicationMenuLink => {
+    const key = targetModel(target);
+    const model = byKey.get(key);
+    if (!model) throw new Error(`${id}: el menú «${label}» apunta a un modelo inexistente: ${key}.`);
+    const screen = typeof target === "string" ? undefined : target.screen;
+    if (screen !== undefined && (screen === defaultScreenId || !Object.hasOwn(model.screens, screen))) throw new Error(`${id}: el menú «${label}» apunta a una pantalla inexistente de ${key}: ${screen}.`);
+    // Plain links keep their stable id (menu visibility by group is stored by id).
+    return { id: screen ? `${key}-${screen}-list` : `${key}-list`, label, href: model.route, model: model.id, ...(screen ? { screen } : {}), ...visibility(readGroups(access, model.id)) };
   };
   const menus: ApplicationMenu[] = Object.entries(spec.native ? {} : (spec.menu ?? Object.fromEntries(models.map((model) => [model.label, model.key])))).map(([label, value]) => {
-    if (typeof value === "string") return link(label, value);
-    const items = Object.entries(value).map(([child, target]) => link(child, target));
+    if (isMenuTarget(value)) return link(label, value);
+    const items = Object.entries(value).map(([child, target]) => {
+      if (!isMenuTarget(target)) throw new Error(`${id}: el menú «${child}» debe apuntar a un modelo o a { model, screen }; sólo se admite un nivel de grupos.`);
+      return link(child, target);
+    });
     return {
       id: `${
         label

@@ -1,11 +1,11 @@
 "use client";
 
 import { createContext, useContext, useEffect, useId, useRef, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { NavigationGuardLink } from "nextjs-nav-guard";
 import { ChevronDown, Menu } from "lucide-react";
 import { activeApplication, activeApplicationMenu, type ApplicationNavigation as Navigation } from "@/lib/applications/navigation";
-import type { ApplicationMenuLink } from "@/lib/applications/manifest";
+import { menuLinkHref, type ApplicationMenuLink } from "@/lib/applications/manifest";
 
 const CloseDropdown = createContext<(() => void) | undefined>(undefined);
 
@@ -39,17 +39,18 @@ function NavigationDropdown({ label, accessibleLabel, active = false, children }
 
 function MenuLink({ item, activeId }: { item: ApplicationMenuLink; activeId?: string }) {
   const close = useContext(CloseDropdown);
-  const props = { href: item.href, "aria-current": item.id === activeId ? "page" as const : undefined,
+  const props = { href: menuLinkHref(item), "aria-current": item.id === activeId ? "page" as const : undefined,
     className: `block rounded-lg px-3 py-2 text-sm whitespace-normal wrap-anywhere focus-visible:outline-2 focus-visible:outline-primary ${item.id === activeId ? "bg-primary/10 font-semibold text-primary" : "text-base-content/75 hover:bg-base-200 hover:text-base-content"}` };
   return <NavigationGuardLink {...props} onClick={close}>{item.label}</NavigationGuardLink>;
 }
 
 export default function ApplicationNavigation({ applications }: { applications: readonly Navigation[] }) {
   const pathname = usePathname();
+  const screen = useSearchParams().get("screen");
   const application = activeApplication(applications, pathname);
   if (!application) return null;
-  const activeId = activeApplicationMenu(application.menus, pathname)?.id;
-  return <nav key={pathname} aria-label={`Navegación de ${application.name}`} className="min-w-0">
+  const activeId = activeApplicationMenu(application.menus, pathname, screen)?.id;
+  return <nav key={`${pathname}?${screen ?? ""}`} aria-label={`Navegación de ${application.name}`} className="min-w-0">
     <div className="lg:hidden">
       <NavigationDropdown label={<><Menu size={15} aria-hidden="true" /><span>Menú</span></>} accessibleLabel={`Menú de ${application.name}`}>
         <>

@@ -6,6 +6,7 @@ import { getModule } from "@/lib/modules/registry";
 import { getCurrentAccessUser } from "@/lib/access/current";
 import { applicationNavigation, firstApplicationMenu } from "@/lib/applications/navigation";
 import { applications } from "@/lib/applications/registry";
+import { menuLinkHref } from "@/lib/applications/manifest";
 
 type Props = { params: Promise<{ module: string; path?: string[] }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
@@ -21,16 +22,16 @@ async function resolveRoute(params: Props["params"]) {
     const navigation = application && applicationNavigation(application, actor);
     if (!navigation) redirect("/erp");
     const first = firstApplicationMenu(navigation.menus);
-    if (first) redirect(first.href);
+    if (first) redirect(menuLinkHref(first));
     return { modelId: undefined, rest: [], label: definition.application.name };
   }
   return { modelId: `${moduleId}.${path[0]}`, rest: path.slice(1) };
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { modelId, rest, ...route } = await resolveRoute(params);
   if (!modelId) return { title: "label" in route ? route.label : "Aplicación" };
-  return modelRouteMetadata(modelId, rest);
+  return modelRouteMetadata(modelId, rest, await searchParams);
 }
 
 /** Convention: /erp/<module>/<model>, /nuevo and /<id>. Only registered models resolve. */

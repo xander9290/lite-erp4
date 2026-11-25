@@ -29,9 +29,14 @@ export function activeApplication(applications: readonly ApplicationNavigation[]
   return applications.find(application => pathname === application.href || pathname.startsWith(`${application.href}/`));
 }
 
-/** Prefer the most specific matching route; list links also cover record forms. */
-export function activeApplicationMenu(menus: readonly ApplicationMenu[], pathname: string): ApplicationMenuLink | undefined {
+/**
+ * Prefer the most specific matching route; list links also cover record forms. Links to screens of
+ * the same route are told apart by the `screen` query value (absent = links without a screen).
+ */
+export function activeApplicationMenu(menus: readonly ApplicationMenu[], pathname: string, screen?: string | null): ApplicationMenuLink | undefined {
   const links = menus.flatMap(item => "items" in item ? item.items : [item]);
-  return links.filter(item => pathname === item.href || (item.match !== "exact" && pathname.startsWith(`${item.href}/`)))
-    .sort((a, b) => b.href.length - a.href.length)[0];
+  const matching = links.filter(item => pathname === item.href || (item.match !== "exact" && pathname.startsWith(`${item.href}/`)));
+  const longest = Math.max(0, ...matching.map(item => item.href.length));
+  const candidates = matching.filter(item => item.href.length === longest);
+  return candidates.find(item => (item.screen ?? null) === (screen || null)) ?? candidates.find(item => !item.screen) ?? candidates[0];
 }

@@ -7,7 +7,7 @@ import CardView from "@/components/ui/card/CardView";
 import KanbanView from "@/components/ui/kanban/KanbanView";
 import type { CollectionProps } from "@/components/ui/collection/types";
 import { modelCreators, modelRelationLookup, modelDelete, modelKanban, modelList, modelMove, modelTransferReview, modelTransferApply, modelTransferExport } from "@/lib/modules/actions";
-import type { CollectionView, ModelClientConfig } from "@/lib/modules/config";
+import { screenHref, screenQuery, type CollectionView, type ModelClientConfig } from "@/lib/modules/config";
 import { modelCollection, type CollectionSource, type ModelColumn } from "@/lib/modules/collection";
 import { modelUiCapabilities } from "@/lib/access/capabilities";
 import { InsertionProvider, useInsertionAnchors, useInsertionFallbackEntries, useInsertionReport } from "@/components/ui/form/insertions/Insertions";
@@ -98,7 +98,9 @@ function CollectionBody({ config, columns: declared, view = config.view, title =
         // «Creado por»: creators of readable records of this model, by contact name.
         ...(config.audit && config.list.fields.includes("createBy") ? { createBy: modelCreators.bind(null, config.id) } : {}),
       },
-      load: modelList.bind(null, config.id), loadKanban: modelKanban.bind(null, config.id),
+      // The screen id selects a server-declared domain; the browser never sends the domain itself.
+      load: (state: import("@/lib/list/types").ListState) => modelList(config.id, state, config.screen?.id),
+      loadKanban: (request: Parameters<typeof modelKanban>[1]) => modelKanban(config.id, request, config.screen?.id),
       move: modelMove.bind(null, config.id), remove: modelDelete.bind(null, config.id),
     },
   }), [config, columns, provider]);
@@ -114,8 +116,8 @@ function CollectionBody({ config, columns: declared, view = config.view, title =
   const common = {
     ...source.common, ...presentation, title, pageSize, filterLookups: source.provider.filterLookups,
     columns: source.columns, queryColumns: source.queryColumns, cardInsertions,
-    createHref: create && capabilities.create ? `${source.common.createHref}?${new URLSearchParams({ ...Object.fromEntries(Object.entries(createDefaults ?? {}).map(([field, value]) => [`default_${field}`, value])), returnTo })}` : undefined,
-    recordHref: open ? source.common.recordHref : undefined,
+    createHref: create && capabilities.create ? `${source.common.createHref}?${new URLSearchParams({ ...screenQuery(config), ...Object.fromEntries(Object.entries(createDefaults ?? {}).map(([field, value]) => [`default_${field}`, value])), returnTo })}` : undefined,
+    recordHref: open ? screenHref(config, source.common.recordHref) : undefined,
     breadcrumbs: embedded ? [] : [{ label: "Aplicaciones", href: "/erp" }, ...(config.application?.href === config.route
       ? [{ label: config.application.name }]
       : [{ label: config.application?.name ?? config.moduleName, href: config.application?.href ?? `/erp/${config.module}` }, { label: title }])],
@@ -125,7 +127,8 @@ function CollectionBody({ config, columns: declared, view = config.view, title =
     return <KanbanView {...common} {...source.kanban} load={source.provider.loadKanban} onMove={movable && capabilities.move ? source.provider.move : undefined} />;
   }
   if (view === "card") return <CardView {...common} load={source.provider.load} />;
-  const transfer = config.transfer && !embedded && !provider ? {
+  // Export reads the default screen's source; other screens do not offer transfer yet.
+  const transfer = config.transfer && !embedded && !provider && (config.screen?.isDefault ?? true) ? {
     ...config.transfer,
     review: modelTransferReview.bind(null, config.id),
     apply: modelTransferApply.bind(null, config.id),

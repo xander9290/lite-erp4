@@ -9,6 +9,8 @@ export type ApplicationMenuLink = {
   readonly id: string;
   readonly label: string;
   readonly href: string;
+  /** Named screen of `model` opened by this link (`?screen=<id>`); absent opens its default screen. */
+  readonly screen?: string;
   readonly match?: "exact" | "prefix";
   readonly access?: ApplicationAccess;
   /** Navigation only: visible to administrators or members of any of these groups. */
@@ -69,6 +71,7 @@ function validateMenus(application: ApplicationManifest) {
       // Never accept arbitrary foreign paths, external URLs, queries or fragments.
       const expected = dependencyModel ? `/erp/${dependency}/${item.model!.split(".")[1]}` : undefined;
       if (typeof item.href !== "string" || !/^\/erp\/[a-z0-9-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(item.href) || (expected ? item.href !== expected : !(item.href === base || item.href.startsWith(`${base}/`)))) throw new Error(`Ruta de menú inválida en ${application.id}.`);
+      if (item.screen !== undefined && (item.model === undefined || typeof item.screen !== "string" || !/^[a-z][a-z0-9]*$/.test(item.screen))) throw new Error(`Pantalla de menú inválida en ${application.id}.`);
       if (item.match !== undefined && !["exact", "prefix"].includes(item.match)) throw new Error(`Coincidencia de menú inválida en ${application.id}.`);
     }
   }
@@ -87,6 +90,11 @@ export function defineApplication<const T extends ApplicationManifest>(manifest:
   if (manifest.drawer !== undefined && typeof manifest.drawer !== "boolean") throw new Error(`drawer debe ser true o false en ${manifest.id}.`);
   validateMenus(manifest);
   return manifest;
+}
+
+/** Link target of a menu item: its route plus the screen selector, never other query state. */
+export function menuLinkHref(item: Pick<ApplicationMenuLink, "href" | "screen">) {
+  return item.screen ? `${item.href}?${new URLSearchParams({ screen: item.screen })}` : item.href;
 }
 
 export function applicationHref(manifest: ApplicationManifest): `/erp/${string}` {

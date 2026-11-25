@@ -454,14 +454,19 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     return rows.map(row => ({ ...row, ...Object.fromEntries(linked.map(([field, byRow, readable]) => [field, (byRow.get(row.id) ?? []).filter(id => readable.has(id))])) }));
   }
 
-  async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>, transaction?: Prisma.TransactionClient, collection: "main" | "relation" = "main"): Promise<ListResult> {
+  /**
+   * `screen` replaces the main collection domain with the one of a named screen chosen by the
+   * server registry (`{}` = a screen without domain). Relation sources never use it.
+   */
+  async function list(prisma: PrismaClient, actor: ModelActor, input: unknown, group?: { field: string; value: string }, domain?: (context: ListDomainContext) => Promise<Record<string, unknown>>, transaction?: Prisma.TransactionClient, collection: "main" | "relation" = "main", screen?: { readonly domain?: CollectionDomain }): Promise<ListResult> {
     try {
       const query = async (tx: Prisma.TransactionClient) => {
         if (computedNames.length && !transaction) await tx.$executeRaw`SET TRANSACTION READ ONLY`;
         const scope = await authorize(tx, actor, "read");
         const fixedDomain = domain ? await domain({ actor: Object.freeze({ id: actor.id, sessionVersion: actor.sessionVersion }), tx }) : undefined;
         const elementPolicy = await elements(tx, actor);
-        const baseDomain = collection === "main" && presentation.domain ? await compileCollectionDomain(domainMetadata, presentation.domain, { actor: Object.freeze({ ...actor }), tx }) : undefined;
+        const mainDomain = screen ? screen.domain : presentation.domain;
+        const baseDomain = collection === "main" && mainDomain ? await compileCollectionDomain(domainMetadata, mainDomain, { actor: Object.freeze({ ...actor }), tx }) : undefined;
         const parsed = listStateSchema.safeParse(input);
         if (!parsed.success || parsed.data.invalidFilters) throw new ModelValidationError("Revisa los filtros y parámetros de esta lista.");
         if (policy && parsed.data.sort && parsed.data.sort !== "id" && !policy.sortable?.includes(parsed.data.sort)) throw new ModelValidationError("El orden solicitado no está habilitado.");
@@ -533,10 +538,10 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     } catch (error) { return { ok: false, error: messageFor(error) }; }
   }
 
-  async function kanban(prisma: PrismaClient, actor: ModelActor, input: KanbanRequest): Promise<ListResult> {
+  async function kanban(prisma: PrismaClient, actor: ModelActor, input: KanbanRequest, screen?: { readonly domain?: CollectionDomain }): Promise<ListResult> {
     const request = z.strictObject({ group: z.string().min(1).max(100), state: listStateSchema }).safeParse(input);
     if (!groupField || !request.success || request.data.state.groupBy?.length || request.data.state.groupPath?.length || !groups.some(group => group.value === request.data.group)) return { ok: false, error: "La columna del kanban no está habilitada." };
-    return list(prisma, actor, request.data.state, { field: groupField, value: request.data.group });
+    return list(prisma, actor, request.data.state, { field: groupField, value: request.data.group }, undefined, undefined, "main", screen);
   }
 
   async function move(prisma: PrismaClient, actor: ModelActor, input: unknown): Promise<KanbanMoveResult> {
@@ -758,5 +763,5 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (rows.length > 1) throw new ModelValidationError("La clave de importación no es única.");
     return rows[0] ? scalar ? repository.read(tx, String(rows[0].id)) : transaction.snapshot(tx, actor, String(rows[0].id)) : null;
   }
-  return { transaction, findUniqueInTransaction, listInTransaction: (prisma: PrismaClient, tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, undefined, tx), react, read, save, action, actions: model.actions ?? [], remove, activity, addNote, lookup, lookupInTransaction, list: (prisma: PrismaClient, actor: ModelActor, input: unknown) => list(prisma, actor, input), defineListAction, defineChildListAction, kanban, move };
+  return { transaction, findUniqueInTransaction, listInTransaction: (prisma: PrismaClient, tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, undefined, tx), react, read, save, action, actions: model.actions ?? [], remove, activity, addNote, lookup, lookupInTransaction, list: (prisma: PrismaClient, actor: ModelActor, input: unknown, screen?: { readonly domain?: CollectionDomain }) => list(prisma, actor, input, undefined, undefined, undefined, "main", screen), defineListAction, defineChildListAction, kanban, move };
 }

@@ -1,12 +1,72 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-24.
+Última actualización: 2026-11-25.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Punto de continuación vigente: Directorio y UI (2026-11-24)
+## Punto de continuación vigente: pantallas nombradas (2026-11-25)
+
+Windows, rama codex/partner sobre HEAD ced123c, cambios sin commit. Primera versión
+de `screens` implementada en el framework según el plan; contrato en
+[Pantallas nombradas](pantallas-modelos.md). Sustituye al pendiente 1 de la sección
+siguiente. Directorio **no** se modificó: su manifest compila igual (pantalla
+implícita default, mismos IDs de menú, vistas y dominio, comprobado cargándolo).
+
+Código: `src/lib/modules/screens.ts` (compilación/validación/selección), define.ts
+(spec, ModuleModel.screens/defaultScreen, menús `{ model, screen }`), service.ts
+(list/kanban aceptan el dominio de pantalla), actions.ts (modelList/modelKanban
+reciben el ID y lo resuelven en servidor), registry.ts (dominio default),
+ModelRoute (selección por `?screen=`, 404 si desconocida, vistas/etiqueta),
+config.ts (`config.screen`, screenQuery/screenHref), ModelCollection y ModelForm
+(enlaces, retorno, defaults), manifest/navigation/ApplicationNavigation y la ruta
+raíz del módulo (`screen` en enlaces y menú activo), eject.ts/eject-view.ts
+(`--screen=<id>`).
+
+Decisiones tomadas al implementar: con screens se rechazan view/views/domain del
+modelo; ID `default` reservado; ID desconocido responde 404; defaults literales
+validados al compilar, precedencia Field < pantalla < propuesta explícita y sin
+aplicarse en modales; relaciones/modales de otros modelos usan la pantalla default;
+transfer sólo en la default (export lee esa fuente).
+
+Verificación (2026-11-25, Windows): TypeScript sin emisión aprobado; ESLint de los
+archivos tocados aprobado; nuevas screens.test.ts 8/8 y screen-domain.test.ts 3/3;
+test:modules 82/82, test:form-model 29/29, test:views 4/4, test:list-grouping 17/17,
+test:form-navigation 13/13, test:access 21/21, test:applications 16/16. test:orm
+131/132 y test:scaffold 10/12: las mismas fallas ocurren sin estos cambios (symlink
+EPERM en Windows y proyecto aislado del scaffold). Sin navegador, servidor, build,
+SQL, migraciones ni consultas a BD; la navegación real con sesión queda pendiente.
+
+Aplicada en Directorio el mismo día a petición del usuario: `partner` declara
+`contacts` (default; card+lista, type=contact, defaults type contact, vistas previas)
+y `addresses` (lista; type en delivery/invoice, defaults type delivery, PartnerForm
+como formulario y PartnerModal como modal). Menú: «Contactos» conserva `partner-list`;
+«Direcciones» es `partner-addresses-list` (`?screen=addresses`). Sin migración ni SQL.
+
+Comprobado en navegador (Windows, dev, sesión del usuario, sin escrituras): Contactos
+igual que antes (2 registros, tarjetas/lista, enlaces sin `screen`); Direcciones con
+título/menú activo propios, filtro aplicado (0 registros, coherente con `childIds`
+vacío en ambos contactos), «Nuevo» con `?screen=addresses&returnTo=…`, alta con
+Tipo = Entrega y breadcrumb de vuelta a Direcciones; alta desde Contactos con Tipo =
+Contacto; `?screen=otra` → 404; sin errores de consola.
+
+Guardado comprobado con autorización del usuario (2026-11-25): desde Direcciones se
+creó en la base de desarrollo Windows «PRUEBA PANTALLAS - ENTREGA» (Empresa, Calle
+de prueba, Tipo Entrega propuesto, principal RG ESTRUCTURAS DE ACERO). Tras guardar,
+la URL del registro conserva `?screen=addresses`; el breadcrumb vuelve a Direcciones,
+que lista 1 registro con enlace que conserva la pantalla. Contactos sigue con 2
+registros sin incluirla y «Otras direcciones» del principal la muestra (1 registro).
+Sin errores de consola. El registro de prueba se conserva; borrarlo es decisión del
+usuario.
+
+Pendientes de esta función:
+1. Opcional: expulsar `PartnerAddressesForm` con `--screen=addresses` para un
+   formulario de direcciones dedicado (hoy reutiliza PartnerForm).
+2. Transfer por pantalla (pasar el ID a export/import) y tipado/autocompletado de
+   `{ model, screen }`; sección en docs/crear-modulos.md (/documentation).
+
+## Punto de continuación anterior: Directorio y UI (2026-11-24)
 
 Puesta al día contrastada con documentación, fuentes y Git. Rama codex/partner,
 HEAD 4821b76 (punto de progreso); los cambios de UI, modelos, artefactos y
@@ -175,8 +235,8 @@ Sin commit/push/pull ni SQL.
 
 ### Pendientes al retomar
 
-1. **Siguiente: implementar pantallas nombradas screens**, con el alcance y la
-   compatibilidad del plan enlazado arriba. No confundir la propuesta con API vigente.
+1. ~~Implementar pantallas nombradas screens~~: implementado el 2026-11-25; ver el
+   punto de continuación vigente arriba.
 2. Si se mantiene la jerarquía de BusinessActivity, añadir su validación contra
    ciclos de varios registros. La protección de un nivel en Partner ya está
    implementada; la clase BusinessActivity aún no declara esa constraint.

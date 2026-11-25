@@ -20,6 +20,7 @@ import { MAX_IMPORT_BYTES, TransferInputError } from "../list/transfer-file";
 import type { TransferFile, TransferPlan, TransferResult } from "../list/transfer-types";
 import { ModelValidationError } from "../orm/context";
 import { parameterLookup } from "./registry";
+import { selectedScreen } from "./screens";
 
 async function requireEntry(model: string) {
   const actor = await requireUser();
@@ -41,6 +42,16 @@ function resolve(id: unknown) {
   const found = getModuleModel(id);
   if (!found) throw new Error(unknownModel);
   return { entry: found.entry, service: modelService(found.entry.id) };
+}
+
+/**
+ * Domain of a declared screen of the model. The browser only names a screen id; the domain and
+ * its compilation stay in the server registry, and record rules still apply on top of it.
+ */
+function screenSource(entry: ReturnType<typeof resolve>["entry"], screen: unknown) {
+  const found = selectedScreen(entry, screen);
+  if (!found) throw new Error("Esta pantalla no está disponible.");
+  return { domain: found.domain };
 }
 
 export async function modelTransferReview(model: string, form: FormData): Promise<TransferResult<TransferPlan>> {
@@ -97,8 +108,8 @@ export async function modelChildren(model: string, field: string, parentId: unkn
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar la relación.") }; }
 }
 
-export async function modelList(model: string, state: unknown): Promise<ListResult> {
-  try { const { service } = resolve(model); const actor = await requireEntry(model); return await withActor(actor, () => service.list(prisma, actor, state)); }
+export async function modelList(model: string, state: unknown, screen?: unknown): Promise<ListResult> {
+  try { const { entry, service } = resolve(model); const source = screenSource(entry, screen); const actor = await requireEntry(model); return await withActor(actor, () => service.list(prisma, actor, state, source)); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar la lista.") }; }
 }
 
@@ -138,8 +149,8 @@ export async function modelCreators(model: string, request: unknown): Promise<Ma
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar los creadores.") }; }
 }
 
-export async function modelKanban(model: string, request: unknown): Promise<ListResult> {
-  try { const { service } = resolve(model); const actor = await requireEntry(model); return await withActor(actor, () => service.kanban(prisma, actor, request as never)); }
+export async function modelKanban(model: string, request: unknown, screen?: unknown): Promise<ListResult> {
+  try { const { entry, service } = resolve(model); const source = screenSource(entry, screen); const actor = await requireEntry(model); return await withActor(actor, () => service.kanban(prisma, actor, request as never, source)); }
   catch (error) { return { ok: false, error: failure(error, "No se pudo consultar el tablero.") }; }
 }
 
