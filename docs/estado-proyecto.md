@@ -129,10 +129,12 @@ Pendientes de esta función:
 
 ### Experimento en curso del usuario: User ↔ Partner uno a uno (2026-11-25)
 
-Edición del usuario, sin commit y **sin orm:sync/migración**: `src/modules/directory/
-models/usert.ts` declara `UserDirectory = extendModel(User, …)` (clase aún vacía) y
-el manifest de Directorio añade `extends: { "core.user": UserDirectory }`. No avanzar
-estos archivos sin pedirlo. Decisiones conversadas:
+Edición guiada del usuario, sin commit y **sin sincronización aplicada/migración**:
+`src/modules/directory/models/usert.ts` declara `UserDirectory = extendModel(User, …)`
+con `partnerId` opcional/único/Restrict y la acción `crearContacto`. El manifest
+registra la extensión y su vista `UserDirectoryForm`: FieldMany2One y FormButton
+en FormHeader, dentro del formulario existente de Usuarios. Referencia generada
+`DirectoryCoreUserActions.crearContacto` apunta al contrato User. Decisiones conversadas:
 
 - Uno a uno = `Fields.Many2one(..., { unique: true })`; el generador crea la inversa
   como `X?` (probado en generator.test.ts). La extensión admite Many2one y unique
@@ -152,10 +154,21 @@ estos archivos sin pedirlo. Decisiones conversadas:
 - Al instalar: `npm run orm:sync -- directory` genera y aplica migración en la base
   de desarrollo; mostrar el SQL al usuario y pedir aprobación antes.
 
+Verificación (2026-11-25, Windows): TypeScript sin emisión/incremental aprobado;
+`git diff --check` sin errores. `orm:sync -- directory --plan` aprobado, sin consultas
+a BD ni escrituras: propone crear directory_core_user con índices únicos de
+record_id/partner_id y FK a users (Cascade para record_id) y directory_partner
+(Restrict para partner_id). Es plan de fuentes, no migración aplicada ni prueba de
+persistencia. Acción rechaza vínculo existente, correo >200 caracteres y coincidencia
+exacta de correo completo sin distinguir mayúsculas; no garantiza unicidad global
+de correos. Crea persona/contacto activo con createBy explícito mediante Prisma directo.
+
 Pendientes del experimento:
-1. Que el usuario complete `partnerId` + la acción y decida instalar (orm:sync).
-2. Vista propia de la extensión con `<FormButton>` de la acción (UserForm ya tiene
-   `<ModelExtensions />`); regenerar referencias de acciones tras cambiarla.
+1. Preparar la sincronización completa, revisar destino y SQL real y obtener
+   aprobación antes de aplicarlo; después reiniciar dev si corresponde.
+2. Probar selección manual, creación y rechazos desde Usuarios; comprobar vínculo
+   y contacto persistidos. Falta añadir en la acción el comentario sobre la omisión
+   del servicio de Partner para mantener visible el límite del experimento.
 3. Si se adopta: diseñar en el núcleo un guardado de otro modelo por su servicio
    dentro de la transacción de una acción (p. ej. `context.save(...)`), con
    permisos, duplicados y errores definidos. No iniciado; requiere autorización.

@@ -3,12 +3,21 @@ import { PartnerTags } from "./models/partnertags";
 import { Partner } from "./models/partner";
 import "server-only";
 import { defineModule } from "@/lib/modules/define";
+import { UserDirectory } from "./models/user";
 
 export default defineModule({
   id: "directory",
   name: "Directorio",
   icon: "notebook",
   depends: ["ubicaciones"],
+  extends: {
+    "core.user": {
+      model: UserDirectory,
+      views: {
+        form: () => import("./views/UserDirectoryForm"),
+      },
+    },
+  },
   models: {
     partner: {
       model: Partner,

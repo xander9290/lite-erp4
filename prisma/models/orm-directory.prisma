@@ -59,6 +59,7 @@ model DirectoryPartner {
   directoryPartnerParentIdRecords DirectoryPartner[] @relation("DirectoryPartner_parentId")
   directoryPartnerTagIdsLinkSourceRecords DirectoryPartnerTagIdsLink[] @relation("DirectoryPartnerTagIdsLink_source")
   directoryPartnerActivityIdsLinkSourceRecords DirectoryPartnerActivityIdsLink[] @relation("DirectoryPartnerActivityIdsLink_source")
+  directoryCoreUserPartnerIdRecords DirectoryCoreUser? @relation("DirectoryCoreUser_partnerId")
 }
 
 model DirectoryPartnertags {
@@ -91,6 +92,20 @@ model DirectoryBusinessactivity {
   @@map("directory_businessactivity")
   directoryPartnerActivityIdsLinkTargetRecords DirectoryPartnerActivityIdsLink[] @relation("DirectoryPartnerActivityIdsLink_target")
   directoryBusinessactivityParentIdRecords DirectoryBusinessactivity[] @relation("DirectoryBusinessactivity_parentId")
+}
+
+model DirectoryCoreUser {
+  id String @id @default(cuid())
+  recordId String @unique @map("record_id")
+  record User @relation("DirectoryCoreUser_recordId", fields: [recordId], references: [id], onDelete: Cascade)
+  partnerId String? @unique @map("partner_id")
+  partner DirectoryPartner? @relation("DirectoryCoreUser_partnerId", fields: [partnerId], references: [id], onDelete: Restrict)
+  createBy String? @map("create_by")
+  createByUser User? @relation("DirectoryCoreUser_createBy", fields: [createBy], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([createBy])
+  @@map("directory_core_user")
 }
 
 model DirectoryPartnerTagIdsLink {
