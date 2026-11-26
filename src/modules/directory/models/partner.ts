@@ -1,6 +1,13 @@
 import "server-only";
-import { Fields, Model, ModelValidationError as Err, type DisplayRecord, constraint } from "@/lib/orm";
+import {
+  Fields,
+  Model,
+  ModelValidationError as Err,
+  type DisplayRecord,
+  constraint,
+} from "@/lib/orm";
 import { ModelTypes } from "@/types/model-types";
+import { Files } from "lucide-react";
 
 export class Partner extends Model {
   name = Fields.Text({
@@ -137,6 +144,11 @@ export class Partner extends Model {
     domain: (d) => d.eq("active", true),
     tracking: true,
   });
+  emailIds = Fields.One2many("DirectoryPartneremails", {
+    label: "Correos adicionales",
+    inverse: "partnerId",
+    maxRows: 10,
+  });
 
   displayName(record: DisplayRecord<Partner, "name">): string {
     return record.name;
@@ -144,7 +156,8 @@ export class Partner extends Model {
 
   // SE NORMALIZA CURP Y RFC EN MAYÚSCULA
   normalize(values: ModelTypes["values"]) {
-    const normalizeCode = (value: unknown) => (typeof value === "string" ? value.trim().toUpperCase() : value);
+    const normalizeCode = (value: unknown) =>
+      typeof value === "string" ? value.trim().toUpperCase() : value;
 
     return {
       ...values,
@@ -163,11 +176,17 @@ export class Partner extends Model {
     // El RFC continúa siendo opcional.
     if (vat == null || vat === "") return;
 
-    const pattern = partnerType === "person" ? /^[A-ZÑ&]{4}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$/ : /^[A-ZÑ&]{3}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$/;
+    const pattern =
+      partnerType === "person"
+        ? /^[A-ZÑ&]{4}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$/
+        : /^[A-ZÑ&]{3}[0-9]{2}(0[1-9]|1[0-2])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$/;
 
     if (typeof vat !== "string" || !pattern.test(vat)) {
       throw new Err("Revisa el RFC.", {
-        vat: partnerType === "person" ? "Introduce un RFC de persona física de 13 caracteres." : "Introduce un RFC de persona moral de 12 caracteres.",
+        vat:
+          partnerType === "person"
+            ? "Introduce un RFC de persona física de 13 caracteres."
+            : "Introduce un RFC de persona moral de 12 caracteres.",
       });
     }
 
@@ -178,7 +197,11 @@ export class Partner extends Model {
 
     const date = new Date(Date.UTC(year, month - 1, day));
 
-    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
       throw new Err("Revisa el RFC.", {
         vat: "El RFC contiene una fecha de calendario inválida.",
       });
@@ -209,7 +232,11 @@ export class Partner extends Model {
 
     const date = new Date(Date.UTC(year, month - 1, day));
 
-    if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
       throw new Err("Revisa la CURP.", {
         curp: "La CURP contiene una fecha de calendario inválida.",
       });
@@ -232,7 +259,10 @@ export class Partner extends Model {
   }
 
   @constraint("parentId")
-  async validateParent(values: ModelTypes["values"], context: ModelTypes["context"]) {
+  async validateParent(
+    values: ModelTypes["values"],
+    context: ModelTypes["context"],
+  ) {
     const parentId = values.parentId;
 
     if (typeof parentId !== "string" || !parentId) return;
@@ -267,12 +297,17 @@ export class Partner extends Model {
       });
 
       if (child) {
-        reject("Un contacto con direcciones adicionales no puede depender de otro.");
+        reject(
+          "Un contacto con direcciones adicionales no puede depender de otro.",
+        );
       }
     }
   }
 
-  async beforeSave(values: ModelTypes["values"], context: ModelTypes["context"]) {
+  async beforeSave(
+    values: ModelTypes["values"],
+    context: ModelTypes["context"],
+  ) {
     const [municipio, estado, pais] = await Promise.all([
       typeof values.countyId === "string"
         ? context.tx.ubicacionesMunicipio.findUnique({
@@ -296,9 +331,19 @@ export class Partner extends Model {
         : null,
     ]);
 
-    const calle = [values.street, values.streetNumber].filter(Boolean).join(" ");
+    const calle = [values.street, values.streetNumber]
+      .filter(Boolean)
+      .join(" ");
 
-    const completeAddress = [calle, values.zipNumber, municipio?.name, estado?.name, pais?.name].filter(Boolean).join(", ");
+    const completeAddress = [
+      calle,
+      values.zipNumber,
+      municipio?.name,
+      estado?.name,
+      pais?.name,
+    ]
+      .filter(Boolean)
+      .join(", ");
 
     return {
       ...values,

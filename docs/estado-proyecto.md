@@ -6,9 +6,43 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Continuidad actual: páginas por grupo implementadas (2026-11-26, Windows)
+## Continuidad actual: correos adicionales de Directorio (2026-11-26, Windows)
 
-Rama codex/partner sobre 06fa8a6, **cambios sin commit**. Plan aprobado por el
+Rama codex/partner, HEAD d76374c (commit del usuario con páginas por grupo).
+Migración `20261126120000_group_page_visibility` **aplicada con aprobación** en
+desarrollo Windows el 2026-11-26 (`npm run db:deploy`); no asumir otras máquinas.
+Falta la prueba en navegador de páginas por grupo: requiere que el usuario inicie
+sesión (admin para configurar, luego un usuario no admin del grupo).
+
+Ejercicio del usuario en curso, **sin commit**: modelo `PartnerEmails`
+(src/modules/directory/models/partneremails.ts, contrato DirectoryPartneremails:
+name=correo, partnerId, usage Selection billing/collection/purchasing/sales/
+logistics/general, sendDocuments, active), `Partner.emailIds` One2many
+(inverse partnerId, maxRows 10) y página «Correos adicionales» (`emails`) en
+PartnerForm con FieldOne2many. Migraciones 20261126224841 y 20261126225957
+(sync_directory) generadas por orm:sync y aplicadas (`migrate status` al día).
+Decisiones explicadas: correo principal en el contacto + colección de buzones
+con uso; personas distintas son contactos hijos; `sendDocuments` marca los que
+reciben envíos; `isDefault` descartado hasta que exista un proceso de envío.
+
+Pendientes detectados (del usuario, no corregidos por el agente):
+- `@constraint("email")`/normalize usan `email`, pero el campo es `name`: el
+  manifest falla con «Restricción inválida/duplicada: validateEmail». Cambiar a
+  `name` (o renombrar el campo y su displayName).
+- `partner_id` quedó nullable en SQL (la primera migración se generó antes de
+  `required: true`); el modo aditivo no lo endurece: revisar con
+  `orm:sync -- directory --force` cuando no haya filas sin contacto.
+- `name` tiene `unique: true` global: un correo no puede repetirse entre
+  contactos. Confirmar si es lo deseado; si no, validar duplicados por contacto
+  con `@constraint("emailIds")` en Partner.
+- Agregar `emails: "Correos adicionales"` a `pages.additionalInfo` del manifest si
+  debe ocultarse por grupo (sin eso, la consola de desarrollo avisa).
+- partner.ts importa `Files` de lucide-react sin usarlo; los modelos los carga
+  orm:sync desde scripts: retirar el import.
+
+## Continuidad anterior: páginas por grupo implementadas (2026-11-26, Windows)
+
+Rama codex/partner sobre 06fa8a6; el usuario lo incluyó en d76374c. Plan aprobado por el
 usuario (catálogo `pages` en el manifest; alcance modelo+pantalla+form/modal+
 notebook+página) e implementado; contrato y lista de archivos en
 [Páginas por grupo](ideas/permisos-campos.md#implementado-2026-11-26), guía en

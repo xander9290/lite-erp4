@@ -244,8 +244,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   valores/validación intactos, aviso genérico con errores ocultos; fieldAccess sigue
   protegiendo datos. Acumulación por implies, grupos sólo de su módulo, admin con
   bypass. Sólo Notebook con `id` dentro de ModelForm. Migración
-  20261126120000_group_page_visibility pendiente de aplicar con aprobación: sin ella
-  fallan las capacidades de no administradores y Grupos. Contrato en
+  20261126120000_group_page_visibility aplicada con aprobación en desarrollo
+  Windows el 2026-11-26; en otras máquinas, sin ella fallan las capacidades de no
+  administradores y Grupos. Contrato en
   [Páginas por grupo](docs/ideas/permisos-campos.md#siguiente-pendiente-ocultar-páginas-por-grupo-2026-11-25)
   y guía en docs/backend.md.
 

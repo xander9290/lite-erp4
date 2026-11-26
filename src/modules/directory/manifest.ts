@@ -1,3 +1,4 @@
+import { PartnerEmails } from "./models/partneremails";
 import { BusinessActivity } from "./models/businessactivity";
 import { PartnerTags } from "./models/partnertags";
 import { Partner } from "./models/partner";
@@ -76,6 +77,8 @@ export default defineModule({
       model: BusinessActivity,
       views: { form: () => import("./views/BusinessactivityForm") },
     },
+  
+    partneremails: PartnerEmails,
   },
   menu: {
     Catálogos: {

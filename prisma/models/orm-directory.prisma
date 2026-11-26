@@ -12,6 +12,16 @@ enum DirectoryPartnerTypeEnum {
   @@map("directory_partner_type")
 }
 
+enum DirectoryPartneremailsUsageEnum {
+  billing
+  collection
+  purchasing
+  sales
+  logistics
+  general
+  @@map("directory_partneremails_usage")
+}
+
 model DirectoryPartner {
   id String @id @default(cuid())
   name String @db.VarChar(120)
@@ -59,6 +69,7 @@ model DirectoryPartner {
   directoryPartnerParentIdRecords DirectoryPartner[] @relation("DirectoryPartner_parentId")
   directoryPartnerTagIdsLinkSourceRecords DirectoryPartnerTagIdsLink[] @relation("DirectoryPartnerTagIdsLink_source")
   directoryPartnerActivityIdsLinkSourceRecords DirectoryPartnerActivityIdsLink[] @relation("DirectoryPartnerActivityIdsLink_source")
+  directoryPartneremailsPartnerIdRecords DirectoryPartneremails[] @relation("DirectoryPartneremails_partnerId")
   directoryCoreUserPartnerIdRecords DirectoryCoreUser? @relation("DirectoryCoreUser_partnerId")
 }
 
@@ -92,6 +103,23 @@ model DirectoryBusinessactivity {
   @@map("directory_businessactivity")
   directoryPartnerActivityIdsLinkTargetRecords DirectoryPartnerActivityIdsLink[] @relation("DirectoryPartnerActivityIdsLink_target")
   directoryBusinessactivityParentIdRecords DirectoryBusinessactivity[] @relation("DirectoryBusinessactivity_parentId")
+}
+
+model DirectoryPartneremails {
+  id String @id @default(cuid())
+  name String @unique @db.VarChar(120)
+  partnerId String? @map("partner_id")
+  partner DirectoryPartner? @relation("DirectoryPartneremails_partnerId", fields: [partnerId], references: [id], onDelete: Restrict)
+  usage DirectoryPartneremailsUsageEnum @default(general)
+  sendDocuments Boolean @default(true) @map("send_documents")
+  active Boolean @default(true)
+  createBy String? @map("create_by")
+  createByUser User? @relation("DirectoryPartneremails_createBy", fields: [createBy], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([partnerId])
+  @@index([createBy])
+  @@map("directory_partneremails")
 }
 
 model DirectoryCoreUser {
