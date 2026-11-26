@@ -22,16 +22,7 @@ export default defineModule({
     partner: {
       model: Partner,
       list: {
-        fields: [
-          "image",
-          "name",
-          "phones",
-          "street",
-          "streetNumber",
-          "vat",
-          "provinceId",
-          "countyId",
-        ],
+        fields: ["image", "name", "phones", "street", "streetNumber", "vat", "provinceId", "countyId"],
       },
       defaultScreen: "contacts",
       screens: {
@@ -81,4 +72,24 @@ export default defineModule({
       "Actividad empresarial": "businessactivity",
     },
   },
+  groups: { admin: "Administrador", auxiliar: "Auxiliar", read: "Consulta" },
+  access: [
+    {
+      group: "admin",
+      models: ["partner", "businessactivity", "partnertags"],
+      perms: "crud",
+      import: true,
+      export: true,
+    },
+    {
+      group: "auxiliar",
+      models: ["partner", "businessactivity", "partnertags"],
+      perms: "cru",
+    },
+    {
+      group: "read",
+      models: ["partner", "businessactivity", "partnertags"],
+      perms: "r",
+    },
+  ],
 });

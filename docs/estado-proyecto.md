@@ -6,6 +6,41 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
+## Continuidad actual: siguiente pendiente, páginas por grupo (2026-11-25)
+
+Revisión local de documentación, fuentes y Git. Rama codex/partner, HEAD 6f06474
+(progreso actual). Screens está implementado y aplicado a Contactos/Direcciones;
+la guía de Otras direcciones sigue cerrada. UserDirectory conserva únicamente el
+vínculo manual opcional/único con Partner; no restaurar creación automática ni
+sincronización de imágenes. El cierre Windows inferior conserva su evidencia.
+
+Cambio local del usuario comprobado en manifest de Directorio: grupos admin
+(Administrador, CRUD e import/export), auxiliar (CRU) y read (Consulta, R), sobre
+partner/businessactivity/partnertags, más formato de list.fields. Se conserva esa
+edición; leer el manifest no acredita asignaciones de usuarios, overrides ni
+comportamiento real de permisos en BD. Este guardado sólo actualiza documentos.
+
+**Siguiente implementación solicitada:** ocultar NotebookPage desde Grupos en los
+formularios de modelos. Usar name como identificador estable de página, dentro
+del alcance modelo + pantalla + form/modal + Notebook estable, sin id adicional
+obligatorio por página. label permanece como texto visible. Ocultar es presentación:
+los permisos de campos/datos y la validación del modelo siguen siendo independientes.
+
+Plan y aceptación en [Páginas por grupo](ideas/permisos-campos.md#siguiente-pendiente-ocultar-páginas-por-grupo-2026-11-25).
+Aún no implementado. Al retomarlo, definir publicación del catálogo y selección
+segura de páginas, conservar borradores y resolver alcance/herencia de grupos.
+Este pedido guarda el pendiente; no inicia cambios de código, esquema ni SQL.
+
+Los demás pendientes se conservan por separado: comprobación local del vínculo
+User–Partner/migración, formulario de página de Direcciones opcional, transfer por
+pantalla (importación/exportación, actualmente sólo en default) y tipado de
+referencias { model, screen }, además de las oportunidades generales anteriores.
+La nueva prioridad no convierte esos puntos en implementaciones ni los cierra.
+
+Verificación de este guardado: git diff --check y enlaces locales de los documentos.
+Sin repetir pruebas de código ni consultar BD, navegador, servidor o remoto.
+No commit/push/pull, migraciones ni nuevas asignaciones/restricciones de grupos.
+
 ## Cierre de continuidad (2026-11-25, Windows)
 
 Rama `codex/partner`, HEAD `7abffb1` (`se remueve experimento de crear contacto en

@@ -83,6 +83,51 @@ presentación completa siguen pendientes. Required por grupo quedó fuera del
 alcance el 2026-11-21; sólo reconsiderarlo ante un caso real. La obligatoriedad
 del modelo se conserva.
 
+## Siguiente pendiente: ocultar páginas por grupo (2026-11-25)
+
+Solicitado como siguiente implementación por el usuario. Aún no implementado;
+este guardado sólo registra el alcance y no modifica componentes, permisos,
+esquema o datos. La restricción es de presentación, independiente de No leer y
+No escribir sobre los campos y del acceso al modelo.
+
+Identidad propuesta: usar NotebookPage.name como identificador estable de la
+página, sin añadir un id obligatorio a cada NotebookPage. El name ya es único
+dentro de su Notebook. Combinarlo con modelo, pantalla, layout form/modal y una
+identidad estable del Notebook para distinguir páginas homónimas en formularios,
+modales o pantallas distintas. label es sólo texto visible y puede cambiar sin
+alterar la política. Renombrar name o el contenedor estable requiere revisar su
+configuración; no persistir IDs efímeros generados por React/useId.
+
+Configuración esperada: Ajustes → Grupos → modelo → formulario/pantalla → páginas
+→ Ocultar. Concretar la forma del catálogo de páginas y su publicación desde
+servidor al implementar: no aceptar nombres arbitrarios enviados por el cliente
+ni asumir que el registro de Fields ya publica el JSX de las vistas.
+
+Alcance y criterios de aceptación:
+
+- Restricción efectiva por grupo y grupos implicados, siguiendo la acumulación
+  positiva y el bypass de administrador de las políticas actuales. Ocultar no
+  concede ni revoca permisos de datos; un componente no debe anular la política.
+- Ocultar pestaña y panel; seleccionar la primera página visible/habilitada si la
+  activa queda oculta. Resolver el Notebook sin páginas visibles sin controles
+  vacíos, desbordamiento ni navegación por teclado hacia elementos ocultos.
+- Conservar valores/borradores y validaciones del modelo. Ocultar una página no
+  elimina required, constraints ni permisos de campos, y no debe borrar datos.
+  Los errores en páginas ocultas deben tener una respuesta comprensible sin
+  revelar la página contra la política ni relajar validaciones silenciosamente.
+- Considerar layouts form/modal, varias pantallas, Notebook anidados y páginas
+  añadidas por extensiones/inserciones; evitar colisiones por name repetido en
+  contenedores distintos. Una vista fuera del contrato declarativo conserva su
+  adaptación explícita, igual que las políticas de campos existentes.
+- Definir catálogo/identidad del Notebook, almacenamiento y eventual migración
+  al implementar. No ejecutar SQL ni configurar restricciones reales por este
+  registro. Añadir pruebas con fixtures ficticios de aislamiento por alcance,
+  herencia/admin, selección de pestaña y conservación de borradores.
+
+Permisos por presentación completa, required por grupo y una nueva capa de
+acciones de navegación conservan su alcance separado; no se incorporan por este
+pendiente. El soporte actual de screens ya está implementado.
+
 ## Migración y comprobaciones
 
 20261121220000_field_action_restrictions crea dos tablas vacías y sus claves

@@ -237,6 +237,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Ideas pendientes
 
+- **Siguiente pendiente solicitado (2026-11-25): ocultar NotebookPage por grupo
+  en formularios de modelos.** Usar name como identificador de página (sin id extra
+  obligatorio), con alcance modelo+pantalla+form/modal+Notebook estable; label sólo
+  presentación. Configuración desde Grupos; ocultar pestaña/panel sin sustituir
+  permisos de campos/datos ni validaciones. Resolver catálogo/identidad, herencia,
+  selección y borradores al implementar. Aún no implementado; este guardado no
+  inicia la función. Alcance y aceptación en
+  [Páginas por grupo](docs/ideas/permisos-campos.md#siguiente-pendiente-ocultar-páginas-por-grupo-2026-11-25).
+
 - **Pantallas nombradas por modelo (implementadas 2026-11-25, primera versión).**
   `screens` indexado por ID (label, view, domain, defaults, views) y `defaultScreen`;
   exclusivo con view/views/domain del modelo. Sin screens hay una pantalla implícita
