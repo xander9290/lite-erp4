@@ -26,6 +26,7 @@ import { screenHref, type ModelClientConfig } from "@/lib/modules/config";
 import type { FieldMetadata } from "@/lib/orm/fields";
 import ModelCollection from "./ModelCollection";
 import FieldVisibility from "@/components/ui/form/FieldVisibility";
+import { NotebookPolicyContext } from "@/components/ui/form/notebookContext";
 import type { ListState } from "@/lib/list/types";
 import { modelChildren, modelRelationLookup, modelAction, modelActivity, modelDelete, modelNote, modelRead, modelSave } from "@/lib/modules/actions";
 import { modelUiCapabilities } from "@/lib/access/capabilities";
@@ -167,6 +168,8 @@ function Editor({ ui, record, displayName, onReload, children, density }: { ui: 
   const kind = useModelFormViewKind(config.id);
   const insertions = useModelExtensionInsertions(kind, config.id);
   const insertionModules = useMemo(() => (config.extensions ?? []).map(extension => ({ module: extension.module, depends: extension.depends ?? [] })), [config.extensions]);
+  // Group page policy of this layout (page form or dialog), computed by the server for the screen.
+  const pagePolicy = useMemo(() => config.hiddenPages ? { declared: new Set(config.hiddenPages.declared), hidden: new Set(modal ? config.hiddenPages.modal : config.hiddenPages.form) } : null, [config.hiddenPages, modal]);
   return <ModelUIContext.Provider value={ui}><ChildCollectionRefreshContext.Provider value={collectionRefresh}><FormView
     density={density}
     layout={modal ? "content" : "page"}
@@ -196,7 +199,9 @@ function Editor({ ui, record, displayName, onReload, children, density }: { ui: 
     footer={<p className="text-xs text-base-content/55">Los cambios se guardan al presionar Guardar.</p>}
   >
     <FormDialogLock />
-    <InsertionProvider modules={insertionModules} collectors={insertions}>{children ?? <ModelFields ui={ui} />}</InsertionProvider>
+    <NotebookPolicyContext.Provider value={pagePolicy}>
+      <InsertionProvider modules={insertionModules} collectors={insertions}>{children ?? <ModelFields ui={ui} />}</InsertionProvider>
+    </NotebookPolicyContext.Provider>
   </FormView></ChildCollectionRefreshContext.Provider></ModelUIContext.Provider>;
 }
 

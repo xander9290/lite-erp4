@@ -1,7 +1,7 @@
 import type { groupDetail } from "@/lib/access/admin";
 import { fieldRestrictionKeys } from "@/lib/access/element-policy";
 import ActionForm from "./ActionForm";
-import { saveFieldRestrictions, saveActionRestrictions, saveMenuVisibility } from "./actions";
+import { saveFieldRestrictions, saveActionRestrictions, saveMenuVisibility, savePageVisibility } from "./actions";
 
 type Detail = NonNullable<Awaited<ReturnType<typeof groupDetail>>>;
 const labels = { noRead: "No leer", noWrite: "No escribir", invisible: "Invisible", readOnly: "Sólo lectura" };
@@ -51,5 +51,20 @@ export function MenuVisibility({ group, menus }: { group: string; menus: Detail[
         })}</tbody>
       </table></div>
     </ActionForm> : <p className="text-sm text-base-content/60">Este módulo no declara menús administrables.</p>}
+  </section>;
+}
+
+export function PageVisibility({ group, pages }: { group: string; pages: Detail["pages"] }) {
+  return <section className="col-span-full space-y-3 p-3" aria-label="Visibilidad de páginas">
+    <p className="text-sm text-base-content/70">Ocultar retira la pestaña del formulario en esa pantalla y presentación. Es sólo presentación: los valores se conservan y las restricciones de campos y la validación siguen aplicando. Sólo aparecen las páginas declaradas en <code>pages</code> del modelo.</p>
+    {pages.length ? <ActionForm action={savePageVisibility} label="Guardar páginas">
+      <input type="hidden" name="group" value={group} />
+      <div className="overflow-x-auto"><table className="table table-sm"><thead><tr><th>Modelo</th><th>Pantalla</th><th>Presentación</th><th>Página</th><th>Ocultar</th></tr></thead>
+        <tbody>{pages.map(page => {
+          const identity = [page.model, page.screen, page.layout, page.notebook, page.page].join("|");
+          return <tr key={identity}><td>{page.modelLabel}</td><td>{page.screenLabel}</td><td>{page.layoutLabel}</td><td>{page.label}<input type="hidden" name="page" value={identity} /><code className="ml-2 text-xs text-base-content/50">{page.notebook}/{page.page}</code></td><td><input type="checkbox" className="checkbox checkbox-sm" name={`${identity}|hidden`} defaultChecked={page.hidden} aria-label={`Ocultar ${page.modelLabel} · ${page.screenLabel} · ${page.layoutLabel}: ${page.label}`} /></td></tr>;
+        })}</tbody>
+      </table></div>
+    </ActionForm> : <p className="text-sm text-base-content/60">Los modelos de este módulo no declaran páginas ocultables.</p>}
   </section>;
 }

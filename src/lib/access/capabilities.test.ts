@@ -28,6 +28,7 @@ function fixture({ groups = ["unit.writer"], overrides = [] as Override[], activ
     accessFieldRestriction: { findMany: async () => [] },
     accessActionRestriction: { findMany: async () => [] },
     accessMenuHidden: { findMany: async () => [] },
+    accessPageHidden: { findMany: async () => [] },
     accessModelOverride: { findMany: async ({ where }: { where: { model: { in: string[] }; groupId: { in: string[] } } }) => {
       queries.push("overrides");
       assert.deepEqual(where.model.in, [...catalog.models.keys()]);

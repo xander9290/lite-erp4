@@ -68,3 +68,16 @@ model AccessMenuHidden {
   @@id([groupId, application, menu])
   @@map("access_menu_hidden")
 }
+
+// Form presentation exceptions: Notebook pages declared in a model's `pages` catalog.
+// Hiding a page never changes field/data permissions or validation.
+model AccessPageHidden {
+  groupId String @map("group_id") @db.VarChar(120)
+  model String @db.VarChar(120)
+  screen String @db.VarChar(60)
+  layout String @db.VarChar(10)
+  notebook String @db.VarChar(60)
+  page String @db.VarChar(60)
+  @@id([groupId, model, screen, layout, notebook, page])
+  @@map("access_page_hidden")
+}

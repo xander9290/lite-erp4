@@ -128,6 +128,125 @@ Permisos por presentación completa, required por grupo y una nueva capa de
 acciones de navegación conservan su alcance separado; no se incorporan por este
 pendiente. El soporte actual de screens ya está implementado.
 
+### Implementado (2026-11-26)
+
+Aprobado por el usuario con catálogo en el manifest (A) y alcance por pantalla y
+presentación (B). Código: `src/lib/modules/pages.ts` (compilePages, hiddenPagesFor),
+`pages` en define.ts/compose.ts (también en extensiones), `AccessPageHidden` en
+access-control.prisma con la migración `20261126120000_group_page_visibility`
+(**no aplicada**), `src/lib/access/page-policy.server.ts` + readAccessCapabilities
+(`hiddenPages`), `config.hiddenPages = { declared, form, modal }` en modelClientConfig
+(pantalla default) y ModelRoute (pantalla presentada), `NotebookPolicyContext` desde
+ModelForm, Notebook (sin pestaña, panel montado como deshabilitado, fallback a la
+primera visible, sin marco si todas ocultas, aviso genérico ante errores ocultos,
+avisos de consola en desarrollo) y FormView (no enfoca campos de páginas
+deshabilitadas/ocultas). Grupos: `groupDetail().pages`, `setPageVisibility` y la
+pestaña «Páginas». Directorio declara `pages.additionalInfo` de Partner.
+
+Diferencias con el plan: no se detecta en desarrollo un notebook del catálogo que
+ningún formulario monte (sólo desajustes de páginas en un Notebook montado, como
+console.warn). El aviso de errores ocultos lo pinta el Notebook, no FormView.
+
+Importante: hasta aplicar la migración, la consulta de páginas ocultas falla para
+usuarios no administradores (capacidades por petición) y al abrir un grupo en Ajustes.
+Aplicarla requiere aprobación del usuario (`npm run db:deploy` o el flujo orm:sync).
+
+### Plan de implementación (2026-11-26, aprobado; ver «Implementado»)
+
+Precedentes que se reutilizan: `AccessMenuHidden` + `setMenuVisibility` (ocultar
+por grupo sólo como presentación), `loadElementPolicies` (acumulación positiva por
+grupos implicados, sólo grupos del módulo dueño, bypass de admin), `groupDetail`
+(catálogo desde el registro, nunca desde el navegador) y `config.fieldAccess`
+(política proyectada por actor en ModelClientConfig). Hoy Notebook ya monta todas
+las páginas y oculta las inactivas con `hidden` + `inert`; `id` es opcional (si
+falta usa `useId`, no estable) y ya sirve de ancla de inserciones.
+
+**1. Catálogo declarado en el manifest (decisión A).** Las páginas viven en TSX
+de cliente y el servidor no puede leerlas. Propuesta: el modelo declara sus
+páginas ocultables, con el id del Notebook y el name de cada página:
+
+```ts
+partner: {
+  // ...
+  pages: {
+    additionalInfo: { otherAddresses: "Otras direcciones", sales: "Ventas", purchase: "Compras", otherInfo: "Otra información" },
+  },
+}
+```
+
+- Compilación: ids/names con el mismo patrón que los IDs de pantalla, etiquetas no
+  vacías, límites (p. ej. 8 notebooks × 20 páginas). Sólo lo declarado se puede
+  ocultar; lo no declarado se comporta como hoy.
+- Comprobación en desarrollo: si un Notebook con `id` de un formulario de modelo
+  pinta una página declarada que no existe, o el catálogo nombra un notebook que
+  ningún formulario monta, `console.error` como las inserciones. No falla en
+  producción.
+- Extensiones: `extends["x.modelo"].pages` añade páginas al catálogo del modelo
+  base (insertadas con `notebook:<id>`); colisión de name → error al componer.
+- Alternativa B (no recomendada para la primera versión): extraer el catálogo del
+  TSX con el compilador de TypeScript durante `orm:generate`, sólo con literales.
+  Evita duplicar, pero añade un analizador frágil y archivos generados que caducan.
+
+**2. Alcance de la regla (decisión B).** Fila = grupo + modelo + pantalla + layout
+(form/modal) + notebook + página, como pide el pendiente. Ajustes lista, por cada
+pantalla × layout del modelo, el catálogo completo. Alternativa más simple:
+grupo + modelo + notebook + página (misma vista en todas las pantallas/modales).
+
+**3. Almacenamiento.** Tabla nueva `access_page_hidden` (`AccessPageHidden`) con
+PK compuesta de los campos del alcance, igual a `access_menu_hidden`. Migración
+vacía, sin datos de negocio; aplicarla requiere aprobación. Filas cuyo catálogo
+desaparece se ignoran al proyectar y se pueden limpiar desde Grupos.
+
+**4. Servidor.**
+- `loadElementPolicies` carga también las páginas ocultas (mismo filtro de módulo
+  dueño); `ElementPolicies.hiddenPages[model]` como claves de alcance.
+- `projectElementAccess` / `modelClientConfig` proyectan para la pantalla y layout
+  pedidos `config.hiddenPages: readonly string[]` (`"<notebook>/<page>"`),
+  filtrado contra el catálogo compuesto. Admin → vacío. También en form-open
+  (modales) y en el formulario de página de ModelRoute.
+- Admin: `groupDetail` añade `pages` (modelo · pantalla · layout · notebook ·
+  página, etiqueta, hidden) y `setPageVisibility(groupId, changes)` valida cada
+  cambio contra el catálogo y sólo toca las filas enviadas (≤1000, Serializable),
+  como `setMenuVisibility`.
+
+**5. Cliente.**
+- ModelForm provee un contexto `FormPagePolicy` con `hiddenPages`; Notebook con
+  `id` lo lee. Una página oculta: sin pestaña, panel montado pero siempre
+  `hidden` + `inert` y nunca activable (clic, teclado, `defaultPage`,
+  `activePage` ni el evento de revelar errores). Conserva valores RHF, borradores
+  y validación Zod/servidor; la protección de datos sigue siendo de fieldAccess.
+- Selección: si la página activa o `defaultPage` está oculta, la primera visible
+  y habilitada. Todas ocultas: no se pinta el Notebook (sin tablist vacío).
+- Errores en una página oculta: FormView no intenta enfocarlos; muestra un aviso
+  genérico «Hay datos que no puedes revisar en este formulario; contacta a un
+  administrador» sin nombrar la página ni los campos. No se relaja la validación.
+- Notebook sin `id` o fuera de ModelForm: sin cambios.
+
+**6. Ajustes → Grupos.** Sección «Páginas» junto a Campos/Acciones con la misma
+UI de casillas («Ocultar»), agrupada por modelo · pantalla · formulario/modal.
+
+**7. Directorio.** Declarar `pages.additionalInfo` de Partner (PartnerForm ya usa
+`id="additionalInfo"`). UserForm (`userNotebook`, core) queda fuera: core no tiene
+grupos de módulo y las reglas sólo aplican a modelos del módulo del grupo.
+
+**8. Pruebas y verificación.**
+- Unitarias: compilación del catálogo (patrones, duplicados, extensiones,
+  límites), acumulación por grupos implicados, módulo ajeno ignorado, bypass de
+  admin, proyección por pantalla/layout, `setPageVisibility` rechaza páginas fuera
+  del catálogo y no toca otras filas.
+- Componente (render en servidor/DOM): pestaña omitida, activa por defecto oculta
+  → primera visible, todas ocultas → sin Notebook, valores conservados al guardar,
+  error en página oculta → aviso genérico sin revelar.
+- Integración PostgreSQL en esquema temporal: migración y políticas.
+- Regresión: test:access, test:form-model, test:form-navigation, test:modules,
+  test:views; TypeScript y ESLint. Navegador en Directorio con un grupo de prueba
+  que el usuario asigne (Claude no crea asignaciones reales sin pedirlo).
+
+Fuera de alcance: ocultar FormGroup/Stack u otros contenedores, ocultar por
+condición del registro, required por grupo y vistas manuales fuera de ModelForm.
+Decisiones pendientes del usuario: A (catálogo en manifest o extraído del TSX) y
+B (alcance con pantalla/layout o sólo modelo).
+
 ## Migración y comprobaciones
 
 20261121220000_field_action_restrictions crea dos tablas vacías y sus claves

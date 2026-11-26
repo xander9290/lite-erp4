@@ -21,6 +21,7 @@ import type { CollectionDomain } from "../orm/domain";
 import { validateTransferSpec, type TransferSpec } from "../list/transfer-contract";
 import { decoratedMethods } from "../orm/decorators";
 import { compileScreens, defaultScreenId, type CompiledScreen, type ModelScreen } from "./screens";
+import { compilePages, type CatalogPage, type ModelPages } from "./pages";
 
 type ModelClass = new () => Model;
 export type ModuleModelSpec =
@@ -68,6 +69,12 @@ export type ModuleModelSpec =
       readonly screens?: Readonly<Record<string, ModelScreen<ModelViews>>>;
       /** Screen opened by plain menu links and relations (default: the first declared screen). */
       readonly defaultScreen?: string;
+      /**
+       * Notebook pages that groups may hide in this model's forms: `{ <Notebook id>: { <page
+       * name>: "Etiqueta" } }`, the same literals as the view's <Notebook id> and <NotebookPage
+       * name>. Presentation only. See docs/ideas/permisos-campos.md («Páginas por grupo»).
+       */
+      readonly pages?: ModelPages;
     };
 export type ModuleModelOptions = Exclude<ModuleModelSpec, ModelClass>;
 export type ModelFormView = ComponentType<{ config: ModelClientConfig; id?: string }>;
@@ -92,6 +99,8 @@ export type ModuleExtensionSpec =
        * Exclusive with `views.form`. Design: docs/ideas/inserciones-vistas.md.
        */
       readonly insertions?: ModelInsertions;
+      /** Pages this extension adds to Notebooks of the base form (`notebook:<id>` insertions). */
+      readonly pages?: ModelPages;
     };
 /**
  * Lazy loaders (`() => import("./views/TareaForm")`): views are client components, and a
@@ -145,6 +154,8 @@ export type ModelExtensionInfo = {
   readonly insertions?: ModelInsertions;
   /** Transitive dependencies of the extending module (insertion order and published targets). */
   readonly depends?: readonly string[];
+  /** Hideable pages contributed by the extension. */
+  readonly pages?: ModelPages;
   /** Many2many of the extension: field and relation (on the companion model) of its links. */
   readonly many2many?: readonly { readonly field: string; readonly source: string; readonly maximum: number }[];
   /** Prisma relation (on the base model) to the companion row; absent without persistent fields. */
@@ -167,6 +178,7 @@ export type ModuleExtension = {
   readonly many2many: readonly string[];
   readonly views?: ExtensionViews;
   readonly insertions?: ModelInsertions;
+  readonly pages?: ModelPages;
   readonly companion?: { readonly name: string; readonly table: string; readonly relation: string };
 };
 
@@ -193,6 +205,8 @@ export type ModuleModel = {
   /** Compiled screens; models without `screens` have one implicit "default" screen. */
   readonly screens: Readonly<Record<string, CompiledScreen<ModelViews>>>;
   readonly defaultScreen: string;
+  /** Hideable Notebook pages: the model's own, then those of its extensions. */
+  readonly pages: readonly CatalogPage[];
   /** Original manifest declaration, recompiled by the registry when other modules extend it. */
   readonly declaration: ModuleModelOptions;
   /** Extensions composed onto this model by the registry (empty in the declaring module). */
@@ -347,6 +361,7 @@ export function compileModuleModel(id: string, modelKey: string, options: Module
   const kanban = compileKanbanConfig(options.kanban, contract.metadata, contract.actions, list.fields);
   const { screens, defaultScreen } = compileScreens(`${id}.${modelKey}`, options, { label, hasKanban: Boolean(kanban), metadata: contract.metadata as Readonly<Record<string, FieldMetadata>>, clientFields });
   const main = screens[defaultScreen];
+  const pages = extensions.reduce<readonly CatalogPage[]>((catalog, extension) => compilePages(`${extension.module} → ${id}.${modelKey}`, extension.module, extension.pages, catalog), compilePages(`${id}.${modelKey}`, id, options.pages));
   return Object.freeze({
     id: `${id}.${modelKey}`,
     key: modelKey,
@@ -366,6 +381,7 @@ export function compileModuleModel(id: string, modelKey: string, options: Module
     views: main.views,
     screens,
     defaultScreen,
+    pages,
     declaration: options,
     extensions: Object.freeze([...extensions]),
   });
@@ -384,6 +400,9 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
     const extension = isModelExtension(declaration) ? declaration : declaration?.model;
     const views = isModelExtension(declaration) ? undefined : declaration?.views;
     const insertions = isModelExtension(declaration) ? undefined : declaration?.insertions;
+    const pages = isModelExtension(declaration) ? undefined : declaration?.pages;
+    // Validated here; collisions with the base model's pages are checked when composing.
+    compilePages(`${id} → ${target}`, id, pages);
     if (views && Object.entries(views).some(([kind, loader]) => !["form", "modal"].includes(kind) || typeof loader !== "function"))
       throw new Error(`${id}: la extensión sólo registra views.form o views.modal con un loader diferido.`);
     if (
@@ -458,6 +477,7 @@ function compileExtensions(spec: ModuleSpec): { extensions: ModuleExtension[]; c
         many2many: Object.freeze(Object.keys(many)),
         ...(views ? { views } : {}),
         ...(insertions ? { insertions } : {}),
+        ...(pages ? { pages } : {}),
         ...(companion ? { companion } : {}),
       }),
     );

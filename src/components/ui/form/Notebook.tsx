@@ -1,9 +1,9 @@
 "use client";
 
-import { Children, Fragment, cloneElement, isValidElement, useCallback, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { Children, Fragment, cloneElement, isValidElement, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { CircleAlert } from "lucide-react";
 import NotebookPage, { type NotebookPageProps } from "./NotebookPage";
-import { NotebookContext, notebookPageId, notebookTabId } from "./notebookContext";
+import { NotebookContext, NotebookPolicyContext, notebookPageId, notebookTabId } from "./notebookContext";
 import { renderInsertions, useInsertionAnchors } from "./insertions/Insertions";
 import type { InsertionEntry, InsertionSlot } from "./insertions/resolve";
 
@@ -70,7 +70,25 @@ export default function Notebook({ children, pages: declaredPages, label = "Secc
   const around = providedId ? slots[`notebook:${providedId}`] : undefined;
   const names = pages.map(page => page.props.name);
   if (names.some(name => !name.trim()) || new Set(names).size !== names.length) throw new Error("Cada NotebookPage necesita un name único y no vacío.");
-  const enabled = useMemo(() => pages.filter(page => !page.props.disabled).map(page => page.props.name), [pages]);
+  // Pages hidden for the actor's groups: no tab and never activatable, but still mounted
+  // (disabled) so values, drafts and validation stay intact. Only Notebooks with `id`.
+  const policy = useContext(NotebookPolicyContext);
+  const hidden = useMemo(() => new Set(providedId && policy?.hidden.size ? pages.map(page => page.props.name).filter(name => policy.hidden.has(`${providedId}/${name}`)) : []), [pages, policy, providedId]);
+  const shown = useMemo(() => hidden.size ? pages.map(page => hidden.has(page.props.name) ? cloneElement(page, { disabled: true }) : page) : pages, [pages, hidden]);
+  const visible = useMemo(() => shown.filter(page => !hidden.has(page.props.name)), [shown, hidden]);
+  const enabled = useMemo(() => visible.filter(page => !page.props.disabled).map(page => page.props.name), [visible]);
+  const namesKey = names.join("|");
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" || !providedId || !policy) return;
+    const prefix = `${providedId}/`;
+    const declared = [...policy.declared].filter(key => key.startsWith(prefix)).map(key => key.slice(prefix.length));
+    if (!declared.length) return;
+    const current = namesKey.split("|");
+    const missing = declared.filter(name => !current.includes(name));
+    const undeclared = current.filter(name => !declared.includes(name));
+    if (missing.length) console.warn(`[páginas] El Notebook ${providedId} no pinta páginas declaradas en pages: ${missing.join(", ")}.`);
+    if (undeclared.length) console.warn(`[páginas] El Notebook ${providedId} tiene páginas sin declarar en pages (no se pueden ocultar por grupo): ${undeclared.join(", ")}.`);
+  }, [providedId, policy, namesKey]);
   const [internalPage, setInternalPage] = useState(defaultPage);
   const selected = activePage ?? internalPage;
   const active = selected && enabled.includes(selected) ? selected : enabled[0] ?? null;
@@ -92,12 +110,21 @@ export default function Notebook({ children, pages: declaredPages, label = "Secc
     tabs.current.get(name)?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
+  // Errors inside a hidden page: say so without naming the page or its fields.
+  const hiddenErrors = [...hidden].some(name => (errorCounts[name] ?? 0) > 0);
+  const hiddenNotice = hiddenErrors && <p role="alert" className="col-span-full flex items-start gap-2 rounded-xl border border-error/30 bg-error/5 p-3 text-sm text-error"><CircleAlert size={16} aria-hidden="true" className="mt-0.5 shrink-0" />Hay datos con errores en una sección que no tienes disponible. Contacta a un administrador.</p>;
+  // Every page hidden: no tablist or empty frame, only the mounted (hidden) panels.
+  if (pages.length && !visible.length) return <>{around && renderInsertions(around.before, scope)}<NotebookContext.Provider value={context}>
+    {hiddenNotice}<div hidden data-notebook-hidden="">{shown.map(page => <Fragment key={page.props.name}>{page}</Fragment>)}</div>
+  </NotebookContext.Provider>{around && renderInsertions(around.after, scope)}</>;
+
   return <>{around && renderInsertions(around.before, scope)}<NotebookContext.Provider value={context}>
+    {hiddenNotice}
     <section id={id} aria-label={label} className={`col-span-full min-w-0 scroll-mt-6 rounded-xl border border-base-300 bg-base-100 ${className}`}>
       <div className="min-w-0 overflow-x-auto rounded-t-xl border-b border-base-300 bg-base-200/40 px-2 pt-1">
         <div role="tablist" aria-label={label} aria-orientation="horizontal" className="tabs tabs-border w-max min-w-full flex-nowrap">
           {/* ARIA tabs stay navigable inside FormView's read-only disabled fieldset. */}
-          {pages.map(({ props: page }) => <div key={page.name} ref={element => { if (element) tabs.current.set(page.name, element); else tabs.current.delete(page.name); }}
+          {visible.map(({ props: page }) => <div key={page.name} ref={element => { if (element) tabs.current.set(page.name, element); else tabs.current.delete(page.name); }}
             id={notebookTabId(id, page.name)} role="tab" aria-selected={active === page.name} aria-controls={notebookPageId(id, page.name)}
             aria-disabled={page.disabled || undefined} tabIndex={active === page.name ? 0 : -1}
             className={`tab h-12 shrink-0 gap-2 px-3 text-sm font-medium outline-offset-[-4px] focus-visible:outline-2 focus-visible:outline-primary sm:px-4 ${active === page.name ? "tab-active text-primary" : "text-base-content/60"} ${page.disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer"}`}
@@ -118,7 +145,7 @@ export default function Notebook({ children, pages: declaredPages, label = "Secc
           </div>)}
         </div>
       </div>
-      {pages.map(page => <Fragment key={page.props.name}>{page}</Fragment>)}
+      {shown.map(page => <Fragment key={page.props.name}>{page}</Fragment>)}
       {!active && <p className="p-5 text-sm text-base-content/60">No hay secciones disponibles.</p>}
     </section>
   </NotebookContext.Provider>{around && renderInsertions(around.after, scope)}</>;

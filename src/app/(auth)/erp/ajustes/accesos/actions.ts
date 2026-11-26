@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/access";
 import { AccessError } from "@/lib/auth/policy";
 import { prisma } from "@/lib/prisma";
-import { setGroupMembers, setModelAccess, setRulesActive, setFieldRestrictions, setActionRestrictions, setMenuVisibility } from "@/lib/access/admin";
+import { setGroupMembers, setModelAccess, setRulesActive, setFieldRestrictions, setActionRestrictions, setMenuVisibility, setPageVisibility } from "@/lib/access/admin";
 import { fieldRestrictionKeys, type FieldRestriction } from "@/lib/access/element-policy";
 import { accessPermissionKeys, type AccessPerms } from "@/lib/access/declare";
 import { GroupMembershipError } from "@/lib/access/membership";
@@ -63,6 +63,20 @@ export async function saveMenuVisibility(_state: AccessActionState, form: FormDa
     await setMenuVisibility(prisma, await requireAdmin(), text(form.get("group")), changes);
     return done("Visibilidad de menús guardada.");
   } catch (error) { return failure(error, "No se pudo guardar la visibilidad de menús."); }
+}
+
+export async function savePageVisibility(_state: AccessActionState, form: FormData): Promise<AccessActionState> {
+  try {
+    const entries = form.getAll("page").map(text);
+    if (entries.length > 1000) throw new Error("Selección inválida.");
+    const changes = entries.map(entry => {
+      const [model, screen, layout, notebook, page, extra] = entry.split("|");
+      if (!model || !screen || !layout || !notebook || !page || extra !== undefined) throw new Error("Selección inválida.");
+      return { model, screen, layout, notebook, page, hidden: form.get(`${entry}|hidden`) === "on" };
+    });
+    await setPageVisibility(prisma, await requireAdmin(), text(form.get("group")), changes);
+    return done("Visibilidad de páginas guardada.");
+  } catch (error) { return failure(error, "No se pudo guardar la visibilidad de páginas."); }
 }
 
 /** Every listed model is posted; unchecked boxes mean no permission. Matching the defaults removes the override. */

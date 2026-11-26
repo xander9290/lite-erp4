@@ -73,6 +73,25 @@ Los Fields compartidos usan `data-form-field={name}` en su wrapper. Añade ese a
 
 `disabled` impide navegar a la página; no elimina ni deshabilita sus Fields, ni cambia el esquema Zod. Si no debe validarse su contenido, condiciona el esquema y los Fields según la regla de negocio. FormView de solo lectura permite seguir consultando sus pestañas.
 
+## Páginas ocultas por grupo
+
+En formularios de modelos (ModelForm), un Notebook con `id` literal puede ocultar páginas
+según los grupos del usuario. El modelo declara en su manifest las páginas ocultables
+(`pages: { <id del Notebook>: { <name>: "Etiqueta" } }`) y Ajustes → Grupos → Páginas
+las oculta por pantalla y presentación (formulario o modal). El servidor entrega las
+claves `<id>/<name>` en `config.hiddenPages` y ModelForm las publica con
+`NotebookPolicyContext`.
+
+Una página oculta no tiene pestaña ni se puede activar (clic, teclado, `defaultPage`,
+`activePage` ni revelado de errores), pero sigue montada como deshabilitada: conserva
+valores, borradores y validación. Si la página activa o `defaultPage` queda oculta, se abre
+la primera visible. Con todas ocultas no se pinta el marco ni la barra de pestañas. Si una
+página oculta tiene errores, el Notebook muestra un aviso genérico sin nombrarla. Es sólo
+presentación: no sustituye las restricciones de campos (No leer/No escribir).
+
+Un Notebook sin `id`, o fuera de ModelForm, se comporta como siempre. En desarrollo, la
+consola avisa si el Notebook no pinta páginas declaradas o pinta páginas sin declarar.
+
 ## Teclado
 
 Tab entra por la pestaña activa; flechas izquierda/derecha cambian de página y saltan las deshabilitadas, con recorrido circular. Home/End van a la primera/última habilitada. Enter o Espacio activan la pestaña. El contenido usa roles `tablist`, `tab` y `tabpanel` con sus identificadores asociados.

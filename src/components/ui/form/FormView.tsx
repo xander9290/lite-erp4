@@ -317,7 +317,8 @@ export default function FormView<TValues extends FieldValues, TContext = unknown
         if (!mounted.current) return;
         if (error instanceof SaveRejected && error.field) {
           const form = document.getElementById(titleId)?.closest("form");
-          const first = form && invalidFormFields(form, methods.getErrors())[0];
+          // Disabled or group-hidden Notebook pages cannot be revealed: skip their fields.
+          const first = form && invalidFormFields(form, methods.getErrors()).find(element => !element.closest('[data-notebook-disabled="true"]'));
           if (first) focusInvalidField(first, name => methods.setFocus(name as FieldPath<TValues>));
           else methods.setFocus(error.field as FieldPath<TValues>);
         }

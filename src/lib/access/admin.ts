@@ -10,6 +10,18 @@ import { restrictionFields } from "../modules/element-access";
 import { fieldRestrictionKeys, type FieldRestriction } from "./element-policy";
 import { registeredGroupMenus } from "../applications/menu-catalog";
 import { menuKey } from "./menu-policy";
+import { pageLayouts, type HiddenPage } from "../modules/pages";
+
+const layoutLabels = { form: "Formulario", modal: "Modal" } as const;
+const pageIdentity = (page: Omit<HiddenPage, "groupId">) => [page.model, page.screen, page.layout, page.notebook, page.page].join("|");
+
+/** Hideable pages of a module: its models' catalogs × screens × layouts, from the registry only. */
+function modulePageCatalog(module: string) {
+  return modules.filter(definition => definition.id === module).flatMap(definition => definition.models.flatMap(model => Object.values(model.screens).flatMap(screen => pageLayouts.flatMap(layout => model.pages.map(page => ({
+    model: model.id, modelLabel: model.label, screen: screen.id, screenLabel: model.declaration.screens ? screen.label : model.label,
+    layout, layoutLabel: layoutLabels[layout], notebook: page.notebook, page: page.page, label: page.label,
+  }))))));
+}
 
 /** Administration of access control. Every function revalidates an active superuser inside its transaction. */
 async function assertAdmin(tx: Prisma.TransactionClient, actor: ModelActor) {
@@ -46,7 +58,7 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
   return prisma.$transaction(async tx => {
     await assertAdmin(tx, actor);
     const catalog = accessCatalog();
-    const [users, members, overrides, states, fieldPolicies, actionPolicies, menus, hiddenMenus] = await Promise.all([
+    const [users, members, overrides, states, fieldPolicies, actionPolicies, menus, hiddenMenus, hiddenPages] = await Promise.all([
       tx.user.findMany({ select: { id: true, login: true, active: true, isAdmin: true, name: true }, orderBy: { login: "asc" } }),
       tx.accessUserGroup.findMany({ where: { groupId }, select: { userId: true } }),
       tx.accessModelOverride.findMany({ where: { groupId } }),
@@ -55,7 +67,9 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
       tx.accessActionRestriction.findMany({ where: { groupId } }),
       registeredGroupMenus(group.module),
       tx.accessMenuHidden.findMany({ where: { groupId } }),
+      tx.accessPageHidden.findMany({ where: { groupId } }),
     ]);
+    const hiddenPageKeys = new Set(hiddenPages.map(pageIdentity));
     const memberIds = new Set(members.map(row => row.userId));
     const models = modules.filter(definition => definition.id === group.module).flatMap(definition => definition.models.map(model => {
       const defaults = catalog.grants.get(model.id)?.find(grant => grant.group === groupId)?.perms ?? none;
@@ -73,6 +87,7 @@ export async function groupDetail(prisma: PrismaClient, actor: ModelActor, group
       users: users.map(user => ({ id: user.id, login: user.login, name: user.name || user.login, active: user.active, isAdmin: user.isAdmin, member: memberIds.has(user.id) })),
       models, rules,
       menus: menus.map(menu => ({ ...menu, hidden: hiddenMenus.some(row => row.application === menu.application && row.menu === menu.id) })),
+      pages: modulePageCatalog(group.module).map(page => ({ ...page, hidden: hiddenPageKeys.has(pageIdentity(page)) })),
       fields: modules.filter(module => module.id === group.module).flatMap(module => module.models.flatMap(model => Object.entries(restrictionFields(model)).map(([field, label]) => ({
         model: model.id, modelLabel: model.label, field, label,
         policy: Object.fromEntries(fieldRestrictionKeys.map(key => [key, fieldPolicies.find(row => row.model === model.id && row.field === field)?.[key] ?? false])) as FieldRestriction,
@@ -98,6 +113,30 @@ export async function setMenuVisibility(prisma: PrismaClient, actor: ModelActor,
     for (const { application, menu, hidden } of changes) {
       if (hidden) await tx.accessMenuHidden.upsert({ where: { groupId_application_menu: { groupId, application, menu } }, create: { groupId, application, menu }, update: {} });
       else await tx.accessMenuHidden.deleteMany({ where: { groupId, application, menu } });
+    }
+  }, { isolationLevel: "Serializable" });
+}
+
+/**
+ * Change only the posted page exceptions of the group's own module, validated against the
+ * compiled `pages` catalog (never names sent by the browser). Presentation only.
+ */
+export async function setPageVisibility(prisma: PrismaClient, actor: ModelActor, groupId: string, changes: readonly (Omit<HiddenPage, "groupId"> & { hidden: boolean })[]) {
+  const group = knownGroup(groupId);
+  if (!group || changes.length > 1000) throw new AccessError("DENIED");
+  const available = new Set(modulePageCatalog(group.module).map(pageIdentity));
+  const seen = new Set<string>();
+  for (const change of changes) {
+    const key = pageIdentity(change);
+    if (!available.has(key) || seen.has(key) || typeof change.hidden !== "boolean") throw new AccessError("DENIED");
+    seen.add(key);
+  }
+  await prisma.$transaction(async tx => {
+    await assertAdmin(tx, actor);
+    for (const { model, screen, layout, notebook, page, hidden } of changes) {
+      const where = { groupId, model, screen, layout, notebook, page };
+      if (hidden) await tx.accessPageHidden.upsert({ where: { groupId_model_screen_layout_notebook_page: where }, create: where, update: {} });
+      else await tx.accessPageHidden.deleteMany({ where });
     }
   }, { isolationLevel: "Serializable" });
 }

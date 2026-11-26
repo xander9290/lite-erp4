@@ -23,6 +23,7 @@ import { domainDependencies, domainUsesRecordId } from "../orm/domain-builder";
 import { ModelValidationError } from "../orm/context";
 import { z } from "zod";
 import { transferCollections, transferHeaders } from "../list/transfer-contract";
+import { hiddenPagesFor } from "./pages";
 
 const modules = registeredModules;
 
@@ -360,6 +361,8 @@ export function modelClientConfig(id: string, access?: CapabilityActor, nested =
   const published = (entry.contract.actions ?? []) as readonly ModelAction[];
   const config: ModelClientConfig = {
     fieldAccess: elements.fields,
+    // Default screen here; ModelRoute recomputes it for the screen it presents.
+    ...(entry.pages.length ? { hiddenPages: hiddenPagesFor(entry.id, entry.pages, entry.defaultScreen, access?.isAdmin ? [] : access?.hiddenPages) } : {}),
     ...(entry.declaration.transfer ? { transfer: { key: entry.declaration.transfer.key, fields: transferHeaders(entry.declaration.transfer), collections: transferCollections(entry.declaration.transfer),
       canImport: Boolean(access?.isAdmin || (access?.modelAccess[id]?.read && access.modelAccess[id]?.import && (access.modelAccess[id]?.create || access.modelAccess[id]?.write))),
       canExport: Boolean(access?.isAdmin || (access?.modelAccess[id]?.read && access.modelAccess[id]?.export)),

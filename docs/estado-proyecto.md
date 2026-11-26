@@ -1,12 +1,40 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-25.
+Última actualización: 2026-11-26.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Continuidad actual: siguiente pendiente, páginas por grupo (2026-11-25)
+## Continuidad actual: páginas por grupo implementadas (2026-11-26, Windows)
+
+Rama codex/partner sobre 06fa8a6, **cambios sin commit**. Plan aprobado por el
+usuario (catálogo `pages` en el manifest; alcance modelo+pantalla+form/modal+
+notebook+página) e implementado; contrato y lista de archivos en
+[Páginas por grupo](ideas/permisos-campos.md#implementado-2026-11-26), guía en
+docs/backend.md y src/components/ui/form/Notebook.md. Directorio declara
+`pages.additionalInfo` (cuatro pestañas de PartnerForm).
+
+Migración `20261126120000_group_page_visibility` (tabla vacía access_page_hidden)
+**sin aplicar**: su SQL coincide con `prisma migrate diff` entre el esquema de HEAD
+y el nuevo (comparación de archivos, sin BD). Hasta aplicarla, los usuarios no
+administradores fallan al resolver capacidades y abrir un grupo en Ajustes falla;
+los administradores no consultan la tabla en sus capacidades. Aplicarla requiere
+aprobación. `npm run db:generate` sí se ejecutó (sólo genera el cliente).
+
+Verificación (2026-11-26): TypeScript y ESLint de los archivos tocados aprobados;
+nuevas pages.test.ts 4/4 (catálogo, extensiones, proyección, carga por grupos),
+admin.test.ts +1 (catálogo de Directorio 2×2×4, rechazo de páginas no declaradas,
+de otro módulo y no admin) y notebookPolicy.test.tsx 4/4 (render: sin pestaña,
+fallback, todas ocultas, sólo el id nombrado). test:modules 86/86, test:access
+22/22 (capabilities.test.ts recibió el mock de accessPageHidden), test:form-model
+33/33, test:form-navigation 13/13, test:views 4/4, test:collection-load 8/8,
+test:list-grouping 17/17, test:applications 16/16. Sin navegador ni BD: falta la
+prueba real (aplicar migración, ocultar en un grupo con un usuario no admin y abrir
+Contactos/Direcciones y el modal), así como el aviso de errores ocultos, que sólo
+se ejerce con efectos en navegador.
+
+## Continuidad anterior: siguiente pendiente, páginas por grupo (2026-11-25)
 
 Revisión local de documentación, fuentes y Git. Rama codex/partner, HEAD 6f06474
 (progreso actual). Screens está implementado y aplicado a Contactos/Direcciones;
@@ -27,7 +55,10 @@ obligatorio por página. label permanece como texto visible. Ocultar es presenta
 los permisos de campos/datos y la validación del modelo siguen siendo independientes.
 
 Plan y aceptación en [Páginas por grupo](ideas/permisos-campos.md#siguiente-pendiente-ocultar-páginas-por-grupo-2026-11-25).
-Aún no implementado. Al retomarlo, definir publicación del catálogo y selección
+Plan de implementación redactado el 2026-11-26 (misma sección, «Plan de
+implementación»): catálogo `pages` en el manifest, tabla `access_page_hidden`,
+`config.hiddenPages` por pantalla/layout y sección «Páginas» en Grupos. Espera las
+decisiones A (fuente del catálogo) y B (alcance) del usuario. Aún no implementado. Al retomarlo, definir publicación del catálogo y selección
 segura de páginas, conservar borradores y resolver alcance/herencia de grupos.
 Este pedido guarda el pendiente; no inicia cambios de código, esquema ni SQL.
 

@@ -5,6 +5,7 @@ import ModelExtensionViews from "@/components/modules/ModelExtensionViews";
 import CollectionViews from "@/components/modules/CollectionViews";
 import { selectedCollectionView, type ModelClientConfig } from "@/lib/modules/config";
 import { selectedScreen } from "@/lib/modules/screens";
+import { hiddenPagesFor } from "@/lib/modules/pages";
 import type { InsertionViewKind, ModuleModel } from "@/lib/modules/define";
 import { getModuleModel, modelClientConfig } from "@/lib/modules/registry";
 import { modelRead } from "@/lib/modules/actions";
@@ -71,6 +72,8 @@ export default async function ModelRoute({ modelId, path, searchParams, applicat
     // Explicit screens name their collections and breadcrumbs; the implicit one keeps the menu label.
     ...(named ? { label: screen.label } : {}),
     screen: { id: screen.id, label: screen.label, isDefault: screen.id === entry.defaultScreen, defaults: screen.defaults },
+    // Hidden Notebook pages of the presented screen (the page form and this model's own modal).
+    ...(entry.pages.length ? { hiddenPages: hiddenPagesFor(entry.id, entry.pages, screen.id, actor.isAdmin ? [] : actor.hiddenPages) } : {}),
   };
   const config = application ? { ...screened, label: application.label, application: { name: application.name, href: application.href } } : screened;
   if (collection) {

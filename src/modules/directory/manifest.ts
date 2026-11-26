@@ -22,7 +22,16 @@ export default defineModule({
     partner: {
       model: Partner,
       list: {
-        fields: ["image", "name", "phones", "street", "streetNumber", "vat", "provinceId", "countyId"],
+        fields: [
+          "image",
+          "name",
+          "phones",
+          "street",
+          "streetNumber",
+          "vat",
+          "provinceId",
+          "countyId",
+        ],
       },
       defaultScreen: "contacts",
       screens: {
@@ -48,6 +57,15 @@ export default defineModule({
             form: () => import("./views/PartnerForm"),
             modal: () => import("./views/PartnerModal"),
           },
+        },
+      },
+      // Pestañas de PartnerForm que Ajustes → Grupos → Páginas puede ocultar (sólo presentación).
+      pages: {
+        additionalInfo: {
+          otherAddresses: "Otras direcciones",
+          sales: "Ventas",
+          purchase: "Compras",
+          otherInfo: "Otra información",
         },
       },
     },

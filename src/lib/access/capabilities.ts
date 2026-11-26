@@ -1,9 +1,12 @@
 import type { AccessPerms } from "./declare";
 import type { ElementPolicies } from "./element-policy";
+import type { HiddenPage } from "../modules/pages";
 
 /** UI hints by model, never a substitute for transactional authorization. */
 export type ModelCapabilities = AccessPerms & { readonly move: boolean };
 export type CapabilityActor = Partial<ElementPolicies> & {
+  /** Notebook pages hidden for the actor (presentation; empty for administrators). */
+  readonly hiddenPages?: readonly HiddenPage[];
   readonly isAdmin: boolean;
   readonly groups: ReadonlySet<string>;
   readonly modelAccess: Readonly<Record<string, AccessPerms>>;

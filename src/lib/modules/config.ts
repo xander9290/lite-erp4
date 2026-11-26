@@ -49,6 +49,11 @@ export type ModelChildCollectionConfig = {
 };
 export type ModelClientConfig = {
   readonly fieldAccess?: import("../access/element-policy").FieldRestrictions;
+  /**
+   * Notebook pages (`<notebook>/<page>`) hidden for the actor in this screen, per layout.
+   * Presentation only; absent when the model declares no `pages` catalog.
+   */
+  readonly hiddenPages?: import("./pages").HiddenPagesConfig;
   readonly transfer?: { readonly fields: readonly string[]; readonly key: string | readonly string[]; readonly canImport: boolean; readonly canExport: boolean; readonly collections: readonly import("../list/transfer-types").TransferCollection[] };
   /** Read-only relations shown in the form (children created and edited in their own form). */
   readonly collections?: Readonly<Record<string, ModelChildCollectionConfig>>;

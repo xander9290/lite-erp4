@@ -7,7 +7,7 @@ import { groupDetail } from "@/lib/access/admin";
 import { accessPermissionKeys } from "@/lib/access/declare";
 import ActionForm from "../../ActionForm";
 import MembersForm from "../../MembersForm";
-import { FieldRestrictions, ActionRestrictions, MenuVisibility } from "../../ElementRestrictions";
+import { FieldRestrictions, ActionRestrictions, MenuVisibility, PageVisibility } from "../../ElementRestrictions";
 import Notebook from "@/components/ui/form/Notebook";
 import { saveModelAccess, saveRules } from "../../actions";
 
@@ -59,6 +59,7 @@ async function Group({ params }: Props) {
       { name: "campos", label: "Campos", children: <FieldRestrictions group={group.id} fields={detail.fields} /> },
       { name: "acciones", label: "Acciones", children: <ActionRestrictions group={group.id} actions={detail.actions} /> },
       { name: "menus", label: "Menús", children: <MenuVisibility group={group.id} menus={detail.menus} /> },
+      { name: "paginas", label: "Páginas", children: <PageVisibility group={group.id} pages={detail.pages} /> },
       { name: "reglas", label: "Reglas de registro", children: (
     <section aria-labelledby="reglas" className="col-span-full space-y-2 rounded-box border border-base-300 p-3">
       <h2 id="reglas" className="font-semibold">Reglas de registro</h2>

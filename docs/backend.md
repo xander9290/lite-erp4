@@ -249,6 +249,48 @@ Crea `src/modules/directory/views/PartnerAddressesForm.tsx` y lo registra en
 modelos con `screens`, `--screen` es obligatorio; en modelos sin pantallas se
 rechaza.
 
+## Ocultar pestañas por grupo
+
+Las pestañas (`NotebookPage`) de un formulario se pueden ocultar a un grupo, por
+pantalla y por presentación (formulario de página o modal). El servidor no lee el
+TSX de las vistas, así que el modelo declara cuáles son ocultables, con el mismo
+`id` del `<Notebook>` y el mismo `name` de cada `<NotebookPage>`:
+
+```ts
+partner: {
+  model: Partner,
+  screens: { /* ... */ },
+  pages: {
+    additionalInfo: {
+      otherAddresses: "Otras direcciones",
+      sales: "Ventas",
+      purchase: "Compras",
+      otherInfo: "Otra información",
+    },
+  },
+},
+```
+
+```tsx
+<Notebook id="additionalInfo">
+  <NotebookPage name="sales" label="Ventas">...</NotebookPage>
+</Notebook>
+```
+
+Después, en Ajustes → Grupos → (grupo) → Páginas, marca «Ocultar» en cada pantalla
+y presentación. Reglas:
+
+- Es sólo presentación: la página sigue montada y sus valores se guardan igual.
+  Para impedir leer o editar datos usa Campos (No leer / No escribir).
+- Se suma por grupos implicados; un grupo sólo configura modelos de su módulo y
+  los administradores siempre ven todo.
+- Si la pestaña por defecto queda oculta se abre la primera visible; si todas
+  quedan ocultas, no se pinta el Notebook.
+- Una extensión puede añadir páginas al catálogo del modelo que extiende con
+  `extends: { "x.modelo": { model, pages: { ... } } }`.
+- Sólo las páginas declaradas aparecen en Grupos. En desarrollo la consola avisa
+  si el catálogo y la vista no coinciden.
+
 ## Límites actuales
 
 - Importar y exportar sólo aparecen en la pantalla por defecto. Cómo activarlos

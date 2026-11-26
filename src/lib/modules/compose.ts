@@ -78,6 +78,7 @@ export function composeModules(definitions: readonly ModuleDefinition[]): readon
       module: extension.module, label: extension.label, fields: extension.fields, computed: extension.computed,
       ...(extension.views ? { views: extension.views } : {}),
       ...(extension.insertions ? { insertions: extension.insertions } : {}),
+      ...(extension.pages ? { pages: extension.pages } : {}),
       ...(extension.many2many.length && extension.companion ? { many2many: Object.freeze(Object.entries(extensionMany2many(extension.extension)).map(([field, descriptor]) => Object.freeze({ field, source: many2manyStorage(extension.companion!, field).source, maximum: descriptor.many2many.maxSelected }))) } : {}),
       depends: Object.freeze([...closure(extension.module)].sort()),
       ...(extension.companion ? { relation: extension.companion.relation, delegate: extension.companion.name[0].toLowerCase() + extension.companion.name.slice(1) } : {}),
