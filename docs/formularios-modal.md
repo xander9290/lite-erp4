@@ -36,6 +36,11 @@ formulario del hijo; la inversa recibe el ID persistido del principal como valor
 inicial. El tipo de contacto mantiene su default del modelo: para una dirección de
 entrega, elegir Entrega. Primero hay que guardar el principal.
 
+`frame` es `true` por defecto: la colección va dentro de un FormGroup con su
+etiqueta como legend. Con `frame={false}` (p. ej. dentro de un NotebookPage cuya
+pestaña ya la nombra) se omiten el grupo, la legend y el borde/sombra de la lista,
+que ocupa todo el ancho. Es sólo presentación.
+
 La lista conserva consulta y paginación al refrescar tras un guardado confirmado.
 La creación exige capacidad de crear e inversa Many2one publicada y editable.
 El hijo exige sus propios permisos de entrada/lectura/escritura, reglas, validaciones

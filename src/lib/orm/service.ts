@@ -38,6 +38,8 @@ import { fieldColumn } from "./presentation";
 import type { ReactionContext } from "./reactions";
 import type { ReactionRule, ReactionResult } from "./reactions.types";
 import type { ActionContext, ModelAction } from "./model";
+import { nestedWrite, readOnlyEnvironment, unavailableEnvironment, withFrame, type EnvironmentDomain, type ModelEnvironment, type ModelEnvironmentModel } from "./environment";
+import { domainBuilder, domainDependencies, domainUsesRecordId, snapshotDomain, type DomainExpression } from "./domain-builder";
 import { displayProjectionPaths } from "./display";
 import { modelDisplayName, resolveDisplayNames } from "./display.server";
 
@@ -145,6 +147,8 @@ type ServicePresentation = {
   relationAccess?: (tx: Prisma.TransactionClient, actor: ModelActor) => RelationAccess;
   /** Revalidated for every published action (groups and element policies in the registry). */
   authorizeAction?: (tx: Prisma.TransactionClient, actor: ModelActor, action: ModelAction) => Promise<void>;
+  /** `context.env` of model methods (the registry injects it); without it, using env fails explicitly. */
+  environment?: (tx: Prisma.TransactionClient, actor: ModelActor) => ModelEnvironment;
 } & ({ list: ModelListPolicy; columns?: never; searchFields?: never } | { list?: never; columns: readonly ListColumn[]; searchFields: readonly string[] });
 
 /** Admin-only baseline. The repository and list policy are fixed on the server, never selected by a client. */
@@ -206,6 +210,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
   config.columns = config.columns.map(column => ({ ...column, type: columnType(column.field), ...(Object.hasOwn(virtualFields,column.field)?{filterable:false,sortable:false,groupable:false}:{}), ...(column.widget === "partner" && auditAvatarField(column.field) ? { avatarField: auditAvatarField(column.field)! } : {}) }));
   const authorize: ServiceAuthorizer = presentation.authorize ?? (async (tx, actor) => { await assertActor(tx, actor); return undefined; });
   const elements = (tx: Prisma.TransactionClient, actor: ModelActor) => presentation.elementAccess?.(tx, actor) ?? Promise.resolve(unrestrictedElements);
+  const envFor = (tx: Prisma.TransactionClient, actor: ModelActor) => presentation.environment?.(tx, actor) ?? unavailableEnvironment;
+  const readEnvFor = (tx: Prisma.TransactionClient, actor: ModelActor) => readOnlyEnvironment(envFor(tx, actor));
   async function publicDocument(tx: Prisma.TransactionClient, actor: ModelActor, record: Values & Document): Promise<Values & Document> {
     const access = await elements(tx, actor);
     const values = publicFieldValues(record, access);
@@ -283,14 +289,17 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
 
   async function persist(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, activityLabel?: string, options?: MutationOptions): Promise<Values & Document> {
     const policy = await elements(tx, actor);
-    try { return await persistCore(tx, actor, input, activityLabel, options); }
+    const submittedId = input && typeof input === "object" && !Array.isArray(input) && typeof (input as Record<string, unknown>).id === "string" ? (input as Record<string, string>).id : undefined;
+    // The frame marks this record as in progress for nested env writes (created ones get their ID below).
+    const frame: { model: string; id?: string } = { model: model.name, id: submittedId };
+    try { return await withFrame(tx, frame, () => persistCore(tx, actor, input, activityLabel, options, frame)); }
     catch (error) {
       if ((policy.privateDocument || hasPrivateFields(policy.fields)) && (error instanceof ModelValidationError || error instanceof z.ZodError)) throw new ModelValidationError("No se pudo validar el registro con tus permisos actuales.");
       throw error;
     }
   }
 
-  async function persistCore(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, activityLabel?: string, options?: MutationOptions) {
+  async function persistCore(tx: Prisma.TransactionClient, actor: ModelActor, input: unknown, activityLabel?: string, options?: MutationOptions, frame?: { id?: string }) {
     const updating = Boolean(input && typeof input === "object" && !Array.isArray(input) && (input as Record<string, unknown>).id);
     const scope = await authorize(tx, actor, updating ? "write" : "create");
     if (!input || typeof input !== "object" || Array.isArray(input)) throw new ModelValidationError("Revisa los datos del registro.");
@@ -311,7 +320,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       if (!current || current.revision !== metadata.revision) throw new ModelValidationError(conflict);
     }
     if (!options?.system) fields = await prepareDocumentInput(tx, actor, fields, current as Document | null);
-    const context: ModelContext<T> = Object.freeze({ tx, actor: Object.freeze({ ...actor }), operation: metadata.id ? "update" : "create", id: metadata.id, previous: current ? modelSnapshot(options?.previous ?? current) as ModelContext<T>["previous"] : null });
+    const context: ModelContext<T> = Object.freeze({ tx, actor: Object.freeze({ ...actor }), operation: metadata.id ? "update" : "create", id: metadata.id, previous: current ? modelSnapshot(options?.previous ?? current) as ModelContext<T>["previous"] : null, env: envFor(tx, actor) });
     if (JSON.stringify(fields).length > 256000) throw new ModelValidationError("El documento supera el tamaño permitido.");
     if (!options?.skipOwner && countDocumentRows(fields, lines) > MAX_DOCUMENT_ROWS) throw new ModelValidationError(`El documento supera el máximo de ${MAX_DOCUMENT_ROWS} líneas en total.`);
     validateLines(fields, current as Document | null, lines);
@@ -326,12 +335,15 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     await validateMany2many(values, many, relationAccessFor(tx, actor));
     await presentation.validateRelations?.(tx, actor, values, { id: metadata.id });
     for (const owner of presentation.owners ?? []) if (values[owner.inverse] !== normalized[owner.inverse]) throw new ModelValidationError("La lógica del hijo no puede cambiar su documento padre.");
-    if (!Object.keys(lines).length) await model.constrain?.(values, context);
+    // Constraints validate; their env only queries.
+    const constraintContext: ModelContext<T> = Object.freeze({ ...context, env: readEnvFor(tx, actor) as unknown as ModelContext<T>["env"] });
+    if (!Object.keys(lines).length) await model.constrain?.(values, constraintContext);
     const scalars = Object.fromEntries([...Object.keys(model.metadata), ...Object.keys(many)].map(name => [name, values[name]])) as T;
     const saved = metadata.id ? await repository.update(tx, metadata.id, metadata.revision!, scalars) : await repository.create(tx, scalars, actor.id);
+    if (frame) frame.id = saved.id;
     const aggregate = await persistLines(tx, actor, saved, values, current as Document | null, lines, model.name);
     const canonical = formSchema.parse(aggregate.values && Object.fromEntries(Object.entries(aggregate.values).filter(([key]) => key !== "id" && key !== "revision")));
-    if (Object.keys(lines).length) await model.constrain?.(canonical, context);
+    if (Object.keys(lines).length) await model.constrain?.(canonical, constraintContext);
     await model.afterSave?.(aggregate.values, context);
     const finalScalar = await repository.read(tx, saved.id);
     if (!finalScalar) throw new ModelValidationError("El registro no está disponible después de guardar.");
@@ -421,7 +433,8 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       const id = params[name];
       if (field.kind === "many2one" && id !== null && id !== undefined && (!access || !(await access(field.target, [id as string])).has(id as string))) throw new ActionParameterError("Revisa los registros seleccionados.", { [name]: "Selecciona un registro existente y accesible." });
     }
-    const patch = await model.runAction(declared.name, current, { tx, actor: Object.freeze({ ...actor }), action: declared.name }, params);
+    // The acted record stays in progress: env must not save it under the action (stale revision).
+    const patch = await withFrame(tx, { model: model.name, id: (current as Document).id }, () => model.runAction!(declared.name, current, { tx, actor: Object.freeze({ ...actor }), action: declared.name, env: envFor(tx, actor) }, params));
     const { id, revision, ...values } = current;
     return persist(tx, actor, { ...values, ...patch, id, revision }, declared.label, { system: true });
   }
@@ -524,7 +537,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
         const sourceRows = await repository.list(tx, { where, sort: state.sort, direction: state.direction, skip: (page - 1) * state.pageSize, take: state.pageSize, audit: presentation.audit === true });
         const access = relationAccessFor(tx, actor);
         const relatedRows = await resolveCollectionRelated(tx,sourceRows,config.columns.map(column=>column.field).filter(name=>Object.hasOwn(relatedFields,name) && elementPolicy.canRead([name])),relatedFields,repository,access);
-        const rows = await resolveCollectionComputed(relatedRows, computedNames.filter(name => elementPolicy.canRead([name])), model, Object.freeze({ tx, actor: Object.freeze({ ...actor }) }), [...nullableCollection].filter(name => model.metadata[name]?.required));
+        const rows = await resolveCollectionComputed(relatedRows, computedNames.filter(name => elementPolicy.canRead([name])), model, Object.freeze({ tx, actor: Object.freeze({ ...actor }), env: readEnvFor(tx, actor) }), [...nullableCollection].filter(name => model.metadata[name]?.required));
         const names = elementPolicy.canRead(displayProjectionPaths(model.metadata, model.displayFields)) ? await resolveDisplayNames(tx, sourceRows, model, repository, access) : new Map(sourceRows.map(row => [row.id, row.id]));
         // Repository contracts can contain extra edit fields: collection DTOs honor the fixed server publication.
         const publishedRows = policy ? rows.map(row => projectListRow(row, [...policy.fields, ...policy.fields.flatMap(name => auditAvatarField(name) ? [auditAvatarField(name)!] : [])])) : rows;
@@ -695,7 +708,7 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
           const current=await inScope(tx,request.id,scope)?await repository.read(tx,request.id):null;
           if(!current || current.revision!==request.revision) throw new ModelValidationError(conflict);
         }
-        const result = await model.react!(request.field,request.values,Object.freeze({tx,actor:Object.freeze({...actor}),id:request.id,
+        const result = await model.react!(request.field,request.values,Object.freeze({tx,actor:Object.freeze({...actor}),id:request.id,env:readEnvFor(tx,actor),
           resolveRelated: repository.related ? (access => (field:string,id:string) => repository.related!(tx,field,id,access))(relationAccessFor(tx,actor)) : undefined,
         }));
         return { patch: Object.fromEntries(Object.entries(publicFieldValues(result.patch, policy)).filter(([name]) => !policy.fields[name]?.noWrite)), preview: publicFieldValues(result.preview, policy) };
@@ -704,6 +717,116 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     } catch(error) {
       return {ok:false,error:error instanceof z.ZodError?"Revisa los campos necesarios para esta reacción.":messageFor(error),...(error instanceof ModelValidationError&&error.fieldErrors?{fieldErrors:error.fieldErrors}:{})};
     }
+  }
+
+  /**
+   * Read-only facade of this model for `context.env` of other models: same transaction and actor,
+   * group access, record rules and field read policies. Plain frozen rows, never lazy relations.
+   */
+  const envFields = new Set(Object.entries(model.metadata).filter(([, field]) => !field.sensitive && !field.related && !field.compute && !(field.kind === "text" && field.writeOnly)).map(([name]) => name));
+  const envLabel = `env.${model.name}`;
+  const domainFields = (node: DomainExpression): string[] => "all" in node ? node.all.flatMap(domainFields) : "any" in node ? node.any.flatMap(domainFields) : "not" in node ? domainFields(node.not) : [node.field];
+  function environment(tx: Prisma.TransactionClient, actor: ModelActor): ModelEnvironmentModel {
+    const checkFields = (fields: unknown) => {
+      if (!Array.isArray(fields) || !fields.length || fields.length > 30 || new Set(fields).size !== fields.length) throw new ModelValidationError(`${envLabel}: indica entre 1 y 30 campos distintos.`);
+      const unknown = fields.filter(name => typeof name !== "string" || !envFields.has(name));
+      if (unknown.length) throw new ModelValidationError(`${envLabel}: campos no disponibles: ${unknown.map(String).join(", ")}. Sólo campos persistentes públicos.`);
+      return fields as string[];
+    };
+    const compileDomain = (domain: EnvironmentDomain<Record<string, unknown>> | null | undefined) => {
+      if (domain === null || domain === undefined) return { where: undefined, fields: [] as string[] };
+      if (typeof domain !== "function") throw new ModelValidationError(`${envLabel}: el dominio debe ser una función d => ...`);
+      const expression = snapshotDomain(domain(domainBuilder as never));
+      if (domainDependencies(expression).length || domainUsesRecordId(expression)) throw new ModelValidationError(`${envLabel}: el dominio no admite d.draft ni d.record; usa valores concretos.`);
+      const fields = domainFields(expression).filter(name => name !== "id");
+      const unknown = fields.filter(name => !envFields.has(name));
+      if (unknown.length) throw new ModelValidationError(`${envLabel}: el dominio usa campos no disponibles: ${unknown.join(", ")}.`);
+      return { where: compileListDomain(domainMetadata, [expression]), fields };
+    };
+    // Group access + record rules (scope) + field read policies, revalidated per call in this tx.
+    const prepare = async (fields: readonly string[], where?: Record<string, unknown>) => {
+      const scope = await authorize(tx, actor, "read");
+      const policy = await elements(tx, actor);
+      if (!policy.canRead([...new Set(fields)])) throw new AccessError("DENIED");
+      return { AND: [...(scope ? [scope] : []), ...(where ? [where] : [])] };
+    };
+    const project = (row: Record<string, unknown>, fields: readonly string[]) => Object.freeze(Object.fromEntries([["id", row.id], ...fields.map(name => [name, row[name] ?? null])]));
+    const rows = (where: Record<string, unknown>, sort: string, direction: "asc" | "desc", skip: number, take: number) =>
+      repository.list(tx, { where, sort, direction, skip, take, audit: false }) as Promise<Record<string, unknown>[]>;
+    const facade: ModelEnvironmentModel = {
+      async search(domain, options) {
+        if (!options || typeof options !== "object") throw new ModelValidationError(`${envLabel}.search: indica { fields }.`);
+        const fields = checkFields(options.fields);
+        const limit = options.limit ?? 100, offset = options.offset ?? 0, order = options.order ?? "id", direction = options.direction ?? "asc";
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500 || !Number.isSafeInteger(offset) || offset < 0) throw new ModelValidationError(`${envLabel}.search: limit es de 1 a 500 y offset no negativo.`);
+        if (order !== "id" && !envFields.has(order)) throw new ModelValidationError(`${envLabel}.search: no se puede ordenar por ${String(order)}.`);
+        if (direction !== "asc" && direction !== "desc") throw new ModelValidationError(`${envLabel}.search: direction es asc o desc.`);
+        const compiled = compileDomain(domain);
+        const where = await prepare([...fields, ...compiled.fields, ...(order === "id" ? [] : [order])], compiled.where);
+        return Object.freeze((await rows(where, order, direction, offset, limit)).map(row => project(row, fields))) as never;
+      },
+      async readMany(ids, fields) {
+        const names = checkFields(fields);
+        if (!Array.isArray(ids) || ids.length > 500 || ids.some(id => typeof id !== "string" || !id.trim() || id.length > 100)) throw new ModelValidationError(`${envLabel}.readMany: indica hasta 500 IDs válidos.`);
+        const unique = [...new Set(ids)];
+        if (!unique.length) return Object.freeze([]) as never;
+        const where = await prepare(names, { id: { in: unique } });
+        const found = new Map((await rows(where, "id", "asc", 0, unique.length)).map(row => [row.id as string, project(row, names)]));
+        return Object.freeze(ids.flatMap(id => found.has(id) ? [found.get(id)!] : [])) as never;
+      },
+      async read(id, fields) {
+        if (typeof id !== "string") throw new ModelValidationError(`${envLabel}.read: el ID debe ser texto.`);
+        return ((await facade.readMany([id], fields))[0] ?? null) as never;
+      },
+      async count(domain) {
+        const compiled = compileDomain(domain);
+        return repository.count(tx, await prepare(compiled.fields, compiled.where));
+      },
+      // Writes reuse this model's own save/remove pipeline: create/write/unlink access, record
+      // rules, field write policies, normalize, Zod, hooks, constraints, relations and history.
+      async create(values) {
+        const input = checkValues(values, "create");
+        return nestedWrite(tx, model.name, async () => saved(await persist(tx, actor, { ...(model.createDefaults?.() ?? {}), ...input })));
+      },
+      async write(id, values) {
+        checkId(id, "write");
+        const input = checkValues(values, "write");
+        return nestedWrite(tx, model.name, async () => {
+          // The current revision is read here, in the caller's transaction: no client revision exists.
+          const current = await transaction.snapshot(tx, actor, id, "write");
+          if (!current) throw new ModelValidationError(`${envLabel}.write: el registro no existe o no puedes modificarlo.`);
+          const { id: _id, revision, ...document } = current;
+          void _id;
+          return saved(await persist(tx, actor, { ...document, ...input, id, revision }));
+        });
+      },
+      async unlink(id) {
+        checkId(id, "unlink");
+        await nestedWrite(tx, model.name, async () => {
+          const scope = await authorize(tx, actor, "unlink");
+          const current = await inScope(tx, id, scope) ? await repository.read(tx, id) : null;
+          if (!current) throw new ModelValidationError(`${envLabel}.unlink: el registro no existe o no puedes eliminarlo.`);
+          await transaction.remove(tx, actor, id, current.revision);
+        });
+      },
+    };
+    function checkId(id: unknown, operation: string): asserts id is string {
+      if (typeof id !== "string" || !id.trim() || id.length > 100) throw new ModelValidationError(`${envLabel}.${operation}: el ID no es válido.`);
+    }
+    function checkValues(values: unknown, operation: string) {
+      if (!values || typeof values !== "object" || Array.isArray(values) || Object.getPrototypeOf(values) !== Object.prototype) throw new ModelValidationError(`${envLabel}.${operation}: indica un objeto de valores.`);
+      const keys = Object.keys(values);
+      const unknown = keys.filter(name => !envFields.has(name));
+      if (unknown.length) throw new ModelValidationError(`${envLabel}.${operation}: campos no disponibles: ${unknown.join(", ")}. Sólo campos persistentes públicos.`);
+      if (operation === "write" && !keys.length) throw new ModelValidationError(`${envLabel}.write: indica al menos un campo.`);
+      return values as Record<string, unknown>;
+    }
+    // Only what the actor may read leaves the target service.
+    async function saved(record: Values & Document) {
+      const visible = await publicDocument(tx, actor, record);
+      return Object.freeze(Object.fromEntries([["id", record.id], ...[...envFields].filter(name => Object.hasOwn(visible, name)).map(name => [name, visible[name] ?? null])])) as never;
+    }
+    return Object.freeze(facade);
   }
 
   const transaction: TransactionModel = {
@@ -738,12 +861,14 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
       if (!current || current.revision !== revision) throw new ModelValidationError(conflict);
       const owners = await captureOwners(tx, actor, current, current, presentation.owners ?? [], options);
       if (!repository.remove) throw new Error("MODEL_NOT_BOUND");
-      await model.beforeRemove?.(current as Readonly<Record<string, unknown>>, { tx, actor, id });
-      if (options?.withLines && Object.keys(lines).length) {
-        const document = await loadLines(tx, actor, current as Document, lines);
-        for (const [name, relation] of Object.entries(lines)) for (const row of document[name] as Document[]) await relation.child().remove(tx, actor, row.id, row.revision, { skipOwner: { model: model.name, id }, withLines: true });
-      }
-      await repository.remove(tx, id, revision);
+      await withFrame(tx, { model: model.name, id }, async () => {
+        await model.beforeRemove?.(current as Readonly<Record<string, unknown>>, { tx, actor, id, env: envFor(tx, actor) });
+        if (options?.withLines && Object.keys(lines).length) {
+          const document = await loadLines(tx, actor, current as Document, lines);
+          for (const [name, relation] of Object.entries(lines)) for (const row of document[name] as Document[]) await relation.child().remove(tx, actor, row.id, row.revision, { skipOwner: { model: model.name, id }, withLines: true });
+        }
+        await repository.remove!(tx, id, revision);
+      });
       for (const owner of owners) await owner.parent.refresh(tx, actor, owner.previous);
     },
     async refresh(tx, actor, previous) {
@@ -763,5 +888,5 @@ export function createModelService<T extends Record<string, unknown>>(model: Con
     if (rows.length > 1) throw new ModelValidationError("La clave de importación no es única.");
     return rows[0] ? scalar ? repository.read(tx, String(rows[0].id)) : transaction.snapshot(tx, actor, String(rows[0].id)) : null;
   }
-  return { transaction, findUniqueInTransaction, listInTransaction: (prisma: PrismaClient, tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, undefined, tx), react, read, save, action, actions: model.actions ?? [], remove, activity, addNote, lookup, lookupInTransaction, list: (prisma: PrismaClient, actor: ModelActor, input: unknown, screen?: { readonly domain?: CollectionDomain }) => list(prisma, actor, input, undefined, undefined, undefined, "main", screen), defineListAction, defineChildListAction, kanban, move };
+  return { transaction, environment, findUniqueInTransaction, listInTransaction: (prisma: PrismaClient, tx: Prisma.TransactionClient, actor: ModelActor, input: unknown) => list(prisma, actor, input, undefined, undefined, tx), react, read, save, action, actions: model.actions ?? [], remove, activity, addNote, lookup, lookupInTransaction, list: (prisma: PrismaClient, actor: ModelActor, input: unknown, screen?: { readonly domain?: CollectionDomain }) => list(prisma, actor, input, undefined, undefined, undefined, "main", screen), defineListAction, defineChildListAction, kanban, move };
 }

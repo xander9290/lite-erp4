@@ -71,21 +71,25 @@ export function useModelChildCollectionsRefresh() {
  * Read-only relations of the record (children created in their own form): one paginated,
  * authorized collection per relation, filtered by the server to this record. Ejected forms
  * place `<ModelChildCollections />` (or `name` for one relation) where they should appear.
+ * `frame={false}` drops the FormGroup/legend and the list card border, e.g. inside a NotebookPage.
  */
-export function ModelChildCollections({ name, openIn = "page" }: { name?: string; openIn?: "page" | "modal" }) {
+export function ModelChildCollections({ name, openIn = "page", frame = true }: { name?: string; openIn?: "page" | "modal"; frame?: boolean }) {
   const ui = useContext(ModelUIContext);
   const recordId = useWatch({ name: "id" }) as string | undefined;
   const collections = Object.entries(ui?.config.collections ?? {}).filter(([field]) => !name || field === name);
   if (!ui || !collections.length) return null;
-  return <>{collections.map(([field, collection]) => <FieldVisibility key={field} name={field} invisible={collection.invisible}><FormGroup fullWidth legend={collection.label}>
-    {recordId ? <ChildCollection parent={ui.config.id} field={field} recordId={recordId} collection={collection} openIn={openIn} />
-      : <p className="text-sm text-base-content/60">Guarda el registro para ver {collection.label.toLowerCase()}.</p>}
-  </FormGroup></FieldVisibility>)}</>;
+  return <>{collections.map(([field, collection]) => {
+    const content = recordId ? <ChildCollection parent={ui.config.id} field={field} recordId={recordId} collection={collection} openIn={openIn} frame={frame} />
+      : <p className={`text-sm text-base-content/60 ${frame ? "" : "p-3"}`}>Guarda el registro para ver {collection.label.toLowerCase()}.</p>;
+    return <FieldVisibility key={field} name={field} invisible={collection.invisible}>
+      {frame ? <FormGroup fullWidth legend={collection.label}>{content}</FormGroup> : <div className="col-span-full min-w-0">{content}</div>}
+    </FieldVisibility>;
+  })}</>;
 }
 
-function ChildCollection({ parent, field, recordId, collection, openIn }: {
+function ChildCollection({ parent, field, recordId, collection, openIn, frame }: {
   parent: string; field: string; recordId: string;
-  collection: NonNullable<ModelClientConfig["collections"]>[string]; openIn: "page" | "modal";
+  collection: NonNullable<ModelClientConfig["collections"]>[string]; openIn: "page" | "modal"; frame: boolean;
 }) {
   const [editing, setEditing] = useState<{ id?: string } | null>(null);
   const [version, setVersion] = useState(0);
@@ -99,6 +103,7 @@ function ChildCollection({ parent, field, recordId, collection, openIn }: {
   const defaults = { [collection.inverse]: recordId };
   const inverse = collection.config.fields[collection.inverse];
   return <><ModelCollection embedded config={collection.config} view="list" title={collection.label} paramPrefix={field}
+    className={frame ? undefined : "rounded-t-none! rounded-b-xl! border-0! shadow-none!"}
     createDefaults={defaults} create={inverse?.kind === "many2one" && !inverse.readOnly} source={source} delete={false}
     onCreate={openIn === "modal" ? () => setEditing({}) : undefined}
     onOpen={openIn === "modal" ? record => setEditing({ id: record.id }) : undefined} />

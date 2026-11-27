@@ -208,6 +208,10 @@ type ColumnDeclaration = {
   name: string; label?: string; width?: string; align?: "left" | "center" | "right";
   widget?: "text" | "long" | "password" | "email" | "phone" | "image" | "avatar" | "statebar";
   render?: (context: One2manyCellContext) => ReactNode;
+  /** Presentation only: the column is not drawn; values stay in RHF and the server rules apply. */
+  invisible?: boolean;
+  /** Presentation only: locks this column (always or per row); the server still validates writes. */
+  readOnly?: boolean | ((row: Record<string, unknown>) => boolean);
 };
 // Stable across Fast Refresh: JSX may briefly retain the previous function identity.
 const columnTag = Symbol.for("lite-erp.form.one2many-column");
@@ -243,13 +247,19 @@ function FieldOne2many<TValues extends FieldValues = FieldValues, TName extends 
     if (props.children === undefined) declarations.push(...Object.keys(line.fields).map(name => ({ name })));
     else visit(props.children);
     if (!declarations.length || declarations.length > 12 || new Set(declarations.map(item => item.name)).size !== declarations.length) throw new Error("Declara entre 1 y 12 columnas de líneas, sin duplicados.");
-    columns = declarations.map(column => {
+    columns = declarations.flatMap(column => {
       const field = line.fields[column.name]?.metadata;
       if (!field || field.sensitive) throw new Error(`Columna de línea no publicada: ${column.name}.`);
       const widgets = field.kind === "text" ? ["text", "long", "password", "email", "phone"] : field.kind === "image" ? ["image", "avatar"] : field.kind === "selection" ? ["statebar"] : [];
       if (column.widget && !widgets.includes(column.widget)) throw new Error(`Widget incompatible en ${column.name}.`);
-      return { key: column.name, label: column.label ?? field.label ?? column.name, width: column.width, align: column.align, render: context => renderField(field, column, { ...context, row: context.row as Record<string, unknown>, fieldName: name => context.fieldName(name as never) }) };
+      if (column.invisible) return [];
+      return [{ key: column.name, label: column.label ?? field.label ?? column.name, width: column.width, align: column.align, render: context => {
+        const row = context.row as Record<string, unknown>;
+        const readOnly = context.readOnly || (typeof column.readOnly === "function" ? column.readOnly(row) === true : column.readOnly === true);
+        return renderField(field, column, { ...context, row, readOnly, fieldName: name => context.fieldName(name as never) });
+      } }];
     });
+    if (!columns.length) throw new Error("One2many requiere al menos una columna visible.");
     createRow = line.createRow as () => FieldArray<TValues, TName>;
   }
   if (!columns || !createRow) throw new Error("One2many requiere columnas y createRow, o una relación declarada en el modelo.");

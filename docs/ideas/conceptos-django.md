@@ -35,6 +35,9 @@ y reintentos explícitos. No sustituir indiscriminadamente los hooks actuales.
 ## Consultas de negocio reutilizables
 
 Inspiración: [Managers y QuerySets](https://docs.djangoproject.com/en/6.0/topics/db/managers/).
+Avance 2026-11-27: la lectura entre modelos ya existe como `context.env`
+([Entorno de modelos](../entorno-modelos.md)); las consultas con nombre propio
+(«contactos activos») siguen siendo una idea sobre esa base.
 Evaluar funciones tipadas sobre Prisma y los servicios actuales cuando consultas
 como contactos activos o documentos vencidos se repitan en consumidores reales.
 

@@ -70,7 +70,16 @@ su FK String, conservando nombre, destino, fields/references y acciones de borra
 explícitas. No se admiten cambios de destino, clave o política de borrado, relaciones
 compuestas, inversas/listas ni cambios incoherentes entre la FK y su relación.
 
-No se permite retirar unicidad, renombrar/eliminar campos ni cambiar tipos base.
+Desde 2026-11-27 también se admite retirar `unique: true` de un campo simple: sólo
+elimina su índice (`DROP INDEX "<tabla>_<columna>_key"`), sin tocar datos. Es el paso
+para cambiar una unicidad global por una compuesta con `uniqueTogether`, cuyo índice
+nuevo comprueba antes combinaciones duplicadas (preflight y guarda bajo lock). Sólo
+se aceptan los DROP INDEX de esos índices exactos derivados de las declaraciones;
+cualquier otro DROP/DELETE sigue en el flujo manual. Por ejemplo, PartnerEmails pasó
+de correo único global a `uniqueTogether = [["partnerId", "name"]]`.
+
+No se permite retirar un `uniqueTogether` existente, renombrar/eliminar campos ni
+cambiar tipos base.
 Los demás cambios aditivos mantienen sus reglas habituales. No editar hashes para
 forzarlos. Por ejemplo, si PartnerEmails.partnerId pasó de opcional a required,
 revisar con `npm run orm:sync -- directory --plan --force` y luego sincronizar con

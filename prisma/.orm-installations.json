@@ -14,7 +14,7 @@
     },
     "directory": {
       "file": "orm-directory.prisma",
-      "hash": "7a765eb097856f3c5841a4041c68bb841c74681f29efc25fe4eac541bd9ef7aa",
+      "hash": "3dde40e1bc7a5914c96c39e0d9498ed37c58b3bea3dcf95a6ba636359ef23467",
       "inverses": [
         {
           "file": "orm-ubicaciones.prisma",

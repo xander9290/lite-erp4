@@ -1,10 +1,106 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-26.
+Última actualización: 2026-11-27.
 
 Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../AGENTS.md)
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
+
+## Resumen y pendientes vigentes (2026-11-27, Windows)
+
+Rama codex/partner. Guardado en commit con todo el trabajo del día: tablas de
+correos/teléfonos sin FormGroup, FieldOne2many.Column invisible/readOnly,
+ModelChildCollections frame={false}, fondo de FormGroup /20, unicidad de correo
+por contacto (uniqueTogether + --force que retira unique simple; migración
+20261127161558_sync_directory_force aplicada en desarrollo Windows según
+`prisma migrate status`), `context.env` fases 1–2 con alcance de extensiones y
+crear contacto desde Usuario con sincronización de avatar.
+
+Pendientes, en orden sugerido:
+1. Probar en navegador «Crear contacto» desde Ajustes → Usuarios: alta con avatar,
+   rechazo por correo duplicado y sincronización del avatar al guardar.
+2. Decidir si Perfil guarda por el servicio de core.user (hoy tx.user.update
+   directo: no ejecuta hooks ni sincroniza el avatar del contacto). El usuario lo
+   pospuso el 2026-11-27.
+3. Permisos de partneremails/partnerphones para los grupos de Directorio y prueba
+   de páginas por grupo con un usuario no admin.
+4. Quitar `purchase: "Compras"` de pages.additionalInfo si no será una pestaña
+   (aviso «no pinta páginas declaradas»); UserForm.tsx tiene un import de
+   FormHeader sin usar (aviso ESLint, cambio del usuario).
+5. Repetir test:orm:install y test:orm donde se permitan symlinks (Mac): en Windows
+   8 pruebas fallan con EPERM antes de su lógica.
+6. Opcionales del framework: destino oficial de inserción `header` (hoy un
+   FormHeader fuera de Inserter funciona por portal, sin orden ni validación);
+   sudo() auditado y escrituras Many2many/One2many por env; integración de env con
+   base temporal.
+
+## En curso: crear contacto desde Usuario con `env` (2026-11-27)
+
+El usuario retoma la creación de Partner desde User, ahora como acción manual de la
+extensión de Directorio sobre core.user (sin creación automática). Guía dada:
+acción `crearContacto` en src/modules/directory/models/user.ts (rechaza si ya hay
+contacto o si existe uno con el mismo correo; crea con env.DirectoryPartner.create y
+vincula devolviendo el patch `{ partnerId }`), `orm:generate -- directory
+--actions-only --write`, FormButton en UserDirectoryForm visible sin partnerId, y
+sincronización de avatar en `afterSave` de la extensión comparando
+`context.previous.avatarUrl` (llamando `super.afterSave`). El usuario completó los
+pasos: acción y afterSave en la extensión, referencia regenerada
+(`DirectoryCoreUserActions` → "User", ["crearContacto"]) y FormButton dentro de un
+FormHeader en UserDirectoryForm (funciona fuera de Inserter porque FormHeader es un
+portal a la cabecera). Comprobado: tsc, ESLint, test:modules 89/89 y carga real del
+registro (core.user publica crearContacto y afterSave). Pendiente: prueba en
+navegador del usuario (crear contacto, correo duplicado, cambio de avatar desde
+Ajustes → Usuarios).
+
+Ajuste del framework hecho para esto: el env de un modelo incluye los módulos que
+lo extienden y sus depends (los métodos de extensiones corren en el servicio base).
+Comprobado con módulos reales (env de core.user ve Directorio y Ubicaciones), prueba
+nueva en modules/environment.test.ts, test:modules 89/89, env 12/12, tsc y ESLint.
+La prueba eject-cli incluye ahora los tipos generados de env en su compilación aislada.
+
+Hallazgo: Perfil guarda con tx.user.update directo (src/lib/auth/profile-service.ts)
+y no ejecuta hooks de User; un cambio de avatar desde Perfil no sincronizaría el
+contacto. Recomendado: que Perfil guarde por el servicio de core.user; decisión
+pendiente del usuario.
+
+## Entorno de modelos `context.env`, fases 1 y 2 (2026-11-27)
+
+Implementado a petición del usuario, sólo lectura: `context.env.<Modelo>` con
+search/read/readMany/count en hooks, constraints, acciones, beforeRemove y
+reacciones, sobre la misma transacción y actor, revalidando acceso por grupo,
+reglas de registro y «No leer» del destino. Visibles: modelos del módulo, de sus
+depends y core. Tipos generados para directory, ubicaciones y core
+(`src/generated/orm/actions/<módulo>/environment.ts`; ubicaciones y core recibieron
+también por primera vez sus `*.actions.ts`). Sin cambios en modelos de Directorio,
+SQL ni datos; ningún modelo lo usa todavía.
+
+Comprobado: environment (orm 6/6, modules 2/2) y generador de tipos; test:orm
+137/138, test:modules 88/88, test:form-model 34/34, test:orm:install 23/30. Los
+fallos restantes son EPERM al crear symlinks en Windows (fixtures temporales), antes
+de su lógica. TypeScript (incluido un uso tipado temporal de DirectoryPartner,
+UbicacionesPais y User con @ts-expect-error) y ESLint sin errores. No probado
+contra la base real ni en navegador. Contrato en [Entorno de modelos](entorno-modelos.md).
+
+Fase 2 (mismo día, a petición del usuario): create/write/unlink en hooks, @action
+y beforeRemove por persist/remove del servicio destino (permisos y reglas de
+escritura, No escribir, normalize, Zod, hooks, constraints, historial, refresco del
+padre); write lee la revisión en la misma tx. @constraint, reacciones y cálculos
+reciben env de sólo lectura (también en tipos de ReactionContext). Guardas por tx
+(WeakMap): marco del registro en guardado/acción/borrado y error claro si env lo
+modifica o toca sus líneas; máximo 3 escrituras anidadas. Valores sólo escalares
+persistentes públicos.
+
+Comprobado fase 2: environment-write 6/6 (pipeline, permisos, registro en curso,
+líneas del registro en acción, profundidad, sólo lectura) con repositorio en
+memoria; test:orm 142/143 (el fallo es EPERM de symlink), test:modules 88/88,
+test:form-model 34/34, tsc (uso tipado temporal de create/write/unlink y bloqueo en
+ReactionContext) y ESLint. /sample#model-reactions sigue ejecutando reacciones en
+servidor. Sin prueba contra PostgreSQL real: la reversión de toda la transacción
+ante un error de guarda se apoya en la transacción de Prisma, no en la prueba en
+memoria. Ningún modelo de Directorio usa env todavía.
+
+Siguiente (requiere caso real y aprobación): sudo() explícito y auditado; escrituras
+Many2many/One2many por env; integración con base temporal.
 
 ## Continuidad actual: teléfonos adicionales y roles comerciales (2026-11-26)
 
@@ -33,6 +129,30 @@ actualiza continuidad; sin commit/push/pull ni cambios de código o datos.
   en memoria se aceptan las cuatro combinaciones (ninguno, cliente, proveedor, ambos).
   No cambia Persona/Empresa ni Contacto/Entrega/Facturación. Aún no forman parte
   de list.fields; mostrarlos/filtrarlos en Lista/Card es una ampliación opcional.
+- 2026-11-27: las pestañas emails y phones de PartnerForm colocan FieldOne2many
+  directamente en NotebookPage, sin el FormGroup fullWidth que añadía fondo y
+  padding alrededor de la tabla (NotebookPage ya quita el borde de la línea).
+  Comprobado con ESLint y tsc; sin revisión en navegador por el agente.
+- 2026-11-27: `prisma migrate status` en desarrollo Windows indica la base al día
+  (102 migraciones); las tres de Directorio (correos force, teléfonos, roles) ya
+  están aplicadas, por el usuario.
+- 2026-11-27: FormGroup aclara su fondo de bg-base-200/40 a bg-base-200/20 a
+  petición del usuario (todos los formularios). Comprobado en /sample: los grupos
+  renderizados en cliente calculan alfa 0.2; el SSR del dev server abierto seguía
+  sirviendo /40 (aviso de hidratación) hasta reiniciarlo.
+- 2026-11-27: ModelChildCollections admite `frame={false}` (default true): sin
+  FormGroup/legend y sin borde/sombra de la lista embebida. PartnerForm lo usa en
+  la página otherAddresses, sin padding de NotebookPage. Comprobado con ESLint,
+  tsc y test:form-model; no revisado en navegador (requiere sesión iniciada).
+  Contrato en docs/formularios-modal.md.
+- 2026-11-27: FieldOne2many.Column admite `invisible` (boolean; no dibuja la
+  columna, el valor sigue en RHF, exige al menos una visible) y `readOnly`
+  (boolean o función por fila, combinado con tabla/fila/capacidades). Sólo
+  presentación; el servidor no cambia. Contrato en
+  src/components/ui/form/FieldOne2many.md; demo /sample#one2many-model (fecha
+  readOnly en líneas con ID). Comprobado: test:form-model (34/34, incluye caso
+  nuevo), ESLint, tsc y navegador sobre la demo (línea guardada bloqueada, nueva
+  editable, sin errores de consola). No se aplicó todavía en PartnerForm.
 - El ajuste del sincronizador para nulabilidad de Many2one quedó implementado y
   comprobado con el alcance de la sección inferior. El usuario retiró el import
   Files sin uso y corrigió correo a name en normalize/constraint de PartnerEmails.
@@ -65,14 +185,24 @@ todas estas ediciones posteriores. Cierre documental: git diff --check.
    ocultarse desde Grupos. Hoy el catálogo sólo tiene las cuatro páginas originales.
    Sigue pendiente la comprobación de páginas por grupo en navegador con no admin;
    la aplicación de su migración en Windows conserva la evidencia anterior.
-3. Definir normalización y validación de números/extensiones según el formato que
-   se decida almacenar; PartnerPhones aún usa Text sin constraint de formato.
-   type opcional y usage requerido sin default son el comportamiento actual;
-   cambiar esas decisiones sólo si lo pide el caso de uso.
-4. Decidir si el correo adicional debe ser único globalmente o por contacto;
-   PartnerEmails.name mantiene unique:true global. No cambiar unicidad ni datos
-   por anticipación. Comprobar/confirmar aplicación de las migraciones recientes
-   en el entorno de trabajo cuando se retome persistencia, sin repetir SQL ya aplicado.
+3. Formato de teléfonos: cerrado por el usuario (2026-11-27). FieldText
+   widget="phone" guarda el número ya formateado (p. ej. «+52 33 1811 5836»),
+   confirmado por el usuario en la columna phones. No hay normalización en el
+   modelo: entradas fuera del formulario (importación, acciones) no pasan por el
+   widget. type opcional y usage requerido sin default siguen igual.
+4. Unicidad de correos (2026-11-27): el usuario eligió única por contacto y
+   borró antes los correos de prueba. PartnerEmails quita unique:true de name y
+   declara uniqueTogether [["partnerId","name"]]. Se amplió orm:sync --force para
+   retirar unique simple (sólo DROP INDEX del índice <tabla>_<columna>_key derivado
+   de las declaraciones, en evolution/prepare/assertSyncSQL) y comprobar duplicados
+   de uniqueTogether en preflight y guarda bajo lock. `orm:sync -- directory --plan`
+   lo rechaza sin --force; con --plan --force propone sólo DROP INDEX
+   directory_partneremails_name_key + CREATE UNIQUE INDEX (partner_id, name).
+   Pruebas: force/evolution/sync/unique-indexes 15/15; test:orm:install 22/29, los 7
+   restantes fallan en Windows al crear el symlink de node_modules del proyecto
+   temporal (EPERM), antes de su lógica; repetirlos donde se permitan symlinks.
+   ESLint y tsc sin errores. Pendiente del usuario: `npm run orm:sync -- directory
+   --force` para preparar/aprobar/aplicar la migración; no aplicada.
 5. Opcionales: publicar roles en listas/tarjetas o crear pantallas por rol; detección
    de posibles duplicados fue sólo una sugerencia, sin implementación solicitada.
    No hacer fusiones automáticas ni tratar las direcciones como contactos duplicados.

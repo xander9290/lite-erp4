@@ -24,7 +24,16 @@ export default defineModule({
     partner: {
       model: Partner,
       list: {
-        fields: ["image", "name", "phones", "street", "streetNumber", "vat", "provinceId", "countyId"],
+        fields: [
+          "image",
+          "name",
+          "phones",
+          "street",
+          "streetNumber",
+          "vat",
+          "provinceId",
+          "countyId",
+        ],
       },
       defaultScreen: "contacts",
       screens: {
@@ -56,9 +65,10 @@ export default defineModule({
       pages: {
         additionalInfo: {
           otherAddresses: "Otras direcciones",
-          sales: "Ventas",
-          purchase: "Compras",
+          salesPurchase: "Venta y compra",
           otherInfo: "Otra información",
+          emails: "Correos adicionales",
+          phones: "Teléfonos adicionales",
         },
       },
     },

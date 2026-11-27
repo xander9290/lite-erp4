@@ -11,6 +11,7 @@ import type { FormValues } from "@/lib/orm/model";
 import type { User } from "@/lib/core/models/user";
 import Notebook from "@/components/ui/form/Notebook";
 import NotebookPage from "@/components/ui/form/NotebookPage";
+import FormHeader from "@/components/ui/form/FormHeader";
 
 type Values = FormValues<typeof User>;
 const contactFields = ["name", "email", "phone", "avatarUrl"] as const;

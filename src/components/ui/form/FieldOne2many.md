@@ -120,6 +120,29 @@ Cuando `FormView model={ui.recordUI}` publica una relación One2many, puede usar
 </FieldOne2many>
 ```
 
+Cada `FieldOne2many.Column` acepta `name` (obligatorio), `label`, `width`,
+`align`, `widget` (variante compatible con el tipo), `render` y dos opciones de
+presentación:
+
+- `invisible` (boolean): no dibuja la columna. El nombre se valida igual contra el
+  contrato del hijo; el valor permanece en el borrador RHF y se envía al guardar.
+  Debe quedar al menos una columna visible.
+- `readOnly` (boolean o `(row) => boolean`): bloquea el control de esa columna
+  siempre o por fila, por ejemplo `readOnly={row => Boolean(row.id)}` para líneas
+  ya guardadas. Se suma al `readOnly` de la tabla, de la fila y de las capacidades.
+  Con `render`, el renderer recibe `readOnly` ya combinado y debe respetarlo.
+
+Ambas son sólo presentación: no ocultan datos al navegador ni impiden escrituras.
+Para proteger un campo usar permisos por campo del grupo o reglas del modelo en
+el servidor.
+
+```tsx
+<FieldOne2many name="phoneIds">
+  <FieldOne2many.Column name="name" widget="phone" readOnly={row => Boolean(row.id)} />
+  <FieldOne2many.Column name="contact" invisible />
+</FieldOne2many>
+```
+
 Se heredan los Fields, defaults, validación, límites y capacidades del hijo. La
 inversa la asigna el servidor; no es una columna editable. Sin children se dibujan
 sus campos escalares. No combinar Column con columns/createRow. Las filas se

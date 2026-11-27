@@ -104,3 +104,12 @@ El motor explícito y los decoradores de reacciones/restricciones se documentan 
 [Reacciones de modelos](reacciones-modelos.md). Las constraints se ejecutan tras
 beforeSave revalidado y antes de persistir; no confundir onchange del borrador con
 las reglas definitivas del guardado.
+
+## Consultar otros modelos desde los métodos
+
+Desde 2026-11-27 los hooks, constraints, acciones y reacciones reciben
+`context.env` para leer otros modelos registrados en la misma transacción y con los
+permisos del usuario: `context.env.DirectoryPartner.search(d => ..., { fields })`,
+`read`, `readMany` y `count`, y desde hooks/acciones `create`, `write` y `unlink` por el
+servicio del destino (las constraints y reacciones sólo consultan). Contrato, límites y
+seguridad en [Entorno de modelos](entorno-modelos.md).

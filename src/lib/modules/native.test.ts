@@ -9,6 +9,7 @@ import { extendModel } from "./extend";
 import { createRepository } from "./repository";
 import { generateModule } from "../orm/generator/generate";
 import { userGroups } from "../access/engine";
+import { unavailableEnvironment } from "../orm/environment";
 
 test("core registers only autonomous User accounts, without a business directory", () => {
   assert.equal(core.native, true);
@@ -107,6 +108,6 @@ test("core.user business rules: password on create, last admin and self-protecti
   await assert.rejects(user.contract.beforeSave({ ...base, isAdmin: false } as never, { tx, actor, operation: "update", id: "a1", previous: base } as never), /propia cuenta/);
   await assert.rejects(user.contract.beforeSave({ ...base, active: false } as never, { tx, actor, operation: "update", id: "b2", previous: base } as never), /al menos un administrador/);
   await assert.rejects(user.contract.beforeSave({ ...base, password: "corta" } as never, { tx, actor, operation: "create", previous: null } as never), (error: { fieldErrors?: Record<string, string> }) => /8 caracteres/.test(error.fieldErrors?.password ?? ""));
-  await assert.rejects(user.contract.beforeRemove!(base, { tx, actor, id: "a1" }), /propia cuenta/);
-  await assert.rejects(user.contract.beforeRemove!(base, { tx, actor, id: "b2" }), /al menos un administrador/);
+  await assert.rejects(user.contract.beforeRemove!(base, { tx, actor, id: "a1", env: unavailableEnvironment }), /propia cuenta/);
+  await assert.rejects(user.contract.beforeRemove!(base, { tx, actor, id: "b2", env: unavailableEnvironment }), /al menos un administrador/);
 });

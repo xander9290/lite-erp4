@@ -9,10 +9,12 @@ import {
 import { ModelTypes } from "@/types/model-types";
 
 export class PartnerEmails extends Model {
+  // Un contacto no repite un correo; contactos distintos sí pueden compartirlo.
+  readonly uniqueTogether = [["partnerId", "name"]] as const;
+
   name = Fields.Text({
     label: "Correo",
     required: true,
-    unique: true,
     maxLength: 120,
     tracking: true,
   });

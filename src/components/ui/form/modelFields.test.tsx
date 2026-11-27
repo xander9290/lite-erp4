@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import type { ReactNode } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { Fields } from "@/lib/orm/fields";
 import { fieldFromMetadata } from "@/lib/modules/fields";
@@ -154,6 +155,27 @@ test("declarative One2many columns inherit child metadata and preserve persisted
   const html=renderToStaticMarkup(<LinesFixture />);
   assert.match(html,/Descripción/);assert.match(html,/maxLength="17"/i);assert.match(html,/name="lines.0.name"/);assert.match(html,/value="Guardado"/);assert.match(html,/database-id/);assert.match(html,/Agregar línea/);assert.match(html,/autocomplete="off"/i);assert.doesNotMatch(html,/documentoId/);
   const readonly=renderToStaticMarkup(<LinesFixture readonly />);assert.doesNotMatch(readonly,/Agregar línea|Quitar línea/);assert.match(readonly,/<fieldset disabled=""/);assert.match(readonly,/value="Guardado"/);
+});
+
+test("declarative One2many columns support invisible and per-row readOnly", async () => {
+  const { default: FieldOne2many } = await import("./FieldOne2many");
+  const childFields={name:Fields.Text({label:"Descripción",required:true}),nota:Fields.Text({label:"Nota oculta"}),cantidad:Fields.Integer({label:"Cantidad",required:true,min:0})};
+  function ColumnsFixture({ columns }: { columns: ReactNode }) {
+    const methods=useForm({defaultValues:{lines:[{id:"saved-id",revision:"2026-11-15T00:00:00.000Z",name:"Guardado",nota:"secreta",cantidad:2},{name:"Nueva",nota:"",cantidad:1}]}});
+    return <FormProvider {...methods}><FormModelContext.Provider value={{fields:{},lines:{lines:{fields:childFields,minRows:0,maxRows:3,createRow:()=>({name:"",nota:"",cantidad:1}),capabilities:{read:true,create:true,write:true,unlink:true}}}}}>
+      <FieldOne2many name="lines">{columns}</FieldOne2many>
+    </FormModelContext.Provider></FormProvider>;
+  }
+  const html=renderToStaticMarkup(<ColumnsFixture columns={<><FieldOne2many.Column name="name" readOnly={row=>Boolean(row.id)} /><FieldOne2many.Column name="nota" invisible /><FieldOne2many.Column name="cantidad" readOnly /></>} />);
+  assert.doesNotMatch(html,/Nota oculta|lines\.0\.nota|secreta/);
+  const input=(name:string)=>html.match(new RegExp(`<input[^>]*name="${name.replace(/\./g,"\\.")}"[^>]*>`))?.[0] ?? "";
+  assert.match(input("lines.0.name"),/readonly=""/i);
+  assert.doesNotMatch(input("lines.1.name"),/readonly=""/i);
+  assert.match(input("lines.0.cantidad"),/readonly=""/i);
+  assert.match(input("lines.1.cantidad"),/readonly=""/i);
+  assert.match(html,/Agregar línea/);
+  assert.throws(()=>renderToStaticMarkup(<ColumnsFixture columns={<FieldOne2many.Column name="name" invisible />} />),/al menos una columna visible/);
+  assert.throws(()=>renderToStaticMarkup(<ColumnsFixture columns={<FieldOne2many.Column name="inexistente" invisible />} />),/no publicada/);
 });
 
 

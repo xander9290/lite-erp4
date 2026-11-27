@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { forceChecks, forcedMigrationSQL, validateForceData } from "./force";
+import { forceChecks, forcedMigrationSQL, retirableUniqueIndexes, validateForceData, withoutRetirableDrops } from "./force";
 import { assertNoUniqueDuplicates, uniqueIndexMigration, uniqueIndexMigrationSQL } from "./unique-indexes";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -36,7 +36,12 @@ export function pendingMigrations(files: readonly MigrationFile[], applied: read
   return files.filter(file => !applied.some(row => row.migration_name === file.name && row.finished_at && !row.rolled_back_at));
 }
 
-export function assertSyncSQL(sql: string, migrationName?: string) {
+/**
+ * `retirableIndexes` (reviewed --force only) lets whole `DROP INDEX "<name>";` statements
+ * through for those exact unique indexes; every other drop/delete still needs the manual flow.
+ */
+export function assertSyncSQL(sql: string, migrationName?: string, retirableIndexes?: ReadonlySet<string>) {
+  sql = withoutRetirableDrops(sql, retirableIndexes);
   if (/\bDROP\s+(TABLE|COLUMN|TYPE|INDEX|CONSTRAINT)\b|\bTRUNCATE\b|\bDELETE\s+FROM\b/i.test(sql)) throw new Error(`La migración${migrationName ? ` ${migrationName}` : ""} contiene retiradas o borrados: requiere el flujo manual de revisión.`);
 }
 
@@ -168,7 +173,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
     stage("Revisar migraciones pendientes del proyecto");
     for (const file of files) {
       if (file.sql.startsWith("-- lite-erp: reviewed force migration") && !options.force) throw new Error(`La migración ${file.name} requiere repetir orm:sync con --force para revisar sus restricciones.`);
-      options.log(`\n${file.name}/migration.sql\n${file.sql}`); assertSyncSQL(file.sql, file.name); }
+      options.log(`\n${file.name}/migration.sql\n${file.sql}`); assertSyncSQL(file.sql, file.name, options.force && file.sql.startsWith("-- lite-erp: reviewed force migration") ? retirableUniqueIndexes(profile.module) : undefined); }
     if (!await options.confirm(`¿Aplicar estas ${files.length} migraciones a la base de desarrollo indicada? Escribe aplicar`)) throw new Error("Cancelado: las migraciones mostradas no se aplicaron. Los archivos preparados se conservan.");
     if (JSON.stringify(await pending()) !== JSON.stringify(files)) throw new Error("Las migraciones cambiaron durante la revisión. Vuelve a ejecutar orm:sync.");
     stage("Aplicar SQL aprobado");
@@ -199,7 +204,7 @@ export async function syncApplication(root: string, id: string, options: SyncOpt
       let checks: Awaited<ReturnType<typeof validateForceData>>;
       try { await client.connect(); checks = await validateForceData(client, target.searchParams.get("schema") || "public", forceChecks(profile)); }
       finally { await client.end(); }
-      assertSyncSQL(proposal.sql);
+      assertSyncSQL(proposal.sql, undefined, retirableUniqueIndexes(profile.module));
       let prepared: string | undefined;
       let preparedSQL: string | undefined;
       try {

@@ -4,6 +4,7 @@ import { Fields, Model, action, defineModel, ActionParameterError, type ActionPa
 import { compileActionParameters, parseActionParameters } from "./action-parameters";
 import { defineModule } from "../modules/define";
 import { composeModules } from "../modules/compose";
+import { unavailableEnvironment } from "../orm/environment";
 const closeParams = { nota: Fields.Text({ required: true, maxLength: 2000 }), cantidad: Fields.Integer({ required: true, min: 1, default: 1 }) };
 class Ticket extends Model {
   name = Fields.Text({ required: true });
@@ -14,7 +15,7 @@ class Ticket extends Model {
   @action({ label: "Legacy" }) legacy(_record: ActionRecord<Ticket>, context: ActionContext) { return { name: context.actor.id }; }
 }
 const contract = defineModel(Ticket, { name: "DemoTicket", table: "demo_ticket" });
-const context = { tx: {} as never, actor: { id: "actor", sessionVersion: 0 }, action: "cerrar" };
+const context = { tx: {} as never, actor: { id: "actor", sessionVersion: 0 }, action: "cerrar", env: unavailableEnvironment };
 const record = { id: "ticket", revision: "2026-01-01T00:00:00.000Z", name: "Ticket" };
 test("parameter actions derive public metadata and execute with frozen typed params while retaining the legacy signature", async () => {
   assert.equal(contract.actions[0].params?.nota.kind, "text");

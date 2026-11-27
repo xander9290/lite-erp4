@@ -16,7 +16,10 @@ function widensVarchar(previous: string, next: string) {
   return !!before && !!after && after.length > before.length && before.rest === after.rest;
 }
 
-/** Explicit force still keeps field identity, defaults, mapping and scalar type unchanged. */
+/**
+ * Explicit force still keeps field identity, defaults, mapping and scalar type unchanged.
+ * Adding or retiring a single-field @unique is admitted: retiring only drops its index.
+ */
 function reviewedStringChange(previous: string, next: string) {
   const parse = (line: string) => {
     const match = /^(\w+) String(\?)?(?:\s+(.*))?$/.exec(line);
@@ -29,7 +32,6 @@ function reviewedStringChange(previous: string, next: string) {
   };
   const before = parse(previous), after = parse(next);
   return !!before && !!after && before.name === after.name && before.rest === after.rest
-    && !(before.unique && !after.unique)
     && (after.length === null || Number.isSafeInteger(after.length) && after.length > 0);
 }
 

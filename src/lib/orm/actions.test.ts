@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Fields, Model, ModelValidationError, action, defineModel, type ActionRecord } from "./index";
+import { unavailableEnvironment } from "./environment";
 
 class Pedido extends Model {
   name = Fields.Text({ required: true });
@@ -17,7 +18,7 @@ class Pedido extends Model {
   romper() { return { inventado: 1 }; }
   auxiliar() { return { estado: "confirmado" }; }
 }
-const context = { tx: {} as never, actor: { id: "u1", sessionVersion: 0 }, action: "x" };
+const context = { tx: {} as never, actor: { id: "u1", sessionVersion: 0 }, action: "x", env: unavailableEnvironment };
 const pedido = defineModel(Pedido, { name: "Pedido", table: "pedido" });
 
 test("sólo los métodos con @action se publican, con label y grupos", () => {

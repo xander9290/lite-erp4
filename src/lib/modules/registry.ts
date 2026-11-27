@@ -18,6 +18,9 @@ import type { ModelAction } from "../orm/model";
 import { createRepository } from "./repository";
 import { modelIdPattern, type ModelClientConfig, type ModelLineConfig } from "./config";
 import type { InsertionViewKind, ModuleDefinition, ModuleModel } from "./define";
+import { createEnvironment, environmentModels } from "./environment";
+import type { Prisma } from "@/generated/prisma/client";
+import type { ModelEnvironment } from "../orm/environment";
 import { relationDomains, relationDomainWhere } from "./relation-domains";
 import { domainDependencies, domainUsesRecordId } from "../orm/domain-builder";
 import { ModelValidationError } from "../orm/context";
@@ -173,6 +176,16 @@ export async function parameterLookup(model: string, actionName: string, paramet
   }), { isolationLevel: "RepeatableRead" });
 }
 
+/**
+ * `context.env` of a model's methods: its module, its declared dependencies, the native core and
+ * the modules extending it (their methods run in this service). Each access builds the target's
+ * facade over the caller's transaction and actor (the target's permissions apply; no elevation).
+ */
+function environmentFor(module: ModuleDefinition, entry: ModuleModel) {
+  const visible = environmentModels(modules, module, entry);
+  return (tx: Prisma.TransactionClient, actor: ModelActor): ModelEnvironment => createEnvironment(module.id, visible, id => modelService(id).environment(tx, actor));
+}
+
 export function modelService(id: string): Service {
   const cached = services.get(id);
   if (cached) return cached;
@@ -221,6 +234,7 @@ export function modelService(id: string): Service {
     collectionNullable: entry.extensions.flatMap(extension => extension.fields),
     // Group access and record rules, revalidated inside each service transaction.
     authorize: (tx, actor, operation) => authorizeModel(tx, actor, entry.id, operation),
+    environment: environmentFor(module, entry),
     activityLabels: async (tx, actor, target, ids) => {
       const related = byPrismaName.get(target);
       // Unregistered/manual targets have no declarative read contract. Do not query them.

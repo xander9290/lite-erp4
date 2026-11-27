@@ -165,7 +165,7 @@ export function defineModel<C extends Constructor>(Declaration: C, options: Mode
 
 export type ModelAction = { readonly name: string; readonly label: string; readonly groups?: readonly string[]; readonly params?: ActionParameterMetadata };
 /** Context of a business action: same transaction and authenticated actor as the save pipeline. */
-export type ActionContext = { readonly tx: Prisma.TransactionClient; readonly actor: Readonly<ModelActor>; readonly action: string };
+export type ActionContext = { readonly tx: Prisma.TransactionClient; readonly actor: Readonly<ModelActor>; readonly action: string; readonly env: import("./environment").ModelEnvironment };
 /** Saved record received by an action method: declared values plus identity and revision. */
 export type ActionRecord<I> = Readonly<Values<I> & RelationInput<I> & { id: string; revision: string }>;
 /** Patch an action may return: only declared fields. */

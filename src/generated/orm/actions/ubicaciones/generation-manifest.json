@@ -1,0 +1,11 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "actions-ubicaciones",
+  "files": {
+    "environment.ts": "c77e53313fa237196c95afe14974b9b4f3b658a56db5fff511ffdd8986eb0344",
+    "UbicacionesPais.actions.ts": "8f8bd5bea89be025b088d134fde21906cd061fd79142799ee07809dd3833a898",
+    "UbicacionesEstado.actions.ts": "5bfbea069ba452a0d7beda45fe659750c3b7d324667b930b865ec1d4d2ac09f2",
+    "UbicacionesMunicipio.actions.ts": "093e7cb8b9eec3ccef4186331fc98231f755a4acd565f727b0d4924a1124be2b",
+    "UbicacionesLocalidad.actions.ts": "5166186261b9d83427d777a5e0b07fa52e1b9ad099ddf27278efd6798308e551"
+  }
+}

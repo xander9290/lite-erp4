@@ -11,6 +11,8 @@ import type { ReactionRule } from "./reactions.types";
 export type ComputedRule = { readonly reads: readonly string[]; readonly outputs: readonly string[] };
 export type ReactionValues = Readonly<Record<string, unknown>>;
 export type ReactionContext = Pick<ModelContext,"tx"|"actor"|"id"> & {
+  /** Queries only: reactions and computed fields run in READ ONLY transactions. */
+  readonly env: import("./environment").ReadOnlyModelEnvironment;
   resolveRelated?: (field: string, id: string) => Promise<Record<string, unknown>>;
 };
 type Declarations = { onchange?:readonly ReactionDeclaration[]; constraints?:readonly ConstraintDeclaration[]; preview?:Readonly<Record<string,Field>> };

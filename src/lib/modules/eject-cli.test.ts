@@ -16,7 +16,7 @@ test("modal CLI generates own and extended forms without a database; plans, coll
     await mkdir(join(addon, "models"), { recursive: true });
     await symlink(join(project, "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
     await writeFile(join(root, "package.json"), JSON.stringify({ type: "module" }));
-    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ extends: join(project, "tsconfig.json"), compilerOptions: { incremental: false, experimentalDecorators: true, paths: { "@/*": [join(root, "src/*"), join(project, "src/*")] } }, include: ["src/**/*.ts", "src/**/*.tsx", join(project, "src/types/next-auth.d.ts")], exclude: [] }));
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ extends: join(project, "tsconfig.json"), compilerOptions: { incremental: false, experimentalDecorators: true, paths: { "@/*": [join(root, "src/*"), join(project, "src/*")] } }, include: ["src/**/*.ts", "src/**/*.tsx", join(project, "src/types/next-auth.d.ts"), `${project.replaceAll("\\", "/")}/src/generated/orm/actions/*/environment.ts`], exclude: [] }));
     await writeFile(join(base, "models/item.ts"), `import { Fields, Model } from "@/lib/orm";
 export class Item extends Model { name = Fields.Text(); parentId = Fields.Many2one("ExampleItem"); childIds = Fields.One2many("ExampleChild", {inverse:"itemId", readonly:true}); }
 export class Child extends Model { name = Fields.Text(); itemId = Fields.Many2one("ExampleItem"); }

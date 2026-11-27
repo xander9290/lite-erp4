@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assertAdditiveEvolution } from "./evolution";
-import { checkQueries, forceChecks, forcedMigrationSQL, validateForceData } from "./force";
+import { checkQueries, forceChecks, forcedMigrationSQL, retirableUniqueIndexes, validateForceData } from "./force";
 import { assertSyncSQL } from "./sync";
 import type { Client } from "pg";
 import { Fields } from "../fields";
@@ -15,8 +15,46 @@ test("force accepts reviewed String constraints while normal evolution remains s
   }
   assert.doesNotThrow(()=>assertAdditiveEvolution(schema('plate String? @db.VarChar(80)'),schema('plate String? @db.VarChar(20)'),true));
   for(const after of [schema('registration String?'),schema('plate Int?'),schema('plate String? @map("other")'),schema('plate String? @default("changed")'),schema('')]) assert.throws(()=>assertAdditiveEvolution(before,after,true));
-  assert.throws(()=>assertAdditiveEvolution(schema('plate String? @unique'),before,true));
+  assert.throws(()=>assertAdditiveEvolution(schema('plate String? @unique'),before),/--force/);
+  assert.doesNotThrow(()=>assertAdditiveEvolution(schema('plate String? @unique'),before,true));
+  assert.doesNotThrow(()=>assertAdditiveEvolution(schema('plate String @unique @db.VarChar(20)'),schema('plate String @db.VarChar(20)'),true));
+  assert.throws(()=>assertAdditiveEvolution(schema('plate String? @unique'),schema('plate String? @default("x")'),true));
   assert.throws(()=>assertAdditiveEvolution(before,'',true),/eliminar/);
+});
+
+test("force retires a single unique and adds a compound key, still rejecting other drops",()=>{
+  const model=(compound:boolean)=>`model Mail {\n id String @id\n name String${compound?"":" @unique"} @db.VarChar(120)\n partnerId String @map("partner_id")\n${compound?' @@unique([partnerId, name])\n':''} @@map("mails")\n}`;
+  assert.throws(()=>assertAdditiveEvolution(model(false),model(true)),/--force/);
+  assert.doesNotThrow(()=>assertAdditiveEvolution(model(false),model(true),true));
+  assert.throws(()=>assertAdditiveEvolution(model(true),model(false),true),/índices/);
+  const retirable=new Set(["mails_name_key"]);
+  const diff='-- DropIndex\nDROP INDEX "mails_name_key";\n\n-- CreateIndex\nCREATE UNIQUE INDEX "mails_partner_id_name_key" ON "mails"("partner_id", "name");';
+  assert.throws(()=>assertSyncSQL(diff),/manual/);
+  assert.doesNotThrow(()=>assertSyncSQL(diff,undefined,retirable));
+  assert.doesNotThrow(()=>assertSyncSQL(forcedMigrationSQL(diff,[]),undefined,retirable));
+  for(const other of ['DROP INDEX "mails_partner_id_idx";','DROP INDEX "mails_name_key"; DROP TABLE "mails";','DROP TABLE "mails";','ALTER TABLE "mails" DROP CONSTRAINT "mails_name_key";','DROP INDEX "other_name_key";']) assert.throws(()=>assertSyncSQL(other,undefined,retirable),/manual/);
+});
+
+test("compound uniqueTogether keys are checked for duplicates before and inside the locked migration",async()=>{
+  const model=defineModel(class extends Model {
+    readonly uniqueTogether=[["partnerId","name"]] as const;
+    name=Fields.Text({required:true,maxLength:120});
+    partnerId=Fields.Many2one("Partner",{required:true});
+  },{name:"Mail",table:"mails"});
+  const profile={module:{id:"mail",depends:[],models:[{model,clientFields:["name","partnerId"]}]},externalOwners:{}};
+  const checks=forceChecks(profile);
+  const compound=checks.find(check=>check.columns);
+  assert.deepEqual(compound?.columns,["partner_id","name"]);
+  assert.deepEqual([...retirableUniqueIndexes(profile.module)].sort(),["mails_name_key","mails_partner_id_key"]);
+  let duplicated=false;
+  const columns=[{table_name:"mails",column_name:"name",data_type:"character varying"},{table_name:"mails",column_name:"partner_id",data_type:"text"}];
+  const client={query:async(sql:string)=>({rows:sql.includes("information_schema.columns")?columns:duplicated&&sql.includes('GROUP BY "partner_id", "name"')?[{exists:1}]:[]})} as unknown as Client;
+  assert.equal((await validateForceData(client,"public",checks)).length,checks.length);
+  duplicated=true;
+  await assert.rejects(validateForceData(client,"public",checks),/Mail \(partnerId, name\): existen combinaciones duplicadas/);
+  const missing={query:async(sql:string)=>({rows:sql.includes("information_schema.columns")?[columns[0]]:[{exists:1}]})} as unknown as Client;
+  assert.ok(!(await validateForceData(missing,"public",[compound!])).length);
+  assert.match(forcedMigrationSQL('CREATE UNIQUE INDEX "mails_partner_id_name_key" ON "mails"("partner_id", "name");',[compound!]),/GROUP BY "partner_id", "name" HAVING count\(\*\) > 1[\s\S]*CREATE UNIQUE INDEX/);
 });
 const check={table:'vehicles',field:'plate',model:'Vehicle',maxLength:20,unique:true,required:true};
 test("force SQL rechecks data under a write lock and preserves strict destructive SQL rejection",()=>{

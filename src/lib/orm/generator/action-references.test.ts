@@ -78,3 +78,19 @@ void [valid,typo];
     await assert.rejects(readFile(join(root, "prisma/models/schema.prisma")), { code: "ENOENT" });
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test("context.env types cover own persistent public fields, never companions, secrets or virtual fields", () => {
+  class Ticket extends Model {
+    name = Fields.Text({ required: true });
+    note = Fields.Text();
+    state = Fields.Selection([{ label: "Abierto", value: "open" }, { label: "Cerrado", value: "closed" }], { required: true });
+    hours = Fields.Integer();
+    done = Fields.Boolean();
+    token = Fields.Text({ sensitive: true });
+  }
+  const desk = defineModule({ id: "desk", name: "Mesa", icon: "list", models: { ticket: Ticket } });
+  const file = actionReferenceFiles(desk.profile.module)["environment.ts"];
+  assert.match(file, /declare module "@\/lib\/orm\/environment"/);
+  assert.match(file, /DeskTicket: \{\n      done: boolean;\n      hours: number \| null;\n      name: string;\n      note: string \| null;\n      state: "open" \| "closed";\n    \};/);
+  assert.doesNotMatch(file, /token/);
+});

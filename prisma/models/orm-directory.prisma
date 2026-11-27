@@ -126,7 +126,7 @@ model DirectoryBusinessactivity {
 
 model DirectoryPartneremails {
   id String @id @default(cuid())
-  name String @unique @db.VarChar(120)
+  name String @db.VarChar(120)
   partnerId String @map("partner_id")
   partner DirectoryPartner @relation("DirectoryPartneremails_partnerId", fields: [partnerId], references: [id], onDelete: Restrict)
   usage DirectoryPartneremailsUsageEnum @default(general)
@@ -137,6 +137,7 @@ model DirectoryPartneremails {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   @@index([partnerId])
+  @@unique([partnerId, name])
   @@index([createBy])
   @@map("directory_partneremails")
 }

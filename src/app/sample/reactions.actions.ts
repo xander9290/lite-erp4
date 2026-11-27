@@ -4,8 +4,9 @@ import { sampleReactionModel } from "./reaction-model";
 import { ModelValidationError } from "@/lib/orm";
 import type { ModelContext } from "@/lib/orm";
 import type { ReactionRequest,ReactionResult } from "@/lib/orm/reactions.types";
+import { unavailableEnvironment } from "@/lib/orm/environment";
 const fakeTx=new Proxy({},{get(){throw new Error("El ejemplo no tiene acceso a datos.");}}) as ModelContext["tx"];
-const context={tx:fakeTx,actor:Object.freeze({id:"sample",sessionVersion:0})};
+const context={tx:fakeTx,actor:Object.freeze({id:"sample",sessionVersion:0}),env:unavailableEnvironment};
 export async function sampleOnchange(input:ReactionRequest):Promise<ReactionResult>{
   try {
     const request=z.strictObject({field:z.string().max(60),values:z.record(z.string(),z.unknown())}).parse(input);
