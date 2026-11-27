@@ -101,19 +101,37 @@ export default defineModule({
   access: [
     {
       group: "admin",
-      models: ["partner", "businessactivity", "partnertags"],
+      models: [
+        "partner",
+        "businessactivity",
+        "partnertags",
+        "partneremails",
+        "partnerphones",
+      ],
       perms: "crud",
       import: true,
       export: true,
     },
     {
       group: "auxiliar",
-      models: ["partner", "businessactivity", "partnertags"],
+      models: [
+        "partner",
+        "businessactivity",
+        "partnertags",
+        "partneremails",
+        "partnerphones",
+      ],
       perms: "cru",
     },
     {
       group: "read",
-      models: ["partner", "businessactivity", "partnertags"],
+      models: [
+        "partner",
+        "businessactivity",
+        "partnertags",
+        "partneremails",
+        "partnerphones",
+      ],
       perms: "r",
     },
   ],
