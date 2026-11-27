@@ -1,6 +1,9 @@
 "use client";
 
-import ModelForm, { ModelExtensions } from "@/components/modules/ModelForm";
+import ModelForm, {
+  ModelChildCollections,
+  ModelExtensions,
+} from "@/components/modules/ModelForm";
 import FormGroup from "@/components/ui/form/FormGroup";
 import FieldBoolean from "@/components/ui/form/FieldBoolean";
 import FieldImage from "@/components/ui/form/FieldImage";
@@ -13,6 +16,7 @@ import FormMediaLayout from "@/components/ui/form/FormMediaLayout";
 import Notebook from "@/components/ui/form/Notebook";
 import NotebookPage from "@/components/ui/form/NotebookPage";
 import Stack from "@/components/ui/form/Stack";
+import FieldOne2many from "@/components/ui/form/FieldOne2many";
 
 type Values = FormValues<typeof Company>;
 
@@ -73,6 +77,9 @@ export default function CompanyForm({
             <FieldMany2One<Values> name="parentId" direction="inline" />
             <FieldBoolean<Values> name="active" direction="inline" />
           </FormGroup>
+        </NotebookPage>
+        <NotebookPage label="Sucursales" name="branches">
+          <ModelChildCollections name="childIds" />
         </NotebookPage>
       </Notebook>
       {/* Campos que otros módulos añaden a este modelo (extensiones). */}

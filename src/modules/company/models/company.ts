@@ -1,5 +1,5 @@
 import "server-only";
-import { Fields, Model, type DisplayRecord } from "@/lib/orm";
+import { displayName, Fields, Model } from "@/lib/orm";
 
 export class Company extends Model {
   readonly uniqueTogether = [["code", "name"]] as const;
@@ -79,7 +79,7 @@ export class Company extends Model {
     label: "Empresa matriz",
     tracking: true,
     onDelete: "Restrict",
-    domain: (d) => d.neq("id", d.record.id),
+    domain: (d) => d.all(d.neq("id", d.record.id), d.eq("parentId", null)),
   });
   childIds = Fields.One2many("CompanyCompany", {
     label: "Sucursales",
@@ -87,8 +87,15 @@ export class Company extends Model {
     readonly: true,
   });
   active = Fields.Boolean({ label: "Activo", default: true, tracking: true });
-  displayName(record: DisplayRecord<Company, "name">): string {
-    return record.name;
+
+  @displayName("parent.code", "name")
+  nombreCompleto(
+    record: Readonly<{
+      parent: Readonly<{ code: string }> | null;
+      name: string;
+    }>,
+  ): string {
+    return [record.parent?.code ?? "", record.name].filter(Boolean).join(" · ");
   }
   // Define aquí normalize, beforeSave y afterSave cuando tu negocio lo necesite.
 }

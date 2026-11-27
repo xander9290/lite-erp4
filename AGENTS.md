@@ -171,8 +171,11 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   se crean por separado en Directorio y se vinculan opcionalmente desde Usuarios.
   La extensión core.user conserva partnerId opcional/único/Restrict; se retiraron
   la acción crearContacto y la sincronización avatarUrl → image del experimento
-  a626650. No recrearlas automáticamente. Se conserva la migración de la tabla
-  compañera y sus datos. Estado y comprobaciones pendientes en docs/estado-proyecto.md.
+  a626650. Esta decisión fue sustituida el 2026-11-27: el usuario reintrodujo
+  crearContacto como acción manual mediante context.env y la sincronización de
+  avatar en afterSave de UserDirectory. No hay creación automática de contactos.
+  Perfil aún guarda directamente y no ejecuta ese hook; adaptar su servicio sigue
+  pospuesto. Estado y comprobaciones pendientes en docs/estado-proyecto.md.
 - La migración `20261123220000_user_standalone_profile` copia los perfiles vinculados
   a users y retira su FK a partners, sin borrar contactos ni credenciales. La tabla
   partners se conserva como `LegacyPartner` ignorado por Prisma Client;

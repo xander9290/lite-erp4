@@ -11,22 +11,23 @@ export default defineModule({
     company: {
       model: Company,
       list: {
-        fields: ["name", "image"],
+        fields: ["name", "image", "parentId", "provinceId", "countyId"],
       },
       defaultScreen: "companies",
       screens: {
         companies: {
           label: "Empresas",
           view: "card",
-          domain: (d) => d.neq("partnerId", false),
+          domain: (d) => d.eq("parentId", null),
           views: {
             form: () => import("./views/CompanyForm"),
+            card: () => import("./views/CompanyCompaniesCard"),
           },
         },
         branches: {
           label: "Sucursales",
           view: "card",
-          domain: (d) => d.neq("partnerId", true),
+          domain: (d) => d.neq("parentId", null),
           views: {
             form: () => import("./views/CompanyForm"),
           },

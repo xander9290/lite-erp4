@@ -6,7 +6,90 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Resumen y pendientes vigentes (2026-11-27, Windows)
+## Continuidad actual: Empresas y Sucursales (2026-11-27, Windows)
+
+Cierre de sesión: rama `dev/company`, HEAD `cf8922a`, con cambios locales sin
+commit en AGENTS, esta continuidad y manifest/modelo/formulario de Company;
+`CompanyCompaniesCard.tsx` es nuevo sin seguimiento. Conservar las ediciones del
+usuario. No se realizó commit, push ni pull.
+
+Avance en fuentes:
+- Empresas filtra `parentId = null`; Sucursales filtra `parentId != null`.
+  Sustituidos los dominios inválidos anteriores (campo partnerId inexistente y
+  luego comparaciones booleanas). Falta comprobar en navegador que desapareció
+  el error genérico; no confundir diagnóstico por código con prueba de ejecución.
+- parentId excluye el registro actual y limita candidatos a empresas sin matriz.
+  No se añadió una constraint de ciclos o validación jerárquica adicional.
+- nombreCompleto combina código de la matriz y nombre propio con « · »; sin
+  matriz conserva el nombre. Usa dependencias parent.code/name y proyección
+  Readonly explícita (detalle del tipado abajo).
+- Vista card de la pantalla companies expulsada y enlazada en manifest; publica
+  name/image/parentId/provinceId/countyId en lista y columnas. Para eject:view en
+  un modelo con screens hay que indicar `--screen=companies` o `--screen=branches`.
+- CompanyForm tiene pestaña Sucursales con
+  `<ModelChildCollections name="childIds" />`. La relación readonly del mismo
+  modelo se presenta así; `fields` no es una prop de ese componente.
+
+Pendientes al retomar:
+1. Comprobar generación/binding de la nueva dependencia parent.code y aplicación
+   de las tres migraciones Company en esta base; no se ejecutaron aquí.
+2. Revisar en navegador ambas pantallas, etiquetas y apertura de sucursales desde
+   el formulario de la matriz. No se confirmó persistencia ni desaparición del
+   error de la captura.
+3. Retirar si ya no se necesita el import FieldOne2many sin uso en CompanyForm
+   (advertencia de ESLint al cierre).
+4. Mantener los pendientes de Directorio: prueba de Crear contacto/avatar/correo
+   duplicado, páginas/permisos con usuario no admin y decisión pospuesta sobre
+   el guardado de Perfil mediante core.user. Los accesos de correos/teléfonos y
+   páginas emails/phones ya están declarados; no siguen pendientes de código.
+
+Se identificó Strapi como la herramienta que el usuario intentaba recordar;
+no se solicitó integrarla ni cambiar la arquitectura del proyecto.
+
+Verificaciones del cierre sobre las fuentes actuales: `npx tsc --noEmit` aprobado;
+`npx eslint src/modules/company` sin errores y con una advertencia por el import
+FieldOne2many sin uso. `git diff --check` aprobado. Sin navegador, build, consultas
+a BD, generación ni migraciones en esta sesión.
+
+Comprobación posterior (mismo día): Company.nombreCompleto usa
+`@displayName("parent.code", "name")`. Se sustituyó DisplayRecord por una
+proyección Readonly explícita con parent nullable: sin displayRelations declarado,
+ese helper no acepta rutas relacionadas. TypeScript completo (`tsc --noEmit`),
+ESLint de Company y `git diff --check` aprobados; sin nueva prueba de navegador,
+generación ni cambios en BD. Se preservaron los cambios del usuario en manifest y
+la tarjeta expulsada.
+
+Revisión de continuidad: rama actual `dev/company`, HEAD `cf8922a` («progreso
+actual»), árbol limpio al comenzar. Esta sección sustituye las referencias a
+`codex/partner` y los pendientes ya resueltos del resumen anterior.
+
+- Registrados en fuentes: Ubicaciones, Directorio y ahora Empresas (`company`),
+  además del núcleo `core.user`. Empresas depende de Ubicaciones y Directorio;
+  tiene Company con código/nombre únicos, imagen, datos fiscales/de contacto,
+  dirección encadenada y jerarquía parentId/childIds readonly. Hay formulario
+  personalizado y pantallas de tarjetas Empresas/Sucursales. Esto describe código
+  existente, sin acreditar funcionamiento en navegador.
+- Hay tres migraciones versionadas de Empresas: `20261127185041_sync_company`,
+  `20261127185307_sync_company` y `20261127191507_sync_company` (tabla, imagen y
+  jerarquía). No se consultó su aplicación a la base local en esta revisión.
+- El diagnóstico inicial de dominios inválidos ya fue corregido en fuentes;
+  los pendientes actuales de ejecución están enumerados al inicio de la sección.
+- El commit `93aa89b` ya incluye partneremails/partnerphones en los tres grupos
+  declarados de Directorio (admin crud, auxiliar cru, consulta r). También están
+  publicadas las páginas emails/phones; no existe la entrada purchase mencionada
+  abajo. Queda comprobar comportamiento con usuario no admin, sin asumir
+  asignaciones reales ni overrides a partir del manifest.
+- Crear contacto desde Usuario y sincronizar avatar están implementados en la
+  extensión UserDirectory mediante context.env. La decisión de retirada del
+  2026-11-25 quedó sustituida por la reintroducción manual del 2026-11-27 descrita
+  abajo. Perfil continúa con tx.user.update directo; su adaptación sigue pospuesta.
+
+Alcance de la puesta en contexto inicial: lectura de AGENTS, README, continuidad, historial y fuentes relevantes;
+sin pruebas de código nuevas, navegador, consultas a la base, migraciones,
+generación, commit/push/pull. Sólo se corrige documentación de continuidad;
+las pruebas de las secciones anteriores conservan su fecha y alcance.
+
+## Resumen anterior al módulo Empresas (2026-11-27, Windows)
 
 Rama codex/partner. Guardado en commit con todo el trabajo del día: tablas de
 correos/teléfonos sin FormGroup, FieldOne2many.Column invisible/readOnly,
