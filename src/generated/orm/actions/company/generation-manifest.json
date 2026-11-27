@@ -1,0 +1,8 @@
+{
+  "generator": "lite-erp-orm-v1",
+  "module": "actions-company",
+  "files": {
+    "environment.ts": "5df03c45bec9bec695d8ee9a3f4fd32d1e02317306e86e0de678e2809bc520e7",
+    "CompanyCompany.actions.ts": "7fe2a2fe1c2a07a61d43828664d6535ac571a289e02fb791c218963c145b444b"
+  }
+}

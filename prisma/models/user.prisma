@@ -40,4 +40,8 @@ model User {
   directoryCoreUserRecordIdRecords DirectoryCoreUser? @relation("DirectoryCoreUser_recordId")
   directoryCoreUserCreatedRecords DirectoryCoreUser[] @relation("DirectoryCoreUser_createBy")
   // END lite-erp:directory:User
+
+  // BEGIN lite-erp:company:User
+  companyCompanyCreatedRecords CompanyCompany[] @relation("CompanyCompany_createBy")
+  // END lite-erp:company:User
 }

@@ -15,6 +15,10 @@ model UbicacionesPais {
   // BEGIN lite-erp:directory:UbicacionesPais
   directoryPartnerCountryIdRecords DirectoryPartner[] @relation("DirectoryPartner_countryId")
   // END lite-erp:directory:UbicacionesPais
+
+  // BEGIN lite-erp:company:UbicacionesPais
+  companyCompanyCountryIdRecords CompanyCompany[] @relation("CompanyCompany_countryId")
+  // END lite-erp:company:UbicacionesPais
 }
 
 model UbicacionesEstado {
@@ -37,6 +41,10 @@ model UbicacionesEstado {
   // BEGIN lite-erp:directory:UbicacionesEstado
   directoryPartnerProvinceIdRecords DirectoryPartner[] @relation("DirectoryPartner_provinceId")
   // END lite-erp:directory:UbicacionesEstado
+
+  // BEGIN lite-erp:company:UbicacionesEstado
+  companyCompanyProvinceIdRecords CompanyCompany[] @relation("CompanyCompany_provinceId")
+  // END lite-erp:company:UbicacionesEstado
 }
 
 model UbicacionesMunicipio {
@@ -59,6 +67,10 @@ model UbicacionesMunicipio {
   // BEGIN lite-erp:directory:UbicacionesMunicipio
   directoryPartnerCountyIdRecords DirectoryPartner[] @relation("DirectoryPartner_countyId")
   // END lite-erp:directory:UbicacionesMunicipio
+
+  // BEGIN lite-erp:company:UbicacionesMunicipio
+  companyCompanyCountyIdRecords CompanyCompany[] @relation("CompanyCompany_countyId")
+  // END lite-erp:company:UbicacionesMunicipio
 }
 
 model UbicacionesLocalidad {
@@ -80,4 +92,8 @@ model UbicacionesLocalidad {
   // BEGIN lite-erp:directory:UbicacionesLocalidad
   directoryPartnerTownIdRecords DirectoryPartner[] @relation("DirectoryPartner_townId")
   // END lite-erp:directory:UbicacionesLocalidad
+
+  // BEGIN lite-erp:company:UbicacionesLocalidad
+  companyCompanyTownIdRecords CompanyCompany[] @relation("CompanyCompany_townId")
+  // END lite-erp:company:UbicacionesLocalidad
 }

@@ -42,6 +42,37 @@
           "text": "\n  // BEGIN lite-erp:directory:User\n  directoryPartnerSaleUserIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_saleUserId\")\n  directoryPartnerPurchaseUserIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_purchaseUserId\")\n  directoryPartnerCreatedRecords DirectoryPartner[] @relation(\"DirectoryPartner_createBy\")\n  directoryPartnertagsCreatedRecords DirectoryPartnertags[] @relation(\"DirectoryPartnertags_createBy\")\n  directoryBusinessactivityCreatedRecords DirectoryBusinessactivity[] @relation(\"DirectoryBusinessactivity_createBy\")\n  directoryPartneremailsCreatedRecords DirectoryPartneremails[] @relation(\"DirectoryPartneremails_createBy\")\n  directoryPartnerphonesCreatedRecords DirectoryPartnerphones[] @relation(\"DirectoryPartnerphones_createBy\")\n  directoryCoreUserRecordIdRecords DirectoryCoreUser? @relation(\"DirectoryCoreUser_recordId\")\n  directoryCoreUserCreatedRecords DirectoryCoreUser[] @relation(\"DirectoryCoreUser_createBy\")\n  // END lite-erp:directory:User\n"
         }
       ]
+    },
+    "company": {
+      "file": "orm-company.prisma",
+      "hash": "878178bb911e137a37c6827c451fd5d1a7fcc525e1b8e318f225958d3b976c22",
+      "inverses": [
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesPais",
+          "text": "\n  // BEGIN lite-erp:company:UbicacionesPais\n  companyCompanyCountryIdRecords CompanyCompany[] @relation(\"CompanyCompany_countryId\")\n  // END lite-erp:company:UbicacionesPais\n"
+        },
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesEstado",
+          "text": "\n  // BEGIN lite-erp:company:UbicacionesEstado\n  companyCompanyProvinceIdRecords CompanyCompany[] @relation(\"CompanyCompany_provinceId\")\n  // END lite-erp:company:UbicacionesEstado\n"
+        },
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesMunicipio",
+          "text": "\n  // BEGIN lite-erp:company:UbicacionesMunicipio\n  companyCompanyCountyIdRecords CompanyCompany[] @relation(\"CompanyCompany_countyId\")\n  // END lite-erp:company:UbicacionesMunicipio\n"
+        },
+        {
+          "file": "orm-ubicaciones.prisma",
+          "target": "UbicacionesLocalidad",
+          "text": "\n  // BEGIN lite-erp:company:UbicacionesLocalidad\n  companyCompanyTownIdRecords CompanyCompany[] @relation(\"CompanyCompany_townId\")\n  // END lite-erp:company:UbicacionesLocalidad\n"
+        },
+        {
+          "file": "user.prisma",
+          "target": "User",
+          "text": "\n  // BEGIN lite-erp:company:User\n  companyCompanyCreatedRecords CompanyCompany[] @relation(\"CompanyCompany_createBy\")\n  // END lite-erp:company:User\n"
+        }
+      ]
     }
   }
 }

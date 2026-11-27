@@ -1,3 +1,4 @@
+import companyModule from "./company/manifest";
 import directoryModule from "./directory/manifest";
 import ubicacionesModule from "./ubicaciones/manifest";
 
@@ -16,4 +17,6 @@ export const modules: readonly ModuleDefinition[] = [
   
     ubicacionesModule,
     directoryModule,
+  
+    companyModule,
   ];
