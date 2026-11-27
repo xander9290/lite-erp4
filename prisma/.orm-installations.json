@@ -14,7 +14,7 @@
     },
     "directory": {
       "file": "orm-directory.prisma",
-      "hash": "fde184ce1617bef9f7730fcea79f35b1d8a3e0ed6b1f8d1a7099a15a8e9b3777",
+      "hash": "7a765eb097856f3c5841a4041c68bb841c74681f29efc25fe4eac541bd9ef7aa",
       "inverses": [
         {
           "file": "orm-ubicaciones.prisma",
@@ -39,7 +39,7 @@
         {
           "file": "user.prisma",
           "target": "User",
-          "text": "\n  // BEGIN lite-erp:directory:User\n  directoryPartnerSaleUserIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_saleUserId\")\n  directoryPartnerPurchaseUserIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_purchaseUserId\")\n  directoryPartnerCreatedRecords DirectoryPartner[] @relation(\"DirectoryPartner_createBy\")\n  directoryPartnertagsCreatedRecords DirectoryPartnertags[] @relation(\"DirectoryPartnertags_createBy\")\n  directoryBusinessactivityCreatedRecords DirectoryBusinessactivity[] @relation(\"DirectoryBusinessactivity_createBy\")\n  directoryPartneremailsCreatedRecords DirectoryPartneremails[] @relation(\"DirectoryPartneremails_createBy\")\n  directoryCoreUserRecordIdRecords DirectoryCoreUser? @relation(\"DirectoryCoreUser_recordId\")\n  directoryCoreUserCreatedRecords DirectoryCoreUser[] @relation(\"DirectoryCoreUser_createBy\")\n  // END lite-erp:directory:User\n"
+          "text": "\n  // BEGIN lite-erp:directory:User\n  directoryPartnerSaleUserIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_saleUserId\")\n  directoryPartnerPurchaseUserIdRecords DirectoryPartner[] @relation(\"DirectoryPartner_purchaseUserId\")\n  directoryPartnerCreatedRecords DirectoryPartner[] @relation(\"DirectoryPartner_createBy\")\n  directoryPartnertagsCreatedRecords DirectoryPartnertags[] @relation(\"DirectoryPartnertags_createBy\")\n  directoryBusinessactivityCreatedRecords DirectoryBusinessactivity[] @relation(\"DirectoryBusinessactivity_createBy\")\n  directoryPartneremailsCreatedRecords DirectoryPartneremails[] @relation(\"DirectoryPartneremails_createBy\")\n  directoryPartnerphonesCreatedRecords DirectoryPartnerphones[] @relation(\"DirectoryPartnerphones_createBy\")\n  directoryCoreUserRecordIdRecords DirectoryCoreUser? @relation(\"DirectoryCoreUser_recordId\")\n  directoryCoreUserCreatedRecords DirectoryCoreUser[] @relation(\"DirectoryCoreUser_createBy\")\n  // END lite-erp:directory:User\n"
         }
       ]
     }

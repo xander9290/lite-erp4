@@ -22,6 +22,22 @@ enum DirectoryPartneremailsUsageEnum {
   @@map("directory_partneremails_usage")
 }
 
+enum DirectoryPartnerphonesTypeEnum {
+  mobile
+  landline
+  other
+  @@map("directory_partnerphones_type")
+}
+
+enum DirectoryPartnerphonesUsageEnum {
+  sales
+  purchase
+  collection
+  logistics
+  general
+  @@map("directory_partnerphones_usage")
+}
+
 model DirectoryPartner {
   id String @id @default(cuid())
   name String @db.VarChar(120)
@@ -53,6 +69,8 @@ model DirectoryPartner {
   saleUser User? @relation("DirectoryPartner_saleUserId", fields: [saleUserId], references: [id], onDelete: Restrict)
   purchaseUserId String? @map("purchase_user_id")
   purchaseUser User? @relation("DirectoryPartner_purchaseUserId", fields: [purchaseUserId], references: [id], onDelete: Restrict)
+  isCustomer Boolean @default(false) @map("is_customer")
+  isSupplier Boolean @default(false) @map("is_supplier")
   createBy String? @map("create_by")
   createByUser User? @relation("DirectoryPartner_createBy", fields: [createBy], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -70,6 +88,7 @@ model DirectoryPartner {
   directoryPartnerTagIdsLinkSourceRecords DirectoryPartnerTagIdsLink[] @relation("DirectoryPartnerTagIdsLink_source")
   directoryPartnerActivityIdsLinkSourceRecords DirectoryPartnerActivityIdsLink[] @relation("DirectoryPartnerActivityIdsLink_source")
   directoryPartneremailsPartnerIdRecords DirectoryPartneremails[] @relation("DirectoryPartneremails_partnerId")
+  directoryPartnerphonesPartnerIdRecords DirectoryPartnerphones[] @relation("DirectoryPartnerphones_partnerId")
   directoryCoreUserPartnerIdRecords DirectoryCoreUser? @relation("DirectoryCoreUser_partnerId")
 }
 
@@ -108,8 +127,8 @@ model DirectoryBusinessactivity {
 model DirectoryPartneremails {
   id String @id @default(cuid())
   name String @unique @db.VarChar(120)
-  partnerId String? @map("partner_id")
-  partner DirectoryPartner? @relation("DirectoryPartneremails_partnerId", fields: [partnerId], references: [id], onDelete: Restrict)
+  partnerId String @map("partner_id")
+  partner DirectoryPartner @relation("DirectoryPartneremails_partnerId", fields: [partnerId], references: [id], onDelete: Restrict)
   usage DirectoryPartneremailsUsageEnum @default(general)
   sendDocuments Boolean @default(true) @map("send_documents")
   active Boolean @default(true)
@@ -120,6 +139,25 @@ model DirectoryPartneremails {
   @@index([partnerId])
   @@index([createBy])
   @@map("directory_partneremails")
+}
+
+model DirectoryPartnerphones {
+  id String @id @default(cuid())
+  name String @db.VarChar(20)
+  type DirectoryPartnerphonesTypeEnum?
+  usage DirectoryPartnerphonesUsageEnum
+  contact String?
+  extension String?
+  partnerId String @map("partner_id")
+  partner DirectoryPartner @relation("DirectoryPartnerphones_partnerId", fields: [partnerId], references: [id], onDelete: Restrict)
+  active Boolean @default(true)
+  createBy String? @map("create_by")
+  createByUser User? @relation("DirectoryPartnerphones_createBy", fields: [createBy], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([partnerId])
+  @@index([createBy])
+  @@map("directory_partnerphones")
 }
 
 model DirectoryCoreUser {

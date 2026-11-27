@@ -6,6 +6,7 @@
     "DirectoryPartnertags.actions.ts": "97e9c6af6c47a4d3ab14e8b45315ca5765ebafabddf1b58c04369788f747ed92",
     "DirectoryBusinessactivity.actions.ts": "5db5ee4798752a3bad7efa9621dc3e70e6e3a707c3b74271f014c22bd869cdfc",
     "DirectoryPartneremails.actions.ts": "fba404af418f0876b4869c853dc7789c5802e94184ffad0fa023e78c240de41d",
+    "DirectoryPartnerphones.actions.ts": "5cc183e395e07ebae74ac7767905e70aaa36bdc6f2ff50e1b16e2e5a47243943",
     "DirectoryCoreUser.actions.ts": "ac80f19cd26283c4c297ccb5fceeb53645b7b665934289bfba0c69d35f4fcd29"
   }
 }

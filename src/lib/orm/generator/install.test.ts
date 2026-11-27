@@ -167,3 +167,24 @@ test("force installs reviewed constraints through the ledger and rejects changed
     assert.equal((await installModels(root,declaration(true),false,true,true)).changes.length,0);
   } finally { await rm(root,{recursive:true,force:true}); }
 });
+
+test("force installs required Many2one and its matching relation through the ledger", { timeout: 30000 }, async () => {
+  const root = await temporaryProject();
+  const declaration = (required: boolean): GenerationProfile => ({
+    module: { id: "required-mail", depends: ["contactos"], models: [{
+      model: defineModel(class extends Model { partnerId = Fields.Many2one("Partner", { required }); }, { name: "RequiredMail", table: "required_mail" }),
+      clientFields: ["partnerId"],
+    }] }, externalOwners: { Partner: "contactos" },
+  });
+  try {
+    await installModels(root, declaration(false), true);
+    await assert.rejects(installModels(root, declaration(true), false, true), /--force/);
+    const plan = await installModels(root, declaration(true), false, true, true);
+    assert.match(plan.sql, /ALTER COLUMN "partner_id" SET NOT NULL/);
+    await installModels(root, declaration(true), true, true, true, plan.changes);
+    const schema = await readFile(join(root, "prisma/models/orm-required-mail.prisma"), "utf8");
+    assert.match(schema, /partnerId String @map\("partner_id"\)/);
+    assert.match(schema, /partner Partner @relation/);
+    assert.equal((await installModels(root, declaration(true), false, true, true)).changes.length, 0);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

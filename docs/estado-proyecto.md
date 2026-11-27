@@ -6,7 +6,128 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Continuidad actual: correos adicionales de Directorio (2026-11-26, Windows)
+## Continuidad actual: teléfonos adicionales y roles comerciales (2026-11-26)
+
+Rama codex/partner, HEAD 9d684ee. Árbol con cambios locales del usuario y del
+ajuste de orm:sync --force: modelos/vistas/manifest de Directorio, artefactos,
+esquema/ledger, migraciones y pruebas/documentación del generador. Conservarlos;
+no asumir árbol limpio ni regenerar vistas personalizadas. Este guardado sólo
+actualiza continuidad; sin commit/push/pull ni cambios de código o datos.
+
+### Avance completado
+
+- El usuario confirma **Teléfonos adicionales implementado**. PartnerPhones está
+  registrado como DirectoryPartnerphones. name es el número (Text requerido,
+  longitud 20, tracking); type opcional mobile/landline/other; usage obligatorio
+  sin default (sales/purchase/collection/logistics/general); contact y extension
+  son textos opcionales; active inicia true. partnerId Many2one obligatorio,
+  no único, Restrict. Partner.phoneIds es One2many editable, inverse partnerId,
+  maxRows 20. La pestaña phones presenta número, tipo, uso, contacto y extensión.
+- Resuelto el error «Columna de línea no publicada: sendDocuments»: era una columna
+  copiada en phoneIds que sólo existe en PartnerEmails. La columna permanece en
+  emailIds; no se añadió un sendDocuments a teléfonos. La pestaña ya se etiqueta
+  «Teléfonos adicionales». Ambas colecciones/columnas se comprobaron en memoria.
+- Roles comerciales añadidos por el usuario: isCustomer e isSupplier Boolean,
+  independientes, default false y tracking true. PartnerForm muestra ambos con
+  FieldBoolean dentro de Stack. El contrato publica los dos campos para formulario;
+  en memoria se aceptan las cuatro combinaciones (ninguno, cliente, proveedor, ambos).
+  No cambia Persona/Empresa ni Contacto/Entrega/Facturación. Aún no forman parte
+  de list.fields; mostrarlos/filtrarlos en Lista/Card es una ampliación opcional.
+- El ajuste del sincronizador para nulabilidad de Many2one quedó implementado y
+  comprobado con el alcance de la sección inferior. El usuario retiró el import
+  Files sin uso y corrigió correo a name en normalize/constraint de PartnerEmails.
+  No volver a presentar esos errores de fuente como pendientes actuales.
+
+### Esquema, migraciones y alcance de comprobación
+
+Los archivos actuales ya declaran PartnerEmails.partnerId y PartnerPhones.partnerId
+obligatorios y las dos columnas de roles Boolean default false. Migraciones locales:
+20261127032543_sync_directory_force (partner_id NOT NULL de correos, con guardas),
+20261127034352_sync_directory (teléfonos) y 20261127040716_sync_directory (roles).
+Ledger y referencias generadas cambiaron. Su existencia no acredita aplicación
+actual a la BD; no se consultó ni modificó por estas revisiones/este guardado.
+El usuario había confirmado la tabla de correos vacía antes de preparar el ajuste.
+
+Evidencia: revisión de fuentes, carga real del manifest en memoria, comparación de
+las columnas JSX de emailIds/phoneIds con sus modelos y cuatro combinaciones de
+roles mediante el normalizador del contrato. El usuario da por completos teléfonos;
+la revisión de roles no incluyó navegador/persistencia. Las pruebas anteriores del
+generador y de páginas por grupo conservan su fecha y alcance; no atribuirlas a
+todas estas ediciones posteriores. Cierre documental: git diff --check.
+
+### Pendientes vigentes y mejoras opcionales
+
+1. Revisar concesiones de partneremails/partnerphones para los grupos de Directorio:
+   el manifest actual sólo enumera partner/businessactivity/partnertags en access.
+   Conservar permisos y acceso heredado del padre; no configurar usuarios/grupos
+   reales automáticamente como efecto de guardar este avance.
+2. Añadir emails y phones a pages.additionalInfo si ambas páginas deben poder
+   ocultarse desde Grupos. Hoy el catálogo sólo tiene las cuatro páginas originales.
+   Sigue pendiente la comprobación de páginas por grupo en navegador con no admin;
+   la aplicación de su migración en Windows conserva la evidencia anterior.
+3. Definir normalización y validación de números/extensiones según el formato que
+   se decida almacenar; PartnerPhones aún usa Text sin constraint de formato.
+   type opcional y usage requerido sin default son el comportamiento actual;
+   cambiar esas decisiones sólo si lo pide el caso de uso.
+4. Decidir si el correo adicional debe ser único globalmente o por contacto;
+   PartnerEmails.name mantiene unique:true global. No cambiar unicidad ni datos
+   por anticipación. Comprobar/confirmar aplicación de las migraciones recientes
+   en el entorno de trabajo cuando se retome persistencia, sin repetir SQL ya aplicado.
+5. Opcionales: publicar roles en listas/tarjetas o crear pantallas por rol; detección
+   de posibles duplicados fue sólo una sugerencia, sin implementación solicitada.
+   No hacer fusiones automáticas ni tratar las direcciones como contactos duplicados.
+
+Conservan su alcance los pendientes anteriores: vínculo manual User–Partner,
+formulario de página de Direcciones dedicado opcional, transfer por pantalla,
+tipado de referencias { model, screen }, ciclos en BusinessActivity, ajuste RFC y
+las oportunidades generales documentadas. La guía de Otras direcciones sigue cerrada.
+
+## Continuidad anterior: obligatoriedad de PartnerEmails.partnerId (2026-11-26)
+
+Rama codex/partner, HEAD 9d684ee. El ejercicio de correos ya está guardado en ese
+commit, no sin commit como indica el cierre Windows anterior. El usuario corrigió
+normalize/constraint para usar name y retiró Files de lucide-react de Partner
+(con cambios locales de formato); conservar esas ediciones. El registro de módulos
+core+ubicaciones+directory cargó en memoria antes de este ajuste.
+
+El usuario confirmó haber eliminado el último correo adicional: tabla sin registros
+según su comprobación, no mediante una consulta del agente. Mantener required:true
+en PartnerEmails.partnerId: expresa la regla correcta de pertenencia al contacto.
+El esquema instalado todavía declara partnerId String? y la relación opcional.
+
+La revisión `orm:sync -- directory --plan --force` reprodujo el rechazo: force sólo
+admitía el cambio en el escalar String, no en la relación propietaria que también
+cambia de nulabilidad. Se ajusta el validador para aceptar únicamente el cambio
+coherente de FK String y descriptor relacional, conservando identidad/destino,
+fields/references y acciones explícitas. Las relaciones compuestas y las inversas
+siguen fuera de ese ajuste. Sin force, el modo aditivo continúa rechazándolo.
+
+También se corrige forceChecks para comprobar la columna física generada: partnerId
+se almacena en partner_id. Antes, la búsqueda por el nombre lógico podía omitir la
+comprobación de nulos de una columna mapeada. Preflight y guardas bajo lock usan el
+mismo nombre físico; los mensajes mantienen el campo lógico.
+
+Verificación previa a aplicar: 15 pruebas de evolution/force/install aprobadas en
+copia aislada. Incluyen ambos sentidos de nulabilidad, rechazo de cambios de destino,
+FK, mapeo/acciones, cambios parciales, controles de nulos sobre columna mapeada e
+instalación/registro gestionado con Prisma en proyecto temporal sin conexión a BD.
+Guía actualizada en [Sincronizar aplicaciones](sincronizar-aplicaciones.md#cambiar-restricciones-con---force).
+
+Verificación final sobre el repositorio: TypeScript sin emisión/incremental,
+ESLint focalizado y las 8 pruebas evolution/force aprobadas. El plan real actualizado
+`orm:sync -- directory --plan --force` ya pasó sin escrituras ni consulta a BD;
+su único DDL propuesto es ALTER TABLE directory_partneremails ALTER COLUMN
+partner_id SET NOT NULL. Los 15 casos previos incluyen instalación con Prisma
+en proyecto temporal y comprobación del ledger.
+
+Siguiente paso, desde terminal del usuario: `npm run orm:sync -- directory --force`
+para comprobar datos y revisar/aprobar la migración. Este ajuste de código no
+acredita aplicada la migración a la base local; no se cambió SQL/ledger del ERP
+ni se consultaron sus datos.
+Los otros pendientes de correos (unicidad global, catálogo de página y permisos)
+y la prueba de páginas por grupo mantienen su alcance.
+
+## Continuidad anterior: correos adicionales de Directorio (2026-11-26, Windows)
 
 Rama codex/partner, HEAD d76374c (commit del usuario con páginas por grupo).
 Migración `20261126120000_group_page_visibility` **aplicada con aprobación** en

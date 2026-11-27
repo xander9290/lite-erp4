@@ -36,6 +36,7 @@ model User {
   directoryPartnertagsCreatedRecords DirectoryPartnertags[] @relation("DirectoryPartnertags_createBy")
   directoryBusinessactivityCreatedRecords DirectoryBusinessactivity[] @relation("DirectoryBusinessactivity_createBy")
   directoryPartneremailsCreatedRecords DirectoryPartneremails[] @relation("DirectoryPartneremails_createBy")
+  directoryPartnerphonesCreatedRecords DirectoryPartnerphones[] @relation("DirectoryPartnerphones_createBy")
   directoryCoreUserRecordIdRecords DirectoryCoreUser? @relation("DirectoryCoreUser_recordId")
   directoryCoreUserCreatedRecords DirectoryCoreUser[] @relation("DirectoryCoreUser_createBy")
   // END lite-erp:directory:User

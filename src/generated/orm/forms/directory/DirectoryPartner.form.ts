@@ -24,4 +24,6 @@ export const DirectoryPartnerForm = defineModelFormReference<{
   "parentId": string | null;
   "saleUserId": string | null;
   "purchaseUserId": string | null;
+  "isCustomer": boolean;
+  "isSupplier": boolean;
 }>("directory.partner");

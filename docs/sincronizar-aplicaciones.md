@@ -64,14 +64,24 @@ El segundo comprueba datos y prepara/aplica una migración después de escribir
 El identificador del módulo es `flota`, no `float`.
 
 Se conservan nombre, tipo base, mapeos y defaults de los campos. Se admite añadir
-`unique`, ajustar VARCHAR/TEXT y cambiar nulabilidad de String; no retirar unicidad,
-renombrar/eliminar campos, cambiar tipos base o modificar relaciones. Los demás
-cambios aditivos mantienen sus reglas habituales. No editar hashes para forzarlos.
+`unique`, ajustar VARCHAR/TEXT y cambiar nulabilidad de String. Para una relación
+Many2one existente se admite cambiar su obligatoriedad junto con la nulabilidad de
+su FK String, conservando nombre, destino, fields/references y acciones de borrado
+explícitas. No se admiten cambios de destino, clave o política de borrado, relaciones
+compuestas, inversas/listas ni cambios incoherentes entre la FK y su relación.
+
+No se permite retirar unicidad, renombrar/eliminar campos ni cambiar tipos base.
+Los demás cambios aditivos mantienen sus reglas habituales. No editar hashes para
+forzarlos. Por ejemplo, si PartnerEmails.partnerId pasó de opcional a required,
+revisar con `npm run orm:sync -- directory --plan --force` y luego sincronizar con
+`npm run orm:sync -- directory --force`, conservando la aprobación del SQL.
 
 Antes de preparar la migración, exige que la base coincida con el esquema instalado,
 tras revisar las migraciones pendientes. Si hay drift o historial inválido, se detiene.
 Comprueba los campos String publicados por la declaración del módulo: valores que
 exceden el límite, duplicados no nulos para unique y nulos para campos obligatorios.
+Estas comprobaciones y sus guardas SQL usan el nombre físico generado de la columna
+(por ejemplo partner_id para partnerId), manteniendo el nombre lógico en los errores.
 No imprime datos de filas ni los corrige/trunca. Si encuentra un problema, indica el
 modelo/campo y conserva los datos para que el desarrollador decida cómo corregirlos.
 

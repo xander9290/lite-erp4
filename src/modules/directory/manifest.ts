@@ -1,3 +1,4 @@
+import { PartnerPhones } from "./models/partnerphones";
 import { PartnerEmails } from "./models/partneremails";
 import { BusinessActivity } from "./models/businessactivity";
 import { PartnerTags } from "./models/partnertags";
@@ -23,16 +24,7 @@ export default defineModule({
     partner: {
       model: Partner,
       list: {
-        fields: [
-          "image",
-          "name",
-          "phones",
-          "street",
-          "streetNumber",
-          "vat",
-          "provinceId",
-          "countyId",
-        ],
+        fields: ["image", "name", "phones", "street", "streetNumber", "vat", "provinceId", "countyId"],
       },
       defaultScreen: "contacts",
       screens: {
@@ -77,8 +69,10 @@ export default defineModule({
       model: BusinessActivity,
       views: { form: () => import("./views/BusinessactivityForm") },
     },
-  
+
     partneremails: PartnerEmails,
+
+    partnerphones: PartnerPhones,
   },
   menu: {
     Catálogos: {

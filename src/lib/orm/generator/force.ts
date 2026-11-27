@@ -1,20 +1,21 @@
 import "server-only";
 import type { Client } from "pg";
 import type { GenerationProfile } from "./profile";
+import { prismaColumnName } from "./generate";
 
 const identifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
-export type ForceCheck = { table: string; field: string; model: string; maxLength?: number; unique?: boolean; required?: boolean };
+export type ForceCheck = { table: string; field: string; column?: string; model: string; maxLength?: number; unique?: boolean; required?: boolean };
 /** Trusted declarations only; never accept checks from an action/browser. */
 export function forceChecks(profile: GenerationProfile): ForceCheck[] {
   return profile.module.models.flatMap(({model}) => Object.entries(model.metadata).flatMap(([field, metadata]) =>
-    metadata.kind === "text" || metadata.kind === "image" || metadata.kind === "many2one" ? [{ table:model.table, field, model:model.name,
+    metadata.kind === "text" || metadata.kind === "image" || metadata.kind === "many2one" ? [{ table:model.table, field, column:prismaColumnName(field), model:model.name,
       maxLength:metadata.kind === "many2one" ? undefined : metadata.maxLength, unique:metadata.unique, required:metadata.required,
     }] : []));
 }
 
 export function checkQueries(check: ForceCheck, table = identifier(check.table)) {
-  const field = identifier(check.field), label = `${check.model}.${check.field}`;
+  const field = identifier(check.column ?? check.field), label = `${check.model}.${check.field}`;
   const queries: { sql: string; error: string }[] = [];
   if (check.maxLength !== undefined) queries.push({ sql:`SELECT 1 FROM ${table} WHERE char_length(${field}) > ${check.maxLength} LIMIT 1`, error:`${label}: existen valores mayores de ${check.maxLength} caracteres. Corrígelos antes de sincronizar; no se truncarán.` });
   if (check.unique) queries.push({ sql:`SELECT 1 FROM ${table} WHERE ${field} IS NOT NULL GROUP BY ${field} HAVING count(*) > 1 LIMIT 1`, error:`${label}: existen valores duplicados. Corrígelos antes de añadir unique.` });
@@ -28,7 +29,7 @@ export async function validateForceData(client: Client, schema: string, checks: 
     "SELECT table_name,column_name,data_type FROM information_schema.columns WHERE table_schema=$1", [schema]);
   const existing: ForceCheck[] = [];
   for (const check of checks) {
-    const column = columns.rows.find(column => column.table_name === check.table && column.column_name === check.field);
+    const column = columns.rows.find(column => column.table_name === check.table && column.column_name === (check.column ?? check.field));
     if (!column) continue;
     if (!["text", "character varying"].includes(column.data_type)) throw new Error(`${check.model}.${check.field}: el tipo instalado requiere una migración manual.`);
     for (const query of checkQueries(check, `${identifier(schema)}.${identifier(check.table)}`)) {
