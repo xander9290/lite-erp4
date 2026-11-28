@@ -21,6 +21,15 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Cajón de aplicaciones
 
+- Company (2026-11-27): catálogo con datos propios, depende sólo de Ubicaciones;
+  sin aislamiento multiempresa ni sincronización con Directorio. Código único
+  global, nombre repetible; matriz→sucursal como máximo dos niveles, constraint
+  impide mover una matriz con hijos debajo de otra. Altas de sucursal desde la
+  matriz; activo independiente, sin cascadas ni ocultación automática de inactivos.
+  Grupos admin/auxiliar/read sobre su modelo, sin asignar usuarios. Contrato y
+  estado de la migración de identidad en src/modules/company/README.md y
+  docs/estado-proyecto.md; no asumir aplicación local o en otra máquina.
+
 - Menús por grupo (2026-11-21): Ajustes → Grupos → Menús oculta por aplicación+ID
   estable, con excepciones positivas en AccessMenuHidden. Sin configurar conserva
   navegación actual; contenedores vacíos desaparecen; admin conserva bypass.
@@ -480,7 +489,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Actualización revisada de restricciones
 
-- orm:sync -- id --force admite añadir unique y cambiar longitud/nulabilidad de String existentes, conservando identidad/tipo base/default/mapeos y el resto del contrato. El modo normal sigue siendo aditivo. --plan --force no consulta ni escribe BD. No habilita --yes/reset/push ni eliminación/renombrado/cambios arbitrarios de tipo. Desde 2026-11-27 admite retirar unique simple (sólo DROP INDEX de `<tabla>_<columna>_key` derivado de las declaraciones) para pasar a uniqueTogether, con chequeo de combinaciones duplicadas; retirar uniqueTogether sigue fuera.
+- orm:sync -- id --force admite añadir unique y cambiar longitud/nulabilidad de String existentes, conservando identidad/tipo base/default/mapeos y el resto del contrato. El modo normal sigue siendo aditivo. --plan --force no consulta ni escribe BD. No habilita --yes/reset/push ni eliminación/renombrado/cambios arbitrarios de tipo. Desde 2026-11-27 admite retirar unique simple (sólo DROP INDEX de `<tabla>_<columna>_key` derivado de las declaraciones) para pasar a uniqueTogether, con chequeo de combinaciones duplicadas. La preparación/instalación de fuentes con force admite retirar un uniqueTogether redundante cubierto por un unique simple conservado (sólo índice de nombre estándar del esquema instalado); su SQL requiere revisión y aplicación manual. Otros retiros compuestos siguen fuera.
 - Force exige coincidencia de BD con esquema instalado, historial íntegro y comprobaciones de longitudes/duplicados/nulos. Prepara SQL desde el diff Prisma validado, mantiene aprobación interactiva y escribe migración versionada con BEGIN/COMMIT, locks y guardas de datos. No autoarreglar/truncar valores ni auto-resolver migraciones fallidas. Conservar hashes/registro mediante instalador, nunca editarlos como bypass. Detalles y límites en docs/sincronizar-aplicaciones.md. Las pruebas force usan únicamente proyecto/esquema temporales; no aplicar los cambios de Vehicle a la base real como parte de una prueba.
 
 ## Onchange y decoradores: dirección acordada

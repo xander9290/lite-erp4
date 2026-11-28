@@ -78,8 +78,18 @@ se aceptan los DROP INDEX de esos índices exactos derivados de las declaracione
 cualquier otro DROP/DELETE sigue en el flujo manual. Por ejemplo, PartnerEmails pasó
 de correo único global a `uniqueTogether = [["partnerId", "name"]]`.
 
-No se permite retirar un `uniqueTogether` existente, renombrar/eliminar campos ni
-cambiar tipos base.
+La preparación e instalación de fuentes con force también admite retirar un
+`uniqueTogether` redundante cuando conserva un `unique: true` en uno de sus campos.
+Sólo admite la declaración estándar sin nombre personalizado y el índice exacto
+derivado del esquema instalado. Caso real: Company conserva código único y retira
+la unicidad individual de nombre y la compuesta código/nombre. La migración de ese
+retiro compuesto sigue requiriendo revisión y aplicación por el flujo manual:
+orm:sync no aplica automáticamente esos DROP INDEX. No editar el ledger ni los
+hashes para preparar el esquema. El instalador conserva sus verificaciones de
+propiedad, cambios concurrentes y evolución.
+
+No se permite retirar una unicidad compuesta sin otra que la cubra, renombrar o
+eliminar campos ni cambiar tipos base.
 Los demás cambios aditivos mantienen sus reglas habituales. No editar hashes para
 forzarlos. Por ejemplo, si PartnerEmails.partnerId pasó de opcional a required,
 revisar con `npm run orm:sync -- directory --plan --force` y luego sincronizar con

@@ -45,7 +45,7 @@
     },
     "company": {
       "file": "orm-company.prisma",
-      "hash": "878178bb911e137a37c6827c451fd5d1a7fcc525e1b8e318f225958d3b976c22",
+      "hash": "61cf6d6ec560d0bb2efc2bc257a3462bea1e0ead0ca1d4a40217d43fae3661bd",
       "inverses": [
         {
           "file": "orm-ubicaciones.prisma",

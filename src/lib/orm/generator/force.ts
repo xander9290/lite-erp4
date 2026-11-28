@@ -2,6 +2,8 @@ import "server-only";
 import type { Client } from "pg";
 import type { GenerationProfile } from "./profile";
 import { prismaColumnName, type ModuleGeneration } from "./generate";
+import { prismaBlocks } from "./prisma-source";
+import { redundantUniqueFields } from "./evolution";
 
 const identifier = (value: string) => `"${value.replaceAll('"', '""')}"`;
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
@@ -25,6 +27,24 @@ export function forceChecks(profile: GenerationProfile): ForceCheck[] {
 export function retirableUniqueIndexes(module: Pick<ModuleGeneration, "models">): Set<string> {
   return new Set(module.models.flatMap(({model}) => Object.entries(model.metadata)
     .filter(([, metadata]) => !metadata.unique).map(([field]) => `${model.table}_${prismaColumnName(field)}_key`)));
+}
+
+/** Offline preparation for manual review, using exact keys from the installed schema. */
+export function redundantUniqueIndexes(module: Pick<ModuleGeneration, "models">, installedSchema: string): Set<string> {
+  const indexes = new Set<string>();
+  for (const { model } of module.models) {
+    const block = prismaBlocks(installedSchema).find(block => block.kind === "model" && block.name === model.name);
+    const retained = Object.entries(model.metadata).filter(([, field]) => field.unique).map(([name]) => `${name} String @unique`);
+    for (const line of block?.body.split("\n") ?? []) {
+      const fields = redundantUniqueFields(line, retained);
+      if (!fields || fields.some(field => !Object.hasOwn(model.metadata, field))
+        || model.uniqueTogether?.some(key => key.join(",") === fields.join(","))) continue;
+      const name = `${model.table}_${fields.map(prismaColumnName).join("_")}_key`;
+      // Longer names are truncated by Prisma/PostgreSQL; leave those to the manual procedure.
+      if (Buffer.byteLength(name, "utf8") <= 63) indexes.add(name);
+    }
+  }
+  return indexes;
 }
 
 /** Removes whole `DROP INDEX "<name>";` statements for those exact retirable unique indexes. */

@@ -66,6 +66,17 @@ function mirrorsForeignKeyChange(previous: string, next: string, before: readonl
     .every(relation => after.some(candidate => reviewedRelationChange(relation, candidate, before, after)));
 }
 
+/** Only a default compound key covered by a retained single-column unique is redundant. */
+export function redundantUniqueFields(line: string, proposed: readonly string[]): string[] | null {
+  const match = /^@@unique\(\[\s*(\w+(?:\s*,\s*\w+)+)\s*\]\)$/.exec(line.trim());
+  if (!match) return null;
+  const fields = match[1].split(",").map(field => field.trim());
+  return fields.some(field => proposed.some(candidate => {
+    const masked = maskPrisma(candidate);
+    return masked.startsWith(`${field} `) && /@unique(?=\s|$)/.test(masked);
+  })) ? fields : null;
+}
+
 /** Additive by default; force admits reviewed String constraints and matching relation nullability. */
 export function assertAdditiveEvolution(previous: string, next: string, force = false) {
   const before = prismaBlocks(previous), after = prismaBlocks(next);
@@ -85,6 +96,8 @@ export function assertAdditiveEvolution(previous: string, next: string, force = 
     const retained = new Set(lines);
     for (const line of lines) {
       if (proposed.includes(line)) continue;
+      // Preparation only: SQL drops of compound indexes still require the manual review flow.
+      if (force && redundantUniqueFields(line, proposed)) continue;
       const widened = proposed.find(candidate => (widensVarchar(line, candidate) || force && ((reviewedStringChange(line, candidate) && mirrorsForeignKeyChange(line, candidate, lines, proposed)) || reviewedRelationChange(line, candidate, lines, proposed))));
       if (!widened) throw new Error(`No se permite retirar o modificar campos, índices o mapeos existentes de ${block.name}. Sólo se admite ampliar VARCHAR sin otros cambios. Para unicidad, longitud o nulabilidad de String revisa orm:sync --force; no permite borrar ni renombrar campos.`);
       retained.add(widened);

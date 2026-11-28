@@ -43,7 +43,7 @@ test("actions-only CLI plans without writes, generates, detects staleness and pr
     await mkdir(dir, { recursive: true });
     await symlink(join(project, "node_modules"), join(root, "node_modules"), process.platform === "win32" ? "junction" : "dir");
     await writeFile(join(root, "package.json"), JSON.stringify({ type: "module" }));
-    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ extends: join(project, "tsconfig.json"), compilerOptions: { incremental: false, experimentalDecorators: true }, include: ["**/*.ts", join(project, "src/types/next-auth.d.ts")], exclude: [] }));
+    await writeFile(join(root, "tsconfig.json"), JSON.stringify({ extends: join(project, "tsconfig.json"), compilerOptions: { incremental: false, experimentalDecorators: true }, include: ["**/*.ts", join(project, "src/types/next-auth.d.ts"), `${project.replaceAll("\\", "/")}/src/generated/orm/actions/*/environment.ts`], exclude: [] }));
     const source = (method = "confirmar") => `import { Fields, Model, action } from ${JSON.stringify("../../../../src/lib/orm/index")};\nimport { defineModule } from ${JSON.stringify("../../../../src/lib/modules/define")};\nclass Item extends Model { name = Fields.Text(); @action({label:"Confirmar"}) ${method}() { return {}; } }\nexport default defineModule({id:"example",name:"Example",icon:"list",models:{item:Item}});\n`;
     await writeFile(join(dir, "manifest.ts"), source());
     const plan = run(); assert.equal(plan.status, 0, plan.stderr); assert.match(plan.stdout, /create actions\/ExampleItem.actions.ts/);

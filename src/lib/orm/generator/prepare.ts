@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { generateModule, type ModuleGeneration } from "./generate";
 import { generationBaseline } from "./installation-state";
 import { prismaBlocks } from "./prisma-source";
-import { retirableUniqueIndexes, withoutRetirableDrops } from "./force";
+import { redundantUniqueIndexes, retirableUniqueIndexes, withoutRetirableDrops } from "./force";
 
 /** Validate and compare schema files only; does not connect to or migrate a database. */
 export async function prepareModuleArtifacts(root: string, profile: ModuleGeneration, owners: Readonly<Record<string, string>>) {
@@ -34,8 +34,10 @@ export async function prepareModuleArtifacts(root: string, profile: ModuleGenera
     };
     run(["validate", "--config", join(root, "prisma7.config.ts"), "--schema", preview]);
     const sql = run(["migrate", "diff", "--config", join(root, "prisma7.config.ts"), "--from-schema", schemaDirectory, "--to-schema", preview, "--script"]);
-    // Retiring a declared single unique only drops its index; evolution still requires --force for it.
-    if (/\bDROP\s+(TABLE|COLUMN|TYPE|INDEX|CONSTRAINT)\b|\bTRUNCATE\b/i.test(withoutRetirableDrops(sql, retirableUniqueIndexes(profile)))) throw new Error("La propuesta contiene eliminaciones SQL; requiere un flujo de revisión distinto.");
+    // Preparation does not execute SQL. Redundant compound keys remain manual SQL changes;
+    // installation still requires force and preserves all other evolution checks.
+    const retirable = new Set([...retirableUniqueIndexes(profile), ...redundantUniqueIndexes(profile, Object.values(baseline.sources).join("\n"))]);
+    if (/\bDROP\s+(TABLE|COLUMN|TYPE|INDEX|CONSTRAINT)\b|\bTRUNCATE\b/i.test(withoutRetirableDrops(sql, retirable))) throw new Error("La propuesta contiene eliminaciones SQL; requiere un flujo de revisión distinto.");
     files["migration.preview.sql"] = `-- Review only. Not an applied migration.\n${sql}`;
     return files;
   } finally { await rm(temporary, { recursive: true, force: true }); }

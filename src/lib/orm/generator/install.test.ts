@@ -34,6 +34,28 @@ async function temporaryProject() {
 }
 const source = (root: string) => join(root, "prisma/models/schema.prisma");
 
+test("manual reviewed preparation removes redundant uniqueness through the installer, preserving code and ownership", { timeout: 30000 }, async () => {
+  const root = await temporaryProject();
+  const profileFor = (original: boolean): GenerationProfile => {
+    class Entry extends Model {
+      code = Fields.Text({ required: true, unique: true });
+      name = Fields.Text({ required: true, unique: original });
+    }
+    class Original extends Entry { readonly uniqueTogether = [["code", "name"]] as const; }
+    return { module: { id: "entries", depends: [], models: [{ model: defineModel(original ? Original : Entry, { name: "Entry", table: "entries" }), clientFields: ["code", "name"] }] }, externalOwners: {} };
+  };
+  try {
+    await installModels(root, profileFor(true), true);
+    await assert.rejects(installModels(root, profileFor(false), false, true), /--force/);
+    const plan = await installModels(root, profileFor(false), false, true, true);
+    assert.match(plan.sql, /DROP INDEX "entries_name_key"/);
+    assert.match(plan.sql, /DROP INDEX "entries_code_name_key"/);
+    assert.doesNotMatch(plan.sql, /DROP INDEX "entries_code_key"|DROP TABLE|DROP COLUMN/);
+    await installModels(root, profileFor(false), true, true, true, plan.changes);
+    assert.equal((await installModels(root, profileFor(false))).changes.length, 0, "ownership/hash remain valid without manual edits");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("installation is review-only by default, preserves source and installs two inverses in the same file", { timeout: 30000 }, async () => {
   const root = await temporaryProject();
   try {

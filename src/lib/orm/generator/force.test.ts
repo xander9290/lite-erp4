@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assertAdditiveEvolution } from "./evolution";
-import { checkQueries, forceChecks, forcedMigrationSQL, retirableUniqueIndexes, validateForceData } from "./force";
+import { checkQueries, forceChecks, forcedMigrationSQL, redundantUniqueIndexes, retirableUniqueIndexes, validateForceData } from "./force";
 import { assertSyncSQL } from "./sync";
 import type { Client } from "pg";
 import { Fields } from "../fields";
@@ -26,7 +26,8 @@ test("force retires a single unique and adds a compound key, still rejecting oth
   const model=(compound:boolean)=>`model Mail {\n id String @id\n name String${compound?"":" @unique"} @db.VarChar(120)\n partnerId String @map("partner_id")\n${compound?' @@unique([partnerId, name])\n':''} @@map("mails")\n}`;
   assert.throws(()=>assertAdditiveEvolution(model(false),model(true)),/--force/);
   assert.doesNotThrow(()=>assertAdditiveEvolution(model(false),model(true),true));
-  assert.throws(()=>assertAdditiveEvolution(model(true),model(false),true),/índices/);
+  assert.doesNotThrow(()=>assertAdditiveEvolution(model(true),model(false),true), "the single unique now covers the compound key");
+  assert.throws(()=>assertAdditiveEvolution(model(true),model(false).replace(" @unique", ""),true),/índices/);
   const retirable=new Set(["mails_name_key"]);
   const diff='-- DropIndex\nDROP INDEX "mails_name_key";\n\n-- CreateIndex\nCREATE UNIQUE INDEX "mails_partner_id_name_key" ON "mails"("partner_id", "name");';
   assert.throws(()=>assertSyncSQL(diff),/manual/);
@@ -57,6 +58,24 @@ test("compound uniqueTogether keys are checked for duplicates before and inside 
   assert.match(forcedMigrationSQL('CREATE UNIQUE INDEX "mails_partner_id_name_key" ON "mails"("partner_id", "name");',[compound!]),/GROUP BY "partner_id", "name" HAVING count\(\*\) > 1[\s\S]*CREATE UNIQUE INDEX/);
 });
 const check={table:'vehicles',field:'plate',model:'Vehicle',maxLength:20,unique:true,required:true};
+test("manual preparation retires only installed default compound keys covered by a retained unique", () => {
+  const model = defineModel(class extends Model {
+    code = Fields.Text({ required: true, unique: true });
+    name = Fields.Text({ required: true });
+    other = Fields.Text();
+  }, { name: "Company", table: "companies" });
+  const previous = 'model Company {\n id String @id\n code String @unique\n name String @unique\n other String?\n @@unique([code, name])\n @@unique([name, other])\n @@map("companies")\n}';
+  const next = 'model Company {\n id String @id\n code String @unique\n name String\n other String?\n @@map("companies")\n}';
+  assert.deepEqual([...redundantUniqueIndexes({ models: [{ model, clientFields: ["code", "name", "other"] }] }, previous)], ["companies_code_name_key"]);
+  assert.throws(() => assertAdditiveEvolution(previous, next, true), /índices/, "non-redundant key remains protected");
+  const redundant = previous.replace(' @@unique([name, other])\n', '');
+  assert.throws(() => assertAdditiveEvolution(redundant, next), /--force/);
+  assert.doesNotThrow(() => assertAdditiveEvolution(redundant, next, true));
+  assert.throws(() => assertAdditiveEvolution(redundant.replace('@@unique([code, name])', '@@unique([code, name], map: "custom")'), next, true), /índices/);
+  assert.throws(() => assertAdditiveEvolution(redundant, next.replace('code String @unique', 'code String'), true), /índices/);
+  // This extension prepares schemas; the automated SQL flow is deliberately still strict.
+  assert.throws(() => assertSyncSQL('DROP INDEX "companies_code_name_key";', undefined, retirableUniqueIndexes({ models: [{ model, clientFields: ["code", "name", "other"] }] })), /manual/);
+});
 test("force SQL rechecks data under a write lock and preserves strict destructive SQL rejection",()=>{
   const sql=forcedMigrationSQL('ALTER TABLE "vehicles" ALTER COLUMN "plate" SET DATA TYPE VARCHAR(20);',[check]);
   assert.match(sql,/BEGIN;[\s\S]*LOCK TABLE[\s\S]*char_length[\s\S]*GROUP BY[\s\S]*IS NULL[\s\S]*ALTER TABLE[\s\S]*COMMIT;/);

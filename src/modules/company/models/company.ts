@@ -1,12 +1,12 @@
 import "server-only";
-import { displayName, Fields, Model } from "@/lib/orm";
+import { constraint, displayName, Fields, Model, ModelValidationError, type ModelContext } from "@/lib/orm";
+import { z } from "zod";
+import type { ModelTypes } from "@/types/model-types";
 
 export class Company extends Model {
-  readonly uniqueTogether = [["code", "name"]] as const;
   name = Fields.Text({
     label: "Nombre",
     required: true,
-    unique: true,
     maxLength: 120,
     tracking: true,
   });
@@ -97,5 +97,68 @@ export class Company extends Model {
   ): string {
     return [record.parent?.code ?? "", record.name].filter(Boolean).join(" · ");
   }
-  // Define aquí normalize, beforeSave y afterSave cuando tu negocio lo necesite.
+
+  normalize(values: ModelTypes["values"]) {
+    const trim = (value: unknown) => typeof value === "string" ? value.trim() : value;
+    const upper = (value: unknown) => typeof value === "string" ? value.trim().toUpperCase() : value;
+    return {
+      ...values,
+      name: upper(values.name),
+      code: upper(values.code),
+      vat: upper(values.vat),
+      email: trim(values.email),
+      phone: trim(values.phone),
+      zipNumber: trim(values.zipNumber),
+    };
+  }
+
+  @constraint("email")
+  validarCorreo(values: ModelTypes["values"]) {
+    if (values.email && !z.email().safeParse(values.email).success) {
+      throw new ModelValidationError("Revisa el correo.", { email: "Introduce un correo válido." });
+    }
+  }
+
+  @constraint("countryId", "vat", "zipNumber")
+  async validarDatosMexicanos(values: ModelTypes["values"], context: ModelContext) {
+    if (typeof values.countryId !== "string" || !values.countryId || (!values.vat && !values.zipNumber)) return;
+    // El servicio ya autorizó la referencia antes de las constraints. Esta lectura mínima
+    // sólo elige la regla de integridad; no publica datos ni exige entrada al catálogo.
+    const country = await context.tx.ubicacionesPais.findUnique({ where: { id: values.countryId }, select: { codigo: true } });
+    if (country?.codigo !== "MX") return;
+    const errors: Record<string, string> = {};
+    if (values.zipNumber && (typeof values.zipNumber !== "string" || !/^\d{5}$/.test(values.zipNumber))) {
+      errors.zipNumber = "Introduce exactamente cinco dígitos para México.";
+    }
+    if (values.vat) {
+      const vat = values.vat;
+      // Estructura y fecha, sin consulta ni certificación fiscal. Admite personas físicas y morales.
+      const match = typeof vat === "string" && /^[A-ZÑ&]{3,4}(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[A-Z0-9]{3}$/.exec(vat);
+      if (!match) errors.vat = "Introduce un RFC de 12 o 13 caracteres con estructura válida.";
+      else {
+        const year = 2000 + Number(match[1]), month = Number(match[2]), day = Number(match[3]);
+        const date = new Date(Date.UTC(year, month - 1, day));
+        if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+          errors.vat = "El RFC contiene una fecha de calendario inválida.";
+        }
+      }
+    }
+    if (Object.keys(errors).length) throw new ModelValidationError("Revisa los datos de México.", errors);
+  }
+
+  @constraint("parentId")
+  async validarJerarquia(values: ModelTypes["values"], context: ModelContext) {
+    if (typeof values.parentId !== "string" || !values.parentId) return;
+    const reject = () => {
+      throw new ModelValidationError("Revisa la empresa matriz.", {
+        parentId: "Selecciona una matriz distinta. Una empresa con sucursales no puede ser sucursal de otra.",
+      });
+    };
+    if (values.parentId === context.id) reject();
+    // Comprobación de integridad sobre todas las filas, incluso hijos ocultos por reglas.
+    // No publica datos ni sustituye la autorización de referencias del servicio.
+    const parent = await context.tx.companyCompany.findUnique({ where: { id: values.parentId }, select: { parentId: true } });
+    if (!parent || parent.parentId) reject();
+    if (context.id && await context.tx.companyCompany.findFirst({ where: { parentId: context.id }, select: { id: true } })) reject();
+  }
 }

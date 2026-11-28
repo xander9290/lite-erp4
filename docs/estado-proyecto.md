@@ -6,7 +6,171 @@ Documento de continuidad entre agentes y máquinas. Leer primero [AGENTS.md](../
 y [README](../README.md); contrastar este resumen con Git y el código relevante.
 Actualizar el estado vigente, evitando acumular una transcripción de sesiones.
 
-## Continuidad actual: Empresas y Sucursales (2026-11-27, Windows)
+## Implementación de sugerencias de Company (2026-11-27, Mac)
+
+El usuario autorizó aplicar la revisión inferior. Cierre actual en `dev/company`,
+HEAD `557fc8a` («progreso actual»), con cambios locales sin commit, incluidos
+archivos nuevos de Company, sus pruebas y la migración. Conservar todas las
+ediciones del usuario, incluido el formato actual de CompanyCompaniesCard.
+Se preservó y amplió su normalize local. Sin commit/push/pull.
+
+- Grupos Company Administrador (crud), Auxiliar (cru), Consulta (r), sólo sobre
+  company.company, sin asignar usuarios ni modificar overrides reales.
+- Identidad acordada por aplicación de la sugerencia: code obligatorio/único
+  global, name obligatorio/repetible. Retirados unique de name y uniqueTogether
+  code/name de la declaración y el esquema gestionado, mediante installModels
+  con force, sin editar hashes a mano. Código conserva maxLength 5 y mayúsculas;
+  nombre conserva maxLength 120 y la normalización del usuario.
+- Constraint de jerarquía: impide autorreferencia, matriz que ya es sucursal y
+  convertir una matriz con hijos en sucursal. Lecturas mínimas con tx para
+  comprobar todos los hijos, sin publicar sus datos; dominios y autorización del
+  servicio se conservan. Activo permanece independiente y sin cascadas.
+- Altas de sucursal desde la matriz (parentId propuesto por ModelChildCollections).
+  Tarjetas/Lista de Sucursales omiten Nuevo; su ruta de alta muestra el camino a
+  Empresas y el formulario de edición omite Nuevo por presentación. La pestaña
+  de hijos se deshabilita en una sucursal. El modelo sigue sin depender de la
+  pantalla para autorizar/guardar, y las raíces mantienen parentId opcional.
+- Correo con validación de servidor, trim de datos de contacto, RFC en mayúsculas.
+  CP/RFC mexicanos se comprueban sólo con país MX seleccionado (campos opcionales,
+  estructura/fecha sin certificación fiscal); otros países no reciben esas reglas.
+  La lectura mínima de código de país usa la tx después de autorizar la referencia,
+  sin exigir entrada directa a Ubicaciones mediante env. Prueba con env no disponible.
+- Ambas pantallas ofrecen Lista/Tarjetas, búsqueda por name/code, filtro active y
+  tarjetas con código e indicador de inactividad. Notebook companyInfo publica
+  generalInfo/branches para ocultación por grupo, corrige defaultPage, quita el
+  import FieldOne2many sin uso y usa compact/email/phone existentes.
+- Retirada dependencia sin uso de Directorio. Company conserva datos propios y
+  continúa como catálogo, sin aislamiento multiempresa. Contrato en
+  [README de Company](../src/modules/company/README.md).
+
+Migración **preparada, no aplicada**:
+`20261128032519_company_identity` (nombre UTC; fecha local 2026-11-27).
+Sólo DROP INDEX company_company_name_key y company_company_code_name_key;
+conserva company_company_code_key y todos los datos. Incluye BEGIN/COMMIT, lock,
+timeout y guardas de código. Hasta aprobar/aplicar SQL, la base todavía rechaza
+nombres repetidos. Antes de preparar, migrate status confirmó las 106 migraciones
+previas aplicadas y migrate diff no detectó drift en esta Mac.
+
+Mejora acotada del instalador: force permite preparar/instalar fuentes que retiran
+una unicidad compuesta redundante cubierta por unique simple conservado, sólo
+declaración/nombre estándar del esquema instalado. SQL compuesto sigue bloqueado
+en orm:sync y requiere revisión/aplicación manual; no se amplió el SQL automático.
+Prueba temporal comprueba ambos retiros y conservación de propiedad/ledger.
+Corregido fixture de action-references: su compilación aislada incluye tipos env
+generados, igual que eject-cli; antes fallaba con usos reales de DirectoryPartner
+y UbicacionesPais, no con el contrato de acciones que pretendía comprobar.
+
+Verificación: test:modules 93/93 antes de añadir el caso de concesiones; Company
+5/5 sobre fuentes finales; test:orm 144/144; test:orm:install 32/32;
+test:form-model 34/34; Prisma validate, TypeScript completo, ESLint focalizado y
+git diff --check aprobados sobre las fuentes finales. Build aprobado fuera del
+sandbox, con tres advertencias de rastreo de archivos en inventory/operation-lock
+del gestor de módulos (archivos sin modificar en esta tarea). El primer build se
+interrumpió tras quedarse sin progreso en sandbox. Prisma Client local regenerado,
+sin SQL aplicado. Navegador local sólo confirmó redirección
+a login; no hubo revisión visual autenticada, escrituras de prueba ni asignación
+de grupos reales.
+
+Pendientes al cierre, en orden:
+1. **Aprobación SQL pendiente.** La pregunta de aplicar
+   `20261128032519_company_identity` quedó sin respuesta; la petición de guardar
+   progreso no autoriza esa aplicación. Revisar nuevamente historial pendiente
+   antes de aplicar por el flujo manual de desarrollo. Después comprobar
+   migrate status/diff. No ejecutar producción ni reset/db push.
+2. **Company autenticado:** comprobar Empresas/Sucursales en Tarjetas y Lista,
+   búsqueda por código, filtro/indicador de inactivos, etiquetas de matriz y alta
+   de sucursales desde su matriz. Tras aplicar la migración, comprobar nombres
+   repetidos con códigos distintos y rechazo de códigos duplicados. Verificar
+   jerarquía, validación por país y Restrict al borrar una matriz con sucursales.
+   Las pruebas automatizadas anteriores no sustituyen esta revisión funcional.
+3. **Permisos reales:** verificar consulta/auxiliar/admin y páginas por grupo con
+   una sesión no admin, incluida selección de Ubicaciones sin entrada directa a
+   sus catálogos. No asignar usuarios ni alterar overrides automáticamente.
+4. **Directorio, pendiente anterior:** probar Crear contacto desde Usuarios,
+   correo duplicado y sincronización de avatar; comprobar páginas/permisos con
+   no admin. Adaptar el guardado de Perfil a core.user continúa pospuesto por
+   el usuario. No confundirlo con una regresión de Company.
+5. **Compartir entre máquinas:** código, pruebas, documentación, esquema/ledger
+   y migración siguen locales. Commit/push requieren autorización; conservar
+   también los archivos nuevos sin seguimiento al preparar ese guardado.
+
+Oportunidad independiente: acotar el rastreo de archivos de inventory/operation-lock
+del gestor de módulos. Criterio: eliminar las tres advertencias del build sin
+ocultar avisos ni perder inventario, locks, mantenimiento o rutas necesarias.
+No se implementó como parte de Company.
+
+Este guardado de continuidad sólo modifica este documento; no repite las suites,
+no consulta ni modifica BD y no ejecuta generación o migraciones. Las evidencias
+anteriores conservan su alcance y fecha. Verificación documental: git diff --check.
+
+## Antecedente: puesta al día en Mac (2026-11-27)
+
+Revisión actual: rama `dev/company`, HEAD `557fc8a` («progreso actual»), árbol
+limpio al comenzar y sin divergencia indicada respecto de la referencia local
+`origin/dev/company`; no se consultó el remoto. Ese commit ya incluye los cambios
+de Company y su tarjeta que el cierre Windows inferior describía sin commit.
+
+Contrastados AGENTS, README, continuidad, historial, registro de módulos,
+manifest/modelo/vistas de Company, extensión UserDirectory, guardado de Perfil,
+esquema Prisma y archivos generados. Están registrados core.user, Ubicaciones,
+Directorio y Empresas. Los filtros Empresas/Sucursales, nombre con código de la
+matriz y colección readonly de sucursales están en fuentes; queda comprobar su
+ejecución. Company conserva el import FieldOne2many sin uso. Los permisos de
+correos/teléfonos y páginas emails/phones de Directorio ya están declarados.
+Crear contacto y sincronizar avatar desde Usuarios usan env; Perfil sigue con
+tx.user.update directo y su adaptación permanece pospuesta.
+
+Corrección del pendiente de generación: Company es un módulo declarativo;
+`modelService` construye su repositorio con el perfil compuesto en ejecución
+(`src/lib/modules/registry.ts`), sin bindings de aplicación en src/generated/orm.
+No asumir que necesita orm:bind por cambiar @displayName. Sí quedan por verificar
+Prisma Client local, aplicación de las migraciones en esta Mac y lectura real de
+parent.code. Siguiente paso sugerido: comprobar esos requisitos locales y después
+ambas pantallas, etiquetas y apertura de sucursales en navegador.
+
+Alcance: revisión de archivos y Git; sólo se actualizó esta continuidad. Sin
+pruebas de código nuevas, navegador, consultas a BD, generación, migraciones ni
+commit/push/pull. Las verificaciones Windows inferiores son históricas y no
+acreditan el estado local de esta Mac. Verificación documental: git diff --check.
+
+## Antecedente: revisión de Company y sugerencias (2026-11-27, Mac)
+
+Análisis de fuentes solicitado por el usuario, sin implementación. Se preservó
+su edición local de Company.normalize (trim/mayúsculas de name/code). Revisados
+modelo, manifest, vistas, esquema/migraciones y contratos compartidos de acceso,
+dominios, pantallas, Notebook y colecciones readonly. Sin pruebas nuevas ni BD o
+navegador; los comportamientos siguientes se deducen del código.
+
+Prioridades propuestas, pendientes de decisión:
+- Declarar grupos y permisos de Company: no tiene groups/access; el contrato
+  vigente exige grupo explícito para entrada directa de usuarios no admin.
+- Completar la regla matriz→sucursal: el dominio limita la matriz elegida, pero
+  falta rechazar que una empresa con sucursales pase a depender de otra raíz.
+  Aceptación: no generar un tercer nivel al modificar una matriz existente.
+- Definir unicidad: name y code son únicos individualmente, por lo que
+  uniqueTogether(code,name) es redundante. Decidir si nombres/códigos de
+  sucursal deben poder repetirse entre matrices antes de cambiar índices.
+- Resolver Nuevo desde Sucursales: parentId opcional permite guardar una raíz
+  fuera del filtro de esa pantalla. Crear desde la matriz ya propone parentId;
+  acordar el flujo de alta directa sin tratar el dominio de pantalla como constraint.
+- Validar/normalizar correo, RFC y CP según países y caso de negocio; publicar
+  code/active en colecciones para búsqueda y consulta de inactivos, sin ocultarlos
+  automáticamente. Definir qué implica desactivar una matriz.
+- Aclarar uso de Directorio: Company declara la dependencia pero no usa sus
+  modelos. Elegir datos propios o vínculo explícito con un contacto, evitando
+  duplicar fuentes o sincronización sin reglas. El catálogo Company actual no
+  implementa selección de empresa ni aislamiento de datos multiempresa.
+- Ajustes pequeños: defaultPage generalInfo no coincide con generalInfoPage
+  (hoy cae en la primera página); quitar import FieldOne2many sin uso. Si se
+  requiere ocultación de pestañas por grupo, añadir id de Notebook y pages en
+  manifest. No es necesario para el funcionamiento básico.
+
+Simplificación propuesta: eliminar la restricción compuesta redundante sólo
+después de acordar la identidad; criterio: misma protección de unicidad elegida,
+con menos índices y declaraciones. No se preparó ni aplicó SQL. La siguiente
+implementación debe partir de las decisiones de acceso, jerarquía e identidad.
+
+## Cierre anterior: Empresas y Sucursales (2026-11-27, Windows)
 
 Cierre de sesión: rama `dev/company`, HEAD `cf8922a`, con cambios locales sin
 commit en AGENTS, esta continuidad y manifest/modelo/formulario de Company;
@@ -31,8 +195,10 @@ Avance en fuentes:
   modelo se presenta así; `fields` no es una prop de ese componente.
 
 Pendientes al retomar:
-1. Comprobar generación/binding de la nueva dependencia parent.code y aplicación
-   de las tres migraciones Company en esta base; no se ejecutaron aquí.
+1. Comprobar Prisma Client local, lectura de la nueva dependencia parent.code y
+   aplicación de las tres migraciones Company en esta base; no se ejecutaron aquí.
+   La revisión Mac superior aclara que el repositorio declarativo se construye
+   en ejecución, sin orm:bind.
 2. Revisar en navegador ambas pantallas, etiquetas y apertura de sucursales desde
    el formulario de la matriz. No se confirmó persistencia ni desaparición del
    error de la captura.

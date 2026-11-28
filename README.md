@@ -53,6 +53,10 @@ catálogos de etiquetas y actividades empresariales, formulario personalizado,
 Tarjetas y Lista, y dirección completa al guardar;
 avance, verificaciones y pendientes de comprobación en
 [continuidad](docs/estado-proyecto.md). Ubicaciones mantiene País/Estado/Municipio/Localidad.
+Empresas (`company`) administra matrices y sucursales, con código único, datos de
+contacto propios, Tarjetas/Lista y grupos de consulta/edición/administración.
+Su [guía y migración de identidad](src/modules/company/README.md) detallan las
+reglas y el alcance actual; todavía es un catálogo sin aislamiento multiempresa.
 
 La transición conserva contactos antiguos como archivo histórico y prepara una
 migración que copia el perfil a users. Antes de ejecutar esta versión contra una
